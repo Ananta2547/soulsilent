@@ -1,0 +1,31 @@
+name = "soulsilent"
+main = ".open-next/worker.js"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
+
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "soulsilent"
+database_id = "78ed04be-4e8e-4b38-864d-dd899c987106"
+
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "soulsilent-media"
+
+# Non-secret vars only. Secrets are managed via `wrangler secret put`:
+#   - JWT_SECRET            (set as secret)
+#   - STRIPE_SECRET_KEY     (set as secret)
+# Still pending (set when ready):
+#   - STRIPE_WEBHOOK_SECRET (wrangler secret put STRIPE_WEBHOOK_SECRET)
+#   - GOOGLE_CLIENT_SECRET  (wrangler secret put GOOGLE_CLIENT_SECRET)
+#   - RESEND_API_KEY        (wrangler secret put RESEND_API_KEY)
+[vars]
+GOOGLE_CLIENT_ID = "798833181382-0sf30qcflhmpo6sepoke9i8ojab71fbp.apps.googleusercontent.com"
+SITE_URL = "https://soulsilent.soulsilent-official.workers.dev"
+# Verified Resend "from" address. Until your domain is verified you can use
+# "onboarding@resend.dev" (Resend's shared sandbox sender).
+EMAIL_FROM = "soulsilent <onboarding@resend.dev>"

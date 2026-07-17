@@ -1,0 +1,1506 @@
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import type { Workshop, Location, Review } from '@/lib/types';
+import { useLang, T, tr } from '@/lib/i18n';
+import { Reveal } from '@/components/design/Reveal';
+import { Btn } from '@/components/design/RippleButton';
+import { Cloud, WaveLine, Star } from '@/components/design/Doodles';
+import { Countdown } from '@/components/design/Countdown';
+import { BookingModal, type BookingResult } from '@/components/workshops/BookingModal';
+import { ReviewModal } from '@/components/workshops/ReviewModal';
+import { AnnounceCountdown } from '@/components/workshops/AnnounceCountdown';
+import { ApplicationConsentModal } from '@/components/workshops/ApplicationConsentModal';
+import { fmtDateTime, sqliteToMs } from '@/lib/datetime';
+import {
+  getEffectivePrice,
+  safeParseArray,
+  parseSchedule,
+  parseMapCoords,
+  coordsToEmbedSrc,
+  isShortMapLink,
+  hasWorkshopEnded,
+  isWorkshopOngoing,
+  getWorkshopDays,
+} from '@/lib/workshop-utils';
+import { visibleAppStatus } from '@/lib/selection-status';
+
+type UserBooking = {
+  id: string;
+  status: string;
+  payment_status: string;
+  expires_at: string | null;
+  app_status: string | null;
+  application_json: string | null;
+};
+type Instructor = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  avatar_url: string | null;
+  portfolio_id: string | null;
+};
+
+export default function WorkshopDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { lang } = useLang();
+  const [workshop, setWorkshop] = useState<Workshop | null>(null);
+  const [location, setLocation] = useState<Location | null>(null);
+  const [instructor, setInstructor] = useState<Instructor | null>(null);
+  const [bookingCount, setBookingCount] = useState(0);
+  const [userBooking, setUserBooking] = useState<UserBooking | null>(null);
+  const [userAttended, setUserAttended] = useState(false);
+  const [userReview, setUserReview] = useState<Review | null>(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [consentOpen, setConsentOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [booking, setBooking] = useState(false);
+  const [bookingOpen, setBookingOpen] = useState(false);
+  const [openDays, setOpenDays] = useState<number[]>([0]);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/workshops/${id}`);
+      const data = (await res.json()) as {
+        workshop: Workshop;
+        location: Location | null;
+        instructor: Instructor | null;
+        bookingCount: number;
+        userBooking: UserBooking | null;
+        userAttended?: boolean;
+        userReview?: Review | null;
+      };
+      setWorkshop(data.workshop);
+      setLocation(data.location);
+      setInstructor(data.instructor);
+      setBookingCount(data.bookingCount || 0);
+      setUserBooking(data.userBooking);
+      setUserAttended(!!data.userAttended);
+      setUserReview(data.userReview || null);
+    } catch {}
+    setLoading(false);
+  }, [id]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // When Stripe redirects back with ?session_id=..., verify the payment
+  // server-side, then strip the query param and refetch. This is the path
+  // that works without webhook delivery (local dev, or before live mode
+  // webhook is configured).
+  useEffect(() => {
+    const sessionId = searchParams.get('session_id');
+    if (!sessionId) return;
+    (async () => {
+      try {
+        await fetch('/api/payments/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId }),
+        });
+      } catch {}
+      // Clean the URL so a refresh doesn't re-verify
+      router.replace(`/workshops/${id}`);
+      load();
+    })();
+  }, [searchParams, router, id, load]);
+
+  async function handleBooking(application?: unknown): Promise<BookingResult> {
+    setBooking(true);
+    try {
+      const res = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workshop_id: id, application }),
+      });
+      const data = (await res.json()) as BookingResult;
+      if (!res.ok) {
+        setBooking(false);
+        return { error: data.error || tr(lang, 'เกิดข้อผิดพลาด', 'Something went wrong') };
+      }
+      // The modal renders the right popup / redirect from the result.
+      return data;
+    } catch {
+      setBooking(false);
+      return { error: tr(lang, 'เกิดข้อผิดพลาด', 'Something went wrong') };
+    }
+  }
+
+  // Resume a submitted-but-unpaid booking (user abandoned checkout earlier).
+  async function resumePayment() {
+    if (!userBooking) return;
+    setBooking(true);
+    try {
+      const res = await fetch(`/api/bookings/${userBooking.id}/pay`, { method: 'POST' });
+      const data = (await res.json()) as { checkoutUrl?: string; error?: string };
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      } else {
+        alert(data.error || tr(lang, 'เกิดข้อผิดพลาด', 'Something went wrong'));
+        setBooking(false);
+      }
+    } catch {
+      alert(tr(lang, 'เกิดข้อผิดพลาด', 'Something went wrong'));
+      setBooking(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '120px 32px', textAlign: 'center' }}>
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            border: '2px solid var(--teal)',
+            borderTopColor: 'transparent',
+            borderRadius: '50%',
+            margin: '0 auto',
+            animation: 'float 1s linear infinite',
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (!workshop) {
+    return (
+      <div style={{ maxWidth: 800, margin: '0 auto', padding: '120px 32px', textAlign: 'center' }}>
+        <p style={{ color: 'var(--muted)', fontSize: 18, marginBottom: 16 }}>
+          {tr(lang, 'ไม่พบ Workshop นี้', 'Workshop not found')}
+        </p>
+        <Btn kind="teal" href="/workshops">
+          {tr(lang, 'กลับไปหน้ารวม', 'Back to all events')}
+        </Btn>
+      </div>
+    );
+  }
+
+  const spotsLeft = workshop.max_participants - bookingCount;
+  const scheduleDays = parseSchedule(workshop.schedule_json);
+  const learnItems = safeParseArray<string>(workshop.learn_json, []);
+  const locationLabel = location
+    ? `${location.name}, ${location.subdistrict}, ${location.district}, ${location.province}`
+    : workshop.location;
+
+  // Workshop date(s) — formatted per scheduling type.
+  const fmtFullDate = (d: string) =>
+    new Date(d + 'T00:00:00').toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-GB', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  const partDates = safeParseArray<string>(workshop.dates_json, []);
+  const workshopType = workshop.workshop_type || 'one_day';
+
+  return (
+    <>
+      {/* Hero */}
+      <section className="section" style={{ paddingTop: 32, paddingBottom: 32, position: 'relative', overflow: 'hidden' }}>
+        <div className="container">
+          <Link
+            href="/workshops"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 13,
+              color: 'var(--muted)',
+              textDecoration: 'none',
+              marginBottom: 24,
+            }}
+          >
+            <span className="mono">←</span> {tr(lang, 'กลับไปหน้ารวมกิจกรรม', 'All events')}
+          </Link>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 48 }} className="ws-detail-grid">
+            <Reveal>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
+                {hasWorkshopEnded(workshop) ? (
+                  <span className="tag" style={{ background: 'var(--cream-deep)', color: 'var(--muted)' }}>{tr(lang, 'ปิดรับ', 'Closed')}</span>
+                ) : workshop.status === 'cancelled' ? (
+                  <span className="tag" style={{ background: '#fde7d3', color: '#a04a14' }}>{tr(lang, 'ยกเลิก', 'Cancelled')}</span>
+                ) : (
+                  <span className="tag tag-accent">{tr(lang, 'เปิดจอง', 'Open')}</span>
+                )}
+                <span className="tag">Workshop · Onsite</span>
+              </div>
+              <h1
+                className="display-th"
+                style={{
+                  fontSize: 'clamp(34px, 5.5vw, 68px)',
+                  margin: '0 0 18px',
+                  lineHeight: 1.05,
+                }}
+              >
+                {workshop.title}
+              </h1>
+              {workshop.short_description && (
+                <p
+                  style={{
+                    fontSize: 'clamp(15px, 1.3vw, 18px)',
+                    color: 'var(--muted)',
+                    margin: 0,
+                    lineHeight: 1.65,
+                    maxWidth: 580,
+                  }}
+                >
+                  {workshop.short_description}
+                </p>
+              )}
+            </Reveal>
+
+            <Reveal variant="reveal-right">
+              <div
+                className="ph ph-teal-100"
+                style={{ aspectRatio: '297 / 420', maxWidth: 360, marginLeft: 'auto', borderRadius: 22, position: 'relative', overflow: 'hidden' }}
+              >
+                {workshop.image_url ? (
+                  <img
+                    src={workshop.image_url}
+                    alt={workshop.title}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <>
+                    <Cloud
+                      color="var(--teal)"
+                      stroke={3}
+                      style={{ position: 'absolute', top: 24, right: 24, width: 88, height: 56 }}
+                    />
+                    <WaveLine
+                      color="var(--teal-200)"
+                      stroke={2.5}
+                      style={{ position: 'absolute', bottom: 24, left: 24, right: 24, width: 'calc(100% - 48px)', height: 36 }}
+                      count={2}
+                    />
+                  </>
+                )}
+              </div>
+            </Reveal>
+          </div>
+        </div>
+      </section>
+
+      {/* Content + sticky booking */}
+      <section className="section" style={{ paddingTop: 0, paddingBottom: 96 }}>
+        <div className="container">
+          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 48 }} className="ws-detail-grid">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 48 }}>
+              {workshop.description && (
+                <Reveal>
+                  <p
+                    style={{
+                      fontSize: 'clamp(15px, 1.2vw, 17px)',
+                      lineHeight: 1.8,
+                      color: 'var(--ink)',
+                      whiteSpace: 'pre-wrap',
+                      margin: 0,
+                    }}
+                  >
+                    {workshop.description}
+                  </p>
+                </Reveal>
+              )}
+
+              {/* Workshop date(s) */}
+              <Reveal>
+                <span className="eyebrow">
+                  <T th="กำหนดการ" en="when" />
+                </span>
+                <h2 className="display-th" style={{ fontSize: 'clamp(28px, 3.5vw, 40px)', margin: '14px 0 20px' }}>
+                  <T th="วันที่จัดกิจกรรม" en="Workshop dates" />
+                </h2>
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'flex-start',
+                    gap: 16,
+                    maxWidth: '100%',
+                  }}
+                >
+                  <span style={{ fontSize: 24, lineHeight: 1, marginTop: 2 }}>📅</span>
+                  <div style={{ minWidth: 0 }}>
+                    {workshopType === 'multi_day' && workshop.end_date ? (
+                      <>
+                        <div style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--teal-deep)', marginBottom: 4 }}>
+                          {tr(lang, 'จัดต่อเนื่อง', 'Consecutive days')}
+                        </div>
+                        <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink)', lineHeight: 1.5 }}>
+                          {fmtFullDate(workshop.date)}
+                          <span style={{ color: 'var(--muted)', margin: '0 8px' }}>→</span>
+                          {fmtFullDate(workshop.end_date)}
+                        </div>
+                      </>
+                    ) : workshopType === 'multi_part' && partDates.length > 0 ? (
+                      <>
+                        <div style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--teal-deep)', marginBottom: 6 }}>
+                          {tr(lang, `แบ่งเป็น ${partDates.length} วัน`, `${partDates.length} sessions`)}
+                        </div>
+                        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {partDates.map((d, idx) => (
+                            <li key={d} style={{ fontSize: 15.5, fontWeight: 600, color: 'var(--ink)', display: 'flex', gap: 8 }}>
+                              <span className="mono" style={{ color: 'var(--teal)', fontWeight: 500 }}>
+                                {String(idx + 1).padStart(2, '0')}
+                              </span>
+                              {fmtFullDate(d)}
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--teal-deep)', marginBottom: 4 }}>
+                          {tr(lang, 'จัดวันเดียว', 'One day')}
+                        </div>
+                        <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink)', lineHeight: 1.5 }}>
+                          {fmtFullDate(workshop.date)}
+                        </div>
+                      </>
+                    )}
+                    <div style={{ fontSize: 13.5, color: 'var(--muted)', marginTop: 8 }}>
+                      {tr(lang, 'เวลา', 'Time')} {workshop.time_start}–{workshop.time_end} {tr(lang, 'น.', '')}
+                    </div>
+                    {workshop.admission_type === 'selection' && workshop.announce_at && (
+                      <div style={{ fontSize: 13.5, color: 'var(--teal-deep)', marginTop: 6, fontWeight: 600 }}>
+                        📣 {tr(lang, 'ประกาศผลคัดเลือก', 'Results announced')}: {fmtDateTime(workshop.announce_at, lang, 'long')}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </Reveal>
+
+              {/* Learn */}
+              {learnItems.length > 0 && (
+                <Reveal>
+                  <span className="eyebrow">
+                    <T th="ที่คุณจะได้กลับไป" en="what you'll take back" />
+                  </span>
+                  <h2 className="display-th" style={{ fontSize: 'clamp(28px, 3.5vw, 40px)', margin: '14px 0 24px' }}>
+                    <T th="สิ่งที่คุณจะได้เรียนรู้" en="What you'll learn" />
+                  </h2>
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    {learnItems.map((item, idx) => (
+                      <li key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+                        <Star
+                          color="var(--accent)"
+                          style={{ width: 22, height: 22, flexShrink: 0, marginTop: 2 }}
+                        />
+                        <span style={{ fontSize: 16, lineHeight: 1.6, color: 'var(--ink)' }}>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </Reveal>
+              )}
+
+              {/* Timeline — accordion: days listed, click to expand activities */}
+              {scheduleDays.length > 0 && (() => {
+                const dayLabel = (d: { label: string }, i: number) =>
+                  d.label.trim() || tr(lang, `วันที่ ${i + 1}`, `Day ${i + 1}`);
+                const multi = scheduleDays.length > 1;
+                const toggleDay = (i: number) =>
+                  setOpenDays((prev) =>
+                    prev.includes(i) ? prev.filter((x) => x !== i) : [...prev, i],
+                  );
+
+                const renderItems = (items: { time: string; detail: string }[]) => (
+                  <ol
+                    style={{
+                      listStyle: 'none',
+                      padding: '0 0 0 24px',
+                      margin: 0,
+                      borderLeft: '2px dashed var(--teal-200)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 28,
+                    }}
+                  >
+                    {items.map((item, idx) => (
+                      <li key={idx} style={{ position: 'relative' }}>
+                        <span
+                          style={{
+                            position: 'absolute',
+                            left: -33,
+                            top: 4,
+                            width: 16,
+                            height: 16,
+                            borderRadius: '50%',
+                            background: 'var(--teal)',
+                            boxShadow: '0 0 0 4px var(--paper)',
+                          }}
+                        />
+                        <div
+                          className="mono"
+                          style={{
+                            fontSize: 12,
+                            color: 'var(--teal)',
+                            fontWeight: 600,
+                            letterSpacing: '.06em',
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          {item.time || '—'}
+                        </div>
+                        <p style={{ fontSize: 16, lineHeight: 1.6, color: 'var(--ink)', margin: '4px 0 0' }}>
+                          {item.detail}
+                        </p>
+                      </li>
+                    ))}
+                  </ol>
+                );
+
+                return (
+                  <Reveal>
+                    <span className="eyebrow">
+                      <T th="ตารางวันนั้น" en="that day's schedule" />
+                    </span>
+                    <h2 className="display-th" style={{ fontSize: 'clamp(28px, 3.5vw, 40px)', margin: '14px 0 24px' }}>
+                      <T th="ตารางกิจกรรม" en="Timeline" />
+                    </h2>
+
+                    {!multi ? (
+                      renderItems(scheduleDays[0].items)
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        {scheduleDays.map((d, i) => {
+                          const open = openDays.includes(i);
+                          return (
+                            <div
+                              key={i}
+                              style={{
+                                borderRadius: 16,
+                                boxShadow: 'inset 0 0 0 1px var(--cream-deep)',
+                                overflow: 'hidden',
+                                background: open ? 'var(--paper)' : 'transparent',
+                              }}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => toggleDay(i)}
+                                aria-expanded={open}
+                                style={{
+                                  width: '100%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: 12,
+                                  padding: '16px 20px',
+                                  background: 'none',
+                                  border: 0,
+                                  cursor: 'pointer',
+                                  textAlign: 'left',
+                                }}
+                              >
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                                  <span
+                                    className="mono"
+                                    style={{ fontSize: 13, fontWeight: 600, color: 'var(--teal)' }}
+                                  >
+                                    {String(i + 1).padStart(2, '0')}
+                                  </span>
+                                  <span style={{ fontSize: 16.5, fontWeight: 600, color: 'var(--ink)' }}>
+                                    {dayLabel(d, i)}
+                                  </span>
+                                  <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>
+                                    · {d.items.length} {tr(lang, 'กิจกรรม', 'items')}
+                                  </span>
+                                </span>
+                                <span
+                                  aria-hidden
+                                  style={{
+                                    fontSize: 13,
+                                    color: 'var(--teal)',
+                                    transform: open ? 'rotate(180deg)' : 'none',
+                                    transition: 'transform .2s ease',
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  ▼
+                                </span>
+                              </button>
+                              {open && (
+                                <div style={{ padding: '4px 20px 22px' }}>
+                                  {d.items.length > 0 ? (
+                                    renderItems(d.items)
+                                  ) : (
+                                    <p style={{ fontSize: 14, color: 'var(--muted)', margin: 0 }}>
+                                      {tr(lang, 'ยังไม่มีรายละเอียดสำหรับวันนี้', 'No schedule for this day yet')}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </Reveal>
+                );
+              })()}
+
+              {/* Instructor / Facilitator */}
+              {instructor && (
+                <Reveal>
+                  <span className="eyebrow">
+                    <T th="ผู้นำกิจกรรม" en="facilitator" />
+                  </span>
+                  <h2
+                    className="display-th"
+                    style={{ fontSize: 'clamp(28px, 3.5vw, 40px)', margin: '14px 0 24px' }}
+                  >
+                    <T th="คนที่จะอยู่กับคุณทั้งวัน" en="Who'll be with you all day" />
+                  </h2>
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 24,
+                      alignItems: 'flex-start',
+                      padding: 24,
+                      borderRadius: 22,
+                      background: 'var(--paper)',
+                      boxShadow: 'inset 0 0 0 1px var(--cream-deep)',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 96,
+                        height: 96,
+                        borderRadius: 18,
+                        background: 'var(--teal-50)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {instructor.avatar_url ? (
+                        <img
+                          src={instructor.avatar_url}
+                          alt={instructor.name}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      ) : (
+                        <span
+                          style={{
+                            fontFamily: 'Mitr, sans-serif',
+                            fontSize: 44,
+                            fontWeight: 500,
+                            color: 'var(--teal-deep)',
+                          }}
+                        >
+                          {instructor.name[0]?.toUpperCase() || '?'}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 220 }}>
+                      <div
+                        className="mono"
+                        style={{
+                          fontSize: 11,
+                          color: 'var(--muted)',
+                          letterSpacing: '.12em',
+                          textTransform: 'uppercase',
+                          marginBottom: 6,
+                        }}
+                      >
+                        {instructor.role === 'teacher'
+                          ? tr(lang, 'ผู้สอน · LEAD FACILITATOR', 'instructor · lead facilitator')
+                          : instructor.role === 'admin'
+                            ? tr(lang, 'ผู้ก่อตั้ง & LEAD FACILITATOR', 'founder & lead facilitator')
+                            : tr(lang, 'ผู้ดูแลกิจกรรม', 'host')}
+                      </div>
+                      <h3
+                        className="display-th"
+                        style={{ fontSize: 22, margin: '0 0 10px', lineHeight: 1.25 }}
+                      >
+                        {instructor.name}
+                      </h3>
+                      <p
+                        style={{
+                          fontSize: 14.5,
+                          color: 'var(--muted)',
+                          lineHeight: 1.65,
+                          margin: '0 0 14px',
+                        }}
+                      >
+                        <T
+                          th="ผู้ที่ออกแบบและนำกิจกรรมนี้ — เตรียมพื้นที่ให้คุณได้เรียนรู้แบบสบาย ๆ"
+                          en="Designs and leads this workshop — creating space for unhurried learning"
+                        />
+                      </p>
+                      {instructor.portfolio_id && (
+                        <Link
+                          href={`/p/${instructor.portfolio_id}`}
+                          style={{
+                            color: 'var(--teal)',
+                            fontWeight: 600,
+                            fontSize: 14,
+                            textDecoration: 'none',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                          }}
+                        >
+                          <T
+                            th="ดูผลงานของผู้สอน"
+                            en="See the facilitator's portfolio"
+                          />{' '}
+                          <span className="mono">→</span>
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                </Reveal>
+              )}
+
+              {/* How to find us — map + address */}
+              {locationLabel && (
+                <Reveal>
+                  <span className="eyebrow">
+                    <T th="สถานที่ · แผนที่" en="location + map" />
+                  </span>
+                  <h2
+                    className="display-th"
+                    style={{ fontSize: 'clamp(28px, 3.5vw, 40px)', margin: '14px 0 8px' }}
+                  >
+                    <T th="วิธีมาหาเรา" en="How to find us" />
+                  </h2>
+                  <p
+                    style={{
+                      fontSize: 14.5,
+                      color: 'var(--muted)',
+                      margin: '0 0 20px',
+                      maxWidth: 600,
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    <T
+                      th="แผนที่ของเรา · กดปุ่ม Google Maps เพื่อเปิดดูเส้นทาง landmark ระหว่างทาง"
+                      en="Our location · tap Google Maps to see directions and landmarks along the way"
+                    />
+                  </p>
+
+                  <FindUs
+                    locationLabel={locationLabel}
+                    /* Prefer the map link from the linked location master-data;
+                       fall back to the (legacy) per-workshop override if set. */
+                    mapUrl={location?.map_url ?? workshop.map_url}
+                    location={location}
+                  />
+                </Reveal>
+              )}
+            </div>
+
+            {/* Sticky booking card */}
+            <div>
+              <div
+                style={{
+                  position: 'sticky',
+                  top: 100,
+                  background: 'var(--paper)',
+                  borderRadius: 24,
+                  padding: 32,
+                  boxShadow: '0 12px 40px -16px rgba(13,30,29,.15)',
+                }}
+              >
+                <BookingCardContent
+                  workshop={workshop}
+                  spotsLeft={spotsLeft}
+                  bookingCount={bookingCount}
+                  userBooking={userBooking}
+                  userAttended={userAttended}
+                  userReview={userReview}
+                  booking={booking}
+                  onBook={() => setBookingOpen(true)}
+                  onResume={resumePayment}
+                  onReview={() => setReviewOpen(true)}
+                  onViewApplication={() => setConsentOpen(true)}
+                  lang={lang}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <style jsx>{`
+        @media (max-width: 920px) {
+          .ws-detail-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
+
+      {bookingOpen && (
+        <BookingModal
+          onClose={() => setBookingOpen(false)}
+          workshop={workshop}
+          submitting={booking}
+          onSubmit={(application) => handleBooking(application)}
+        />
+      )}
+
+      {reviewOpen && (
+        <ReviewModal
+          workshopId={workshop.id}
+          workshopTitle={workshop.title}
+          initial={null}
+          onClose={() => setReviewOpen(false)}
+          onSaved={(review) => {
+            setUserReview(review);
+            setReviewOpen(false);
+          }}
+        />
+      )}
+
+      {consentOpen && userBooking && (
+        <ApplicationConsentModal
+          bookingId={userBooking.id}
+          applicationJson={userBooking.application_json}
+          workshopTitle={workshop.title}
+          requireConsent={workshop.require_consent === 1}
+          onClose={() => setConsentOpen(false)}
+          onSaved={(consent) => {
+            // Reflect the new consent locally so re-opening shows the saved value.
+            setUserBooking((prev) => {
+              if (!prev) return prev;
+              let app: Record<string, unknown> = {};
+              try { app = prev.application_json ? JSON.parse(prev.application_json) : {}; } catch { app = {}; }
+              app.consent = { photoVideo: consent, label: consent === 'granted' ? 'ยินยอม' : 'ไม่ยินยอม' };
+              return { ...prev, application_json: JSON.stringify(app) };
+            });
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+function BookingCardContent({
+  workshop,
+  spotsLeft,
+  bookingCount,
+  userBooking,
+  userAttended,
+  userReview,
+  booking,
+  onBook,
+  onResume,
+  onReview,
+  onViewApplication,
+  lang,
+}: {
+  workshop: Workshop;
+  spotsLeft: number;
+  bookingCount: number;
+  userBooking: UserBooking | null;
+  userAttended: boolean;
+  userReview: Review | null;
+  booking: boolean;
+  onBook: () => void;
+  onResume: () => void;
+  onReview: () => void;
+  onViewApplication: () => void;
+  lang: 'th' | 'en';
+}) {
+  const [saved, setSaved] = useState(false);
+  const eff = getEffectivePrice(workshop);
+  // Show "Free" when the payment model is free OR the effective price is ฿0.
+  const isFree = (workshop.payment_type || 'paid') === 'free' || eff.price <= 0;
+  const pct =
+    workshop.max_participants > 0
+      ? Math.round((bookingCount / workshop.max_participants) * 100)
+      : 0;
+  const lowSeats = spotsLeft > 0 && spotsLeft <= 4;
+  const isSelection = workshop.admission_type === 'selection';
+  const paymentType = workshop.payment_type || 'paid';
+  // Event finished → block any new booking.
+  const ended = hasWorkshopEnded(workshop);
+  // Currently taking place (start → last day's end) — multi-day aware.
+  const ongoing = isWorkshopOngoing(workshop);
+  const wsDays = getWorkshopDays(workshop);
+  const lastDay = wsDays[wsDays.length - 1] || workshop.date;
+  // Selection result the user is allowed to see (masked until announcement).
+  const visStatus = userBooking ? visibleAppStatus(workshop, userBooking.app_status ?? 'applied') : null;
+  const isRejected = isSelection && visStatus === 'rejected';
+  // Selection accepts applications beyond capacity (waitlist), so the "sold
+  // out" gate only applies to direct booking.
+  const soldOut = !isSelection && spotsLeft <= 0;
+  // A live selection application this user already submitted (track, don't re-apply).
+  const hasApplied =
+    isSelection &&
+    !!userBooking &&
+    userBooking.payment_status !== 'paid' &&
+    userBooking.status !== 'confirmed' &&
+    visStatus !== 'rejected';
+  const isPaid = !!userBooking && userBooking.payment_status === 'paid';
+  // Has a secured seat (paid or confirmed) — eligible to view the application.
+  const booked = !!userBooking && (userBooking.payment_status === 'paid' || userBooking.status === 'confirmed');
+  // A pending booking with an expires_at in the future = user has a live hold
+  const hasLiveHold =
+    !!userBooking &&
+    !isPaid &&
+    !!userBooking.expires_at &&
+    sqliteToMs(userBooking.expires_at) > Date.now();
+  // Direct booking submitted but not paid (incl. abandoned checkout / expired
+  // hold) → let the user resume payment instead of re-applying.
+  const owesPayment =
+    !isSelection &&
+    !!userBooking &&
+    userBooking.payment_status === 'pending' &&
+    userBooking.status !== 'cancelled' &&
+    paymentType !== 'free';
+
+  return (
+    <>
+      {/* Price */}
+      <div
+        className="mono"
+        style={{
+          fontSize: 10.5,
+          letterSpacing: '.12em',
+          textTransform: 'uppercase',
+          color: 'var(--muted)',
+        }}
+      >
+        {isFree ? tr(lang, 'ค่าเข้าร่วม', 'Entry') : tr(lang, 'ราคา / ที่นั่ง', 'Per seat')}
+      </div>
+
+      {isFree ? (
+        <div style={{ fontFamily: 'Archivo Black', fontSize: 'clamp(36px, 4vw, 42px)', color: 'var(--teal)', letterSpacing: '-.02em', lineHeight: 1, margin: '4px 0 6px' }}>
+          {tr(lang, 'ฟรี', 'Free')}
+        </div>
+      ) : eff.isPromo ? (
+        <div style={{ marginTop: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+            <span
+              style={{
+                fontFamily: 'Archivo Black',
+                fontSize: 'clamp(36px, 4vw, 42px)',
+                color: 'var(--teal)',
+                letterSpacing: '-.02em',
+                lineHeight: 1,
+              }}
+            >
+              ฿{eff.price.toLocaleString()}
+            </span>
+            <span
+              style={{
+                fontSize: 16,
+                color: 'var(--muted)',
+                textDecoration: 'line-through',
+              }}
+            >
+              ฿{eff.originalPrice.toLocaleString()}
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div
+          style={{
+            fontFamily: 'Archivo Black',
+            fontSize: 'clamp(36px, 4vw, 42px)',
+            color: 'var(--ink)',
+            letterSpacing: '-.02em',
+            lineHeight: 1,
+            margin: '4px 0 6px',
+          }}
+        >
+          ฿{eff.price.toLocaleString()}
+        </div>
+      )}
+
+      {paymentType === 'deposit' && (
+        <div style={{ fontSize: 12.5, color: 'var(--teal-deep)', margin: '0 0 6px', fontWeight: 600 }}>
+          {tr(lang, `มัดจำ ฿${(workshop.deposit_amount || 0).toLocaleString()} · คืนได้วันงาน (โอนเท่านั้น)`, `Deposit ฿${(workshop.deposit_amount || 0).toLocaleString()} · refundable on event day (transfer only)`)}
+        </div>
+      )}
+
+      {workshop.short_description && (
+        <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '6px 0 22px', lineHeight: 1.5 }}>
+          {workshop.short_description}
+        </p>
+      )}
+
+      {/* Seat progress */}
+      <div style={{ marginBottom: 18 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            fontSize: 12,
+            marginBottom: 8,
+          }}
+        >
+          <span
+            className="mono"
+            style={{
+              color: 'var(--muted)',
+              letterSpacing: '.06em',
+              textTransform: 'uppercase',
+            }}
+          >
+            {isSelection ? tr(lang, 'ที่นั่งทั้งหมด', 'Total seats') : tr(lang, 'ที่นั่งที่จองแล้ว', 'Booked')}
+          </span>
+          <span style={{ fontWeight: 600, color: 'var(--ink)' }}>
+            {bookingCount}/{workshop.max_participants}
+          </span>
+        </div>
+        <div
+          style={{
+            height: 8,
+            borderRadius: 99,
+            background: 'var(--cream)',
+            overflow: 'hidden',
+          }}
+        >
+          <div
+            style={{
+              height: '100%',
+              width: `${Math.min(100, pct)}%`,
+              background: pct >= 80 ? '#e25c3b' : 'var(--teal)',
+              borderRadius: 99,
+              transition: 'width 1s ease',
+            }}
+          />
+        </div>
+        {lowSeats && (
+          <div
+            style={{
+              fontSize: 12.5,
+              color: '#a04a14',
+              marginTop: 10,
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+            }}
+          >
+            ⚠ {tr(lang, `เหลือเพียง ${spotsLeft} ที่นั่ง`, `Only ${spotsLeft} seats left`)}
+          </div>
+        )}
+      </div>
+
+      {/* Announcement date + countdown for selection workshops */}
+      {isSelection && workshop.announce_at && !isRejected && !ended && (
+        <div style={{ marginBottom: 14 }}>
+          <AnnounceCountdown
+            announceAt={workshop.announce_at}
+            heading={
+              hasApplied
+                ? tr(lang, 'คุณสมัครแล้ว — รอประกาศผลวันที่', "You've applied — results on")
+                : tr(lang, 'ประกาศผลคัดเลือก', 'Results announcement')
+            }
+          />
+        </div>
+      )}
+
+      {/* Primary action */}
+      {ended ? (
+        userAttended ? (
+          userReview ? (
+            // A review is one-time and immutable — show it read-only, no edit.
+            <div
+              style={{
+                background: 'var(--cream)',
+                borderRadius: 16,
+                padding: '16px 18px',
+                border: '1px solid var(--cream-deep)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+                <span className="mono" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '.1em', textTransform: 'uppercase' }}>
+                  {tr(lang, 'รีวิวของคุณ', 'Your review')}
+                </span>
+                <span style={{ color: '#f5b301', letterSpacing: 2, fontSize: 15 }}>
+                  {'★'.repeat(userReview.rating)}
+                  <span style={{ color: 'var(--cream-deep)' }}>{'★'.repeat(5 - userReview.rating)}</span>
+                </span>
+              </div>
+              {userReview.comment && (
+                <p style={{ fontSize: 13.5, color: 'var(--ink)', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>
+                  {userReview.comment}
+                </p>
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onReview}
+              className="btn btn-teal"
+              style={{ width: '100%', justifyContent: 'center', fontSize: 15, padding: '15px 22px' }}
+            >
+              {tr(lang, 'รีวิวกิจกรรม', 'Review workshop')} <span aria-hidden>★</span>
+            </button>
+          )
+        ) : (
+          <button
+            type="button"
+            disabled
+            className="btn"
+            style={{ width: '100%', justifyContent: 'center', fontSize: 15, padding: '15px 22px', background: 'var(--cream-deep)', color: 'var(--muted)', cursor: 'not-allowed' }}
+          >
+            {tr(lang, 'กิจกรรมจบแล้ว', 'Event ended')}
+          </button>
+        )
+      ) : isPaid ? (
+        <>
+          <Countdown
+            date={workshop.date}
+            timeStart={workshop.time_start}
+            timeEnd={workshop.time_end}
+            endDate={lastDay}
+          />
+          {/* While the event is ongoing, booked users can view their application
+              and edit only the PDPA consent. */}
+          {ongoing && booked && (
+            <button
+              type="button"
+              onClick={onViewApplication}
+              className="btn btn-paper"
+              style={{ width: '100%', justifyContent: 'center', marginTop: 10 }}
+            >
+              {tr(lang, 'ดูใบสมัคร', 'View application')}
+            </button>
+          )}
+        </>
+      ) : isRejected ? (
+        <button
+          type="button"
+          disabled
+          className="btn"
+          style={{ width: '100%', justifyContent: 'center', fontSize: 15, padding: '15px 22px', background: '#fde7d3', color: '#a04a14', cursor: 'not-allowed' }}
+        >
+          {tr(lang, 'ไม่ผ่านการพิจารณา', 'Not selected')}
+        </button>
+      ) : owesPayment ? (
+        <>
+          {hasLiveHold && <HoldCountdown expiresAt={userBooking!.expires_at!} lang={lang} />}
+          <button
+            type="button"
+            onClick={onResume}
+            disabled={booking}
+            className="btn btn-teal"
+            style={{
+              width: '100%',
+              justifyContent: 'center',
+              fontSize: 15,
+              padding: '15px 22px',
+              marginTop: hasLiveHold ? 12 : 0,
+              marginBottom: 10,
+            }}
+          >
+            {booking ? tr(lang, 'กำลังโหลด...', 'Loading...') : tr(lang, 'ดำเนินการต่อ', 'Continue')}{' '}
+            <span className="mono">→</span>
+          </button>
+          <Link href="/me/bookings" style={{ display: 'block', textAlign: 'center', fontSize: 12.5, color: 'var(--muted)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
+            {tr(lang, 'จัดการการจอง', 'Manage booking')}
+          </Link>
+        </>
+      ) : hasApplied ? (
+        <Link
+          href="/me/bookings"
+          className="btn btn-teal"
+          style={{ width: '100%', justifyContent: 'center', fontSize: 15, padding: '15px 22px', marginBottom: 10 }}
+        >
+          {tr(lang, 'ดูสถานะการสมัคร', 'View application status')} <span className="mono">→</span>
+        </Link>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={onBook}
+            disabled={booking || soldOut}
+            className="btn btn-teal"
+            style={{
+              width: '100%',
+              justifyContent: 'center',
+              fontSize: 15,
+              padding: '15px 22px',
+              marginBottom: 10,
+            }}
+          >
+            {booking
+              ? tr(lang, 'กำลังดำเนินการ...', 'Processing...')
+              : soldOut
+                ? tr(lang, 'เต็มแล้ว', 'Sold out')
+                : isSelection
+                  ? tr(lang, 'สมัครเข้าร่วม', 'Apply to join')
+                  : tr(lang, 'จองที่นั่งเลย', 'Book a seat')}{' '}
+            <span className="mono">→</span>
+          </button>
+
+          {/* Save for later */}
+          <button
+            type="button"
+            onClick={() => setSaved((s) => !s)}
+            className="btn"
+            style={{
+              width: '100%',
+              justifyContent: 'center',
+              background: 'var(--cream)',
+              color: 'var(--ink)',
+              fontSize: 14,
+              padding: '13px 22px',
+            }}
+          >
+            {saved ? (
+              <>
+                {tr(lang, 'บันทึกแล้ว', 'Saved')}{' '}
+                <span style={{ color: 'var(--cal-orange, #ee7c2a)' }}>♥</span>
+              </>
+            ) : (
+              <>
+                {tr(lang, 'บันทึกไว้ก่อน', 'Save for later')} <span>♡</span>
+              </>
+            )}
+          </button>
+        </>
+      )}
+
+      {/* Perks list */}
+      <ul
+        style={{
+          listStyle: 'none',
+          padding: 0,
+          margin: '22px 0 0',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+          fontSize: 13,
+          color: 'var(--muted)',
+        }}
+      >
+        {[
+          tr(lang, 'จองที่นั่งทันที · ชำระเงินภายใน 10 นาที', 'Seat held instantly · pay within 10 min'),
+          tr(lang, 'รวมอาหารและเครื่องดื่ม', 'Food and drinks included'),
+          tr(lang, 'ที่นั่งจำกัด · ชำระแล้วไม่คืนเงิน', 'Limited seats · paid bookings non-refundable'),
+        ].map((line) => (
+          <li key={line} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ color: 'var(--teal)', fontWeight: 700, flexShrink: 0 }}>✓</span>
+            {line}
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+/**
+ * 10-minute (or whatever the server set) hold countdown for a pending booking.
+ * Reloads the page when it hits zero so the seat-released state is reflected.
+ */
+function HoldCountdown({ expiresAt, lang }: { expiresAt: string; lang: 'th' | 'en' }) {
+  const target = sqliteToMs(expiresAt);
+  const [now, setNow] = useState<number>(0);
+
+  useEffect(() => {
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  if (now === 0) {
+    return (
+      <div
+        style={{ background: 'var(--cream)', borderRadius: 14, height: 76 }}
+        aria-hidden
+      />
+    );
+  }
+
+  const remain = Math.max(0, target - now);
+  if (remain === 0) {
+    return (
+      <div
+        style={{
+          padding: '14px 16px',
+          background: 'var(--cream)',
+          borderRadius: 14,
+          textAlign: 'center',
+          fontSize: 13,
+          color: '#a04a14',
+          fontWeight: 600,
+        }}
+      >
+        {tr(lang, 'หมดเวลาจองชั่วคราว · ที่นั่งถูกปล่อยแล้ว', 'Hold expired · seat released')}
+      </div>
+    );
+  }
+
+  const minutes = Math.floor(remain / 60000);
+  const seconds = Math.floor((remain % 60000) / 1000);
+  const fmt = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  const urgent = remain < 2 * 60 * 1000; // last 2 mins → emphasise
+
+  return (
+    <div
+      style={{
+        padding: '14px 16px',
+        background: urgent ? '#a04a14' : 'var(--ink)',
+        color: '#fff',
+        borderRadius: 14,
+        textAlign: 'center',
+        transition: 'background .25s ease',
+      }}
+    >
+      <div
+        className="mono"
+        style={{
+          fontSize: 10.5,
+          letterSpacing: '.16em',
+          textTransform: 'uppercase',
+          color: 'var(--accent)',
+          fontWeight: 600,
+          marginBottom: 4,
+        }}
+      >
+        ⏱ {tr(lang, 'ที่นั่งถูก hold ไว้', 'Seat on hold')}
+      </div>
+      <div
+        style={{
+          fontFamily: 'Archivo Black, monospace',
+          fontSize: 28,
+          letterSpacing: '.06em',
+          lineHeight: 1,
+        }}
+      >
+        {fmt}
+      </div>
+      <div style={{ fontSize: 11, opacity: 0.8, marginTop: 4 }}>
+        {tr(
+          lang,
+          'จ่ายให้ทันก่อนหมดเวลา ไม่งั้นที่นั่งจะถูกปล่อย',
+          'Pay before the timer runs out or the seat is released'
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Decide what to embed + where the "Open in Maps" button should point.
+ * Priority:
+ *   1. `<iframe src="...">` paste → use the extracted src verbatim.
+ *   2. Embed URL already → use as-is.
+ *   3. URL with coords (`@LAT,LNG` / `?q=lat,lng` / `!3d...!4d...`) → build a
+ *      coords-pinned embed so the map shows the exact place.
+ *   4. Short link (`maps.app.goo.gl/...`) → returns shouldResolve=true so the
+ *      component can call /api/maps/resolve to follow the redirect.
+ *   5. Anything else → fall back to a geocoded search by address.
+ */
+function resolveMapUrls(
+  mapUrl: string | null | undefined,
+  addressFallback: string
+): { embedSrc: string; openUrl: string; shouldResolve: boolean } {
+  const query = encodeURIComponent(addressFallback);
+  const addrEmbed = `https://maps.google.com/maps?q=${query}&output=embed`;
+  const addrOpen = `https://www.google.com/maps/search/?api=1&query=${query}`;
+
+  if (!mapUrl || !mapUrl.trim()) {
+    return { embedSrc: addrEmbed, openUrl: addrOpen, shouldResolve: false };
+  }
+
+  const iframeMatch = mapUrl.match(/<iframe[^>]*\bsrc=["']([^"']+)["']/i);
+  if (iframeMatch) {
+    return { embedSrc: iframeMatch[1], openUrl: iframeMatch[1], shouldResolve: false };
+  }
+
+  const u = mapUrl.trim();
+
+  if (u.includes('/maps/embed') || u.includes('output=embed')) {
+    return { embedSrc: u, openUrl: u, shouldResolve: false };
+  }
+
+  const coords = parseMapCoords(u);
+  if (coords) {
+    return {
+      embedSrc: coordsToEmbedSrc(coords.lat, coords.lng, coords.zoom),
+      openUrl: u,
+      shouldResolve: false,
+    };
+  }
+
+  // Short link: open button works, embed has to wait for /api/maps/resolve
+  if (isShortMapLink(u)) {
+    return { embedSrc: addrEmbed, openUrl: u, shouldResolve: true };
+  }
+
+  return { embedSrc: addrEmbed, openUrl: u, shouldResolve: false };
+}
+
+function FindUs({
+  locationLabel,
+  mapUrl,
+  location,
+}: {
+  locationLabel: string;
+  mapUrl: string | null;
+  location: Location | null;
+}) {
+  const { lang } = useLang();
+  const [copied, setCopied] = useState(false);
+  const coverImage = (() => {
+    if (!location?.gallery_json) return null;
+    try {
+      const arr = JSON.parse(location.gallery_json) as string[];
+      return Array.isArray(arr) && arr.length ? arr[0] : null;
+    } catch {
+      return null;
+    }
+  })();
+  const initial = resolveMapUrls(mapUrl, locationLabel);
+  const [embedSrc, setEmbedSrc] = useState(initial.embedSrc);
+  const openUrl = initial.openUrl;
+
+  // Follow short link server-side to pull out real coords
+  useEffect(() => {
+    if (!initial.shouldResolve || !mapUrl) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/maps/resolve?url=${encodeURIComponent(mapUrl)}`);
+        if (!res.ok) return;
+        const data = (await res.json()) as { finalUrl?: string };
+        if (cancelled || !data.finalUrl) return;
+        const coords = parseMapCoords(data.finalUrl);
+        if (coords) setEmbedSrc(coordsToEmbedSrc(coords.lat, coords.lng, coords.zoom));
+      } catch {
+        // network fail — keep the address-fallback embed
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapUrl]);
+
+  async function copyAddress() {
+    try {
+      await navigator.clipboard.writeText(locationLabel);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      // older browsers — silent fail
+    }
+  }
+
+  return (
+    <>
+      {/* Map */}
+      <div
+        style={{
+          position: 'relative',
+          borderRadius: 18,
+          overflow: 'hidden',
+          background: 'var(--cream)',
+          boxShadow: 'inset 0 0 0 1px var(--cream-deep)',
+          aspectRatio: '16 / 10',
+        }}
+      >
+        <iframe
+          src={embedSrc}
+          title="Google Maps"
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          style={{ width: '100%', height: '100%', border: 0, display: 'block' }}
+        />
+        <a
+          href={openUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn btn-paper btn-sm"
+          style={{
+            position: 'absolute',
+            top: 14,
+            right: 14,
+            boxShadow: '0 6px 16px -4px rgba(13,30,29,.25)',
+          }}
+        >
+          Google Maps <span className="mono">↗</span>
+        </a>
+      </div>
+
+      {/* Address card */}
+      <div
+        style={{
+          marginTop: 20,
+          padding: 22,
+          background: 'var(--cream)',
+          borderRadius: 18,
+          display: 'flex',
+          gap: 18,
+          alignItems: 'flex-start',
+          flexWrap: 'wrap',
+        }}
+      >
+        {/* Cover image (first gallery image) */}
+        {coverImage && (
+          <div
+            style={{
+              width: 120,
+              height: 120,
+              borderRadius: 14,
+              overflow: 'hidden',
+              flexShrink: 0,
+              background: 'var(--cream-deep)',
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={coverImage} alt={location?.name || ''} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </div>
+        )}
+
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <div
+            className="mono"
+            style={{
+              fontSize: 11,
+              color: 'var(--muted)',
+              letterSpacing: '.12em',
+              textTransform: 'uppercase',
+              marginBottom: 8,
+            }}
+          >
+            {tr(lang, 'ที่อยู่', 'Address')}
+          </div>
+          <div style={{ fontSize: 15, lineHeight: 1.55, marginBottom: 16 }}>{locationLabel}</div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+            {location && (
+              <Link href={`/locations/${location.id}`} className="btn btn-teal btn-sm">
+                {tr(lang, 'ดูรายละเอียดสถานที่', 'View location details')} <span className="mono">→</span>
+              </Link>
+            )}
+            <button
+              type="button"
+              onClick={copyAddress}
+              className="btn btn-paper btn-sm"
+              style={{ background: 'transparent' }}
+            >
+              {copied
+                ? `✓ ${tr(lang, 'คัดลอกแล้ว', 'Copied')}`
+                : tr(lang, 'คัดลอกที่อยู่', 'Copy address')}
+            </button>
+            <a
+              href={openUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-ghost btn-sm"
+            >
+              {tr(lang, 'เปิด Google Maps', 'Open Google Maps')} <span className="mono">↗</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
