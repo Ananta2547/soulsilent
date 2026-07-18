@@ -250,3 +250,40 @@ export function getEffectivePrice(w: Workshop, now: Date = new Date()):
     promoEnd: w.promo_end,
   };
 }
+
+/** How long a freshly-created workshop wears the "ใหม่" (New) badge. */
+export const NEW_WORKSHOP_DAYS = 7;
+
+/** True for NEW_WORKSHOP_DAYS days after the workshop was created.
+ *  created_at is stored UTC ("YYYY-MM-DD HH:MM:SS") — normalise to ISO/UTC. */
+export function isNewWorkshop(w: { created_at?: string | null }, now: Date = new Date()): boolean {
+  if (!w.created_at) return false;
+  const iso = w.created_at.includes('T') ? w.created_at : w.created_at.replace(' ', 'T') + 'Z';
+  const created = new Date(iso);
+  if (Number.isNaN(created.getTime())) return false;
+  return now.getTime() - created.getTime() < NEW_WORKSHOP_DAYS * 24 * 60 * 60 * 1000;
+}
+
+/** True once the event's start moment has passed — booking auto-closes then. */
+export function hasWorkshopStarted(w: TimeShape, now: Date = new Date()): boolean {
+  const start = getWorkshopStart(w);
+  return !Number.isNaN(start.getTime()) && now.getTime() >= start.getTime();
+}
+
+/** Public booking-status badge. active = open (accent), everything else
+ *  non-draft = closed (muted). Draft is never shown publicly. Once the event
+ *  has STARTED, booking auto-closes → "ปิดรับ" regardless of the stored status. */
+export function getWorkshopStatusBadge(w: Workshop, now: Date = new Date()): { label: string; open: boolean } {
+  const open = w.status === 'active' && !hasWorkshopStarted(w, now);
+  return { label: open ? 'เปิดจอง' : 'ปิดรับ', open };
+}
+
+/** Public listing order: New (≤7d) → Open → Closed; within each group the
+ *  soonest event date is pushed up first. "Open" uses the effective badge so a
+ *  started (auto-closed) workshop sinks into the Closed group. */
+export function compareWorkshopsForListing(a: Workshop, b: Workshop, now: Date = new Date()): number {
+  const rank = (w: Workshop) => (isNewWorkshop(w, now) ? 0 : getWorkshopStatusBadge(w, now).open ? 1 : 2);
+  const diff = rank(a) - rank(b);
+  if (diff !== 0) return diff;
+  return getWorkshopStart(a).getTime() - getWorkshopStart(b).getTime();
+}

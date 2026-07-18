@@ -1,10 +1,15 @@
 import { SiteHeader } from '@/components/layout/SiteHeader';
+import { PageTransition } from '@/components/design/PageTransition';
+import { ScrollReveal } from '@/components/design/ScrollReveal';
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
       <SiteHeader />
-      <main>{children}</main>
+      <ScrollReveal />
+      <main>
+        <PageTransition>{children}</PageTransition>
+      </main>
     </>
   );
 }

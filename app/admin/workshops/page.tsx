@@ -42,7 +42,7 @@ export default function AdminWorkshopsPage() {
 
   async function fetchAll() {
     const [wsRes, locRes] = await Promise.all([
-      fetch('/api/workshops'),
+      fetch('/api/workshops?counts=1'),
       fetch('/api/locations'),
     ]);
     const wsData = (await wsRes.json()) as { workshops: Workshop[] };
@@ -62,6 +62,22 @@ export default function AdminWorkshopsPage() {
     if (!confirm('ต้องการลบ Workshop นี้?')) return;
     await fetch(`/api/workshops/${id}`, { method: 'DELETE' });
     fetchAll();
+  }
+
+  // Star/feature toggle → Workshop shows in the homepage Hero fan. Optimistic.
+  async function toggleFeatured(id: string, next: boolean) {
+    setWorkshops((ws) => ws.map((w) => (w.id === id ? { ...w, featured: next ? 1 : 0 } : w)));
+    try {
+      const res = await fetch(`/api/workshops/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ featured: next }),
+      });
+      if (!res.ok) throw new Error('failed');
+    } catch {
+      // revert on failure
+      setWorkshops((ws) => ws.map((w) => (w.id === id ? { ...w, featured: next ? 0 : 1 } : w)));
+    }
   }
 
   async function openEdit(id: string) {
@@ -180,6 +196,7 @@ export default function AdminWorkshopsPage() {
                 <th className="text-left py-3 px-4 text-gray font-medium">สถานที่</th>
                 <th className="text-left py-3 px-4 text-gray font-medium">ราคา</th>
                 <th className="text-left py-3 px-4 text-gray font-medium">สถานะ</th>
+                <th className="text-center py-3 px-4 text-gray font-medium">ผู้สมัคร</th>
                 <th className="text-right py-3 px-4 text-gray font-medium">จัดการ</th>
               </tr>
             </thead>
@@ -212,24 +229,34 @@ export default function AdminWorkshopsPage() {
                         className={
                           ws.status === 'active'
                             ? 'badge-success'
-                            : ws.status === 'cancelled'
-                              ? 'badge-danger'
-                              : ws.status === 'draft'
-                                ? 'badge bg-amber-100 text-amber-700'
-                                : 'badge bg-gray-lighter text-gray'
+                            : ws.status === 'draft'
+                              ? 'badge bg-amber-100 text-amber-700'
+                              : 'badge bg-gray-lighter text-gray'
                         }
                       >
                         {ws.status === 'active'
-                          ? 'เปิดรับ'
-                          : ws.status === 'cancelled'
-                            ? 'ยกเลิก'
-                            : ws.status === 'draft'
-                              ? 'ฉบับร่าง'
-                              : 'เสร็จสิ้น'}
+                          ? 'เปิดจอง'
+                          : ws.status === 'draft'
+                            ? 'แบบร่าง'
+                            : 'ปิดรับ'}
                       </span>
+                    </td>
+                    <td className="py-3 px-4 text-center whitespace-nowrap">
+                      <span className="text-dark font-semibold">{ws.booking_count ?? 0}</span>
+                      <span className="text-gray"> / {ws.max_participants} คน</span>
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleFeatured(ws.id, !ws.featured)}
+                          aria-pressed={!!ws.featured}
+                          title={ws.featured ? 'เอาดาวออก (ไม่แสดงหน้าแรก)' : 'ติดดาว — แสดงในการ์ดหน้าแรก'}
+                          className="leading-none"
+                          style={{ background: 'transparent', border: 0, cursor: 'pointer', fontSize: 16, lineHeight: 1, color: ws.featured ? '#f5c243' : '#cbd0cf' }}
+                        >
+                          {ws.featured ? '★' : '☆'}
+                        </button>
                         {ws.admission_type === 'selection' && (
                           <Link
                             href={`/admin/workshops/${ws.id}/applicants`}
@@ -287,7 +314,7 @@ export default function AdminWorkshopsPage() {
               })}
               {workshops.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-gray">
+                  <td colSpan={8} className="py-8 text-center text-gray">
                     ยังไม่มี Workshop —{' '}
                     <button
                       type="button"

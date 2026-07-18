@@ -13,10 +13,23 @@ const LangCtx = createContext<LangCtxValue>({ lang: 'th', setLang: () => {} });
 
 const STORAGE_KEY = 'ss_lang';
 
+/**
+ * Bilingual UI is OFF — the site ships Thai-only.
+ *
+ * This is the single switch for it. While false the language is pinned to 'th',
+ * so every <T th en />, tr() and pick() call site returns Thai without being
+ * touched, and <LangSwitch> renders nothing. All English strings are still in
+ * the code, so flipping this back to true restores the TH/EN site as it was.
+ */
+export const LANG_SWITCH_ENABLED = false;
+
 export function LangProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>('th');
 
   useEffect(() => {
+    // Skip the stored value while pinned — a visitor who previously chose 'en'
+    // would otherwise be restored into an English UI that has no way back.
+    if (!LANG_SWITCH_ENABLED) return;
     try {
       const stored = localStorage.getItem(STORAGE_KEY) as Lang | null;
       if (stored === 'th' || stored === 'en') setLangState(stored);
@@ -24,6 +37,7 @@ export function LangProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setLang = (l: Lang) => {
+    if (!LANG_SWITCH_ENABLED) return;
     setLangState(l);
     try {
       localStorage.setItem(STORAGE_KEY, l);

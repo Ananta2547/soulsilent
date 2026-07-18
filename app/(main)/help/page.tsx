@@ -23,8 +23,8 @@ const HELP_FAQ: { cat: L; items: { q: L; a: L }[] }[] = [
       {
         q: { th: 'เปลี่ยนอีเมลของบัญชีได้ไหม?', en: 'Can I change my account email?' },
         a: {
-          th: 'ได้ ไปที่ จัดการบัญชี › ข้อมูลติดต่อ แล้วแก้ไขอีเมล ระบบจะส่งอีเมลยืนยันก่อนเปลี่ยน',
-          en: 'Yes — go to Account management › Contact info and update your email. We’ll send a confirmation before switching.',
+          th: 'ระบบไม่สามารถแก้ไขอีเมลด้วยตนเองได้ หากคุณต้องการเปลี่ยนอีเมลจริงๆ กรุณาติดต่อศูนย์ช่วยเหลือ',
+          en: 'Email cannot be changed by yourself. If you really need to change it, please contact the help center.',
         },
       },
     ],
@@ -32,13 +32,6 @@ const HELP_FAQ: { cat: L; items: { q: L; a: L }[] }[] = [
   {
     cat: { th: 'การชำระเงิน คืนเงิน & ยกเลิก', en: 'Payment, refunds & cancellations' },
     items: [
-      {
-        q: { th: 'ยกเลิกการจองแล้วได้เงินคืนไหม?', en: 'Do I get a refund if I cancel?' },
-        a: {
-          th: 'ยกเลิกก่อนวันงาน 7 วันคืนเต็มจำนวน, 3–7 วันคืน 50%, น้อยกว่า 3 วันไม่สามารถคืนได้ แต่โอนสิทธิ์ให้คนอื่นได้',
-          en: 'Cancel 7+ days before: full refund. 3–7 days: 50%. Under 3 days: non-refundable, but you may transfer your seat to someone else.',
-        },
-      },
       {
         q: { th: 'จ่ายเงินช่องทางไหนได้บ้าง?', en: 'What payment methods do you accept?' },
         a: {

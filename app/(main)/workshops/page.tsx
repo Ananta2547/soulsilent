@@ -3,29 +3,40 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { Workshop } from '@/lib/types';
-import { useLang, T, tr } from '@/lib/i18n';
-import { Reveal } from '@/components/design/Reveal';
-import { Cloud, ZigZag, UnderlineMark, Sparkle, DotCluster } from '@/components/design/Doodles';
-import { getWorkshopTags, getEffectivePrice } from '@/lib/workshop-utils';
+import { getWorkshopTags, getEffectivePrice, getWorkshopStatusBadge, isNewWorkshop, compareWorkshopsForListing } from '@/lib/workshop-utils';
+import { MarketingFooter } from '@/components/layout/MarketingFooter';
+
+/* ============================================================
+   Workshops listing — port of Design Composer "Workshops.dc.html".
+   Navbar stays as-is (SiteHeader from app/(main)/layout.tsx). Live D1
+   data via /api/workshops, Thai-only. Filters (category + tags) are
+   derived from real data — richer than the mockup's fixed pills.
+   ============================================================ */
+
+const MONTHS_TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+
+/** "2026-07-22" → "22 ก.ค. 2569" (Buddhist-era year). */
+function fmtDate(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getDate()} ${MONTHS_TH[d.getMonth()]} ${d.getFullYear() + 543}`;
+}
 
 export default function WorkshopsListingPage() {
-  const { lang } = useLang();
   const [workshops, setWorkshops] = useState<Workshop[]>([]);
   const [loading, setLoading] = useState(true);
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [tagFilter, setTagFilter] = useState<string>('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [tagFilter, setTagFilter] = useState('');
 
   useEffect(() => {
-    fetch('/api/workshops?status=active')
+    fetch('/api/workshops?public=1')
       .then((r) => r.json() as Promise<{ workshops: Workshop[] }>)
-      .then((d) => {
-        setWorkshops(d.workshops || []);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+      .then((d) => setWorkshops(d.workshops || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
-  // Distinct category + tag list — derived from actual data
   const categories = useMemo(() => {
     const set = new Set<string>();
     workshops.forEach((w) => w.category && set.add(w.category));
@@ -38,183 +49,100 @@ export default function WorkshopsListingPage() {
     return Array.from(set).sort();
   }, [workshops]);
 
-  const filtered = useMemo(() => {
-    return workshops.filter((w) => {
-      if (categoryFilter !== 'all' && w.category !== categoryFilter) return false;
-      if (tagFilter && !getWorkshopTags(w).includes(tagFilter)) return false;
-      return true;
-    });
-  }, [workshops, categoryFilter, tagFilter]);
+  const filtered = useMemo(
+    () =>
+      workshops
+        .filter((w) => {
+          if (categoryFilter !== 'all' && w.category !== categoryFilter) return false;
+          if (tagFilter && !getWorkshopTags(w).includes(tagFilter)) return false;
+          return true;
+        })
+        // New (≤7d) → Open → Closed, each by soonest event date.
+        .sort((a, b) => compareWorkshopsForListing(a, b)),
+    [workshops, categoryFilter, tagFilter],
+  );
 
   return (
     <>
-      <section className="section" style={{ paddingTop: 48, paddingBottom: 32, position: 'relative', overflow: 'hidden' }}>
-        <Sparkle color="var(--accent)" style={{ position: 'absolute', top: 80, right: '12%', width: 28, pointerEvents: 'none' }} />
-        <DotCluster color="var(--teal-200)" rows={4} cols={4} style={{ position: 'absolute', left: '10%', top: '60%', width: 36 }} />
+      {/* ---- Header ---- */}
+      <section className="container" style={{ paddingTop: 56, paddingBottom: 40 }}>
+        <div className="mono" style={{ color: 'var(--muted)', letterSpacing: '.14em', fontSize: 11, textTransform: 'uppercase', marginBottom: 14 }}>— กิจกรรมทั้งหมด</div>
+        <h1 className="display-th reveal-up" style={{ fontSize: 'clamp(34px,5.4vw,58px)', margin: 0, color: 'var(--ink)', lineHeight: 1.05 }}>
+          เลือก
+          <span style={{ position: 'relative', display: 'inline-block', color: 'var(--teal)' }}>
+            กิจกรรม
+            <svg viewBox="0 0 220 16" preserveAspectRatio="none" style={{ position: 'absolute', left: 0, right: 0, bottom: -10, width: '100%', height: 14 }} aria-hidden="true">
+              <path d="M2 10 Q 30 3 58 9 T 112 8 T 166 9 T 218 7" fill="none" stroke="var(--accent)" strokeWidth="5" strokeLinecap="round" />
+            </svg>
+          </span>
+          ที่ใช่กับคุณ
+        </h1>
+        <p style={{ margin: '22px 0 0', fontSize: 16, lineHeight: 1.6, color: 'var(--muted)', maxWidth: 640 }}>
+          ทั้ง workshop, camp และ talk — เลือกแบบที่เหมาะกับเวลาและจังหวะของคุณ. ที่นั่งจำกัดเสมอ.
+        </p>
+      </section>
 
-        <div className="container" style={{ position: 'relative' }}>
-          <Reveal>
-            <span className="eyebrow">
-              <T th="กิจกรรมทั้งหมด" en="All events" />
-            </span>
-            <h1
-              className="display-th"
-              style={{
-                fontSize: 'clamp(40px, 7vw, 96px)',
-                margin: '18px 0 12px',
-                position: 'relative',
-                display: 'inline-block',
-              }}
-            >
-              <T
-                th={
-                  <>
-                    เลือก<span style={{ color: 'var(--teal)' }}>กิจกรรม</span>ที่ใช่กับคุณ
-                  </>
-                }
-                en={
-                  <>
-                    Find your <span style={{ color: 'var(--teal)' }}>workshop</span>
-                  </>
-                }
-              />
-              <Reveal
-                draw
-                delay={400}
-                style={{ position: 'absolute', left: 0, bottom: -10, width: '40%', height: 18, pointerEvents: 'none' }}
-              >
-                <UnderlineMark color="var(--accent)" stroke={6} />
-              </Reveal>
-            </h1>
-            <p style={{ fontSize: 'clamp(15px, 1.3vw, 17px)', color: 'var(--muted)', maxWidth: 560, lineHeight: 1.65 }}>
-              <T
-                th="ทั้ง workshop, camp และ talk — เลือกแบบที่เหมาะกับเวลาและจังหวะของคุณ. ที่นั่งจำกัดเสมอ."
-                en="Workshops, camps, and talks — choose what fits your time and pace. Seats are always limited."
-              />
-            </p>
-          </Reveal>
+      {/* ---- Filter bar ---- */}
+      <section className="bg-cream" style={{ padding: '28px 0 32px' }}>
+        <div className="container" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <FilterPill active={categoryFilter === 'all'} onClick={() => setCategoryFilter('all')}>ทั้งหมด</FilterPill>
+            {categories.map((c) => (
+              <FilterPill key={c} active={categoryFilter === c} onClick={() => setCategoryFilter(c)}>{c}</FilterPill>
+            ))}
+          </div>
+          {tags.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span className="mono" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '.1em' }}>#TAGS</span>
+              {tags.map((t) => {
+                const on = tagFilter === t;
+                return (
+                  <button
+                    key={t}
+                    onClick={() => setTagFilter(on ? '' : t)}
+                    className="tag"
+                    style={{ cursor: 'pointer', border: 0, fontFamily: 'inherit', background: on ? 'var(--teal)' : 'var(--teal-50)', color: on ? '#fff' : 'var(--teal-deep)' }}
+                  >
+                    {t}
+                  </button>
+                );
+              })}
+              {tagFilter && (
+                <button onClick={() => setTagFilter('')} style={{ background: 'transparent', border: 0, color: 'var(--muted)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>ล้างแท็ก</button>
+              )}
+            </div>
+          )}
         </div>
       </section>
 
-      <section className="section bg-cream" style={{ paddingTop: 56 }}>
+      {/* ---- Grid ---- */}
+      <section className="section" style={{ paddingTop: 40 }}>
         <div className="container">
-          {/* Category filter */}
-          <Reveal variant="reveal-right" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-            <FilterPill active={categoryFilter === 'all'} onClick={() => setCategoryFilter('all')}>
-              {tr(lang, 'ทั้งหมด', 'All')}
-            </FilterPill>
-            {categories.map((c) => (
-              <FilterPill key={c} active={categoryFilter === c} onClick={() => setCategoryFilter(c)}>
-                {c}
-              </FilterPill>
-            ))}
-          </Reveal>
-
-          {/* Tag filter */}
-          {tags.length > 0 && (
-            <Reveal
-              variant="reveal-right"
-              delay={80}
-              style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 32, alignItems: 'center' }}
-            >
-              <span
-                className="mono"
-                style={{ fontSize: 10.5, color: 'var(--muted)', letterSpacing: '.12em', textTransform: 'uppercase', marginRight: 4 }}
-              >
-                #tags
-              </span>
-              {tags.map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTagFilter(tagFilter === t ? '' : t)}
-                  className="tag"
-                  style={{
-                    cursor: 'pointer',
-                    background: tagFilter === t ? 'var(--teal)' : 'var(--teal-50)',
-                    color: tagFilter === t ? '#fff' : 'var(--teal-deep)',
-                    border: 0,
-                    fontFamily: 'inherit',
-                  }}
-                >
-                  {t}
-                </button>
-              ))}
-              {tagFilter && (
-                <button
-                  onClick={() => setTagFilter('')}
-                  style={{
-                    background: 'transparent',
-                    border: 0,
-                    color: 'var(--muted)',
-                    fontSize: 12,
-                    cursor: 'pointer',
-                    textDecoration: 'underline',
-                  }}
-                >
-                  {tr(lang, 'ล้างแท็ก', 'clear tag')}
-                </button>
-              )}
-            </Reveal>
-          )}
-
           {loading ? (
             <div style={{ textAlign: 'center', padding: '80px 0' }}>
-              <div
-                style={{
-                  width: 32,
-                  height: 32,
-                  border: '2px solid var(--teal)',
-                  borderTopColor: 'transparent',
-                  borderRadius: '50%',
-                  margin: '0 auto',
-                  animation: 'float 1s linear infinite',
-                }}
-              />
+              <div style={{ width: 32, height: 32, border: '2px solid var(--teal)', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto', animation: 'float 1s linear infinite' }} />
             </div>
+          ) : filtered.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '56px 0', color: 'var(--muted)' }}>ไม่พบกิจกรรมที่ตรงกับตัวกรอง</div>
           ) : (
-            <div className="grid-x g-cards">
-              {filtered.length === 0 && (
-                <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px 0', color: 'var(--muted)' }}>
-                  {tr(lang, 'ไม่พบกิจกรรมที่ตรงกับตัวกรอง', 'No events match the filters')}
-                </div>
-              )}
-              {filtered.map((w, i) => (
-                <Reveal key={w.id} variant="reveal-zoom" delay={i * 70}>
-                  <Card w={w} />
-                </Reveal>
-              ))}
+            <div className="wk-grid">
+              {filtered.map((w) => <Card key={w.id} w={w} />)}
             </div>
           )}
         </div>
       </section>
+
+      <MarketingFooter />
     </>
   );
 }
 
-function FilterPill({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
+function FilterPill({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
       onClick={onClick}
-      style={{
-        padding: '10px 18px',
-        borderRadius: 999,
-        fontSize: 13,
-        fontWeight: 500,
-        cursor: 'pointer',
-        fontFamily: 'inherit',
-        border: 0,
-        background: active ? 'var(--ink)' : 'var(--paper)',
-        color: active ? '#fff' : 'var(--ink)',
-        transition: 'all .2s ease',
-      }}
+      className="filter-pill"
+      style={{ fontFamily: 'inherit', cursor: 'pointer', border: 0, borderRadius: 999, padding: '10px 20px', fontSize: 13.5, fontWeight: 600, background: active ? 'var(--ink)' : 'var(--paper)', color: active ? '#fff' : 'var(--ink)', transition: 'background .2s ease, color .2s ease' }}
     >
       {children}
     </button>
@@ -222,140 +150,80 @@ function FilterPill({
 }
 
 function Card({ w }: { w: Workshop }) {
-  const { lang } = useLang();
-  const tags = getWorkshopTags(w);
   const eff = getEffectivePrice(w);
+  const free = w.payment_type === 'free' || eff.price <= 0;
 
   return (
-    <Link
-      href={`/workshops/${w.id}`}
-      className="card"
-      style={{
-        padding: 16,
-        background: 'var(--paper)',
-        display: 'flex',
-        flexDirection: 'column',
-        textDecoration: 'none',
-        color: 'var(--ink)',
-      }}
-    >
-      <div
-        className="ph ph-teal card-media"
-        style={{ aspectRatio: '297 / 420', borderRadius: 14, marginBottom: 16, position: 'relative', overflow: 'hidden' }}
-      >
+    <Link href={`/workshops/${w.id}`} className="card reveal-up" style={{ padding: 16, background: 'var(--paper)', display: 'flex', flexDirection: 'column', textDecoration: 'none', color: 'var(--ink)' }}>
+      <div className="ph ph-teal card-media" style={{ aspectRatio: '3/4', borderRadius: 14, marginBottom: 14, position: 'relative', overflow: 'hidden' }}>
         {w.image_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img src={w.image_url} alt={w.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
-          <>
-            <ZigZag
-              color="var(--teal)"
-              stroke={3}
-              style={{ position: 'absolute', bottom: 14, left: 14, right: 14, width: 'calc(100% - 28px)', height: 24 }}
-            />
-            <Cloud
-              color="var(--teal-200)"
-              stroke={3}
-              style={{ position: 'absolute', top: 14, left: 14, width: 64, height: 40 }}
-            />
-          </>
+          <span className="mono" style={{ position: 'absolute', bottom: 10, right: 12, fontSize: 9, letterSpacing: '.1em', opacity: 0.5 }}>COVER · 3:4</span>
         )}
         {eff.isPromo && (
+          <span className="tag tag-accent" style={{ position: 'absolute', top: 10, right: 10, fontWeight: 700 }}>
+            ลด {Math.round((1 - eff.price / eff.originalPrice) * 100)}%
+          </span>
+        )}
+        {isNewWorkshop(w) && (
           <span
-            className="tag tag-accent"
-            style={{ position: 'absolute', top: 10, right: 10, fontWeight: 700 }}
+            style={{
+              position: 'absolute',
+              top: 18,
+              left: -32,
+              width: 122,
+              transform: 'rotate(-45deg)',
+              background: 'var(--accent)',
+              color: 'var(--ink)',
+              textAlign: 'center',
+              fontFamily: 'Mitr',
+              fontWeight: 600,
+              fontSize: 12.5,
+              letterSpacing: '.08em',
+              padding: '4px 0',
+              boxShadow: '0 2px 8px rgba(13,30,29,.28)',
+              pointerEvents: 'none',
+            }}
           >
-            {tr(lang, 'ลด', 'SAVE')} {Math.round((1 - eff.price / eff.originalPrice) * 100)}%
+            ใหม่
           </span>
         )}
       </div>
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-        {w.category && <span className="tag">{w.category}</span>}
-        <span className="tag tag-accent">{tr(lang, 'เปิดจอง', 'Open')}</span>
-      </div>
-      <h3 className="display-th" style={{ fontSize: 20, margin: '0 0 6px', lineHeight: 1.2 }}>
-        {w.title}
-      </h3>
-      {tags.length > 0 && (
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
-          {tags.slice(0, 3).map((t) => (
-            <span
-              key={t}
-              className="mono"
-              style={{
-                fontSize: 10,
-                color: 'var(--muted)',
-                background: 'var(--cream)',
-                padding: '2px 8px',
-                borderRadius: 999,
-              }}
-            >
-              #{t}
+        {(() => {
+          const b = getWorkshopStatusBadge(w);
+          return (
+            <span className={b.open ? 'tag tag-accent' : 'tag'} style={b.open ? undefined : { background: '#e6e3da', color: 'var(--muted)' }}>
+              {b.label}
             </span>
-          ))}
-        </div>
-      )}
-      <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14, lineHeight: 1.55 }}>
-        <div>
-          📅{' '}
-          {new Date(w.date).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-          })}{' '}
-          · {w.time_start}–{w.time_end}
-        </div>
-        {w.location && <div>📍 {w.location}</div>}
+          );
+        })()}
+        {w.category && <span className="tag">{w.category}</span>}
       </div>
-      <div
-        style={{
-          marginTop: 'auto',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          paddingTop: 14,
-        }}
-      >
+      <h3 className="display-th u-clamp-2" style={{ fontSize: 17, margin: '0 0 8px', lineHeight: 1.25, minHeight: '2.5em' }}>{w.title}</h3>
+      <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.55 }}>
+        <div>📅 {fmtDate(w.date)} · {w.time_start}–{w.time_end}</div>
+        {w.location && <div className="u-clamp-2">📍 {w.location}</div>}
+      </div>
+
+      <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12 }}>
         <div>
-          <div
-            style={{
-              fontSize: 10,
-              fontFamily: 'JetBrains Mono',
-              color: 'var(--muted)',
-              letterSpacing: '.1em',
-              textTransform: 'uppercase',
-            }}
-          >
-            {w.payment_type === 'free' || eff.price <= 0 ? tr(lang, 'ค่าเข้าร่วม', 'Entry') : tr(lang, 'เริ่มต้น', 'From')}
-          </div>
-          {w.payment_type === 'free' || eff.price <= 0 ? (
-            <div style={{ fontFamily: 'Archivo Black', fontSize: 22, color: 'var(--teal)' }}>
-              {tr(lang, 'ฟรี', 'Free')}
-            </div>
+          <div className="mono" style={{ fontSize: 9.5, color: 'var(--muted)', letterSpacing: '.1em', textTransform: 'uppercase' }}>ค่าเข้าร่วม</div>
+          {free ? (
+            <div style={{ fontFamily: 'Archivo Black', fontSize: 19, color: 'var(--teal)' }}>ฟรี</div>
           ) : eff.isPromo ? (
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-              <span style={{ fontFamily: 'Archivo Black', fontSize: 22, color: 'var(--teal)' }}>
-                ฿{eff.price.toLocaleString()}
-              </span>
-              <span
-                style={{
-                  fontSize: 12,
-                  color: 'var(--muted)',
-                  textDecoration: 'line-through',
-                }}
-              >
-                ฿{eff.originalPrice.toLocaleString()}
-              </span>
+              <span style={{ fontFamily: 'Archivo Black', fontSize: 19, color: 'var(--teal)' }}>฿{eff.price.toLocaleString()}</span>
+              <span style={{ fontSize: 12, color: 'var(--muted)', textDecoration: 'line-through' }}>฿{eff.originalPrice.toLocaleString()}</span>
             </div>
           ) : (
-            <div style={{ fontFamily: 'Archivo Black', fontSize: 22 }}>
-              ฿{eff.price.toLocaleString()}
-            </div>
+            <div style={{ fontFamily: 'Archivo Black', fontSize: 19 }}>฿{eff.price.toLocaleString()}</div>
           )}
         </div>
-        <span className="btn btn-teal btn-sm" aria-hidden>
-          {tr(lang, 'จอง', 'Book')} <span className="mono">→</span>
-        </span>
+        <span className="btn btn-teal btn-sm" aria-hidden>จอง <span className="mono">→</span></span>
       </div>
     </Link>
   );

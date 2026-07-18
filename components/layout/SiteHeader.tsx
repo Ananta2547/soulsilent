@@ -43,10 +43,7 @@ export function SiteHeader() {
   return (
     <>
       <div className="nav-wrap">
-        <div
-          className="container"
-          style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '16px 32px' }}
-        >
+        <div className="nav-bar">
           <Link
             href="/"
             style={{
@@ -98,7 +95,8 @@ export function SiteHeader() {
             </span>
           </Link>
 
-          <nav className="hide-sm" style={{ display: 'flex', gap: 6, marginLeft: 18, flex: 1 }}>
+          {/* Nav sits next to the logo (design: Home Hero.dc.html). */}
+          <nav className="hide-sm nav-links" style={{ marginLeft: 26 }}>
             {links.map((l) => (
               <Link key={l.href} href={l.href} className="nav-link">
                 {tr(lang, l.th, l.en)}
@@ -106,7 +104,8 @@ export function SiteHeader() {
             ))}
           </nav>
 
-          <span style={{ flex: 1 }} className="show-sm" />
+          {/* Spacer clusters the utilities (calendar, profile) on the right. */}
+          <span style={{ flex: 1 }} />
 
           <Link
             href="/calendar"
@@ -116,8 +115,8 @@ export function SiteHeader() {
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: 38,
-              height: 38,
+              width: 44,
+              height: 44,
               borderRadius: '50%',
               background: 'var(--cream)',
               color: 'var(--ink)',
@@ -198,7 +197,9 @@ export function SiteHeader() {
               )}
             </div>
           ) : (
-            <Btn kind="ink" size="sm" href="/auth/login">
+            /* Below 560px this is dropped from the bar to keep the header on
+               one line — the drawer carries the same action. */
+            <Btn kind="ink" size="sm" href="/auth/login" className="hide-xs">
               <T th="เข้าสู่ระบบ" en="Sign in" />
             </Btn>
           )}

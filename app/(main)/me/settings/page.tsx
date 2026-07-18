@@ -92,8 +92,8 @@ function SettingsHub() {
 
   const warnMsg = tr(
     lang,
-    'คุณยังไม่ได้บันทึกการเปลี่ยนแปลง — ต้องการออกจากหน้านี้โดยไม่บันทึกหรือไม่?',
-    'You have unsaved changes. Leave without saving?',
+    'คุณมีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก แน่ใจหรือไม่ว่าต้องการออกโดยไม่บันทึก?',
+    'You have unsaved changes. Are you sure you want to leave without saving?',
   );
 
   // Guard tab/refresh/external navigation while there are unsaved edits.

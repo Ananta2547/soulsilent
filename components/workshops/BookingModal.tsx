@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useLang, T, tr, pick } from '@/lib/i18n';
 import { fmtDateTime } from '@/lib/datetime';
+import { getVault } from '@/lib/vault';
 import { Btn } from '@/components/design/RippleButton';
 import type { ApplicationQuestion, Workshop } from '@/lib/types';
 
@@ -25,6 +26,7 @@ type Vault = {
   firstName?: string;
   lastName?: string;
   nickname?: string;
+  dob?: string;
   gender?: string;
   genderOther?: string;
   phone?: string;
@@ -105,15 +107,16 @@ export function BookingModal({
         setProfile(d.user || null);
       } catch {}
       try {
-        const raw = localStorage.getItem('ss_autofill_vault');
-        if (raw) setVault(JSON.parse(raw) as Vault);
+        const raw = await getVault();
+        if (raw && Object.keys(raw).length > 0) setVault(raw as unknown as Vault);
       } catch {}
     })();
   }, []);
 
   const fullName = [vault.firstName, vault.lastName].filter(Boolean).join(' ') || profile?.name || '—';
   const prefixLabel = vault.prefix && PREFIX_LABEL[vault.prefix] ? pick(PREFIX_LABEL[vault.prefix], lang) : '';
-  const age = ageFrom(profile?.date_of_birth);
+  // DOB now lives in the autofill vault; fall back to the legacy profile column.
+  const age = ageFrom(vault.dob || profile?.date_of_birth);
   const genderLabel =
     vault.gender === 'other'
       ? vault.genderOther || '—'
@@ -130,9 +133,11 @@ export function BookingModal({
     !(vault.firstName || '').trim() ||
     !(vault.lastName || '').trim() ||
     !(vault.nickname || '').trim() ||
+    age == null ||
     !vault.gender ||
     (vault.gender === 'other' && !(vault.genderOther || '').trim()) ||
     !(vault.phone || profile?.phone || '').trim() ||
+    !(vault.facebook || '').trim() ||
     !(vault.medical || '').trim();
 
   function goNext() {
@@ -283,13 +288,13 @@ export function BookingModal({
                 <Row label={tr(lang, 'คำนำหน้า', 'Title')} value={prefixLabel || '—'} />
                 <Row label={tr(lang, 'ชื่อ-นามสกุล', 'Full name')} value={fullName} required missing={!(vault.firstName || '').trim() || !(vault.lastName || '').trim()} />
                 <Row label={tr(lang, 'ชื่อเล่น', 'Nickname')} value={vault.nickname || '—'} required missing={!(vault.nickname || '').trim()} />
-                <Row label={tr(lang, 'อายุ', 'Age')} value={age != null ? tr(lang, `${age} ปี`, `${age} yrs`) : '—'} />
+                <Row label={tr(lang, 'อายุ', 'Age')} value={age != null ? tr(lang, `${age} ปี`, `${age} yrs`) : '—'} required missing={age == null} />
                 <Row label={tr(lang, 'เพศ', 'Gender')} value={genderLabel} required missing={!vault.gender || (vault.gender === 'other' && !(vault.genderOther || '').trim())} />
               </ReadGroup>
               <ReadGroup lang={lang} title={tr(lang, 'ช่องทางติดต่อ', 'Contact')}>
                 <Row label={tr(lang, 'โทร', 'Phone')} value={vault.phone || profile?.phone || '—'} required missing={!(vault.phone || profile?.phone || '').trim()} />
                 <Row label={tr(lang, 'อีเมล', 'Email')} value={profile?.email || '—'} />
-                <Row label="Facebook" value={vault.facebook || '—'} />
+                <Row label="Facebook" value={vault.facebook || '—'} required missing={!(vault.facebook || '').trim()} />
                 <Row label="Line ID" value={vault.lineId || '—'} />
               </ReadGroup>
               <ReadGroup lang={lang} title={tr(lang, 'สุขภาพ & อาหาร', 'Health & food')}>

@@ -1016,16 +1016,22 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
           </div>
           <div>
             <label className="block text-xs font-medium text-dark mb-1">เริ่ม</label>
-            <DateField24
+            <input
+              type="date"
               value={form.promo_start ?? ''}
-              onChange={(v) => setForm({ ...form, promo_start: v })}
+              max={form.promo_end || undefined}
+              onChange={(e) => setForm({ ...form, promo_start: e.target.value })}
+              className="input-field"
             />
           </div>
           <div>
             <label className="block text-xs font-medium text-dark mb-1">สิ้นสุด</label>
-            <DateField24
+            <input
+              type="date"
               value={form.promo_end ?? ''}
-              onChange={(v) => setForm({ ...form, promo_end: v })}
+              min={form.promo_start || undefined}
+              onChange={(e) => setForm({ ...form, promo_end: e.target.value })}
+              className="input-field"
             />
           </div>
         </div>
@@ -1246,10 +1252,9 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
           }
           className="input-field"
         >
-          <option value="active">เปิดรับ</option>
-          <option value="cancelled">ยกเลิก</option>
-          <option value="completed">เสร็จสิ้น</option>
-          <option value="draft">ฉบับร่าง (Draft)</option>
+          <option value="active">เปิดจอง (Open)</option>
+          <option value="closed">ปิดรับ (Closed)</option>
+          <option value="draft">แบบร่าง (Draft)</option>
         </select>
       </div>
 

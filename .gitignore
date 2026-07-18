@@ -37,6 +37,12 @@ yarn-error.log*
 .dev.vars
 .wrangler/
 
+# OpenNext build output (regenerated on deploy)
+/.open-next/
+
+# Local agent tooling config
+/.claude/
+
 # vercel
 .vercel
 

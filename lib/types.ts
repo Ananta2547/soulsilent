@@ -131,7 +131,9 @@ export interface Workshop {
   max_participants: number;
   price: number;
   image_url: string | null;
-  status: 'active' | 'cancelled' | 'completed' | 'draft';
+  /** active = เปิดจอง (public), closed = ปิดรับ (public), draft = แบบร่าง (hidden).
+   *  cancelled/completed are legacy values, treated as "closed" when displayed. */
+  status: 'active' | 'closed' | 'cancelled' | 'completed' | 'draft';
   /** JSON array of ApplicationQuestion for the pre-booking form. */
   application_form: string;
   /** Admission + payment config (selection workflow). */
@@ -157,6 +159,11 @@ export interface Workshop {
   payout_slip_meta: string | null;
   created_at: string;
   updated_at: string;
+  /** 1 = starred by admin → featured in the homepage Hero fan (migration 035). */
+  featured: number;
+  /** Live count of non-cancelled bookings. Computed — only present when the
+   *  workshops API is called with ?counts=1 (admin-only). */
+  booking_count?: number;
 }
 
 export interface Booking {

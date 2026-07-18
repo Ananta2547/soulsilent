@@ -8,6 +8,10 @@ export async function getStripe(): Promise<Stripe> {
     const env = await getEnv();
     stripeInstance = new Stripe(env.STRIPE_SECRET_KEY || '', {
       apiVersion: '2026-04-22.dahlia',
+      // Cloudflare Workers has no Node `http` module — the Stripe SDK must talk
+      // to the API over fetch, otherwise every call fails with
+      // "An error occurred with our connection to Stripe".
+      httpClient: Stripe.createFetchHttpClient(),
     });
   }
   return stripeInstance;

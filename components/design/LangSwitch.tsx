@@ -1,7 +1,7 @@
 'use client';
 
 import { useLayoutEffect, useRef, useState } from 'react';
-import { useLang } from '@/lib/i18n';
+import { useLang, LANG_SWITCH_ENABLED } from '@/lib/i18n';
 
 export function LangSwitch() {
   const { lang, setLang } = useLang();
@@ -17,6 +17,9 @@ export function LangSwitch() {
       setThumb({ x: r.left - parent.left, w: r.width });
     }
   }, [lang]);
+
+  // After the hooks, never before — the early return must not change hook order.
+  if (!LANG_SWITCH_ENABLED) return null;
 
   return (
     <div className="seg" ref={ref}>

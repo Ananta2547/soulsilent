@@ -246,6 +246,35 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
 }
 
+/** PATCH — lightweight admin toggles (e.g. featured/star). */
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    await requireAdmin();
+    const { id } = await params;
+    const body = (await request.json()) as { featured?: boolean | number };
+    if (body.featured === undefined) {
+      return NextResponse.json({ error: 'ไม่มีข้อมูลให้แก้ไข' }, { status: 400 });
+    }
+    const featured = body.featured ? 1 : 0;
+    const db = await getDB();
+    const res = await db
+      .prepare("UPDATE workshops SET featured = ?, updated_at = datetime('now') WHERE id = ?")
+      .bind(featured, id)
+      .run();
+    if (!res.meta.changes) {
+      return NextResponse.json({ error: 'ไม่พบ Workshop' }, { status: 404 });
+    }
+    return NextResponse.json({ ok: true, featured });
+  } catch (error) {
+    const err = error as Error;
+    if (err.message === 'Unauthorized' || err.message === 'Forbidden') {
+      return NextResponse.json({ error: err.message }, { status: 403 });
+    }
+    console.error('Toggle featured error:', error);
+    return NextResponse.json({ error: 'เกิดข้อผิดพลาด' }, { status: 500 });
+  }
+}
+
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await requireAdmin();

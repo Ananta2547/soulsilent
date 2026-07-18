@@ -118,10 +118,7 @@ export function AllsoullearnHeader() {
   return (
     <>
       <div className="nav-wrap">
-        <div
-          className="container"
-          style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '16px 32px' }}
-        >
+        <div className="nav-bar">
           <Link href="/allsoullearn" style={{ textDecoration: 'none' }}>
             <AslLogo />
           </Link>

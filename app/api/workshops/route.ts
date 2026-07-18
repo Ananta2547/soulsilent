@@ -11,13 +11,31 @@ export async function GET(request: Request) {
     const status = url.searchParams.get('status');
     const category = url.searchParams.get('category');
     const tag = url.searchParams.get('tag');
+    const withCounts = url.searchParams.get('counts') === '1';
+
+    // Applicant counts reveal per-workshop demand — admin only.
+    if (withCounts) {
+      try {
+        await requireAdmin();
+      } catch {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
 
     const where: string[] = [];
     const params: string[] = [];
 
+    // Public pages show open + closed workshops, never drafts.
+    if (url.searchParams.get('public') === '1') {
+      where.push("status IN ('active', 'closed')");
+    }
     if (status) {
       where.push('status = ?');
       params.push(status);
+    }
+    // Only admin-starred workshops (homepage Hero fan).
+    if (url.searchParams.get('featured') === '1') {
+      where.push('featured = 1');
     }
     if (category) {
       where.push('category = ?');
@@ -29,7 +47,10 @@ export async function GET(request: Request) {
       params.push(tag);
     }
 
-    let query = 'SELECT * FROM workshops';
+    const countSelect = withCounts
+      ? ", (SELECT COUNT(*) FROM bookings WHERE bookings.workshop_id = workshops.id AND bookings.status != 'cancelled') AS booking_count"
+      : '';
+    let query = `SELECT *${countSelect} FROM workshops`;
     if (where.length > 0) query += ' WHERE ' + where.join(' AND ');
     query += ' ORDER BY date DESC';
 

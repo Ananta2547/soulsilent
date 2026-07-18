@@ -170,6 +170,60 @@ body {
   transform: scale(0.94);
 }
 
+/* ============================================================
+   Site-wide micro-interactions — subtle life on hover/press.
+   Applies to every public page; neutralised under reduced-motion.
+   ============================================================ */
+.btn { box-shadow: 0 0 0 0 transparent; }
+.btn:hover { transform: translateY(-2px); }
+.btn:active { transform: translateY(0) scale(0.95); }
+
+.filter-pill { transition: transform 0.16s cubic-bezier(0.2, 0.7, 0.2, 1), background 0.2s ease, color 0.2s ease; }
+.filter-pill:hover { transform: translateY(-1px); }
+.filter-pill:active { transform: scale(0.96); }
+
+.input-field { transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease; }
+
+@media (prefers-reduced-motion: reduce) {
+  .btn, .btn:hover, .btn:active,
+  .filter-pill, .filter-pill:hover, .filter-pill:active {
+    transition: none !important;
+    transform: none !important;
+  }
+  /* Show revealed content immediately instead of leaving it faded out. */
+  .reveal, .reveal-left, .reveal-right, .reveal-zoom {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+/* Scroll reveal — fade-up when scrolled into view (ScrollReveal.tsx toggles
+   `.in`). Uses `animation` + the `translate` property (NOT `transform`) so it
+   composes with a card's :hover transform instead of overriding it. Per-batch
+   stagger delay is set inline by the observer. */
+.reveal-up { opacity: 0; }
+.reveal-up.in { animation: reveal-up-kf 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@keyframes reveal-up-kf {
+  from { opacity: 0; translate: 0 26px; }
+  to { opacity: 1; translate: 0 0; }
+}
+
+/* Page transition — gentle slide-up on every route change. Deliberately does
+   NOT touch opacity: even if the animation never runs (frozen/headless), the
+   page is only offset a few px, never blank. */
+.page-enter { animation: page-enter-kf 0.4s cubic-bezier(0.2, 0.7, 0.2, 1); }
+@keyframes page-enter-kf {
+  from { transform: translateY(14px); }
+  to { transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-up { opacity: 1 !important; }
+  .reveal-up.in { animation: none !important; }
+  .page-enter { animation: none !important; }
+}
+
 .btn-teal {
   background: var(--teal);
   color: #fff;
@@ -491,8 +545,8 @@ body {
 .nav-wrap::after {
   content: "";
   position: absolute;
-  left: 32px;
-  right: 32px;
+  left: 40px;
+  right: 40px;
   bottom: 0;
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(13, 30, 29, 0.08), transparent);
@@ -687,13 +741,23 @@ body {
 
 @media (max-width: 560px) {
   .g-stats3 { grid-template-columns: repeat(3, 1fr); gap: 14px; }
-  .hide-sm { display: none !important; }
 }
 
 .show-sm { display: none; }
 
+/* hide-sm / show-sm are a matched pair (desktop nav vs. hamburger) and MUST
+   flip at the same width — otherwise both render at once. */
 @media (max-width: 760px) {
+  .hide-sm { display: none !important; }
   .show-sm { display: inherit; }
+}
+
+/* Dropped from the bar on small screens to stop the header overflowing.
+   Anything using this must also be reachable from the drawer. */
+.hide-xs { display: inherit; }
+
+@media (max-width: 560px) {
+  .hide-xs { display: none !important; }
 }
 
 /* Section backgrounds */
@@ -2065,3 +2129,467 @@ body {
 .pf-back .sep{ width:1px; height:14px; background:rgba(255,255,255,.2); }
 .pf-back .lbl{ opacity:.7; font-weight:500; }
 
+/* ============================================================
+   Header bar — full-width (Blizzard-style).
+   Standalone `.nav-bar` (no `.container`), so it spans the whole
+   viewport instead of the 1280px max-width. The logo hugs the left
+   edge and the nav/utility cluster hugs the right, held off the
+   screen edges by the horizontal padding below.
+   ============================================================ */
+.nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+  box-sizing: border-box;   /* padding must not add to the 100% width */
+  padding: 16px 40px;       /* full-width bar — 40px keeps content off the edges */
+}
+
+@media (max-width: 760px) {
+  .nav-bar { gap: 12px; padding: 14px 20px; }
+}
+
+@media (max-width: 420px) {
+  .nav-bar { gap: 8px; padding: 12px 16px; }
+}
+
+/* ============================================================
+   Hero — layered editorial composition
+     hero__headline (z0) sits BEHIND hero__fan (z2); the fan is
+     pulled up over the headline's lower half via margin-top.
+   ============================================================ */
+.hero {
+  position: relative;
+  overflow: hidden;
+  padding-top: 56px;
+  padding-bottom: 72px;
+}
+
+.hero__inner { position: relative; }
+
+.hero__eyebrow {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 22px;
+}
+
+/* --- Background typography layer --- */
+.hero__headline {
+  position: relative;
+  z-index: 0;
+  text-align: center;
+  margin: 0;
+  user-select: none;
+  /* Decorative-ish: the fan overlaps it, so don't eat clicks meant for cards. */
+  pointer-events: none;
+}
+
+.hero__mark-wrap {
+  position: relative;
+  display: inline-block;
+  padding: 0 0.1em;
+}
+
+/* Yellow brush under "นอกห้องเรียน" — kept from the original hero. */
+.hero__mark {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -6%;
+  width: 100%;
+  height: 52%;
+  z-index: -1;
+}
+
+/* --- Fanned card array --- */
+.hero__fan {
+  position: relative;
+  z-index: 2;
+  height: clamp(196px, 25vw, 300px);
+  /* Pull the fan up so it overlaps the headline's lower half. */
+  margin-top: clamp(-150px, -9vw, -60px);
+  perspective: 1600px;
+}
+
+.hero__fan-slot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+}
+
+.hero__card {
+  position: relative;
+  width: clamp(104px, 13vw, 172px);
+  aspect-ratio: 3 / 4;
+  border-radius: 18px;
+  overflow: hidden;
+  transform: rotate(var(--r));
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.45s ease;
+  box-shadow: 0 30px 60px -20px rgba(13, 30, 29, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.3) inset;
+}
+
+.hero__fan-slot:hover { z-index: 20; }
+
+.hero__card:hover {
+  transform: translateY(-16px) rotate(var(--r)) scale(1.05);
+  box-shadow: 0 46px 82px -22px rgba(13, 30, 29, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.45) inset;
+}
+
+.hero__card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.62;
+  mix-blend-mode: luminosity;
+}
+
+/* Glassmorphism sheen */
+.hero__card-sheen {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(140deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.1) 42%, rgba(255,255,255,0) 62%);
+}
+
+.hero__card-title {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0 10px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
+}
+
+/* --- Central CTA --- */
+.hero__cta {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  margin-top: 30px;
+}
+
+/* --- Bottom row: lede · secondary action · stats --- */
+.hero__sub {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 32px 48px;
+  margin-top: 64px;
+  padding-top: 28px;
+  border-top: 1px dashed var(--teal-100);
+}
+
+.hero__lede {
+  flex: 1 1 400px;
+  max-width: 560px;
+  margin: 0;
+  font-size: clamp(15px, 1.3vw, 18px);
+  line-height: 1.65;
+  color: var(--ink);
+}
+
+.hero__aside {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 28px 36px;
+}
+
+.hero__stats {
+  display: flex;
+  gap: 36px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hero__stat { display: flex; flex-direction: column; gap: 2px; }
+
+.hero__stat-num {
+  font-family: 'Archivo Black', sans-serif;
+  font-size: clamp(26px, 2.6vw, 34px);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.hero__stat-label {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* --- Tablet --- */
+@media (max-width: 920px) {
+  .hero { padding-top: 44px; padding-bottom: 60px; }
+  .hero__sub { gap: 28px 32px; }
+  .hero__aside { width: 100%; justify-content: space-between; }
+}
+
+/* --- Mobile: fan collapses to one focused card + peeks, everything stacks --- */
+@media (max-width: 640px) {
+  .hero__fan {
+    height: clamp(210px, 58vw, 260px);
+    margin-top: -28px;
+  }
+  .hero__card { width: clamp(128px, 38vw, 168px); border-radius: 16px; }
+  .hero__cta { margin-top: 26px; }
+  .hero__cta .btn { width: 100%; justify-content: center; }
+  .hero__sub {
+    flex-direction: column;
+    align-items: stretch;
+    margin-top: 44px;
+  }
+  .hero__lede { flex: 1 1 auto; max-width: none; }
+  .hero__aside { flex-direction: column; align-items: stretch; gap: 24px; }
+  .hero__stats { justify-content: space-between; gap: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero__card { transition: none; }
+  .hero__card:hover { transform: rotate(var(--r)); }
+}
+
+/* Header nav links — grouped with the utilities on the right. */
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Hairline separating navigation from the utility cluster. */
+.nav-links::after {
+  content: "";
+  width: 1px;
+  height: 18px;
+  margin-left: 16px;
+  background: rgba(13, 30, 29, 0.12);
+}
+
+/* ============================================================
+   Text containment utilities
+   User-generated strings (workshop/article titles) have no length
+   guarantee, so any element rendering one needs a break rule and,
+   inside a card, a clamp — otherwise a single long token blows past
+   its wrapper and card heights drift out of alignment.
+   ============================================================ */
+
+/* Lets an unbroken 60-char token wrap instead of overflowing. */
+.u-break {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.u-clamp-1,
+.u-clamp-2,
+.u-clamp-3 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.u-clamp-1 { -webkit-line-clamp: 1; line-clamp: 1; }
+.u-clamp-2 { -webkit-line-clamp: 2; line-clamp: 2; }
+.u-clamp-3 { -webkit-line-clamp: 3; line-clamp: 3; }
+
+/* ============================================================
+   Grid card alignment
+   Reveal wrappers sit between the grid and the card. The grid
+   stretches the WRAPPER to the row height, but a block wrapper
+   doesn't pass that height on, so shorter cards float and their
+   bottoms don't line up. Make the wrapper hand its height down.
+   ============================================================ */
+.grid-x > [class*="reveal"] {
+  display: flex;
+  flex-direction: column;
+}
+
+.grid-x > [class*="reveal"] > .card {
+  flex: 1 1 auto;
+}
+
+/* ============================================================
+   Home (Design Composer port) — "Experience" fanned hero + grids
+   Scoped under .home-dc so nothing leaks to other pages.
+   ============================================================ */
+.home-dc { background: var(--paper); }
+
+.home-dc .giant-en {
+  text-align: center;
+  color: var(--ink);
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+  margin: 0 0 -46px;
+  font-size: clamp(48px, 12vw, 168px);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+/* Fanned ticket array */
+.fan-wrap {
+  position: relative;
+  height: 380px;
+  max-width: 980px;
+  margin: 0 auto;
+  z-index: 2;
+}
+.fan-card {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  width: 222px;
+  height: 302px;
+  border-radius: 20px;
+  overflow: hidden;
+  cursor: pointer;
+  transform-origin: center center;
+  /* Lift and its shadow share one duration + curve so they read as a single
+     cohesive motion; the dim/brighten filter trails just behind. */
+  transition:
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.5s ease;
+  will-change: transform, filter;
+}
+/* Cover image drifts in slowly on hover for a subtle sense of depth. */
+.fan-card img {
+  transition: transform 0.85s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+.fan-card:hover img {
+  transform: scale(1.08);
+}
+@media (prefers-reduced-motion: reduce) {
+  .fan-card,
+  .fan-card img {
+    transition: none;
+  }
+  .fan-card:hover img {
+    transform: none;
+  }
+}
+.home-dc .hero-lede { margin-top: 130px; }
+
+/* Responsive grids (own class each — no blunt shared override) */
+.dc-events-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
+.dc-articles-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; }
+/* Reviews slider — 3 per view, arrow-paged (2/view ≤900px, swipe-only 1/view ≤560px). */
+.dc-rev-slider { display: flex; align-items: center; gap: 14px; }
+.dc-rev-track {
+  display: flex;
+  gap: 22px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  /* room for the tilt (rotated corners), the .card hover lift + drop shadow,
+     which the scroll clip would otherwise cut */
+  padding: 22px 6px 34px;
+}
+.dc-rev-track::-webkit-scrollbar { display: none; }
+.dc-rev-cell { flex: 0 0 calc((100% - 44px) / 3); min-width: 0; scroll-snap-align: start; }
+.dc-rev-arrow {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 17px;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.dc-rev-arrow:hover:not(:disabled) { transform: scale(1.08); }
+.dc-rev-arrow:disabled { opacity: 0.35; cursor: default; }
+
+@media (max-width: 900px) {
+  .fan-wrap { transform: scale(0.74); transform-origin: top center; margin-bottom: -96px; }
+  .home-dc .hero-lede { margin-top: 60px; }
+  .dc-events-grid { grid-template-columns: repeat(2, 1fr); }
+  .dc-articles-grid { grid-template-columns: 1fr; }
+  .dc-rev-cell { flex-basis: calc((100% - 22px) / 2); }
+}
+@media (max-width: 560px) {
+  .dc-rev-cell { flex-basis: 100%; }
+  .dc-rev-arrow { display: none; }
+}
+@media (max-width: 480px) {
+  /* 5-card fan is ~894px wide natively; scale so the outer cards stay on a
+     390px screen (they were clipping ~48px each side at 0.5). */
+  .fan-wrap { transform: scale(0.42); margin-bottom: -210px; }
+  .home-dc .giant-en { font-size: clamp(40px, 15vw, 72px); }
+  .home-dc .hero-lede { margin-top: 20px; }
+  .dc-events-grid { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   Workshops listing grid (Design Composer "Workshops.dc.html")
+   ============================================================ */
+.wk-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+}
+.wk-grid .card {
+  box-shadow: 0 1px 0 rgba(13, 30, 29, 0.06), 0 10px 30px -18px rgba(13, 30, 29, 0.22);
+  border: 1px solid rgba(13, 30, 29, 0.06);
+}
+.wk-grid .card:hover {
+  box-shadow: 0 16px 40px -16px rgba(13, 30, 29, 0.24);
+}
+@media (max-width: 860px) {
+  .wk-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 480px) {
+  .wk-grid { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   Articles / Journal (Design Composer "Articles.dc.html")
+   ============================================================ */
+.art-hero { display: grid; grid-template-columns: 1.4fr 1fr; gap: 32px; align-items: end; }
+.art-featured { display: grid; grid-template-columns: 1fr 1fr; gap: 0; overflow: hidden; }
+.art-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+
+@media (max-width: 860px) {
+  .art-hero { grid-template-columns: 1fr; }
+  .art-hero > div:last-child { text-align: left !important; }
+  .art-featured { grid-template-columns: 1fr; }
+  .art-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 480px) {
+  .art-grid { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   About page (Design Composer "About.dc.html")
+   ============================================================ */
+.beliefs-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.team-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+
+@media (max-width: 860px) {
+  .beliefs-grid { grid-template-columns: 1fr; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .team-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns: 1fr; }
+  .team-grid { grid-template-columns: 1fr; }
+}

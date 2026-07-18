@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLang, T, tr } from '@/lib/i18n';
 import { Btn } from '@/components/design/RippleButton';
+import { getVault, putVault } from '@/lib/vault';
 import { ImageUploader } from '@/components/admin/image/ImageUploader';
 import { ASPECTS } from '@/lib/image-aspects';
 import { parseImageMeta } from '@/lib/image-meta';
@@ -31,11 +32,14 @@ const fieldLabel = 'block text-[11px] font-mono uppercase tracking-wider text-gr
 function SectionCard({
   title,
   desc,
+  badge,
   children,
   className = '',
 }: {
   title?: string;
   desc?: string;
+  /** Optional status chip rendered next to the title (e.g. "รอยืนยัน"). */
+  badge?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
 }) {
@@ -43,9 +47,12 @@ function SectionCard({
     <div className={`card card-static ${className}`}>
       {title && (
         <div style={{ marginBottom: 16 }}>
-          <h3 className="display-th" style={{ fontSize: 18, lineHeight: 1.3, margin: 0 }}>
-            {title}
-          </h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <h3 className="display-th" style={{ fontSize: 18, lineHeight: 1.3, margin: 0 }}>
+              {title}
+            </h3>
+            {badge}
+          </div>
           {desc && <p style={{ fontSize: 13, color: 'var(--muted)', margin: '4px 0 0', lineHeight: 1.5 }}>{desc}</p>}
         </div>
       )}
@@ -87,26 +94,22 @@ export function EditProfilePanel({
 }) {
   const { lang } = useLang();
   const [nickname, setNickname] = useState(me.nickname || '');
-  const [dob, setDob] = useState(me.date_of_birth || '');
   const [avatarUrl, setAvatarUrl] = useState(me.avatar_url || '');
   const [avatarMeta, setAvatarMeta] = useState<ImageMeta | null>(parseImageMeta(me.avatar_meta));
   const [coverUrl, setCoverUrl] = useState(me.cover_image_url || '');
   const [coverMeta, setCoverMeta] = useState<ImageMeta | null>(parseImageMeta(me.cover_image_meta));
   const [saving, setSaving] = useState(false);
-  const age = calcAge(dob);
 
   // Baseline of last-saved values (so dirty flips back after save without
   // mutating the `me` prop). State so it's safe to read during render.
   const [base, setBase] = useState({
     nickname: me.nickname || '',
-    dob: me.date_of_birth || '',
     avatarUrl: me.avatar_url || '',
     coverUrl: me.cover_image_url || '',
   });
 
   const dirty =
     nickname !== base.nickname ||
-    dob !== base.dob ||
     avatarUrl !== base.avatarUrl ||
     coverUrl !== base.coverUrl;
   useEffect(() => {
@@ -124,7 +127,9 @@ export function EditProfilePanel({
           // the profile PUT (which overwrites every column) doesn't wipe them.
           name: me.name,
           nickname,
-          date_of_birth: dob,
+          // DOB is now edited on the Autofill page; preserve the stored value so
+          // this profile PUT (which overwrites every column) doesn't wipe it.
+          date_of_birth: me.date_of_birth ?? '',
           bio: me.bio ?? '',
           avatar_url: avatarUrl || null,
           avatar_meta: avatarMeta,
@@ -134,7 +139,7 @@ export function EditProfilePanel({
       });
       if (res.ok) {
         // Update the baseline so `dirty` flips back to false after save.
-        setBase({ nickname, dob, avatarUrl, coverUrl });
+        setBase({ nickname, avatarUrl, coverUrl });
         onDirtyChange?.(false);
         onSaved(tr(lang, 'บันทึกโปรไฟล์แล้ว', 'Profile saved'));
       } else onSaved(tr(lang, 'บันทึกไม่สำเร็จ', 'Save failed'));
@@ -256,10 +261,12 @@ export function EditProfilePanel({
             </div>
             <div>
               <label className={fieldLabel}>
-                <T th="วันเกิด" en="Birthdate" />
-                {age != null && <span style={{ color: 'var(--teal)', marginLeft: 8 }}>· {lang === 'th' ? `${age} ปี` : `age ${age}`}</span>}
+                <T th="อีเมล" en="Email" />
               </label>
-              <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} className="field" max={new Date().toISOString().slice(0, 10)} />
+              <input value={me.email} disabled className="field" style={{ background: 'var(--cream-deep)', color: 'var(--muted)' }} />
+              <p style={{ fontSize: 12, color: 'var(--muted)', margin: '6px 0 0' }}>
+                <T th="ไม่สามารถเปลี่ยนอีเมลได้" en="Email cannot be changed" />
+              </p>
             </div>
             <div>
               <label className={fieldLabel}>
@@ -374,18 +381,6 @@ export function AccountPanel({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
-      <SectionCard title={tr(lang, 'ข้อมูลบัญชี', 'Account info')}>
-        <div>
-          <label className={fieldLabel}>
-            <T th="อีเมล" en="Email" />
-          </label>
-          <input value={me.email} disabled className="field" style={{ background: 'var(--cream-deep)', color: 'var(--muted)' }} />
-          <p style={{ fontSize: 12, color: 'var(--muted)', margin: '6px 0 0' }}>
-            <T th="ไม่สามารถเปลี่ยนอีเมลได้" en="Email cannot be changed" />
-          </p>
-        </div>
-      </SectionCard>
-
       {/* Password */}
       <SectionCard>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
@@ -591,16 +586,23 @@ export function IdentityPanel({ me, onSaved }: { me?: MeData; onSaved?: (m: stri
   const router = useRouter();
   const goForm = () => router.push('/me/settings?tab=autofill');
 
-  const [vault, setVault] = useState<{ firstName?: string; lastName?: string; nickname?: string; medical?: string }>({});
+  const [vault, setVault] = useState<Partial<Vault>>({});
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('ss_autofill_vault');
-      if (raw) setVault(JSON.parse(raw));
-    } catch {}
+    let alive = true;
+    // Server-synced vault (falls back to this device's cache). See lib/vault.ts.
+    getVault().then((raw) => {
+      if (alive && raw && Object.keys(raw).length > 0) setVault(raw as Partial<Vault>);
+    });
+    return () => {
+      alive = false;
+    };
   }, []);
 
-  const identityComplete = !!((vault.firstName || '').trim() && (vault.lastName || '').trim() && (vault.nickname || '').trim());
-  const healthComplete = !!(vault.medical || '').trim();
+  // Read the same required-field lists the form gates on, so this status can
+  // never disagree with the section badges.
+  const isDone = (keys: (keyof Vault)[]) => keys.every((k) => String(vault[k] ?? '').trim().length > 0);
+  const identityComplete = isDone(REQUIRED_BASE.identity);
+  const healthComplete = isDone(REQUIRED_BASE.health);
   const verified = identityComplete && healthComplete;
 
   const emailVerified = me?.email_verified === 1;
@@ -750,6 +752,7 @@ type Vault = {
   firstName: string;
   lastName: string;
   nickname: string;
+  dob: string;
   gender: string;
   genderOther: string;
   phone: string;
@@ -766,6 +769,7 @@ const EMPTY_VAULT: Vault = {
   firstName: '',
   lastName: '',
   nickname: '',
+  dob: '',
   gender: 'female',
   genderOther: '',
   phone: '',
@@ -778,7 +782,45 @@ const EMPTY_VAULT: Vault = {
   dietary: '',
 };
 
+/* Sectional model — each section saves independently. Required fields decide
+   whether a section is "complete"; once saved complete a section is "verified"
+   and its required fields can be edited but not emptied. */
+type SectionKey = 'identity' | 'health' | 'emergency';
+
+const SECTION_FIELDS: Record<SectionKey, (keyof Vault)[]> = {
+  identity: ['prefix', 'firstName', 'lastName', 'nickname', 'dob', 'gender', 'genderOther', 'phone', 'lineId', 'facebook'],
+  health: ['medical', 'dietary'],
+  emergency: ['emName', 'emRelation', 'emPhone'],
+};
+
+const REQUIRED_BASE: Record<SectionKey, (keyof Vault)[]> = {
+  // Line ID stays optional. DOB + Facebook are required (needed for applications).
+  identity: ['prefix', 'firstName', 'lastName', 'nickname', 'dob', 'gender', 'phone', 'facebook'],
+  health: ['medical', 'dietary'],
+  emergency: [], // optional — always saveable
+};
+
+/** Thai block + spaces — used by the ชื่อจริง / นามสกุล / ชื่อเล่น inputs.
+    Anything else is stripped as the user types. */
+const THAI_CHAR = /[฀-๿\s]/;
+const stripNonThai = (s: string) =>
+  s
+    .split('')
+    .filter((ch) => THAI_CHAR.test(ch))
+    .join('');
+
+/** Required fields for a section given current values (gender "other" needs genderOther). */
+function requiredFor(section: SectionKey, vals: Vault): (keyof Vault)[] {
+  if (section === 'identity' && vals.gender === 'other') return [...REQUIRED_BASE.identity, 'genderOther'];
+  return REQUIRED_BASE[section];
+}
+
+const isFilled = (val: unknown) => String(val ?? '').trim().length > 0;
+
+const ERR_RING: React.CSSProperties = { boxShadow: 'inset 0 0 0 1.5px #d94b46' };
+
 export function AutofillPanel({
+  me,
   onSaved,
   onDirtyChange,
 }: {
@@ -788,84 +830,231 @@ export function AutofillPanel({
 }) {
   const { lang } = useLang();
   const [v, setV] = useState<Vault>(EMPTY_VAULT);
-  const [savedJson, setSavedJson] = useState(JSON.stringify(EMPTY_VAULT));
+  // Last-saved snapshot. On mount it loads from the vault; only an explicit
+  // section Save updates it, so unsaved (possibly invalid) edits are discarded
+  // when the panel unmounts and repopulated from here on return.
+  const [saved, setSaved] = useState<Vault>(EMPTY_VAULT);
+  /** Fields the user has left (blurred) — gates the "required" error per field. */
+  const [touched, setTouched] = useState<Partial<Record<keyof Vault, boolean>>>({});
+  /** Fields where the last keystroke/paste contained non-Thai characters. */
+  const [thaiWarn, setThaiWarn] = useState<Partial<Record<keyof Vault, boolean>>>({});
   const set = (k: keyof Vault) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setV((p) => ({ ...p, [k]: e.target.value }));
 
-  useEffect(() => {
-    (() => {
-      try {
-        const raw = localStorage.getItem('ss_autofill_vault');
-        if (raw) {
-          const loaded = { ...EMPTY_VAULT, ...JSON.parse(raw) };
-          setV(loaded);
-          setSavedJson(JSON.stringify(loaded));
-        }
-      } catch {}
-    })();
-  }, []);
+  /** Thai-only name input: silently drops any disallowed character and flags why. */
+  const setThaiName = (k: keyof Vault) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    const clean = stripNonThai(raw);
+    setThaiWarn((p) => ({ ...p, [k]: clean !== raw }));
+    setV((p) => ({ ...p, [k]: clean }));
+  };
 
-  const dirty = JSON.stringify(v) !== savedJson;
-  useEffect(() => {
-    onDirtyChange?.(dirty);
-  }, [dirty, onDirtyChange]);
+  const onBlurField = (k: keyof Vault) => () => setTouched((p) => ({ ...p, [k]: true }));
 
-  function save() {
+  useEffect(() => {
+    // Load-once from the device vault on mount. Synchronous setState here is the
+    // intended pattern for hydrating persisted state (and is SSR-safe — no
+    // localStorage during render).
+    let alive = true;
+    getVault().then((raw) => {
+      if (!alive) return;
+      const loaded = { ...EMPTY_VAULT, ...(raw || {}) } as Vault;
+      // Seed DOB from the legacy profile column so users who set it on the old
+      // Edit-Profile page don't have to re-enter it here.
+      if (!loaded.dob && me?.date_of_birth) loaded.dob = me.date_of_birth;
+      setV(loaded);
+      setSaved(loaded);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [me]);
+
+  const sectionDirty = (s: SectionKey) => SECTION_FIELDS[s].some((f) => v[f] !== saved[f]);
+  const isComplete = (s: SectionKey, vals: Vault) => requiredFor(s, vals).every((f) => isFilled(vals[f]));
+  /** A section is verified once it has been saved with every required field filled. */
+  const isVerified = (s: SectionKey) => isComplete(s, saved);
+
+  // The parent unsaved-changes guard watches any section being dirty.
+  const anyDirty = (['identity', 'health', 'emergency'] as SectionKey[]).some(sectionDirty);
+  useEffect(() => {
+    onDirtyChange?.(anyDirty);
+  }, [anyDirty, onDirtyChange]);
+
+  /** Persist only this section's fields into the shared vault, keeping other
+      sections at their last-saved values (never their unsaved edits). */
+  function saveSection(s: SectionKey) {
+    if (!isComplete(s, v)) return; // guarded — the button is disabled in this state
+    const next: Vault = { ...saved };
+    SECTION_FIELDS[s].forEach((f) => {
+      (next as Record<string, string>)[f] = v[f];
+    });
     try {
-      const json = JSON.stringify(v);
-      localStorage.setItem('ss_autofill_vault', json);
-      setSavedJson(json);
-      onDirtyChange?.(false);
-      onSaved(tr(lang, 'บันทึกข้อมูลอัตโนมัติแล้ว', 'Autofill vault saved'));
+      void putVault(next as Record<string, string>); // writes localStorage + syncs to server
+      setSaved(next);
+      const label =
+        s === 'identity' ? tr(lang, 'ตัวตน', 'Identity') : s === 'health' ? tr(lang, 'สุขภาพ & อาหาร', 'Health & dietary') : tr(lang, 'ผู้ติดต่อฉุกเฉิน', 'Emergency contact');
+      onSaved(tr(lang, `บันทึกส่วน “${label}” แล้ว`, `${label} section saved`));
     } catch {
       onSaved(tr(lang, 'บันทึกไม่สำเร็จ', 'Save failed'));
     }
   }
+
+  /** Empty-required error: after the field is blurred, once the section is
+      verified (delete-prevention), or once the user has started filling it. */
+  const showErr = (f: keyof Vault, s: SectionKey) =>
+    requiredFor(s, v).includes(f) && !isFilled(v[f]) && (touched[f] || isVerified(s) || sectionDirty(s));
+
+  /** Any error on the field — drives the red ring. */
+  const hasErr = (f: keyof Vault, s: SectionKey) => showErr(f, s) || !!thaiWarn[f];
+
+  // Plain render helpers (not nested components) so they don't remount each render.
+  const req = () => <span style={{ color: '#d94b46' }}> *</span>;
+  const renderErr = () => (
+    <span style={{ display: 'block', marginTop: 4, fontSize: 11.5, color: '#d94b46' }}>{tr(lang, 'ห้ามเว้นว่าง — จำเป็น', 'Required — cannot be empty')}</span>
+  );
+  const renderThaiErr = () => (
+    <span style={{ display: 'block', marginTop: 4, fontSize: 11.5, color: '#d94b46' }}>
+      {tr(lang, 'กรอกภาษาไทยเท่านั้น — ห้ามตัวเลขหรืออักษรพิเศษ', 'Thai letters only — no digits or symbols')}
+    </span>
+  );
+
+  /** "รอยืนยัน" until the section has been saved with every required field filled. */
+  const statusBadge = (s: SectionKey) =>
+    isVerified(s) ? (
+      <span className="tag" style={{ fontSize: 10.5 }}>✓ {tr(lang, 'ยืนยันแล้ว', 'Verified')}</span>
+    ) : (
+      <span className="tag tag-warn" style={{ fontSize: 10.5 }}>{tr(lang, 'รอยืนยัน', 'Pending')}</span>
+    );
+
+  const saveBar = (s: SectionKey) => {
+    const verified = isVerified(s);
+    const complete = isComplete(s, v);
+    const dirtyS = sectionDirty(s);
+    const canSave = complete && dirtyS;
+    const blocked = verified && dirtyS && !complete; // a required field was cleared
+
+    // "Saved" only means something once the section actually holds saved data —
+    // an untouched optional section (Emergency) should read as blank, not "Saved".
+    const hasSavedData = SECTION_FIELDS[s].some((f) => isFilled(saved[f]));
+
+    let status: { text: string; color: string; check?: boolean } | null = null;
+    if (blocked) status = { text: tr(lang, 'กรอกช่องที่จำเป็นให้ครบก่อนบันทึก — ห้ามเว้นว่าง', 'Fill the required fields before saving — they cannot be empty'), color: '#d94b46' };
+    else if (!verified && !complete) status = { text: tr(lang, 'กรอกช่องที่มีเครื่องหมาย * ให้ครบเพื่อบันทึกครั้งแรก', 'Fill every * field to save this section for the first time'), color: 'var(--muted)' };
+    else if (canSave) status = { text: tr(lang, 'พร้อมบันทึก', 'Ready to save'), color: 'var(--muted)' };
+    else if (!dirtyS && hasSavedData) status = { text: tr(lang, 'บันทึกแล้ว', 'Saved'), color: 'var(--teal-deep)', check: true };
+
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginTop: 8, paddingTop: 14, borderTop: '1px dashed var(--cream-deep)' }}>
+        <Btn kind="teal" size="sm" disabled={!canSave} onClick={() => saveSection(s)} style={!canSave ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}>
+          {tr(lang, 'บันทึกส่วนนี้', 'Save section')} <span className="mono">→</span>
+        </Btn>
+        {status && (
+          <span style={{ fontSize: 12.5, color: status.color, fontWeight: status.check ? 600 : 400 }}>
+            {status.check ? '✓ ' : ''}
+            {status.text}
+          </span>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 18px', borderRadius: 16, background: 'var(--teal-50)' }}>
         <ShieldSvg color="var(--teal-deep)" size={20} />
         <p style={{ margin: 0, fontSize: 13, color: 'var(--teal-deep)', lineHeight: 1.6 }}>
-          <T th="ข้อมูลนี้จะถูกใช้กรอกแบบฟอร์มสมัครเวิร์กชอปให้อัตโนมัติ และเก็บไว้ในเครื่องของคุณ" en="This vault auto-fills your workshop checkout forms. Stored on your device." />
+          <T th="ข้อมูลนี้จะถูกใช้กรอกแบบฟอร์มสมัครเวิร์กชอปให้อัตโนมัติ และเก็บไว้ในเครื่องของคุณ · แต่ละส่วนบันทึกแยกกันได้" en="This vault auto-fills your workshop checkout forms. Stored on your device · each section saves independently." />
         </p>
       </div>
 
-      <SectionCard title={tr(lang, 'ตัวตน', 'Identity')}>
+      <SectionCard title={tr(lang, 'ตัวตน', 'Identity')} badge={statusBadge('identity')}>
         <div className="form-grid">
           <div>
             <label className={fieldLabel}>
               <T th="คำนำหน้า" en="Title / Prefix" />
+              {req()}
             </label>
-            <select value={v.prefix || ''} onChange={(e) => setV((p) => ({ ...p, prefix: e.target.value }))} className="field">
+            <select value={v.prefix || ''} onChange={(e) => setV((p) => ({ ...p, prefix: e.target.value }))} onBlur={onBlurField('prefix')} className="field" style={showErr('prefix', 'identity') ? ERR_RING : undefined}>
               <option value="">{tr(lang, '— เลือก —', '— Select —')}</option>
               <option value="mr">{tr(lang, 'นาย', 'Mr.')}</option>
               <option value="mrs">{tr(lang, 'นาง', 'Mrs.')}</option>
               <option value="ms">{tr(lang, 'นางสาว', 'Ms.')}</option>
             </select>
+            {showErr('prefix', 'identity') && renderErr()}
           </div>
           {/* spacer to keep prefix on its own row on 2-col grids */}
           <div aria-hidden />
           <div>
             <label className={fieldLabel}>
               <T th="ชื่อจริง" en="First name" />
+              {req()}
             </label>
-            <input value={v.firstName || ''} onChange={set('firstName')} className="field" />
+            <input
+              value={v.firstName || ''}
+              onChange={setThaiName('firstName')}
+              onBlur={onBlurField('firstName')}
+              className="field"
+              inputMode="text"
+              placeholder={tr(lang, 'ภาษาไทยเท่านั้น', 'Thai letters only')}
+              style={hasErr('firstName', 'identity') ? ERR_RING : undefined}
+            />
+            {thaiWarn.firstName ? renderThaiErr() : showErr('firstName', 'identity') ? renderErr() : null}
           </div>
           <div>
             <label className={fieldLabel}>
               <T th="นามสกุล" en="Last name" />
+              {req()}
             </label>
-            <input value={v.lastName || ''} onChange={set('lastName')} className="field" />
+            <input
+              value={v.lastName || ''}
+              onChange={setThaiName('lastName')}
+              onBlur={onBlurField('lastName')}
+              className="field"
+              inputMode="text"
+              placeholder={tr(lang, 'ภาษาไทยเท่านั้น', 'Thai letters only')}
+              style={hasErr('lastName', 'identity') ? ERR_RING : undefined}
+            />
+            {thaiWarn.lastName ? renderThaiErr() : showErr('lastName', 'identity') ? renderErr() : null}
           </div>
           <div>
             <label className={fieldLabel}>
               <T th="ชื่อเล่น" en="Nickname" />
+              {req()}
             </label>
-            <input value={v.nickname || ''} onChange={set('nickname')} className="field" placeholder={tr(lang, 'เช่น มะนาว', 'e.g. Nong')} />
+            <input
+              value={v.nickname || ''}
+              onChange={setThaiName('nickname')}
+              onBlur={onBlurField('nickname')}
+              className="field"
+              inputMode="text"
+              placeholder={tr(lang, 'เช่น มะนาว (ภาษาไทยเท่านั้น)', 'e.g. Nong (Thai letters only)')}
+              style={hasErr('nickname', 'identity') ? ERR_RING : undefined}
+            />
+            {thaiWarn.nickname ? renderThaiErr() : showErr('nickname', 'identity') ? renderErr() : null}
+          </div>
+          <div>
+            <label className={fieldLabel}>
+              <T th="วันเกิด" en="Birthdate" />
+              {req()}
+              {calcAge(v.dob) != null && (
+                <span style={{ color: 'var(--teal)', marginLeft: 8 }}>· {lang === 'th' ? `${calcAge(v.dob)} ปี` : `age ${calcAge(v.dob)}`}</span>
+              )}
+            </label>
+            <input
+              type="date"
+              value={v.dob || ''}
+              onChange={(e) => setV((p) => ({ ...p, dob: e.target.value }))}
+              onBlur={onBlurField('dob')}
+              className="field"
+              max={new Date().toISOString().slice(0, 10)}
+              style={showErr('dob', 'identity') ? ERR_RING : undefined}
+            />
+            {showErr('dob', 'identity') && renderErr()}
           </div>
           <div>
             <label className={fieldLabel}>
               <T th="เพศ" en="Gender" />
+              {req()}
             </label>
             <select
               value={v.gender || 'female'}
@@ -885,50 +1074,70 @@ export function AutofillPanel({
             <div>
               <label className={fieldLabel}>
                 <T th="ระบุเพศ" en="Specify gender" />
+                {req()}
               </label>
               <input
                 value={v.genderOther || ''}
                 onChange={set('genderOther')}
+                onBlur={onBlurField('genderOther')}
                 className="field"
+                style={showErr('genderOther', 'identity') ? ERR_RING : undefined}
                 placeholder={tr(lang, 'ระบุอัตลักษณ์ทางเพศของคุณ', 'Type your gender identity')}
               />
+              {showErr('genderOther', 'identity') && renderErr()}
             </div>
           )}
           <div>
             <label className={fieldLabel}>
               <T th="เบอร์โทรศัพท์" en="Phone number" />
+              {req()}
             </label>
-            <input type="tel" value={v.phone} onChange={set('phone')} className="field" placeholder={tr(lang, 'เช่น 081-234-5678', 'e.g. 081-234-5678')} />
+            <input type="tel" value={v.phone} onChange={set('phone')} onBlur={onBlurField('phone')} className="field" style={showErr('phone', 'identity') ? ERR_RING : undefined} placeholder={tr(lang, 'เช่น 081-234-5678', 'e.g. 081-234-5678')} />
+            {showErr('phone', 'identity') && renderErr()}
           </div>
           <div>
             <label className={fieldLabel}>Line ID</label>
             <input value={v.lineId} onChange={set('lineId')} className="field" />
           </div>
           <div>
-            <label className={fieldLabel}>Facebook</label>
-            <input value={v.facebook} onChange={set('facebook')} className="field" />
+            <label className={fieldLabel}>
+              Facebook
+              {req()}
+            </label>
+            <input value={v.facebook} onChange={set('facebook')} onBlur={onBlurField('facebook')} className="field" style={showErr('facebook', 'identity') ? ERR_RING : undefined} placeholder={tr(lang, 'ลิงก์หรือชื่อโปรไฟล์ Facebook', 'Facebook profile link or name')} />
+            {showErr('facebook', 'identity') && renderErr()}
           </div>
         </div>
+        {saveBar('identity')}
       </SectionCard>
 
-      <SectionCard title={tr(lang, 'สุขภาพ & อาหาร', 'Health & dietary')} desc={tr(lang, 'ช่วยให้ผู้จัดดูแลคุณได้ดีขึ้นในวันเวิร์กชอป (หากไม่มี ให้ระบุว่า "ไม่มี")', 'Helps facilitators care for you on the day. Put "None" if not applicable.')}>
+      <SectionCard
+        title={tr(lang, 'สุขภาพ & อาหาร', 'Health & dietary')}
+        badge={statusBadge('health')}
+        desc={tr(lang, 'ช่วยให้ผู้จัดดูแลคุณได้ดีขึ้นในวันเวิร์กชอป (หากไม่มี ให้ระบุว่า "ไม่มี")', 'Helps facilitators care for you on the day. Put "None" if not applicable.')}
+      >
         <div className="form-grid" style={{ gridTemplateColumns: '1fr' }}>
           <div>
             <label className={fieldLabel}>
               <T th="โรคประจำตัว / อาการแพ้" en="Medical conditions / allergies" />
+              {req()}
             </label>
-            <textarea value={v.medical} onChange={set('medical')} className="field" rows={2} style={{ resize: 'vertical' }} placeholder={tr(lang, 'หากไม่มี ให้ระบุว่า "ไม่มี"', 'Put "None" if not applicable')} />
+            <textarea value={v.medical} onChange={set('medical')} onBlur={onBlurField('medical')} className="field" rows={2} style={{ resize: 'vertical', ...(showErr('medical', 'health') ? ERR_RING : {}) }} placeholder={tr(lang, 'หากไม่มี ให้ระบุว่า "ไม่มี"', 'Put "None" if not applicable')} />
+            {showErr('medical', 'health') && renderErr()}
           </div>
           <div>
             <label className={fieldLabel}>
               <T th="ข้อจำกัดด้านอาหาร" en="Dietary restrictions" />
+              {req()}
             </label>
-            <textarea value={v.dietary} onChange={set('dietary')} className="field" rows={2} style={{ resize: 'vertical' }} />
+            <textarea value={v.dietary} onChange={set('dietary')} onBlur={onBlurField('dietary')} className="field" rows={2} style={{ resize: 'vertical', ...(showErr('dietary', 'health') ? ERR_RING : {}) }} placeholder={tr(lang, 'หากไม่มี ให้ระบุว่า "ไม่มี"', 'Put "None" if not applicable')} />
+            {showErr('dietary', 'health') && renderErr()}
           </div>
         </div>
+        {saveBar('health')}
       </SectionCard>
 
-      <SectionCard title={tr(lang, 'ผู้ติดต่อฉุกเฉิน', 'Emergency contact')} desc={tr(lang, 'ไม่บังคับ — เว้นว่างได้', 'Optional — you may leave this blank.')}>
+      <SectionCard title={tr(lang, 'ผู้ติดต่อฉุกเฉิน', 'Emergency contact')} desc={tr(lang, 'ไม่บังคับ — เว้นว่างได้ บันทึกเมื่อไรก็ได้', 'Optional — you may leave this blank. Saveable anytime.')}>
         <div className="form-grid">
           <div>
             <label className={fieldLabel}>
@@ -949,13 +1158,8 @@ export function AutofillPanel({
             <input type="tel" value={v.emPhone} onChange={set('emPhone')} className="field" />
           </div>
         </div>
+        {saveBar('emergency')}
       </SectionCard>
-
-      <div>
-        <Btn kind="teal" onClick={save}>
-          {tr(lang, 'บันทึก', 'Save vault')} <span className="mono">→</span>
-        </Btn>
-      </div>
     </div>
   );
 }
