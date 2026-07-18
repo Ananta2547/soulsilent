@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useLang, tr } from '@/lib/i18n';
 import { menuForRole } from '@/lib/profile-menu';
@@ -42,6 +43,23 @@ export function ProfileDropdown({
   const { lang } = useLang();
   const ref = useRef<HTMLDivElement>(null);
 
+  // On mobile the menu is a fixed bottom sheet. It must be portaled to <body>:
+  // `.nav-wrap` (its normal parent) has `-webkit-backdrop-filter`, which creates
+  // a containing block for `position:fixed` descendants — so a non-portaled sheet
+  // anchors to the ~68px header instead of the viewport and lands at the top with
+  // its head cut off. Desktop keeps the in-place absolute popover (anchored to the
+  // trigger), so we only portal on mobile.
+  const [mounted, setMounted] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+    const mq = window.matchMedia('(max-width: 560px)');
+    const sync = () => setIsMobile(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -61,7 +79,7 @@ export function ProfileDropdown({
   const display = user.nickname || user.name;
   const age = calcAge(user.date_of_birth);
 
-  return (
+  const tree = (
     <>
       {/* Dim backdrop — only shown on mobile where the menu is a bottom sheet. */}
       <div className="prof-pop-backdrop" aria-hidden onClick={onClose} />
@@ -271,4 +289,7 @@ export function ProfileDropdown({
     </div>
     </>
   );
+
+  // Escape the header's backdrop-filter containing block on mobile via a portal.
+  return isMobile && mounted ? createPortal(tree, document.body) : tree;
 }
