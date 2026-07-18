@@ -18,7 +18,9 @@ export async function GET() {
     } catch {
       vault = null;
     }
-    return NextResponse.json({ vault });
+    // userId lets the client scope its localStorage cache per-account so one
+    // user's vault can never bleed into another on a shared browser.
+    return NextResponse.json({ vault, userId: user.sub });
   } catch (error) {
     console.error('Get vault error:', error);
     return NextResponse.json({ error: 'เกิดข้อผิดพลาด' }, { status: 500 });
