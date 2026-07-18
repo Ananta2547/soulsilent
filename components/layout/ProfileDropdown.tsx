@@ -62,6 +62,9 @@ export function ProfileDropdown({
   const age = calcAge(user.date_of_birth);
 
   return (
+    <>
+      {/* Dim backdrop — only shown on mobile where the menu is a bottom sheet. */}
+      <div className="prof-pop-backdrop" aria-hidden onClick={onClose} />
     <div
       ref={ref}
       className="prof-pop"
@@ -266,5 +269,6 @@ export function ProfileDropdown({
         </button>
       </div>
     </div>
+    </>
   );
 }
