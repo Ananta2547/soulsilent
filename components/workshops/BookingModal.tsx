@@ -117,6 +117,14 @@ export function BookingModal({
   const prefixLabel = vault.prefix && PREFIX_LABEL[vault.prefix] ? pick(PREFIX_LABEL[vault.prefix], lang) : '';
   // DOB now lives in the autofill vault; fall back to the legacy profile column.
   const age = ageFrom(vault.dob || profile?.date_of_birth);
+
+  // Age restriction (per workshop). null on either end = no limit there. Only
+  // block when we actually know the age — a missing DOB is handled by the
+  // `incomplete` gate below (it asks the user to complete their profile first).
+  const minAge = workshop.min_age ?? null;
+  const maxAge = workshop.max_age ?? null;
+  const ageBlocked =
+    age != null && ((minAge != null && age < minAge) || (maxAge != null && age > maxAge));
   const genderLabel =
     vault.gender === 'other'
       ? vault.genderOther || '—'
@@ -244,6 +252,54 @@ export function BookingModal({
               {tr(lang, 'ดูหน้าการจอง', 'View Booking Page')}
             </Link>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Age restriction popup — blocks entry to the application form ----
+  if (ageBlocked) {
+    const rangeTh =
+      minAge != null && maxAge != null
+        ? `${minAge}–${maxAge} ปี`
+        : minAge != null
+          ? `${minAge} ปีขึ้นไป`
+          : `ไม่เกิน ${maxAge} ปี`;
+    const rangeEn =
+      minAge != null && maxAge != null
+        ? `${minAge}–${maxAge} years old`
+        : minAge != null
+          ? `${minAge} years or older`
+          : `up to ${maxAge} years old`;
+    return (
+      <div
+        onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+        style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(13,30,29,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}
+      >
+        <div style={{ width: '100%', maxWidth: 420, background: 'var(--paper)', borderRadius: 22, boxShadow: '0 30px 80px -24px rgba(13,30,29,.5)', overflow: 'hidden', textAlign: 'center', padding: '36px 28px' }}>
+          <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#fdeceb', color: '#b3261e', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px' }}>
+            <svg width="30" height="30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+            </svg>
+          </div>
+          <h2 className="display-th" style={{ fontSize: 21, margin: '0 0 10px' }}>
+            <T th="คุณสมบัติไม่ตรงตามเงื่อนไข" en="You don't meet the requirement" />
+          </h2>
+          <p style={{ fontSize: 14.5, color: 'var(--muted)', lineHeight: 1.65, margin: '0 0 8px' }}>
+            {tr(
+              lang,
+              `ขออภัย กิจกรรมนี้จำกัดอายุผู้เข้าร่วมสำหรับผู้ที่มีอายุ ${rangeTh} เท่านั้น`,
+              `Sorry, this activity is limited to participants ${rangeEn} only.`,
+            )}
+          </p>
+          {age != null && (
+            <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 22px' }}>
+              {tr(lang, `อายุของคุณ: ${age} ปี`, `Your age: ${age}`)}
+            </p>
+          )}
+          <Btn kind="teal" onClick={onClose} style={{ width: '100%', justifyContent: 'center' }}>
+            {tr(lang, 'ตกลง', 'OK')}
+          </Btn>
         </div>
       </div>
     );

@@ -129,6 +129,10 @@ export interface Workshop {
   map_url: string | null;
   theme_color: string | null;
   max_participants: number;
+  /** Minimum participant age in years. null = no minimum (open to all ages). */
+  min_age: number | null;
+  /** Maximum participant age in years. null = no maximum. */
+  max_age: number | null;
   price: number;
   image_url: string | null;
   /** active = เปิดจอง (public), closed = ปิดรับ (public), draft = แบบร่าง (hidden).

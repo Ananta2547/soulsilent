@@ -306,7 +306,7 @@ function EventCard({ w }: { w: Workshop }) {
       <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12 }}>
         <div>
           <div className="mono" style={{ fontSize: 9.5, color: 'var(--muted)', letterSpacing: '.1em', textTransform: 'uppercase' }}>เริ่มต้น</div>
-          <div style={{ fontFamily: 'Archivo Black', fontSize: 19, color: 'var(--teal)' }}>{free ? 'ฟรี' : `฿${eff.price.toLocaleString()}`}</div>
+          <div style={{ fontFamily: 'var(--font-display-th)', fontWeight: 600, fontSize: 19, color: 'var(--teal)' }}>{free ? 'ฟรี' : `฿${eff.price.toLocaleString()}`}</div>
         </div>
         <span className="btn btn-teal btn-sm" aria-hidden>จอง <span className="mono">→</span></span>
       </div>

@@ -11,6 +11,18 @@ import type { Workshop } from '@/lib/types';
 /** Minutes a booking holds its seat for after creation. */
 const HOLD_MINUTES = 10;
 
+/** Whole years from a YYYY-MM-DD birthdate, or null. Mirrors the client. */
+function ageFromDob(dob: string | null): number | null {
+  if (!dob) return null;
+  const d = new Date(dob.length === 10 ? `${dob}T00:00:00` : dob);
+  if (Number.isNaN(d.getTime())) return null;
+  const now = new Date();
+  let a = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) a--;
+  return a >= 0 ? a : null;
+}
+
 /**
  * SQL fragment used everywhere we count "taken" seats. A row counts when:
  *   - it's been paid (status='confirmed' or payment_status='paid'), OR
@@ -141,6 +153,37 @@ export async function POST(request: Request) {
 
     if (!workshop || workshop.status !== 'active') {
       return NextResponse.json({ error: 'Workshop นี้ไม่สามารถจองได้' }, { status: 400 });
+    }
+
+    // Age restriction (defense-in-depth — the BookingModal also blocks this).
+    // DOB now lives in the autofill vault (vault_json.dob); fall back to the
+    // legacy users.date_of_birth column.
+    if (workshop.min_age != null || workshop.max_age != null) {
+      const u = await db
+        .prepare('SELECT vault_json, date_of_birth FROM users WHERE id = ?')
+        .bind(user.sub)
+        .first<{ vault_json: string | null; date_of_birth: string | null }>();
+      let dob: string | null = u?.date_of_birth ?? null;
+      try {
+        const v = u?.vault_json ? (JSON.parse(u.vault_json) as { dob?: string }) : null;
+        if (v?.dob) dob = v.dob;
+      } catch {}
+      const age = ageFromDob(dob);
+      if (age == null) {
+        return NextResponse.json({ error: 'กรุณาระบุวันเกิดในโปรไฟล์ก่อนสมัคร' }, { status: 400 });
+      }
+      if (workshop.min_age != null && age < workshop.min_age) {
+        return NextResponse.json(
+          { error: `กิจกรรมนี้จำกัดอายุผู้เข้าร่วมสำหรับผู้ที่มีอายุ ${workshop.min_age} ปีขึ้นไปเท่านั้น` },
+          { status: 400 },
+        );
+      }
+      if (workshop.max_age != null && age > workshop.max_age) {
+        return NextResponse.json(
+          { error: `กิจกรรมนี้จำกัดอายุผู้เข้าร่วมไม่เกิน ${workshop.max_age} ปี` },
+          { status: 400 },
+        );
+      }
     }
 
     const admissionType = workshop.admission_type || 'direct';

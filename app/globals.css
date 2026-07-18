@@ -351,7 +351,11 @@ body {
   background: var(--paper);
   border-radius: 22px;
   position: relative;
-  transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.35s ease, background 0.25s ease;
+  /* Resting definition so a white card never blends into a white/paper page:
+     a hairline border + a soft ambient shadow. Hover deepens the shadow. */
+  border: 1px solid rgba(13, 30, 29, 0.07);
+  box-shadow: 0 1px 2px rgba(13, 30, 29, 0.04), 0 12px 30px -20px rgba(13, 30, 29, 0.16);
+  transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.35s ease, border-color 0.25s ease, background 0.25s ease;
   overflow: hidden;
 }
 
@@ -370,7 +374,8 @@ body {
 
 .card-static:hover {
   transform: none;
-  box-shadow: none;
+  /* Content panels don't lift, but keep the resting shadow (don't flatten). */
+  box-shadow: 0 1px 2px rgba(13, 30, 29, 0.04), 0 12px 30px -20px rgba(13, 30, 29, 0.16);
 }
 
 .card:hover .card-media {
@@ -814,9 +819,18 @@ body {
 }
 @media (max-width: 860px) {
   .settings-grid { grid-template-columns: 1fr; }
-  .settings-grid .set-side { position: static; }
-  .set-rail { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; }
-  .set-rail .set-navitem { width: auto; white-space: nowrap; flex-shrink: 0; }
+  /* min-width:0 lets the single grid column shrink to the viewport. Without it
+     the nowrap tab rail's min-content width (~630px) blows the whole page wider
+     than the screen → horizontal overflow, zoomed-out layout, everything clipped
+     on the right (banner text, form fields). */
+  .settings-grid .set-side { position: static; min-width: 0; max-width: 100%; }
+  .set-rail {
+    display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px;
+    -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+  .set-rail::-webkit-scrollbar { display: none; }
+  .set-rail .set-navitem { width: auto; white-space: nowrap; flex-shrink: 0; scroll-snap-align: start; }
 }
 
 /* session / step row */

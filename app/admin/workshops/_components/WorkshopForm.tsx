@@ -46,6 +46,9 @@ export type WorkshopFormValues = {
   promo_end: string;
   theme_color: string;
   max_participants: number;
+  /** Age limits — stored as strings so an empty field means "no limit". */
+  min_age: string;
+  max_age: string;
   price: number;
   image_url: string;
   image_meta: ImageMeta | null;
@@ -89,6 +92,8 @@ export const emptyWorkshopForm: WorkshopFormValues = {
   promo_end: '',
   theme_color: '',
   max_participants: 20,
+  min_age: '',
+  max_age: '',
   price: 0,
   image_url: '',
   image_meta: null,
@@ -236,6 +241,9 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
       promo_price: form.promo_price.trim() === '' ? null : Number(form.promo_price),
       promo_start: form.promo_start || null,
       promo_end: form.promo_end || null,
+      // Empty age fields → null (no restriction).
+      min_age: form.min_age.trim() === '' ? null : Number(form.min_age),
+      max_age: form.max_age.trim() === '' ? null : Number(form.max_age),
     };
   };
 
@@ -754,6 +762,38 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
             className="input-field"
           />
         </div>
+      </div>
+
+      {/* Age restriction — leave blank for no limit */}
+      <div>
+        <label className="block text-sm font-medium text-dark mb-1">จำกัดอายุผู้เข้าร่วม (ปี)</label>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <input
+              type="number"
+              min={0}
+              max={120}
+              inputMode="numeric"
+              placeholder="อายุขั้นต่ำ"
+              value={form.min_age}
+              onChange={(e) => setForm({ ...form, min_age: e.target.value })}
+              className="input-field"
+            />
+          </div>
+          <div>
+            <input
+              type="number"
+              min={0}
+              max={120}
+              inputMode="numeric"
+              placeholder="อายุสูงสุด"
+              value={form.max_age}
+              onChange={(e) => setForm({ ...form, max_age: e.target.value })}
+              className="input-field"
+            />
+          </div>
+        </div>
+        <p className="text-xs text-gray mt-1">เว้นว่าง = เปิดรับทุกวัย (ไม่จำกัดอายุ)</p>
       </div>
 
       {/* Theme color */}

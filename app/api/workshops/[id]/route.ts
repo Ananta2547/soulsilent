@@ -163,6 +163,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       map_url?: string;
       theme_color?: string;
       max_participants?: number;
+      min_age?: number | null;
+      max_age?: number | null;
       price: number;
       image_url?: string;
       image_meta?: import('@/lib/types').ImageMeta | null;
@@ -187,7 +189,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
            time_start = ?, time_end = ?, day_times_json = ?, location = ?, location_id = ?,
            schedule_json = ?, learn_json = ?, target_json = ?, category = ?, tags_json = ?,
            promo_price = ?, promo_start = ?, promo_end = ?, map_url = ?, theme_color = ?,
-           max_participants = ?, price = ?, image_url = ?, image_meta = ?, status = ?,
+           max_participants = ?, min_age = ?, max_age = ?, price = ?, image_url = ?, image_meta = ?, status = ?,
            admission_type = ?, payment_type = ?, deposit_amount = ?,
            announce_at = ?, confirm_main_by = ?, confirm_waitlist_by = ?,
            require_consent = ?, photos_drive_url = ?, master_id = ?,
@@ -219,6 +221,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         body.map_url || null,
         body.theme_color || null,
         body.max_participants || 20,
+        body.min_age ?? null,
+        body.max_age ?? null,
         body.price,
         body.image_url || null,
         body.image_meta ? JSON.stringify(body.image_meta) : null,

@@ -213,14 +213,14 @@ function Card({ w }: { w: Workshop }) {
         <div>
           <div className="mono" style={{ fontSize: 9.5, color: 'var(--muted)', letterSpacing: '.1em', textTransform: 'uppercase' }}>ค่าเข้าร่วม</div>
           {free ? (
-            <div style={{ fontFamily: 'Archivo Black', fontSize: 19, color: 'var(--teal)' }}>ฟรี</div>
+            <div style={{ fontFamily: 'var(--font-display-th)', fontWeight: 600, fontSize: 19, color: 'var(--teal)' }}>ฟรี</div>
           ) : eff.isPromo ? (
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-              <span style={{ fontFamily: 'Archivo Black', fontSize: 19, color: 'var(--teal)' }}>฿{eff.price.toLocaleString()}</span>
+              <span style={{ fontFamily: 'var(--font-display-th)', fontWeight: 600, fontSize: 19, color: 'var(--teal)' }}>฿{eff.price.toLocaleString()}</span>
               <span style={{ fontSize: 12, color: 'var(--muted)', textDecoration: 'line-through' }}>฿{eff.originalPrice.toLocaleString()}</span>
             </div>
           ) : (
-            <div style={{ fontFamily: 'Archivo Black', fontSize: 19 }}>฿{eff.price.toLocaleString()}</div>
+            <div style={{ fontFamily: 'var(--font-display-th)', fontWeight: 600, fontSize: 19 }}>฿{eff.price.toLocaleString()}</div>
           )}
         </div>
         <span className="btn btn-teal btn-sm" aria-hidden>จอง <span className="mono">→</span></span>

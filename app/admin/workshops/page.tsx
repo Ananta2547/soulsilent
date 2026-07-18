@@ -121,6 +121,8 @@ export default function AdminWorkshopsPage() {
         promo_end: w.promo_end || '',
         theme_color: w.theme_color || '',
         max_participants: w.max_participants,
+        min_age: w.min_age != null ? String(w.min_age) : '',
+        max_age: w.max_age != null ? String(w.max_age) : '',
         price: w.price,
         image_url: w.image_url || '',
         image_meta: parseImageMeta(w.image_meta),

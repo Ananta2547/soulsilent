@@ -876,7 +876,7 @@ function BookingCardContent({
       </div>
 
       {isFree ? (
-        <div style={{ fontFamily: 'Archivo Black', fontSize: 'clamp(36px, 4vw, 42px)', color: 'var(--teal)', letterSpacing: '-.02em', lineHeight: 1, margin: '4px 0 6px' }}>
+        <div style={{ fontFamily: 'var(--font-display-th)', fontWeight: 600, fontSize: 'clamp(36px, 4vw, 42px)', color: 'var(--teal)', letterSpacing: '-.02em', lineHeight: 1, margin: '4px 0 6px' }}>
           {tr(lang, 'ฟรี', 'Free')}
         </div>
       ) : eff.isPromo ? (
@@ -884,7 +884,7 @@ function BookingCardContent({
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
             <span
               style={{
-                fontFamily: 'Archivo Black',
+                fontFamily: 'var(--font-display-th)', fontWeight: 600,
                 fontSize: 'clamp(36px, 4vw, 42px)',
                 color: 'var(--teal)',
                 letterSpacing: '-.02em',
@@ -907,7 +907,7 @@ function BookingCardContent({
       ) : (
         <div
           style={{
-            fontFamily: 'Archivo Black',
+            fontFamily: 'var(--font-display-th)', fontWeight: 600,
             fontSize: 'clamp(36px, 4vw, 42px)',
             color: 'var(--ink)',
             letterSpacing: '-.02em',
