@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import Stripe from 'stripe';
 import { getDB, getEnv } from '@/lib/db';
 import { getStripe } from '@/lib/stripe';
 
@@ -9,12 +10,25 @@ export async function POST(request: Request) {
     const env = await getEnv();
     const webhookSecret = env.STRIPE_WEBHOOK_SECRET || '';
 
+    if (!signature || !webhookSecret) {
+      return NextResponse.json({ error: 'Webhook not configured' }, { status: 400 });
+    }
+
     const stripe = await getStripe();
-    let event;
+    let event: Stripe.Event;
 
     try {
-      event = stripe.webhooks.constructEvent(body, signature!, webhookSecret);
-    } catch {
+      // Cloudflare Workers has no Node `crypto` — signature verification MUST use
+      // the async SubtleCrypto path (`constructEvent` sync throws on Workers).
+      event = await stripe.webhooks.constructEventAsync(
+        body,
+        signature,
+        webhookSecret,
+        undefined,
+        Stripe.createSubtleCryptoProvider(),
+      );
+    } catch (err) {
+      console.error('Webhook signature verify failed:', err);
       return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
     }
 
