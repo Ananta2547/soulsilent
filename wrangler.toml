@@ -28,4 +28,4 @@ GOOGLE_CLIENT_ID = "798833181382-0sf30qcflhmpo6sepoke9i8ojab71fbp.apps.googleuse
 SITE_URL = "https://soulsilent.soulsilent-official.workers.dev"
 # Verified Resend "from" address. Until your domain is verified you can use
 # "onboarding@resend.dev" (Resend's shared sandbox sender).
-EMAIL_FROM = "soulsilent <onboarding@resend.dev>"
+EMAIL_FROM = "soulsilent <noreply@soulsilent.site>"
