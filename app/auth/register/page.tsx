@@ -53,7 +53,8 @@ export default function RegisterPage() {
         setError(data.error || tr(lang, 'เกิดข้อผิดพลาด', 'Something went wrong'));
         return;
       }
-      // Registered + signed in. Show the "verify your email" screen.
+      // Account is pending (not signed in). Show the "verify your email" screen;
+      // the user confirms via the emailed link, then signs in.
       setSent({ email, devLink: data.devLink });
     } catch {
       setError(tr(lang, 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'Cannot reach server'));
@@ -135,7 +136,7 @@ export default function RegisterPage() {
               </p>
               <p style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--ink)', margin: '0 0 14px', wordBreak: 'break-all' }}>{sent.email}</p>
               <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, margin: '0 0 22px' }}>
-                {tr(lang, 'กรุณากดลิงก์ในอีเมลเพื่อยืนยันอีเมลของคุณ', 'Please click the link in the email to verify your address.')}
+                {tr(lang, 'กรุณากดลิงก์ยืนยันเพื่อเสร็จสิ้นการสมัคร แล้วจึงเข้าสู่ระบบได้', 'Click the link to finish signing up, then sign in.')}
               </p>
               {sent.devLink && (
                 <div style={{ marginBottom: 18, padding: 12, borderRadius: 12, background: 'var(--cream)', fontSize: 11 }}>
@@ -143,8 +144,8 @@ export default function RegisterPage() {
                   <a href={sent.devLink} className="text-primary underline" style={{ wordBreak: 'break-all' }}>{sent.devLink}</a>
                 </div>
               )}
-              <Btn kind="teal" onClick={() => router.push('/')} style={{ width: '100%', justifyContent: 'center' }}>
-                {tr(lang, 'เข้าสู่หน้าแรก', 'Go to homepage')} <span className="mono">→</span>
+              <Btn kind="teal" onClick={() => router.push('/auth/login')} style={{ width: '100%', justifyContent: 'center' }}>
+                {tr(lang, 'ไปหน้าเข้าสู่ระบบ', 'Go to sign in')} <span className="mono">→</span>
               </Btn>
             </div>
           ) : (

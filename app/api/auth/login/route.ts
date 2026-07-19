@@ -58,6 +58,15 @@ export async function POST(request: Request) {
         .run();
     }
 
+    // Email/password accounts must confirm their address before the first login.
+    // Google accounts are pre-verified (see /api/auth/google), so they pass this.
+    if (!user.email_verified) {
+      return NextResponse.json(
+        { needsVerification: true, email: user.email, error: 'กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ' },
+        { status: 403 },
+      );
+    }
+
     const token = await createToken({ sub: user.id, email: user.email, name: user.name, role: user.role });
     await setAuthCookie(token);
 

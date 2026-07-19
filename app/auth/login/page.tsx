@@ -28,6 +28,24 @@ function LoginPageInner() {
   const [loading, setLoading] = useState(false);
   // Blocked-account dialogs: self-deleted (recoverable) / suspended / permanently gone.
   const [blocked, setBlocked] = useState<null | 'recover' | 'suspended' | 'deleted'>(null);
+  // Unverified email/password account — prompt to check inbox + allow a resend.
+  const [needsVerify, setNeedsVerify] = useState<string | null>(null);
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent'>('idle');
+
+  async function resendVerify() {
+    if (!needsVerify || resendState === 'sending') return;
+    setResendState('sending');
+    try {
+      await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: needsVerify }),
+      });
+      setResendState('sent');
+    } catch {
+      setResendState('idle');
+    }
+  }
 
   const urlError =
     errorParam === 'google_failed'
@@ -68,11 +86,13 @@ function LoginPageInner() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, recover }),
       });
-      const data = (await res.json()) as { error?: string; blocked?: string };
+      const data = (await res.json()) as { error?: string; blocked?: string; needsVerification?: boolean; email?: string };
       // Account-state gates take priority over the plain error/redirect path.
       if (data.blocked === 'suspended') { setBlocked('suspended'); return; }
       if (data.blocked === 'deleted') { setBlocked('deleted'); return; }
       if (data.blocked === 'pending_deletion') { setBlocked('recover'); return; }
+      // Unverified email → show the "check your inbox" prompt instead of an error.
+      if (data.needsVerification) { setResendState('idle'); setNeedsVerify(data.email || email); return; }
       if (!res.ok) {
         setError(data.error || tr(lang, 'เกิดข้อผิดพลาด', 'Something went wrong'));
         return;
@@ -168,6 +188,29 @@ function LoginPageInner() {
               }}
             >
               {error || urlError}
+            </div>
+          )}
+
+          {needsVerify && (
+            <div style={{ marginBottom: 14, padding: 14, background: 'var(--teal-50, #e6f4f1)', color: 'var(--teal-deep)', borderRadius: 14, fontSize: 13, lineHeight: 1.6 }}>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                <T th="ยังไม่ได้ยืนยันอีเมล" en="Email not verified yet" />
+              </div>
+              <p style={{ margin: '0 0 10px' }}>
+                {tr(lang, `กรุณากดลิงก์ยืนยันที่เราส่งไปที่ ${needsVerify} ก่อนเข้าสู่ระบบ`, `Please click the verification link we sent to ${needsVerify} before signing in.`)}
+              </p>
+              {resendState === 'sent' ? (
+                <div style={{ fontWeight: 600 }}>✓ {tr(lang, 'ส่งลิงก์ยืนยันใหม่แล้ว — โปรดตรวจอีเมล', 'A new verification link has been sent — check your inbox.')}</div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={resendVerify}
+                  disabled={resendState === 'sending'}
+                  style={{ background: 'var(--teal)', color: '#fff', border: 0, borderRadius: 999, padding: '8px 16px', fontFamily: 'inherit', fontWeight: 600, fontSize: 13, cursor: resendState === 'sending' ? 'default' : 'pointer' }}
+                >
+                  {resendState === 'sending' ? tr(lang, 'กำลังส่ง...', 'Sending...') : tr(lang, 'ส่งลิงก์ยืนยันอีกครั้ง', 'Resend verification link')}
+                </button>
+              )}
             </div>
           )}
 

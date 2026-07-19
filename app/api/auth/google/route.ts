@@ -108,6 +108,10 @@ export async function POST(request: Request) {
         .run();
     }
 
+    // Google has already verified the address → mark the account verified so it
+    // bypasses the email/password verification gate and can sign in immediately.
+    await db.prepare('UPDATE users SET email_verified = 1 WHERE id = ?').bind(user.id).run();
+
     const token = await createToken({
       sub: user.id,
       email: user.email,

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { v4 as uuid } from 'uuid';
 import { getDB, getEnv } from '@/lib/db';
-import { hashPassword, createToken, setAuthCookie } from '@/lib/auth';
+import { hashPassword, createToken } from '@/lib/auth';
 import { sendEmail, emailTemplate } from '@/lib/email';
 
 export async function POST(request: Request) {
@@ -41,11 +41,11 @@ export async function POST(request: Request) {
       .bind(id, email, password_hash, name, 'user')
       .run();
 
-    const token = await createToken({ sub: id, email, name, role: 'user' });
-    await setAuthCookie(token);
-
+    // Account starts PENDING (email_verified defaults to 0). No session is issued
+    // here — the user must click the emailed link, then sign in. Login is blocked
+    // until email_verified = 1 (see /api/auth/login).
     // Send the email-verification link right away. Best-effort — a mail failure
-    // must not fail the registration itself; the user can resend from Settings.
+    // must not fail the registration itself; the user can resend from login.
     let devLink: string | undefined;
     try {
       const env = await getEnv();

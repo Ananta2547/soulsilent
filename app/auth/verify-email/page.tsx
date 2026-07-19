@@ -67,10 +67,10 @@ function VerifyInner() {
                 <T th="ยืนยันอีเมลสำเร็จ" en="Email verified" />
               </h1>
               <p style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 20 }}>
-                <T th="อีเมลของคุณได้รับการยืนยันเรียบร้อยแล้ว" en="Your email has been verified successfully." />
+                <T th="อีเมลของคุณได้รับการยืนยันแล้ว — เข้าสู่ระบบเพื่อเริ่มใช้งานได้เลย" en="Your email is verified — sign in to get started." />
               </p>
-              <Btn kind="teal" href="/me/settings?tab=identity" style={{ justifyContent: 'center' }}>
-                {tr(lang, 'ไปที่การยืนยันตัวตน', 'Go to verification')} <span className="mono">→</span>
+              <Btn kind="teal" href="/auth/login" style={{ justifyContent: 'center' }}>
+                {tr(lang, 'เข้าสู่ระบบ', 'Sign in')} <span className="mono">→</span>
               </Btn>
             </>
           )}
@@ -83,8 +83,8 @@ function VerifyInner() {
               <p style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 20 }}>
                 <T th="ลิงก์ยืนยันหมดอายุหรือไม่ถูกต้อง — ลองส่งอีเมลยืนยันใหม่อีกครั้ง" en="The verification link is invalid or expired. Try sending a new one." />
               </p>
-              <Link href="/me/settings?tab=identity" className="btn btn-paper">
-                {tr(lang, 'กลับไปที่ตั้งค่า', 'Back to settings')}
+              <Link href="/auth/login" className="btn btn-paper">
+                {tr(lang, 'ไปหน้าเข้าสู่ระบบ', 'Go to sign in')}
               </Link>
             </>
           )}
