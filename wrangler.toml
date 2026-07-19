@@ -25,7 +25,7 @@ bucket_name = "soulsilent-media"
 #   - RESEND_API_KEY        (wrangler secret put RESEND_API_KEY)
 [vars]
 GOOGLE_CLIENT_ID = "798833181382-0sf30qcflhmpo6sepoke9i8ojab71fbp.apps.googleusercontent.com"
-SITE_URL = "https://soulsilent.soulsilent-official.workers.dev"
+SITE_URL = "https://soulsilent.site"
 # Verified Resend "from" address. Until your domain is verified you can use
 # "onboarding@resend.dev" (Resend's shared sandbox sender).
 EMAIL_FROM = "soulsilent <noreply@soulsilent.site>"
