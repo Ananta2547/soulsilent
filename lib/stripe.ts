@@ -37,7 +37,7 @@ export async function createWorkshopCheckout(params: {
   const stripe = await getStripe();
   const session = await stripe.checkout.sessions.create({
     // 'promptpay' = Thai QR payment via mobile banking apps (SCB/KBank/KMA/etc.)
-    payment_method_types: ['card', 'promptpay'],
+    payment_method_types: ['promptpay'],
     line_items: [
       {
         price_data: {
@@ -70,7 +70,7 @@ export async function createCourseCheckout(params: {
 }): Promise<string> {
   const stripe = await getStripe();
   const session = await stripe.checkout.sessions.create({
-    payment_method_types: ['card', 'promptpay'],
+    payment_method_types: ['promptpay'],
     line_items: [
       {
         price_data: {
