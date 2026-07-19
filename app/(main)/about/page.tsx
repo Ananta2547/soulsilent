@@ -20,9 +20,9 @@ function yearsSince(year: number, month1: number, day: number): number {
 }
 
 const BELIEFS = [
-  { icon: '—', title: 'ช้า แต่ลึก', blurb: 'เราเชื่อว่าการเรียนรู้ที่ดีต้องมีพื้นที่ให้เงียบ ให้คิด ให้กลับมาหาตัวเอง' },
-  { icon: '+', title: 'เรียบง่ายแต่งดงาม', blurb: 'อุปกรณ์ไม่ต้อง ความตั้งใจมา เครื่องมือเล็ก ๆ ที่เปลี่ยนวิธีมอง' },
-  { icon: '✺', title: 'ไม่มีสูตรสำเร็จ', blurb: 'แต่ละกลุ่มไม่เหมือนกัน แต่ละครั้งเราจึงออกแบบใหม่ ฟังคุณก่อนแล้วจึงเริ่ม' },
+  { icon: '—', title: 'Safe & Fair', blurb: 'ทุกคนมีเสรีภาพในการเป็นตัวเองอย่างเต็มที่\nแต่ต้องไม่เบียดเบียนสิทธิของคนอื่น\nรักษาพื้นที่ปลอดภัยสำหรับทุกคน' },
+  { icon: '+', title: 'People First', blurb: 'เมื่อเกิดข้อผิดพลาด สิ่งแรกที่เราทำ\nไม่ใช่การชี้นิ้วหาคนผิดแต่คือการรับฟัง\nและดูแลความรู้สึกของมนุษย์ก่อน' },
+  { icon: '✺', title: 'It’s Okay', blurb: 'ไม่เป็นไรเลย ถ้าวันนี้ยังไม่พร้อม\nไม่เป็นไรเลย ถ้าวันนี้ยังทำไม่ได้\nไม่เป็นไรเลยที่จะยืนยันในเสียงของตัวเอง' },
 ];
 
 const SWATCHES = ['ph-teal', 'ph-cream', 'ph-ink', 'ph-accent'];
@@ -60,32 +60,26 @@ export default function AboutPage() {
           <path d="M4 44 Q 40 6 76 44 T 148 44 T 220 44 T 256 20" fill="none" stroke="var(--teal-100)" strokeWidth="8" strokeLinecap="round" />
         </svg>
         <div className="mono" style={{ color: 'var(--muted)', letterSpacing: '.14em', fontSize: 11, textTransform: 'uppercase', marginBottom: 16 }}>— เกี่ยวกับเรา</div>
-        <h1 className="display-th reveal-up" style={{ fontSize: 'clamp(38px,6.2vw,68px)', margin: 0, lineHeight: 1.06, color: 'var(--ink)' }}>
-          เราคือทีมที่<br /><span style={{ color: 'var(--teal)' }}>ออกแบบ</span><br />พื้นที่เรียนรู้<span style={{ color: 'var(--teal)' }}>.</span>
+        <h1 className="display-th reveal-up" style={{ fontSize: 'clamp(38px,6.2vw,68px)', margin: 0, lineHeight: 1.32, color: 'var(--ink)' }}>
+          เราคือทีมที่ <span style={{ color: 'var(--teal)' }}>ออกแบบ</span><br />พื้นที่เรียนรู้<span style={{ color: 'var(--teal)' }}>.</span>
         </h1>
         <p style={{ maxWidth: 640, margin: '26px 0 0', fontSize: 16, lineHeight: 1.75, color: 'var(--muted)' }}>
-          soulsilent เริ่มต้นจากเพื่อนกลุ่มเล็ก ๆ ที่อยากออกแบบ workshop ที่ไม่ต้องเร่งรีบ. ตั้งแต่ปี 2565 เราจัดกิจกรรมกว่า {stats.workshops} ครั้ง ในกรุงเทพฯ หัวหิน เชียงใหม่ และอีกหลายเมือง. เป้าหมายของเราไม่เคยเปลี่ยน — ทำให้คนกลับมา<span className="mark" style={{ background: 'var(--accent-soft)', padding: '0 4px', borderRadius: 4 }}>รู้จักตัวเอง</span>ผ่านเรื่องเล็ก ๆ.
+          ในวันที่โลกหมุนไวและเต็มไปด้วยเสียงรอบตัวจนเราแทบไม่ได้ยินเสียงตัวเอง Soul Silent เริ่มต้นเดินทางในปี 2565 เพื่อสร้างพื้นที่สำหรับหยุดพักและเรียนรู้ถึงความเหนื่อยล้าทางอารมณ์ที่อาจซ่อนอยู่ และเราพบว่าหลายคนกำลังเผชิญกับความเครียด ความเหงา หรือความสับสนในใจโดยไม่รู้ตัว หน้าที่ของเราคือการสร้างพื้นที่ ที่ช่วยให้ใจคุณนิ่งพอที่จะค้นพบคำตอบของคำถาม ผ่านกิจกรรมต่าง ๆ ที่จัดขึ้น เราเชื่อว่าการเรียนรู้ไม่จำเป็นต้องมาจากตำราเล่มหนาเสมอไป ในพื้นที่แห่งนี้ แม้แต่การนั่งจิบกาแฟและแลกเปลี่ยนเรื่องราวกับคนแปลกหน้า ก็อาจทำให้เราค้นพบมุมมองใหม่ ๆ ที่หนังสือเล่มไหนก็ไม่เคยบอกไว้
         </p>
       </section>
 
       {/* ---- Beliefs ---- */}
       <section className="bg-cream section">
         <div className="container">
-          <h2 className="display-th reveal-up" style={{ fontSize: 'clamp(26px,3.6vw,36px)', margin: '0 0 28px' }}>
-            สิ่งที่เราเชื่อ{' '}
-            <span style={{ position: 'relative', display: 'inline-block', color: 'var(--teal)' }}>
-              เงียบ ๆ
-              <svg viewBox="0 0 140 50" style={{ position: 'absolute', left: -10, right: -10, top: -8, bottom: -8, width: 'calc(100% + 20px)', height: 'calc(100% + 16px)', pointerEvents: 'none' }} aria-hidden="true">
-                <ellipse cx="70" cy="25" rx="66" ry="20" fill="none" stroke="var(--teal)" strokeWidth="3" />
-              </svg>
-            </span>
+          <h2 className="display-en reveal-up" style={{ fontSize: 'clamp(26px,3.6vw,36px)', margin: '0 0 28px' }}>
+            Our Beliefs<span style={{ color: 'var(--teal)' }}>.</span>
           </h2>
           <div className="beliefs-grid">
             {BELIEFS.map((b) => (
               <div key={b.title} className="card" style={{ padding: 26 }}>
                 <div style={{ color: 'var(--teal)', marginBottom: 16, fontSize: 20, lineHeight: 1 }}>{b.icon}</div>
                 <h3 style={{ fontFamily: 'Mitr', fontWeight: 600, fontSize: 17, margin: '0 0 8px' }}>{b.title}</h3>
-                <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.6, margin: 0 }}>{b.blurb}</p>
+                <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-line' }}>{b.blurb}</p>
               </div>
             ))}
           </div>
@@ -147,13 +141,12 @@ export default function AboutPage() {
       {/* ---- CTA ---- */}
       <section className="section bg-ink-section" style={{ textAlign: 'center' }}>
         <div className="container">
-          <h2 className="display-en reveal-up" style={{ fontSize: 'clamp(46px,8.5vw,96px)', margin: 0, lineHeight: 0.9, color: '#fff' }}>
-            JOIN US<br /><span style={{ color: 'var(--accent)' }}>SOON</span>
+          <h2 className="display-en reveal-up" style={{ fontSize: 'clamp(40px,7.5vw,84px)', margin: 0, lineHeight: 0.9, color: '#fff' }}>
+            FIND YOUR<br /><span style={{ color: 'var(--accent)' }}>ORDINARY</span> ZONE
           </h2>
-          <p style={{ fontFamily: 'Mitr', fontSize: 16, color: 'rgba(255,255,255,.7)', margin: '20px 0 32px' }}>เริ่มจากกิจกรรมเดียว แล้วเดินทางต่อไปด้วยกัน</p>
+          <p style={{ fontFamily: 'Mitr', fontSize: 16, color: 'rgba(255,255,255,.7)', margin: '20px 0 32px' }}>วางความคาดหวังที่แบกมานาน แล้วลองมาหาจุดนั่งพักสบาย ๆ ในโซนนี้</p>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
             <Link href="/workshops" className="btn btn-teal">ดูกิจกรรมทั้งหมด <span className="mono">→</span></Link>
-            <Link href="/help" className="btn btn-paper">คุยกับทีม</Link>
           </div>
         </div>
       </section>

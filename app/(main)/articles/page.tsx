@@ -58,13 +58,13 @@ export default function ArticlesPage() {
       <section className="container art-hero" style={{ paddingTop: 52, paddingBottom: 36 }}>
         <div>
           <div className="mono" style={{ color: 'var(--muted)', letterSpacing: '.14em', fontSize: 11, textTransform: 'uppercase', marginBottom: 14 }}>— หน้าแรก · JOURNAL</div>
-          <h1 className="display-th" style={{ fontSize: 'clamp(36px,5.8vw,64px)', margin: 0, color: 'var(--ink)', lineHeight: 1.02 }}>
-            บันทึก<br />นอกห้อง<span style={{ color: 'var(--teal)' }}>.</span>
+          <h1 className="display-th" style={{ fontSize: 'clamp(36px,5.8vw,64px)', margin: 0, color: 'var(--ink)', lineHeight: 1.2 }}>
+            พื้นที่ของความทรงจำ<br /><span style={{ color: 'var(--teal)' }}>บทความ</span> ข่าวสาร
           </h1>
         </div>
         <div style={{ textAlign: 'right' }}>
           <p style={{ margin: '0 0 18px', fontSize: 14.5, lineHeight: 1.6, color: 'var(--muted)' }}>
-            รวมบทความ บันทึกภาคสนาม บทสัมภาษณ์ และวิธีทำ ทุกเรื่องเขียนโดยทีม soulsilent หลังจากลงพื้นที่จริงแล้ว.
+            บันทึกจากเรื่องราว มุมมอง และประสบการณ์จากทีม Soul Silent<br />เปิดมาอ่านเล่นตอนว่างในวันหยุด หรือก่อนเข้านอน
           </p>
           <div style={{ display: 'flex', gap: 28, justifyContent: 'flex-end' }}>
             <div>

@@ -221,7 +221,7 @@ function Hero({ workshops }: { workshops: Workshop[] }) {
   return (
     <section id="top" className="container" style={{ position: 'relative', paddingTop: 44, paddingBottom: 80, overflow: 'hidden' }}>
       <div className="mono" style={{ textAlign: 'center', fontSize: 13, letterSpacing: '.22em', textTransform: 'uppercase', color: 'var(--teal)', fontWeight: 500, marginBottom: 10 }}>
-        เวิร์กช็อป&nbsp;&nbsp;·&nbsp;&nbsp;แคมป์&nbsp;&nbsp;·&nbsp;&nbsp;เทศกาล
+        Workshop&nbsp;&nbsp;·&nbsp;&nbsp;Event&nbsp;&nbsp;·&nbsp;&nbsp;Seminar
       </div>
 
       <h1 className="giant-en">
@@ -236,8 +236,8 @@ function Hero({ workshops }: { workshops: Workshop[] }) {
       </div>
 
       <p className="hero-lede" style={{ textAlign: 'center', maxWidth: 520, margin: '130px auto 0', position: 'relative', zIndex: 5, fontSize: 16, lineHeight: 1.6, color: 'var(--muted)' }}>
-        ค้นหากิจกรรมที่ใช่ จองบัตรได้ในไม่กี่คลิก<br />
-        แล้วออกไปเจอ<span className="mark">ประสบการณ์ใหม่</span>นอกห้องเรียน.
+        ค้นหาพื้นที่ที่ชอบ จองกิจกรรมที่ใช่<br />
+        แล้วมาร่วมเปิด<span className="mark">มุมมองใหม่</span>ที่คุณอาจไม่เคยเจอ
       </p>
 
       <div style={{ display: 'flex', justifyContent: 'center', marginTop: 26 }}>
@@ -334,8 +334,8 @@ function UpcomingEvents({ workshops }: { workshops: Workshop[] }) {
           <div className="reveal-up">
             <div className="mono" style={{ color: 'var(--muted)', letterSpacing: '.14em', fontSize: 11, textTransform: 'uppercase', marginBottom: 10 }}>— 01 · เร็ว ๆ นี้</div>
             <h2 className="display-th" style={{ fontSize: 'clamp(30px,4.4vw,46px)', margin: 0, color: 'var(--ink)' }}>
-              กิจกรรมที่<br />
-              <span style={{ position: 'relative', display: 'inline-block' }}>
+              เปิดพื้นที่ให้เรื่องราวใหม่ ๆ<br />
+              ที่<span style={{ position: 'relative', display: 'inline-block' }}>
                 กำลังจะเกิดขึ้น
                 <svg viewBox="0 0 300 18" preserveAspectRatio="none" style={{ position: 'absolute', left: 0, right: 0, bottom: -10, width: '100%', height: 16 }} aria-hidden="true">
                   <path d="M2 11 Q 40 2 78 10 T 152 9 T 226 10 T 298 8" fill="none" stroke="var(--teal)" strokeWidth="5" strokeLinecap="round" />
@@ -343,7 +343,7 @@ function UpcomingEvents({ workshops }: { workshops: Workshop[] }) {
               </span>
             </h2>
             <p style={{ margin: '20px 0 0', fontSize: 15, lineHeight: 1.6, color: 'var(--muted)', maxWidth: 440 }}>
-              จองล่วงหน้า · ที่นั่งจำกัดทุก workshop. เหลือที่ว่างให้ความคิดได้ทำงาน.
+              สำรองที่นั่งล่วงหน้า พื้นที่นี้จำกัดคน แต่ไม่จำกัดความเป็นตัวเอง
             </p>
           </div>
           {categories.length > 0 && (
@@ -402,12 +402,12 @@ function ArticlesSection({ lead, side, categories }: { lead?: Article; side: Art
           <div className="reveal-up">
             <div className="mono" style={{ color: 'var(--muted)', letterSpacing: '.14em', fontSize: 11, textTransform: 'uppercase', marginBottom: 10 }}>— 02 · อ่าน</div>
             <h2 className="display-th" style={{ fontSize: 'clamp(30px,4.4vw,46px)', margin: 0, color: 'var(--ink)' }}>
-              ข่าวสาร <span style={{ color: 'var(--teal)' }}>บทความ</span><br />การเรียนรู้
+              พื้นที่ของความทรงจำ<br /><span style={{ color: 'var(--teal)' }}>บทความ</span> ข่าวสาร
             </h2>
           </div>
-          <div style={{ maxWidth: 320, textAlign: 'right', alignSelf: 'flex-end' }}>
+          <div style={{ maxWidth: 480, textAlign: 'right', alignSelf: 'flex-end' }}>
             <p style={{ margin: '0 0 12px', fontSize: 14.5, lineHeight: 1.6, color: 'var(--muted)' }}>
-              บันทึก, สัมภาษณ์, และเครื่องมือเล็ก ๆ จากทีม soulsilent — อ่านเล่นในวันหยุด หรือก่อนเข้านอน.
+              <span style={{ whiteSpace: 'nowrap' }}>บันทึกจากเรื่องราว มุมมอง และประสบการณ์จากทีม Soul Silent</span><br />เปิดมาอ่านเล่นตอนว่างในวันหยุด หรือก่อนเข้านอน
             </p>
             <Link href="/articles" style={{ fontWeight: 700, fontSize: 14 }}>archive ทั้งหมด <span className="mono">→</span></Link>
           </div>
@@ -522,11 +522,11 @@ function ReviewsSection({ reviews }: { reviews: PublicReview[] }) {
     <section className="section bg-teal-section" style={{ textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
       <span className="mono" style={{ position: 'absolute', right: '8%', top: 64, color: 'var(--accent)', fontSize: 22 }}>+</span>
       <div className="container">
-        <div className="mono" style={{ letterSpacing: '.14em', fontSize: 11, textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 14 }}>03 — รีวิว</div>
+        <div className="mono" style={{ letterSpacing: '.14em', fontSize: 11, textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 14 }}>03 — พื้นที่รีวิว</div>
         <h2 className="display-en" style={{ fontSize: 'clamp(48px,9vw,110px)', margin: 0, color: '#fff', lineHeight: 0.9 }}>
-          <span style={{ color: 'var(--accent)' }}>&ldquo;</span>SOULFUL<span style={{ color: 'var(--accent)' }}>&rdquo;</span>
+          <span style={{ color: 'var(--accent)' }}>&ldquo;</span>ECHOES<span style={{ color: 'var(--accent)' }}>&rdquo;</span>
         </h2>
-        <p style={{ fontFamily: 'Mitr', fontSize: 18, color: 'var(--accent)', margin: '14px 0 48px' }}>— จากผู้เข้าร่วม</p>
+        <p style={{ fontFamily: 'Mitr', fontSize: 18, color: 'var(--accent)', margin: '14px 0 48px' }}>— เสียงสะท้อนจากผู้เข้าร่วม</p>
 
         <div className="dc-rev-slider">
           <button type="button" className="dc-rev-arrow mono" aria-label="รีวิวก่อนหน้า" onClick={() => slide(-1)} disabled={!canPrev}>←</button>
@@ -574,16 +574,16 @@ function ReviewsSection({ reviews }: { reviews: PublicReview[] }) {
 function StatsSection({ stats }: { stats: SiteStats }) {
   const years = yearsSince(2022, 11, 15);
   const numbers = [
-    { n: String(years), label: 'ปีก่อตั้ง', sub: 'ตั้งแต่ 2565' },
-    { n: stats.workshops.toLocaleString(), label: 'กิจกรรม', sub: 'workshop · camp · talk' },
-    { n: stats.participants.toLocaleString(), label: 'ผู้เข้าร่วม', sub: 'ทั่วประเทศ' },
-    { n: String(stats.locations), label: 'สถานที่จัดงาน', sub: 'organize เต็มระบบ' },
+    { n: String(years), label: 'ปีที่ลุยกันมา', sub: 'ตั้งแต่ 2565' },
+    { n: stats.workshops.toLocaleString(), label: 'ประสบการณ์', sub: 'Workshop Event Seminar' },
+    { n: stats.participants.toLocaleString(), label: 'เพื่อนร่วมเดินทาง', sub: 'ทั่วประเทศ' },
+    { n: String(stats.locations), label: 'สถานที่จัดงาน', sub: 'พื้นที่ปลอดภัย' },
   ];
   return (
     <section className="section">
       <div className="container">
         <div className="reveal-up" style={{ maxWidth: 760, marginBottom: 40 }}>
-          <div className="mono" style={{ color: 'var(--muted)', letterSpacing: '.14em', fontSize: 11, textTransform: 'uppercase', marginBottom: 12 }}>— 04 · ตัวเลข</div>
+          <div className="mono" style={{ color: 'var(--muted)', letterSpacing: '.14em', fontSize: 11, textTransform: 'uppercase', marginBottom: 12 }}>— 04 · สถิติ</div>
           <h2 className="display-th" style={{ fontSize: 'clamp(30px,4.4vw,52px)', margin: 0, lineHeight: 1.15, color: 'var(--ink)' }}>
             ตัวเลขที่ทำให้เรา{' '}
             <span style={{ position: 'relative', display: 'inline-block', color: 'var(--teal)' }}>
@@ -591,8 +591,7 @@ function StatsSection({ stats }: { stats: SiteStats }) {
               <svg viewBox="0 0 140 60" preserveAspectRatio="none" style={{ position: 'absolute', left: -12, right: -12, top: -8, bottom: -8, width: 'calc(100% + 24px)', height: 'calc(100% + 16px)', pointerEvents: 'none' }} aria-hidden="true">
                 <ellipse cx="70" cy="30" rx="66" ry="25" fill="none" stroke="var(--teal)" strokeWidth="3" />
               </svg>
-            </span>{' '}
-            เงียบ ๆ
+            </span>
           </h2>
         </div>
         <div className="card card-cream stats-grid" style={{ padding: '40px 30px' }}>

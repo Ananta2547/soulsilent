@@ -78,7 +78,7 @@ export default function WorkshopsListingPage() {
           ที่ใช่กับคุณ
         </h1>
         <p style={{ margin: '22px 0 0', fontSize: 16, lineHeight: 1.6, color: 'var(--muted)', maxWidth: 640 }}>
-          ทั้ง workshop, camp และ talk — เลือกแบบที่เหมาะกับเวลาและจังหวะของคุณ. ที่นั่งจำกัดเสมอ.
+          ทั้ง Workshop, Event, Seminar และอื่น ๆ อีกมากมาย — เลือกแบบที่เหมาะกับเวลาและจังหวะของคุณ
         </p>
       </section>
 
