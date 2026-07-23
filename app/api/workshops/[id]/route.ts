@@ -240,6 +240,19 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       )
       .run();
 
+    // Organizer cancelled the event → cascade-cancel every live booking with a
+    // remark, so participants see "กิจกรรมมีการเปลี่ยนแปลงกำหนดการ".
+    if ((body.status || 'active') === 'cancelled') {
+      await db
+        .prepare(
+          `UPDATE bookings SET status='cancelled',
+             cancel_reason=COALESCE(cancel_reason,'workshop_changed')
+           WHERE workshop_id=? AND status!='cancelled'`,
+        )
+        .bind(id)
+        .run();
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     const err = error as Error;

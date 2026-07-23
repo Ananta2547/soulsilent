@@ -1295,7 +1295,13 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
           <option value="active">เปิดจอง (Open)</option>
           <option value="closed">ปิดรับ (Closed)</option>
           <option value="draft">แบบร่าง (Draft)</option>
+          <option value="cancelled">ยกเลิกกิจกรรม (Cancelled)</option>
         </select>
+        {form.status === 'cancelled' && (
+          <p className="text-xs mt-1" style={{ color: '#b3261e' }}>
+            เมื่อบันทึก ระบบจะยกเลิกการจองทั้งหมดของกิจกรรมนี้ และแสดงหมายเหตุ &ldquo;กิจกรรมมีการเปลี่ยนแปลงกำหนดการ&rdquo; ให้ผู้เข้าร่วม
+          </p>
+        )}
       </div>
 
       <div className="flex items-center gap-3 pt-4 border-t border-gray-lighter">

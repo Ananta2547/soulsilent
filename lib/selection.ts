@@ -51,7 +51,8 @@ export async function settleSelection(db: Db, w: SettleWorkshop): Promise<void> 
     // Reject un-confirmed ORIGINAL approved seats (waitlist_rank IS NULL).
     await db
       .prepare(
-        `UPDATE bookings SET app_status='rejected', status='cancelled'
+        `UPDATE bookings SET app_status='rejected', status='cancelled',
+           cancel_reason=COALESCE(cancel_reason,'seat_full')
          WHERE workshop_id=? AND app_status='approved' AND waitlist_rank IS NULL AND confirmed_at IS NULL`
       )
       .bind(w.id)
@@ -87,7 +88,8 @@ export async function settleSelection(db: Db, w: SettleWorkshop): Promise<void> 
   if (waitBy != null && now >= waitBy) {
     await db
       .prepare(
-        `UPDATE bookings SET app_status='rejected', status='cancelled'
+        `UPDATE bookings SET app_status='rejected', status='cancelled',
+           cancel_reason=COALESCE(cancel_reason,'seat_full')
          WHERE workshop_id=? AND app_status='approved' AND waitlist_rank IS NOT NULL AND confirmed_at IS NULL`
       )
       .bind(w.id)

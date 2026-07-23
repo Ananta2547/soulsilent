@@ -15,7 +15,8 @@ type Db = Awaited<ReturnType<typeof import('./db').getDB>>;
 export async function expireStaleHolds(db: Db): Promise<void> {
   await db
     .prepare(
-      `UPDATE bookings SET status = 'cancelled'
+      `UPDATE bookings SET status = 'cancelled',
+         cancel_reason = COALESCE(cancel_reason, 'payment_failed')
        WHERE status != 'cancelled'
          AND payment_status = 'pending'
          AND expires_at IS NOT NULL

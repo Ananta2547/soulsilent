@@ -72,6 +72,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       args.push(body.app_status);
       sets.push('status = ?');
       args.push(body.app_status === 'rejected' ? 'cancelled' : 'pending');
+      // Rejected in selection = didn't make the cut → "seat full" remark; a fresh
+      // approve/waitlist clears any prior reason.
+      sets.push('cancel_reason = ?');
+      args.push(body.app_status === 'rejected' ? 'seat_full' : null);
       // Keep a rank only while waitlisted; clear it on a fresh approve so the
       // seat is treated as a round-1 (main) approval.
       sets.push('waitlist_rank = ?');
