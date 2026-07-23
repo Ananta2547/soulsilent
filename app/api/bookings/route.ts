@@ -3,7 +3,7 @@ import { v4 as uuid } from 'uuid';
 import { getDB, getEnv } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { createWorkshopCheckout } from '@/lib/stripe';
-import { getEffectivePrice } from '@/lib/workshop-utils';
+import { getEffectivePrice, hasWorkshopStarted } from '@/lib/workshop-utils';
 import { settleSelection, visibleAppStatus, confirmDeadlineFor, type SettleWorkshop } from '@/lib/selection';
 import { expireStaleHolds } from '@/lib/holds';
 import type { Workshop } from '@/lib/types';
@@ -153,6 +153,15 @@ export async function POST(request: Request) {
 
     if (!workshop || workshop.status !== 'active') {
       return NextResponse.json({ error: 'Workshop นี้ไม่สามารถจองได้' }, { status: 400 });
+    }
+
+    // Registration closes the moment the event starts — a multi-day workshop
+    // must not take joiners once it is under way (matches the "ปิดรับ" badge).
+    if (hasWorkshopStarted(workshop)) {
+      return NextResponse.json(
+        { error: 'กิจกรรมเริ่มแล้ว ไม่สามารถสมัครได้' },
+        { status: 400 },
+      );
     }
 
     // Age restriction (defense-in-depth — the BookingModal also blocks this).

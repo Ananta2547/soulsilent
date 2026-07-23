@@ -22,6 +22,7 @@ import {
   coordsToEmbedSrc,
   isShortMapLink,
   hasWorkshopEnded,
+  hasWorkshopStarted,
   isWorkshopOngoing,
   getWorkshopDays,
 } from '@/lib/workshop-utils';
@@ -825,6 +826,9 @@ function BookingCardContent({
   const paymentType = workshop.payment_type || 'paid';
   // Event finished → block any new booking.
   const ended = hasWorkshopEnded(workshop);
+  // First day already under way → registration closes (matches the "ปิดรับ"
+  // badge in listings). Multi-day events must not accept joiners mid-run.
+  const started = hasWorkshopStarted(workshop);
   // Currently taking place (start → last day's end) — multi-day aware.
   const ongoing = isWorkshopOngoing(workshop);
   const wsDays = getWorkshopDays(workshop);
@@ -1114,6 +1118,15 @@ function BookingCardContent({
         >
           {tr(lang, 'ดูสถานะการสมัคร', 'View application status')} <span className="mono">→</span>
         </Link>
+      ) : started ? (
+        <button
+          type="button"
+          disabled
+          className="btn"
+          style={{ width: '100%', justifyContent: 'center', fontSize: 15, padding: '15px 22px', background: 'var(--cream-deep)', color: 'var(--muted)', cursor: 'not-allowed' }}
+        >
+          {tr(lang, 'ปิดรับสมัคร — กิจกรรมเริ่มแล้ว', 'Registration closed — event started')}
+        </button>
       ) : (
         <>
           <button
