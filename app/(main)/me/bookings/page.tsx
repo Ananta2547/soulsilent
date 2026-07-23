@@ -159,7 +159,7 @@ export default function MyBookingsPage() {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [thankYou, setThankYou] = useState(false);
-  const [filter, setFilter] = useState<'active' | 'done' | 'other'>('active');
+  const [filter, setFilter] = useState<'all' | 'active' | 'done' | 'other'>('all');
   const [slipUrl, setSlipUrl] = useState<string | null>(null);
   const [consentFor, setConsentFor] = useState<Booking | null>(null);
 
@@ -311,11 +311,13 @@ export default function MyBookingsPage() {
         {/* Tabs */}
         {(() => {
           const counts = {
+            all: bookings.length,
             active: bookings.filter((b) => classify(b) === 'active').length,
             done: bookings.filter((b) => classify(b) === 'done').length,
             other: bookings.filter((b) => classify(b) === 'other').length,
           };
-          const tabs: { key: 'active' | 'done' | 'other'; label: string }[] = [
+          const tabs: { key: 'all' | 'active' | 'done' | 'other'; label: string }[] = [
+            { key: 'all', label: `${tr(lang, 'ทั้งหมด', 'All')} (${counts.all})` },
             { key: 'active', label: `${tr(lang, 'กำลังดำเนินการ', 'In progress')} (${counts.active})` },
             { key: 'done', label: `${tr(lang, 'สำเร็จ', 'Completed')} (${counts.done})` },
             { key: 'other', label: `${tr(lang, 'ดำเนินการไม่สำเร็จ', 'Unsuccessful')} (${counts.other})` },
@@ -351,7 +353,7 @@ export default function MyBookingsPage() {
         })()}
 
         {(() => {
-          const filtered = bookings.filter((b) => classify(b) === filter);
+          const filtered = filter === 'all' ? bookings : bookings.filter((b) => classify(b) === filter);
           if (bookings.length === 0) {
             return (
               <div style={{ padding: 48, borderRadius: 22, background: 'var(--cream)', textAlign: 'center', color: 'var(--muted)' }}>
