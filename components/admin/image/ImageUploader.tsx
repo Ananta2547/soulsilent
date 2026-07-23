@@ -234,7 +234,12 @@ export function ImageUploader({
             src={value}
             alt="preview"
             className="rounded-xl border border-gray-lighter"
-            style={{ maxHeight: 160, maxWidth: '100%', aspectRatio: primary.ratio, objectFit: 'cover' }}
+            style={
+              primary.ratio == null
+                ? // Free aspect (slips): show the whole image, never squashed.
+                  { maxHeight: 240, maxWidth: '100%', width: 'auto', height: 'auto', objectFit: 'contain' }
+                : { maxHeight: 160, maxWidth: '100%', aspectRatio: primary.ratio, objectFit: 'cover' }
+            }
           />
           <div className="mt-2 flex items-center gap-3 flex-wrap">
             <button

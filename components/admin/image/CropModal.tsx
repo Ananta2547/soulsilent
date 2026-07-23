@@ -53,6 +53,11 @@ export function CropModal({ src, primary, overlays = [], initialCrop, onCancel, 
       return;
     }
     const { width, height } = e.currentTarget;
+    if (primary.ratio == null) {
+      // Free aspect (slips): select the WHOLE image so confirming keeps it intact.
+      setCrop({ unit: '%', x: 0, y: 0, width: 100, height: 100 });
+      return;
+    }
     const next = centerCrop(
       makeAspectCrop({ unit: '%', width: 90 }, primary.ratio, width, height),
       width,
@@ -94,7 +99,8 @@ export function CropModal({ src, primary, overlays = [], initialCrop, onCancel, 
         width: (pxCrop.width / img.width) * 100,
         height: (pxCrop.height / img.height) * 100,
       };
-      await onSave({ blob, crop: cropPct, aspect: primary.ratio });
+      // Free-aspect crops record whatever shape the admin actually kept.
+      await onSave({ blob, crop: cropPct, aspect: primary.ratio ?? pxCrop.width / pxCrop.height });
     } catch (e) {
       setError((e as Error).message || 'ครอบตัดไม่สำเร็จ');
     } finally {
@@ -201,6 +207,9 @@ function OverlayGuides({
       : null; // pixel mode — skip overlay (rare; would need image dim refs)
 
   if (!cropPct) return null;
+  // Free-aspect primary has no fixed box to inscribe guides into.
+  const cropAspect = primary.ratio;
+  if (cropAspect == null) return null;
 
   return (
     <div
@@ -211,12 +220,12 @@ function OverlayGuides({
       }}
     >
       {overlays.map((o, i) => {
-        // Skip if same as primary
-        if (Math.abs(o.ratio - primary.ratio) < 0.01) return null;
+        // Skip free-aspect overlays and any that match the primary.
+        if (o.ratio == null) return null;
+        if (Math.abs(o.ratio - cropAspect) < 0.01) return null;
         // Compute the inscribed (centered) box at ratio `o.ratio` inside the
         // primary crop rectangle. cropPct is in % of the displayed image; the
         // displayed image fills the container 1:1 by react-image-crop layout.
-        const cropAspect = primary.ratio;
         let oW = cropPct.w;
         let oH = (oW / o.ratio) * cropAspect; // express height in cropPct's % units
         // If oH > crop height, scale by height instead

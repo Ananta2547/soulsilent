@@ -338,11 +338,11 @@ export default function AttendancePage() {
                                     href={b.refund_slip_url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-block w-9 h-11 rounded-md overflow-hidden border border-gray-lighter shrink-0"
+                                    className="inline-flex items-center justify-center w-9 h-11 rounded-md overflow-hidden border border-gray-lighter shrink-0 bg-cream"
                                     title="ดูสลิป"
                                   >
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={b.refund_slip_url} alt="slip" className="w-full h-full object-cover" />
+                                    <img src={b.refund_slip_url} alt="slip" className="max-w-full max-h-full object-contain" />
                                   </a>
                                   <button
                                     type="button"

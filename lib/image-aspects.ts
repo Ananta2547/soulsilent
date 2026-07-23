@@ -11,7 +11,9 @@
  *     the admin can see how it'll be masked elsewhere.
  */
 
-export type AspectSpec = { ratio: number; label: string };
+/** `ratio` omitted = free / original aspect: the cropper doesn't force a shape
+ *  and defaults to the whole image (used for slips, which must stay full-page). */
+export type AspectSpec = { ratio?: number; label: string };
 
 export const ASPECTS = {
   // Workshop cover poster — A3 portrait (29.7 × 42 cm).
@@ -34,11 +36,13 @@ export const ASPECTS = {
   AVATAR: { ratio: 1, label: '1:1 · avatar' },
   PROFILE_COVER: { ratio: 16 / 5, label: '16:5 · cover photo' },
 
-  PAYOUT_SLIP: { ratio: 3 / 4, label: '3:4 · สลิปโอนเงิน' },
-  REFUND_SLIP: { ratio: 3 / 4, label: '3:4 · สลิปคืนมัดจำ' },
+  // Slips are photos of a receipt — never crop them, keep the original shape.
+  PAYOUT_SLIP: { label: 'สัดส่วนจริง · สลิปโอนเงิน' },
+  REFUND_SLIP: { label: 'สัดส่วนจริง · สลิปคืนมัดจำ' },
 } satisfies Record<string, AspectSpec>;
 
-/** Pick the larger ratio (wider). Used to compute master crop when multiple placements exist. */
+/** Pick the larger ratio (wider). Used to compute master crop when multiple
+ *  placements exist. Free-aspect specs (no ratio) are ignored. */
 export function largestAspect(...specs: AspectSpec[]): AspectSpec {
-  return specs.reduce((a, b) => (b.ratio > a.ratio ? b : a));
+  return specs.reduce((a, b) => ((b.ratio ?? -1) > (a.ratio ?? -1) ? b : a));
 }
