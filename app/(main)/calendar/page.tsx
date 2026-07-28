@@ -396,8 +396,9 @@ function CalendarGrid({
     }
   }
 
-  const useFiveRows = cells.slice(35).every((c) => c.isOther);
-  const visibleCells = useFiveRows ? cells.slice(0, 35) : cells;
+  // Always render 6 rows (42 cells) so the calendar height never jumps between
+  // months — short months are padded with the following month's days.
+  const visibleCells = cells;
   const dowLabels = lang === 'th' ? TH_DOW : EN_DOW;
 
   // Split the flat cells into weeks of 7 so multi-day bars can span columns.
