@@ -26,6 +26,28 @@ function shortDate(iso: string | null): string {
   return `${d.getDate()} ${MONTHS_TH[d.getMonth()]} ${be}`;
 }
 
+const MONTHS_TH_FULL = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+
+/** "2026-07-31" → "31 กรกฎาคม 2569" (full Thai month, Buddhist-era year). */
+function fmtDateFull(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getDate()} ${MONTHS_TH_FULL[d.getMonth()]} ${d.getFullYear() + 543}`;
+}
+
+/** Card location as "name-province, district"; falls back to legacy free text. */
+function fmtLocation(w: Workshop): string {
+  const name = (w.loc_name || '').trim();
+  const province = (w.loc_province || '').trim();
+  const district = (w.loc_district || '').trim();
+  if (name || province || district) {
+    const head = [name, province].filter(Boolean).join('-');
+    return district ? `${head}, ${district}` : head;
+  }
+  return (w.location || '').trim();
+}
+
 function priceLabel(w: Workshop): string {
   const eff = getEffectivePrice(w);
   if (w.payment_type === 'free' || eff.price <= 0) return 'ฟรี';
@@ -299,9 +321,21 @@ function EventCard({ w }: { w: Workshop }) {
         <span className="tag">{w.category || 'ONSITE'}</span>
       </div>
       <h3 className="display-th u-clamp-2" style={{ fontSize: 17, margin: '0 0 8px', lineHeight: 1.25, minHeight: '2.5em' }}>{w.title}</h3>
-      <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.55 }}>
-        <div>📅 {shortDate(w.date)} · {w.time_start}–{w.time_end}</div>
-        {w.location && <div className="u-clamp-2">📍 {w.location}</div>}
+      <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span aria-hidden>📅</span>
+          <span>{fmtDateFull(w.date)}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span aria-hidden>🕐</span>
+          <span>{w.time_start} – {w.time_end}</span>
+        </div>
+        {fmtLocation(w) && (
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+            <span aria-hidden>📍</span>
+            <span className="u-clamp-2">{fmtLocation(w)}</span>
+          </div>
+        )}
       </div>
       <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12 }}>
         <div>
