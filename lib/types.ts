@@ -168,6 +168,11 @@ export interface Workshop {
   /** Live count of non-cancelled bookings. Computed — only present when the
    *  workshops API is called with ?counts=1 (admin-only). */
   booking_count?: number;
+  /** Joined from the linked location (GET /api/workshops). Used by cards to
+   *  format "name-province, district". Null when no location_id. */
+  loc_name?: string | null;
+  loc_province?: string | null;
+  loc_district?: string | null;
 }
 
 export interface Booking {

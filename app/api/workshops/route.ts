@@ -50,7 +50,10 @@ export async function GET(request: Request) {
     const countSelect = withCounts
       ? ", (SELECT COUNT(*) FROM bookings WHERE bookings.workshop_id = workshops.id AND bookings.status != 'cancelled') AS booking_count"
       : '';
-    let query = `SELECT *${countSelect} FROM workshops`;
+    // Join the linked location so cards can format "name-province, district"
+    // without a second round-trip (public read of name/province/district only).
+    let query = `SELECT workshops.*, l.name AS loc_name, l.province AS loc_province, l.district AS loc_district${countSelect}
+       FROM workshops LEFT JOIN locations l ON workshops.location_id = l.id`;
     if (where.length > 0) query += ' WHERE ' + where.join(' AND ');
     query += ' ORDER BY date DESC';
 
