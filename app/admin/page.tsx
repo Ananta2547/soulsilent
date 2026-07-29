@@ -14,19 +14,15 @@ interface Booking {
 interface Stats {
   totalUsers: number;
   totalWorkshops: number;
-  totalCourses: number;
   workshopRevenue: number;
-  courseRevenue: number;
   recentBookings: Booking[];
 }
 
 interface ApiResp {
   users?: { id: string }[];
   workshops?: { id: string }[];
-  courses?: { id: string }[];
   bookings?: Booking[];
   soulsilent?: { total: number };
-  allsoullearn?: { total: number };
 }
 
 export default function AdminDashboard() {
@@ -36,28 +32,24 @@ export default function AdminDashboard() {
   useEffect(() => {
     async function fetchStats() {
       try {
-        const [usersRes, workshopsRes, coursesRes, revenueRes, bookingsRes] = await Promise.all([
+        const [usersRes, workshopsRes, revenueRes, bookingsRes] = await Promise.all([
           fetch('/api/users'),
           fetch('/api/workshops'),
-          fetch('/api/courses?all=1'),
           fetch('/api/revenue'),
           fetch('/api/bookings'),
         ]);
 
-        const [users, workshops, courses, revenue, bookings] = (await Promise.all([
+        const [users, workshops, revenue, bookings] = (await Promise.all([
           usersRes.json(),
           workshopsRes.json(),
-          coursesRes.json(),
           revenueRes.json(),
           bookingsRes.json(),
-        ])) as [ApiResp, ApiResp, ApiResp, ApiResp, ApiResp];
+        ])) as [ApiResp, ApiResp, ApiResp, ApiResp];
 
         setStats({
           totalUsers: users.users?.length || 0,
           totalWorkshops: workshops.workshops?.length || 0,
-          totalCourses: courses.courses?.length || 0,
           workshopRevenue: revenue.soulsilent?.total || 0,
-          courseRevenue: revenue.allsoullearn?.total || 0,
           recentBookings: (bookings.bookings || []).slice(0, 5),
         });
       } catch {
@@ -76,14 +68,11 @@ export default function AdminDashboard() {
     );
   }
 
-  const totalRevenue = (stats?.workshopRevenue || 0) + (stats?.courseRevenue || 0);
-  const wsShare = totalRevenue > 0 ? ((stats?.workshopRevenue || 0) / totalRevenue) * 100 : 0;
-  const csShare = totalRevenue > 0 ? ((stats?.courseRevenue || 0) / totalRevenue) * 100 : 0;
+  const totalRevenue = stats?.workshopRevenue || 0;
 
   const statCards = [
     { label: 'ผู้ใช้งาน', value: stats?.totalUsers || 0, suffix: 'คน', icon: UsersIcon, tint: 'bg-blue-50 text-blue-600' },
     { label: 'Workshop', value: stats?.totalWorkshops || 0, suffix: 'รายการ', icon: WorkshopIcon, tint: 'bg-primary/10 text-primary' },
-    { label: 'คอร์สเรียน', value: stats?.totalCourses || 0, suffix: 'คอร์ส', icon: CourseIcon, tint: 'bg-accent/15 text-accent-dark' },
     { label: 'รายรับรวม', value: totalRevenue, suffix: 'บาท', icon: MoneyIcon, tint: 'bg-emerald-50 text-emerald-600', money: true },
   ];
 
@@ -121,42 +110,6 @@ export default function AdminDashboard() {
             </div>
           );
         })}
-      </section>
-
-      {/* Revenue split */}
-      <section className="card !p-6">
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-          <h2 className="font-heading text-lg text-dark">รายรับแยกตามแพลตฟอร์ม</h2>
-          <a
-            href="/admin/revenue"
-            className="text-xs text-primary font-medium hover:underline"
-          >
-            ดูทั้งหมด →
-          </a>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <PlatformRow
-            label="soulsilent"
-            sublabel="การจอง Workshop"
-            value={stats?.workshopRevenue || 0}
-            dotClass="bg-primary"
-            textClass="text-primary"
-          />
-          <PlatformRow
-            label="allsoullearn"
-            sublabel="คอร์สที่ขายได้"
-            value={stats?.courseRevenue || 0}
-            dotClass="bg-accent"
-            textClass="text-accent-dark"
-          />
-        </div>
-        {/* Share bar */}
-        {totalRevenue > 0 && (
-          <div className="flex h-2 rounded-full overflow-hidden bg-gray-lighter/60">
-            <div className="bg-primary h-full" style={{ width: `${wsShare}%` }} />
-            <div className="bg-accent h-full" style={{ width: `${csShare}%` }} />
-          </div>
-        )}
       </section>
 
       {/* Recent bookings */}
@@ -225,36 +178,6 @@ export default function AdminDashboard() {
   );
 }
 
-function PlatformRow({
-  label,
-  sublabel,
-  value,
-  dotClass,
-  textClass,
-}: {
-  label: string;
-  sublabel: string;
-  value: number;
-  dotClass: string;
-  textClass: string;
-}) {
-  return (
-    <div className="flex items-start gap-3 p-4 rounded-xl bg-surface">
-      <span className={`w-3 h-3 rounded-full mt-1.5 flex-shrink-0 ${dotClass}`} />
-      <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium text-dark">{label}</div>
-        <div
-          className={`text-2xl ${textClass} leading-tight mt-0.5 truncate`}
-          style={{ fontFamily: 'Archivo Black, Mitr, sans-serif', letterSpacing: '-0.02em' }}
-        >
-          ฿{value.toLocaleString()}
-        </div>
-        <div className="text-xs text-gray mt-0.5">{sublabel}</div>
-      </div>
-    </div>
-  );
-}
-
 /* Inline icons (avoid emoji rendering inconsistencies) */
 function UsersIcon() {
   return (
@@ -269,14 +192,6 @@ function WorkshopIcon() {
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
         d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-    </svg>
-  );
-}
-function CourseIcon() {
-  return (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-        d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
     </svg>
   );
 }

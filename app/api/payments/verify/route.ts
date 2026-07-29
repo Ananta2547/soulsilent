@@ -53,16 +53,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, type: 'workshop', booking_id: metadata.booking_id });
     }
 
-    if (metadata.type === 'course' && metadata.enrollment_id) {
-      await db
-        .prepare(
-          "UPDATE enrollments SET payment_status = 'paid', stripe_payment_id = ? WHERE id = ?"
-        )
-        .bind(paymentIntentId, metadata.enrollment_id)
-        .run();
-      return NextResponse.json({ ok: true, type: 'course', enrollment_id: metadata.enrollment_id });
-    }
-
     return NextResponse.json({ ok: false, error: 'unknown session type' }, { status: 400 });
   } catch (error) {
     const err = error as Error;

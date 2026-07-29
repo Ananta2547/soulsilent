@@ -44,13 +44,6 @@ export async function POST(request: Request) {
           )
           .bind(session.payment_intent as string, metadata.booking_id)
           .run();
-      } else if (metadata.type === 'course' && metadata.enrollment_id) {
-        await db
-          .prepare(
-            "UPDATE enrollments SET payment_status = 'paid', stripe_payment_id = ? WHERE id = ?"
-          )
-          .bind(session.payment_intent as string, metadata.enrollment_id)
-          .run();
       }
     }
 

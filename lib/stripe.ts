@@ -60,39 +60,6 @@ export async function createWorkshopCheckout(params: {
   return session.url!;
 }
 
-export async function createCourseCheckout(params: {
-  courseTitle: string;
-  amount: number;
-  enrollmentId: string;
-  userId: string;
-  successUrl: string;
-  cancelUrl: string;
-}): Promise<string> {
-  const stripe = await getStripe();
-  const session = await stripe.checkout.sessions.create({
-    payment_method_types: ['promptpay'],
-    line_items: [
-      {
-        price_data: {
-          currency: 'thb',
-          product_data: { name: params.courseTitle },
-          unit_amount: Math.round(params.amount * 100),
-        },
-        quantity: 1,
-      },
-    ],
-    mode: 'payment',
-    success_url: appendSessionId(params.successUrl),
-    cancel_url: params.cancelUrl,
-    metadata: {
-      type: 'course',
-      enrollment_id: params.enrollmentId,
-      user_id: params.userId,
-    },
-  });
-  return session.url!;
-}
-
 /**
  * Verify a Stripe Checkout session against the live API and return what we
  * need to update our DB. Used by /api/payments/verify when the user comes
