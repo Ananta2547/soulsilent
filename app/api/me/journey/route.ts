@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
+import { hasWorkshopEnded } from '@/lib/workshop-utils';
 
 /**
  * GET /api/me/journey
  *
- * Every workshop the signed-in user applied to or attended (active bookings —
- * excludes cancelled/rejected), joined with the workshop + the user's review.
+ * My Journey shows a workshop ONLY when all three hold (per requirement):
+ *   1. secured seat  — confirmed / paid (not cancelled/rejected)
+ *   2. attended      — checked in (attended = 1)
+ *   3. event ended   — the workshop's end date/time is in the past
+ * Missing any one → excluded.
  *
  * The event-photos Drive link is returned ONLY to users who attended/checked in
  * (attended = 1) — enforced here so it can't be read from the network otherwise.
@@ -33,14 +37,27 @@ export async function GET() {
       .bind(user.sub)
       .all<Record<string, unknown>>();
 
-    const items = (rows.results || []).map((b) => {
-      const attended = b.attended === 1;
-      return {
+    const items = (rows.results || [])
+      .filter((b) => {
+        // 1. secured seat
+        const secured = b.payment_status === 'paid' || b.status === 'confirmed';
+        // 2. attended (checked in)
+        const attended = b.attended === 1;
+        // 3. event ended (multi-day aware)
+        const ended = hasWorkshopEnded({
+          workshop_type: (b.workshop_type as 'one_day') || 'one_day',
+          date: (b.date as string) || '',
+          end_date: (b.end_date as string | null) ?? null,
+          dates_json: (b.dates_json as string) || '[]',
+          time_end: (b.time_end as string) || '23:59',
+        });
+        return secured && attended && ended;
+      })
+      .map((b) => ({
         ...b,
-        // Only reveal the Drive link to attended users (requirement).
-        photos_drive_url: attended ? (b.photos_drive_url as string | null) : null,
-      };
-    });
+        // attended is guaranteed by the filter → always reveal the Drive link.
+        photos_drive_url: (b.photos_drive_url as string | null) ?? null,
+      }));
 
     return NextResponse.json({ items });
   } catch (error) {
