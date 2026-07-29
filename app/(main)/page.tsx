@@ -6,7 +6,6 @@ import type { Workshop, Article, ArticleCategory } from '@/lib/types';
 import { useLang } from '@/lib/i18n';
 import { getEffectivePrice, hasWorkshopEnded, getWorkshopStatusBadge, isNewWorkshop, compareWorkshopsForListing } from '@/lib/workshop-utils';
 import { categoryLabel, formatArticleDate } from '@/lib/article-utils';
-import { MarketingFooter } from '@/components/layout/MarketingFooter';
 
 /* ============================================================
    Home — port of Design Composer "Home Hero.dc.html".
@@ -693,7 +692,6 @@ export default function HomePage() {
       <ArticlesSection lead={leadArticle} side={sideArticles} categories={articleCategories} />
       <ReviewsSection reviews={reviews} />
       <StatsSection stats={stats} />
-      <MarketingFooter />
     </div>
   );
 }

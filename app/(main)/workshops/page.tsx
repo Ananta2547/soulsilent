@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { Workshop } from '@/lib/types';
 import { getWorkshopTags, getEffectivePrice, getWorkshopStatusBadge, isNewWorkshop, compareWorkshopsForListing } from '@/lib/workshop-utils';
-import { MarketingFooter } from '@/components/layout/MarketingFooter';
 
 /* ============================================================
    Workshops listing — port of Design Composer "Workshops.dc.html".
@@ -153,8 +152,6 @@ export default function WorkshopsListingPage() {
           )}
         </div>
       </section>
-
-      <MarketingFooter />
     </>
   );
 }

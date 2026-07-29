@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { MarketingFooter } from '@/components/layout/MarketingFooter';
 
 /* ============================================================
    About — port of Design Composer "About.dc.html".
@@ -150,8 +149,6 @@ export default function AboutPage() {
           </div>
         </div>
       </section>
-
-      <MarketingFooter />
     </>
   );
 }

@@ -5,7 +5,6 @@ import Link from 'next/link';
 import type { Article, ArticleCategory } from '@/lib/types';
 import { DEFAULT_CATEGORIES, categoryLabel, formatArticleDate, parseTags } from '@/lib/article-utils';
 import { useLang } from '@/lib/i18n';
-import { MarketingFooter } from '@/components/layout/MarketingFooter';
 
 /* ============================================================
    Articles / Journal — port of Design Composer "Articles.dc.html".
@@ -169,8 +168,6 @@ export default function ArticlesPage() {
           )}
         </div>
       </section>
-
-      <MarketingFooter />
     </>
   );
 }

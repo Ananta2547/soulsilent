@@ -14,12 +14,20 @@ function SocialIcon({ label }: { label: string }) {
       return <svg {...common} fill="currentColor"><path d="M21.6 7.6a3 3 0 0 0-2.1-2.1C17.7 5 12 5 12 5s-5.7 0-7.5.5a3 3 0 0 0-2.1 2.1C2 9.4 2 12 2 12s0 2.6.4 4.4a3 3 0 0 0 2.1 2.1c1.8.5 7.5.5 7.5.5s5.7 0 7.5-.5a3 3 0 0 0 2.1-2.1c.4-1.8.4-4.4.4-4.4s0-2.6-.4-4.4M10 15.2V8.8l5.5 3.2z" /></svg>;
     case 'TikTok':
       return <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.6 5.1c-.9-.8-1.5-1.9-1.6-3.1h-3.1v13.9a3 3 0 1 1-2.1-2.9v-3.2A6.1 6.1 0 0 0 9 9.6a6.2 6.2 0 1 0 6.1 6.2V9.4a8.3 8.3 0 0 0 4.9 1.6V8a4.9 4.9 0 0 1-3.4-2.9" /></svg>;
+    case 'X':
+      return <svg {...common} fill="currentColor"><path d="M18.2 2.2h3.3l-7.2 8.3 8.5 11.3h-6.6l-5.2-6.8-6 6.8H1.7l7.7-8.8L1.2 2.2H8l4.7 6.2zm-1.2 17.9h1.8L7.1 4H5.2z" /></svg>;
     default:
-      return <span className="mono" style={{ fontSize: 13, fontWeight: 700 }}>LINE</span>;
+      return null;
   }
 }
 
-const SOCIALS = ['Facebook', 'Instagram', 'YouTube', 'TikTok', 'Line'];
+const SOCIALS: { label: string; href: string }[] = [
+  { label: 'Facebook', href: 'https://www.facebook.com/profile.php?id=100088101092600' },
+  { label: 'Instagram', href: 'https://www.instagram.com/soulsilent.official/' },
+  { label: 'YouTube', href: 'https://www.youtube.com/@SoulSilentOfficial' },
+  { label: 'TikTok', href: 'https://www.tiktok.com/@soulsilent.tk?is_from_webapp=1&sender_device=pc' },
+  { label: 'X', href: 'https://x.com/soulsilent_x' },
+];
 
 const FOOTER_NAV = [
   { label: 'กิจกรรมทั้งหมด', href: '/workshops' },
@@ -36,8 +44,8 @@ export function MarketingFooter() {
         <div className="mono" style={{ color: '#fff', letterSpacing: '.16em', fontSize: 14, textTransform: 'uppercase', fontWeight: 700, marginBottom: 22 }}>ติดตามเรา</div>
         <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
           {SOCIALS.map((s) => (
-            <a key={s} href="#" aria-label={s} style={{ width: 42, height: 42, borderRadius: '50%', background: 'rgba(255,255,255,.14)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
-              <SocialIcon label={s} />
+            <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer" aria-label={s.label} style={{ width: 42, height: 42, borderRadius: '50%', background: 'rgba(255,255,255,.14)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+              <SocialIcon label={s.label} />
             </a>
           ))}
         </div>
@@ -59,7 +67,7 @@ export function MarketingFooter() {
           <div style={{ height: 1, background: 'rgba(255,255,255,.12)', margin: '36px 0 24px' }} />
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, justifyContent: 'space-between', alignItems: 'center' }}>
             <div className="mono" style={{ fontSize: 11.5, color: 'rgba(255,255,255,.5)' }}>© {be} soulsilent. สงวนลิขสิทธิ์.</div>
-            <div className="mono" style={{ fontSize: 11.5, color: 'rgba(255,255,255,.35)' }}>soulsilent.soulsilent-official.workers.dev</div>
+            <div className="mono" style={{ fontSize: 11.5, color: 'rgba(255,255,255,.35)' }}>soulsilent.site</div>
           </div>
         </div>
       </div>
