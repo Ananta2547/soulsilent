@@ -137,7 +137,15 @@ function outcome(b: Booking): { bucket: Bucket; reason: string | null } {
     }
   }
 
-  if (b.status === 'cancelled') return { bucket: 'other', reason: b.cancel_reason ?? null };
+  if (b.status === 'cancelled') {
+    let reason = b.cancel_reason ?? null;
+    // A cancelled booking that never completed payment (manual abandon or an
+    // expired hold with no reason stored) reads as a payment failure.
+    if (!reason && b.payment_status !== 'paid' && b.payment_status !== 'refunded' && (b.amount || 0) > 0) {
+      reason = 'payment_failed';
+    }
+    return { bucket: 'other', reason };
+  }
   if ((b.view_status || 'applied') === 'rejected') return { bucket: 'other', reason: b.cancel_reason ?? 'seat_full' };
 
   const secured = b.payment_status === 'paid' || b.status === 'confirmed';
