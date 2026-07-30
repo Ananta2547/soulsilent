@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 import { requireAdmin, getCurrentUser } from '@/lib/auth';
 import { expireStaleHolds } from '@/lib/holds';
+import { hasWorkshopEnded, getWorkshopDays } from '@/lib/workshop-utils';
 import type { Workshop, Location, User } from '@/lib/types';
 
 type InstructorPublic = Pick<User, 'id' | 'name' | 'email' | 'role' | 'avatar_url'> & {
@@ -100,19 +101,36 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     }
 
     // Review eligibility + the user's existing review (for the review button).
+    // "Completed" = secured seat + event ended + checked in for EVERY day. A
+    // partial attendance reads as incomplete_days, no check-in as not_registered
+    // (mirrors the My Bookings outcome). Only a completed booking may review.
     let userAttended = false;
+    let userCompleted = false;
+    let userIncompleteReason: 'not_registered' | 'incomplete_days' | null = null;
     let userReview: import('@/lib/types').Review | null = null;
     if (user) {
-      const att = await db
+      const bk = await db
         .prepare(
-          `SELECT id FROM bookings
-           WHERE workshop_id = ? AND user_id = ? AND attended = 1
-             AND (payment_status = 'paid' OR status = 'confirmed')
-           LIMIT 1`
+          `SELECT attended, attendance_json FROM bookings
+           WHERE workshop_id = ? AND user_id = ? AND (payment_status = 'paid' OR status = 'confirmed')
+           ORDER BY created_at DESC LIMIT 1`
         )
         .bind(id, user.sub)
-        .first<{ id: string }>();
-      userAttended = !!att;
+        .first<{ attended: number | null; attendance_json: string | null }>();
+      if (bk) {
+        userAttended = bk.attended === 1;
+        let present = 0;
+        try {
+          const m = bk.attendance_json ? JSON.parse(bk.attendance_json) : null;
+          if (m && typeof m === 'object') present = Object.values(m).filter((v) => v === 1).length;
+        } catch {}
+        if (present === 0 && bk.attended === 1) present = 1;
+        const totalDays = Math.max(1, getWorkshopDays(workshop).length);
+        if (hasWorkshopEnded(workshop)) {
+          if (present >= totalDays) userCompleted = true;
+          else userIncompleteReason = present <= 0 ? 'not_registered' : 'incomplete_days';
+        }
+      }
       userReview = await db
         .prepare('SELECT * FROM reviews WHERE workshop_id = ? AND user_id = ?')
         .bind(id, user.sub)
@@ -126,6 +144,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       bookingCount: countResult?.count || 0,
       userBooking,
       userAttended,
+      userCompleted,
+      userIncompleteReason,
       userReview: userReview || null,
     });
   } catch (error) {

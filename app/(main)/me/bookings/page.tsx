@@ -130,7 +130,9 @@ function outcome(b: Booking): { bucket: Bucket; reason: string | null } {
   // result is masked — keep the card In Progress no matter the admin's decision.
   // (The raw status may already be 'cancelled'/'rejected', which must NOT leak
   // it into another tab or surface a remark/badge until announce_at passes.)
-  if (b.ws_admission_type === 'selection' && b.ws_announce_at) {
+  // A workshop cancellation is not a "result" — never mask it, the user must
+  // know the event is off.
+  if (b.ws_admission_type === 'selection' && b.ws_announce_at && b.cancel_reason !== 'workshop_changed') {
     const announceMs = new Date(b.ws_announce_at).getTime();
     if (!Number.isNaN(announceMs) && Date.now() < announceMs) {
       return { bucket: 'active', reason: null };
@@ -512,7 +514,8 @@ export default function MyBookingsPage() {
                     )}
                   </div>
 
-                  {pendingAnnounce && (
+                  {/* No countdowns on an unsuccessful/cancelled card. */}
+                  {pendingAnnounce && classify(b) !== 'other' && (
                     <div style={{ flexBasis: '100%' }}>
                       <AnnounceCountdown
                         announceAt={b.ws_announce_at!}
@@ -522,7 +525,7 @@ export default function MyBookingsPage() {
                   )}
 
                   {/* Secured seat, event not over → countdown to the start (In Progress). */}
-                  {paid && b.ws_date && !bookingEnded(b) && (
+                  {paid && b.ws_date && !bookingEnded(b) && classify(b) !== 'other' && (
                     <div style={{ flexBasis: '100%' }}>
                       <StartCountdown booking={b} lang={lang} />
                     </div>
@@ -714,7 +717,7 @@ function StatusBadge({ booking: b, expired, owesPayment, unsuccessful, lang }: {
       return <span className="tag tag-warn">{tr(lang, `ตัวสำรอง อันดับ ${b.waitlist_rank ?? '—'}`, `Waitlist #${b.waitlist_rank ?? '—'}`)}</span>;
     }
     if (view === 'rejected') {
-      return <span className="tag" style={{ background: '#fde7d3', color: '#a04a14', fontWeight: 700 }}>✕ {tr(lang, 'ไม่ผ่านการพิจารณา', 'Not selected')}</span>;
+      return <span className="tag" style={{ background: '#fde7d3', color: '#a04a14', fontWeight: 700 }}>✕ {tr(lang, 'สิทธิ์การเข้าร่วมเต็มแล้ว', 'Participation slots are full')}</span>;
     }
   }
 

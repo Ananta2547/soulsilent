@@ -56,6 +56,8 @@ export default function WorkshopDetailPage() {
   const [bookingCount, setBookingCount] = useState(0);
   const [userBooking, setUserBooking] = useState<UserBooking | null>(null);
   const [userAttended, setUserAttended] = useState(false);
+  const [userCompleted, setUserCompleted] = useState(false);
+  const [userIncompleteReason, setUserIncompleteReason] = useState<string | null>(null);
   const [userReview, setUserReview] = useState<Review | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [consentOpen, setConsentOpen] = useState(false);
@@ -74,6 +76,8 @@ export default function WorkshopDetailPage() {
         bookingCount: number;
         userBooking: UserBooking | null;
         userAttended?: boolean;
+        userCompleted?: boolean;
+        userIncompleteReason?: string | null;
         userReview?: Review | null;
       };
       setWorkshop(data.workshop);
@@ -82,6 +86,8 @@ export default function WorkshopDetailPage() {
       setBookingCount(data.bookingCount || 0);
       setUserBooking(data.userBooking);
       setUserAttended(!!data.userAttended);
+      setUserCompleted(!!data.userCompleted);
+      setUserIncompleteReason(data.userIncompleteReason ?? null);
       setUserReview(data.userReview || null);
     } catch {}
     setLoading(false);
@@ -719,6 +725,8 @@ export default function WorkshopDetailPage() {
                   bookingCount={bookingCount}
                   userBooking={userBooking}
                   userAttended={userAttended}
+                  userCompleted={userCompleted}
+                  userIncompleteReason={userIncompleteReason}
                   userReview={userReview}
                   booking={booking}
                   onBook={() => setBookingOpen(true)}
@@ -792,6 +800,8 @@ function BookingCardContent({
   bookingCount,
   userBooking,
   userAttended,
+  userCompleted,
+  userIncompleteReason,
   userReview,
   booking,
   onBook,
@@ -805,6 +815,8 @@ function BookingCardContent({
   bookingCount: number;
   userBooking: UserBooking | null;
   userAttended: boolean;
+  userCompleted: boolean;
+  userIncompleteReason: string | null;
   userReview: Review | null;
   booking: boolean;
   onBook: () => void;
@@ -824,6 +836,8 @@ function BookingCardContent({
   const lowSeats = spotsLeft > 0 && spotsLeft <= 4;
   const isSelection = workshop.admission_type === 'selection';
   const paymentType = workshop.payment_type || 'paid';
+  // Organizer/admin cancelled the whole event → no booking, show the reason.
+  const cancelled = workshop.status === 'cancelled';
   // Event finished → block any new booking.
   const ended = hasWorkshopEnded(workshop);
   // First day already under way → registration closes (matches the "ปิดรับ"
@@ -1009,8 +1023,14 @@ function BookingCardContent({
       )}
 
       {/* Primary action */}
-      {ended ? (
-        userAttended ? (
+      {cancelled ? (
+        <div
+          style={{ width: '100%', textAlign: 'center', fontSize: 14.5, fontWeight: 600, color: '#b3261e', background: '#fdeceb', border: '1px solid #f3c9c5', borderRadius: 14, padding: '15px 18px', lineHeight: 1.6 }}
+        >
+          {tr(lang, 'กิจกรรมมีการเปลี่ยนแปลงกำหนดการ', 'This event has been changed / cancelled')}
+        </div>
+      ) : ended ? (
+        userCompleted ? (
           userReview ? (
             // A review is one-time and immutable — show it read-only, no edit.
             <div
@@ -1053,7 +1073,11 @@ function BookingCardContent({
             className="btn"
             style={{ width: '100%', justifyContent: 'center', fontSize: 15, padding: '15px 22px', background: 'var(--cream-deep)', color: 'var(--muted)', cursor: 'not-allowed' }}
           >
-            {tr(lang, 'กิจกรรมจบแล้ว', 'Event ended')}
+            {userIncompleteReason === 'incomplete_days'
+              ? tr(lang, 'เงื่อนไขเวลาเข้าร่วมไม่ครบถ้วน', 'Attendance requirement not met')
+              : userIncompleteReason === 'not_registered'
+                ? tr(lang, 'เกินกำหนดเวลาลงทะเบียน', 'Missed the registration window')
+                : tr(lang, 'กิจกรรมจบแล้ว', 'Event ended')}
           </button>
         )
       ) : isPaid ? (
@@ -1084,7 +1108,7 @@ function BookingCardContent({
           className="btn"
           style={{ width: '100%', justifyContent: 'center', fontSize: 15, padding: '15px 22px', background: '#fde7d3', color: '#a04a14', cursor: 'not-allowed' }}
         >
-          {tr(lang, 'ไม่ผ่านการพิจารณา', 'Not selected')}
+          {tr(lang, 'สิทธิ์การเข้าร่วมเต็มแล้ว', 'Participation slots are full')}
         </button>
       ) : owesPayment ? (
         <>
