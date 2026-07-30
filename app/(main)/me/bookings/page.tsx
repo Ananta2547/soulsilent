@@ -126,6 +126,17 @@ function daysPresent(b: Booking): number {
 
 /** Tab bucket + the reason (real or computed) for an unsuccessful outcome. */
 function outcome(b: Booking): { bucket: Bucket; reason: string | null } {
+  // Anti-spoiler: for a selection booking, before the announcement moment the
+  // result is masked — keep the card In Progress no matter the admin's decision.
+  // (The raw status may already be 'cancelled'/'rejected', which must NOT leak
+  // it into another tab or surface a remark/badge until announce_at passes.)
+  if (b.ws_admission_type === 'selection' && b.ws_announce_at) {
+    const announceMs = new Date(b.ws_announce_at).getTime();
+    if (!Number.isNaN(announceMs) && Date.now() < announceMs) {
+      return { bucket: 'active', reason: null };
+    }
+  }
+
   if (b.status === 'cancelled') return { bucket: 'other', reason: b.cancel_reason ?? null };
   if ((b.view_status || 'applied') === 'rejected') return { bucket: 'other', reason: b.cancel_reason ?? 'seat_full' };
 
