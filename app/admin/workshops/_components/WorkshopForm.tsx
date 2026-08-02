@@ -238,9 +238,13 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
         .filter((d) => d.items.length > 0 || d.label.length > 0),
       tags: form.tags.filter((t) => t.trim().length > 0),
       target_items: form.target_items.filter((s) => s.trim().length > 0),
-      promo_price: form.promo_price.trim() === '' ? null : Number(form.promo_price),
-      promo_start: form.promo_start || null,
-      promo_end: form.promo_end || null,
+      // Free events can't run a promo — drop every promo field.
+      promo_price:
+        form.payment_type === 'free' || form.promo_price.trim() === ''
+          ? null
+          : Number(form.promo_price),
+      promo_start: form.payment_type === 'free' ? null : form.promo_start || null,
+      promo_end: form.payment_type === 'free' ? null : form.promo_end || null,
       // Empty age fields → null (no restriction).
       min_age: form.min_age.trim() === '' ? null : Number(form.min_age),
       max_age: form.max_age.trim() === '' ? null : Number(form.max_age),
@@ -297,6 +301,18 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
   const hasSelectionDateError =
     form.admission_type === 'selection' && !!(announceErr || confirmMainErr || confirmWaitErr);
 
+  // Promo window order (values are "YYYY-MM-DDTHH:MM"): start before end, and
+  // end no later than the event's own start. Only relevant for paid events.
+  const promoStartErr =
+    form.promo_start && form.promo_end && form.promo_start >= form.promo_end
+      ? 'เริ่มโปรต้องอยู่ก่อนวันเวลาสิ้นสุด'
+      : null;
+  const promoEndErr =
+    form.promo_end && wsStartDT && form.promo_end > wsStartDT
+      ? 'สิ้นสุดโปรต้องไม่เกินวันเวลาจัดกิจกรรม'
+      : null;
+  const hasPromoError = form.payment_type !== 'free' && !!(promoStartErr || promoEndErr);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -352,6 +368,12 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
     // Selection rounds must run in order: announce → confirm main → confirm waitlist.
     if (hasSelectionDateError) {
       setError('กรุณาแก้ไขลำดับวันที่คัดเลือกให้ถูกต้อง (ประกาศผล → ยืนยันตัวจริง → ยืนยันตัวสำรอง)');
+      return;
+    }
+
+    // Promo window must be valid: start before end, end no later than event start.
+    if (hasPromoError) {
+      setError('กรุณาแก้ไขวันเวลาโปรโมชันให้ถูกต้อง');
       return;
     }
 
@@ -1081,54 +1103,54 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
         )}
       </fieldset>
 
-      {/* Promotion */}
-      <fieldset className="border border-accent/30 rounded-xl p-4 bg-accent/5 space-y-3">
-        <legend className="text-sm font-medium text-dark px-2">โปรโมชัน (ไม่บังคับ)</legend>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div>
-            <label className="block text-xs font-medium text-dark mb-1">ราคาโปร</label>
-            <input
-              type="number"
-              min="0"
-              value={form.promo_price ?? ''}
-              onChange={(e) => setForm({ ...form, promo_price: e.target.value })}
-              className="input-field"
-              placeholder="ปล่อยว่าง = ไม่มีโปร"
-            />
+      {/* Promotion — free events can't run a promo, so the whole block hides. */}
+      {form.payment_type !== 'free' && (
+        <fieldset className="border border-accent/30 rounded-xl p-4 bg-accent/5 space-y-3">
+          <legend className="text-sm font-medium text-dark px-2">โปรโมชัน (ไม่บังคับ)</legend>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
+            <div>
+              <label className="block text-xs font-medium text-dark mb-1">ราคาโปร</label>
+              <input
+                type="number"
+                min="0"
+                value={form.promo_price ?? ''}
+                onChange={(e) => setForm({ ...form, promo_price: e.target.value })}
+                className="input-field"
+                placeholder="ปล่อยว่าง = ไม่มีโปร"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-dark mb-1">เริ่ม</label>
+              <DateTimePicker
+                value={form.promo_start ?? ''}
+                onChange={(v) => setForm({ ...form, promo_start: v })}
+                invalid={!!promoStartErr}
+              />
+              {promoStartErr && <p className="text-xs text-red-500 mt-1">⚠ {promoStartErr}</p>}
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-dark mb-1">สิ้นสุด</label>
+              <DateTimePicker
+                value={form.promo_end ?? ''}
+                onChange={(v) => setForm({ ...form, promo_end: v })}
+                invalid={!!(promoStartErr || promoEndErr)}
+              />
+              {promoEndErr && <p className="text-xs text-red-500 mt-1">⚠ {promoEndErr}</p>}
+            </div>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-dark mb-1">เริ่ม</label>
-            <input
-              type="date"
-              value={form.promo_start ?? ''}
-              max={form.promo_end || undefined}
-              onChange={(e) => setForm({ ...form, promo_start: e.target.value })}
-              className="input-field"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-dark mb-1">สิ้นสุด</label>
-            <input
-              type="date"
-              value={form.promo_end ?? ''}
-              min={form.promo_start || undefined}
-              onChange={(e) => setForm({ ...form, promo_end: e.target.value })}
-              className="input-field"
-            />
-          </div>
-        </div>
-        {form.promo_price && form.price > 0 && Number(form.promo_price) < form.price && (
-          <div className="text-xs text-gray flex items-center gap-2">
-            <span className="line-through">฿{form.price.toLocaleString()}</span>
-            <span className="text-primary font-semibold">
-              ฿{Number(form.promo_price).toLocaleString()}
-            </span>
-            <span className="text-accent-dark font-medium">
-              ลด {Math.round((1 - Number(form.promo_price) / form.price) * 100)}%
-            </span>
-          </div>
-        )}
-      </fieldset>
+          {form.promo_price && form.price > 0 && Number(form.promo_price) < form.price && (
+            <div className="text-xs text-gray flex items-center gap-2">
+              <span className="line-through">฿{form.price.toLocaleString()}</span>
+              <span className="text-primary font-semibold">
+                ฿{Number(form.promo_price).toLocaleString()}
+              </span>
+              <span className="text-accent-dark font-medium">
+                ลด {Math.round((1 - Number(form.promo_price) / form.price) * 100)}%
+              </span>
+            </div>
+          )}
+        </fieldset>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>

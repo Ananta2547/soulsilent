@@ -234,10 +234,23 @@ export function getEffectivePrice(w: Workshop, now: Date = new Date()):
     return { price: original, isPromo: false, originalPrice: original };
   }
 
-  const today = now.toISOString().slice(0, 10); // YYYY-MM-DD in UTC
+  // Compare in Thailand wall-clock (UTC+7). Bounds may be date-only (legacy,
+  // "YYYY-MM-DD") or datetime ("YYYY-MM-DDTHH:MM"). A date-only start counts
+  // from 00:00 of that day, a date-only end through 23:59 — so old records keep
+  // their whole-day semantics while new records honour the chosen time.
+  const nowStr = new Date(now.getTime() + 7 * 3600 * 1000).toISOString().slice(0, 16);
+  const startBound = w.promo_start
+    ? w.promo_start.length <= 10
+      ? `${w.promo_start}T00:00`
+      : w.promo_start
+    : null;
+  const endBound = w.promo_end
+    ? w.promo_end.length <= 10
+      ? `${w.promo_end}T23:59`
+      : w.promo_end
+    : null;
   const inRange =
-    (!w.promo_start || w.promo_start <= today) &&
-    (!w.promo_end || w.promo_end >= today);
+    (!startBound || startBound <= nowStr) && (!endBound || endBound >= nowStr);
 
   if (!inRange) {
     return { price: original, isPromo: false, originalPrice: original };
