@@ -7,7 +7,7 @@ import type { DayTime, ImageMeta, Location, ScheduleDay, ScheduleItem, User, Wor
 import { ImageUploader } from '@/components/admin/image/ImageUploader';
 import { TimeField24 } from '@/components/admin/TimeField24';
 import { DateField24 } from '@/components/admin/DateField24';
-import { DateTimeField24 } from '@/components/admin/DateTimeField24';
+import { DateTimePicker } from '@/components/admin/DateTimePicker';
 import { ASPECTS } from '@/lib/image-aspects';
 import { parseImageMeta } from '@/lib/image-meta';
 import { safeParseArray } from '@/lib/workshop-utils';
@@ -276,6 +276,27 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
     if (ok) onSuccess?.();
   }
 
+  // Selection-round date order (all values are "YYYY-MM-DDTHH:MM", which sorts
+  // chronologically as plain strings). Each error is null unless both sides of
+  // the comparison are filled in and out of order.
+  const eventFirstDate =
+    form.workshop_type === 'multi_part' ? [...form.dates].sort()[0] || '' : form.date;
+  const wsStartDT = eventFirstDate ? `${eventFirstDate}T${form.time_start || '00:00'}` : '';
+  const announceErr =
+    form.announce_at && wsStartDT && form.announce_at >= wsStartDT
+      ? 'ต้องอยู่ก่อนวันจัดกิจกรรม'
+      : null;
+  const confirmMainErr =
+    form.confirm_main_by && form.announce_at && form.confirm_main_by <= form.announce_at
+      ? 'ต้องอยู่หลังวันประกาศผลคัดเลือก'
+      : null;
+  const confirmWaitErr =
+    form.confirm_waitlist_by && form.confirm_main_by && form.confirm_waitlist_by <= form.confirm_main_by
+      ? 'ต้องอยู่หลังกำหนดยืนยันตัวจริง'
+      : null;
+  const hasSelectionDateError =
+    form.admission_type === 'selection' && !!(announceErr || confirmMainErr || confirmWaitErr);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -326,6 +347,12 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
         setError(`เวลาของวันที่ ${fmtDate(bad.date)} ไม่ถูกต้อง — เวลาเริ่มต้องอยู่ก่อนเวลาจบ`);
         return;
       }
+    }
+
+    // Selection rounds must run in order: announce → confirm main → confirm waitlist.
+    if (hasSelectionDateError) {
+      setError('กรุณาแก้ไขลำดับวันที่คัดเลือกให้ถูกต้อง (ประกาศผล → ยืนยันตัวจริง → ยืนยันตัวสำรอง)');
+      return;
     }
 
     const ok = await send(makePayload(canonicalDate, endDate, dates, form.status));
@@ -988,18 +1015,33 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
         </div>
 
         {form.admission_type === 'selection' && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 items-start">
             <div>
               <label className="block text-xs font-medium text-dark mb-1">ประกาศผลคัดเลือก</label>
-              <DateTimeField24 value={form.announce_at} onChange={(v) => setForm({ ...form, announce_at: v })} />
+              <DateTimePicker
+                value={form.announce_at}
+                onChange={(v) => setForm({ ...form, announce_at: v })}
+                invalid={!!announceErr}
+              />
+              {announceErr && <p className="text-xs text-red-500 mt-1">⚠ {announceErr}</p>}
             </div>
             <div>
               <label className="block text-xs font-medium text-dark mb-1">ยืนยันตัวจริง ภายใน</label>
-              <DateTimeField24 value={form.confirm_main_by} onChange={(v) => setForm({ ...form, confirm_main_by: v })} />
+              <DateTimePicker
+                value={form.confirm_main_by}
+                onChange={(v) => setForm({ ...form, confirm_main_by: v })}
+                invalid={!!confirmMainErr}
+              />
+              {confirmMainErr && <p className="text-xs text-red-500 mt-1">⚠ {confirmMainErr}</p>}
             </div>
             <div>
               <label className="block text-xs font-medium text-dark mb-1">ยืนยันตัวสำรอง ภายใน</label>
-              <DateTimeField24 value={form.confirm_waitlist_by} onChange={(v) => setForm({ ...form, confirm_waitlist_by: v })} />
+              <DateTimePicker
+                value={form.confirm_waitlist_by}
+                onChange={(v) => setForm({ ...form, confirm_waitlist_by: v })}
+                invalid={!!confirmWaitErr}
+              />
+              {confirmWaitErr && <p className="text-xs text-red-500 mt-1">⚠ {confirmWaitErr}</p>}
             </div>
           </div>
         )}
