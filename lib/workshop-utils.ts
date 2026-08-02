@@ -287,7 +287,14 @@ export function hasWorkshopStarted(w: TimeShape, now: Date = new Date()): boolea
  *  non-draft = closed (muted). Draft is never shown publicly. Once the event
  *  has STARTED, booking auto-closes → "ปิดรับ" regardless of the stored status. */
 export function getWorkshopStatusBadge(w: Workshop, now: Date = new Date()): { label: string; open: boolean } {
-  const open = w.status === 'active' && !hasWorkshopStarted(w, now);
+  let open = w.status === 'active' && !hasWorkshopStarted(w, now);
+  // Selection: booking (applications) close once the results are announced —
+  // after that it's the confirm phase for the already-selected, not open to new
+  // applicants. announce_at is Thai wall-clock ("YYYY-MM-DDTHH:MM").
+  if (open && w.admission_type === 'selection' && w.announce_at) {
+    const ann = new Date(`${w.announce_at}:00${TH_OFFSET}`).getTime();
+    if (!Number.isNaN(ann) && now.getTime() >= ann) open = false;
+  }
   return { label: open ? 'เปิดจอง' : 'ปิดรับ', open };
 }
 

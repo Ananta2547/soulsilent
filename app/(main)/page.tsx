@@ -35,6 +35,24 @@ function fmtDateFull(iso: string | null): string {
   return `${d.getDate()} ${MONTHS_TH_FULL[d.getMonth()]} ${d.getFullYear() + 543}`;
 }
 
+/** "2026-07-31" → "31 ก.ค. 69" (short month, 2-digit Buddhist-era year). */
+function fmtDateShort(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const beYY = String((d.getFullYear() + 543) % 100).padStart(2, '0');
+  return `${d.getDate()} ${MONTHS_TH[d.getMonth()]} ${beYY}`;
+}
+
+/** Card date label — continuous (multi-day) events show a short start–end
+ *  range ("31 ก.ค. 69 - 2 ส.ค. 69"); everything else the single full date. */
+function cardDateLabel(w: Workshop): string {
+  if (w.workshop_type === 'multi_day' && w.end_date) {
+    return `${fmtDateShort(w.date)} - ${fmtDateShort(w.end_date)}`;
+  }
+  return fmtDateFull(w.date);
+}
+
 /** Card location as "name-province, district"; falls back to legacy free text. */
 function fmtLocation(w: Workshop): string {
   const name = (w.loc_name || '').trim();
@@ -275,6 +293,7 @@ function Hero({ workshops }: { workshops: Workshop[] }) {
 function EventCard({ w }: { w: Workshop }) {
   const eff = getEffectivePrice(w);
   const free = w.payment_type === 'free' || eff.price <= 0;
+  const badge = getWorkshopStatusBadge(w);
   return (
     <Link href={`/workshops/${w.id}`} className="card reveal-up" style={{ padding: 16, display: 'flex', flexDirection: 'column', textDecoration: 'none', color: 'var(--ink)' }}>
       <div className="ph ph-teal card-media" style={{ aspectRatio: '3/4', borderRadius: 14, marginBottom: 14, position: 'relative', overflow: 'hidden' }}>
@@ -309,21 +328,16 @@ function EventCard({ w }: { w: Workshop }) {
         )}
       </div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-        {(() => {
-          const b = getWorkshopStatusBadge(w);
-          return (
-            <span className={b.open ? 'tag tag-accent' : 'tag'} style={b.open ? undefined : { background: '#e6e3da', color: 'var(--muted)' }}>
-              {b.label}
-            </span>
-          );
-        })()}
+        <span className={badge.open ? 'tag tag-accent' : 'tag'} style={badge.open ? undefined : { background: '#e6e3da', color: 'var(--muted)' }}>
+          {badge.label}
+        </span>
         <span className="tag">{w.category || 'ONSITE'}</span>
       </div>
       <h3 className="display-th u-clamp-2" style={{ fontSize: 17, margin: '0 0 8px', lineHeight: 1.25, minHeight: '2.5em' }}>{w.title}</h3>
       <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: 3 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span aria-hidden>📅</span>
-          <span>{fmtDateFull(w.date)}</span>
+          <span>{cardDateLabel(w)}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span aria-hidden>🕐</span>
@@ -341,7 +355,17 @@ function EventCard({ w }: { w: Workshop }) {
           <div className="mono" style={{ fontSize: 9.5, color: 'var(--muted)', letterSpacing: '.1em', textTransform: 'uppercase' }}>เริ่มต้น</div>
           <div style={{ fontFamily: 'var(--font-display-th)', fontWeight: 600, fontSize: 19, color: 'var(--teal)' }}>{free ? 'ฟรี' : `฿${eff.price.toLocaleString()}`}</div>
         </div>
-        <span className="btn btn-teal btn-sm" aria-hidden>จอง <span className="mono">→</span></span>
+        {badge.open ? (
+          <span className="btn btn-teal btn-sm" aria-hidden>จอง <span className="mono">→</span></span>
+        ) : (
+          <span
+            className="btn btn-sm"
+            aria-hidden
+            style={{ background: '#e6e3da', color: 'var(--muted)', cursor: 'not-allowed' }}
+          >
+            ปิดรับ
+          </span>
+        )}
       </div>
     </Link>
   );
