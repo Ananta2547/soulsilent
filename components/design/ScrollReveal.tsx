@@ -43,13 +43,18 @@ export function ScrollReveal() {
       return r.top < window.innerHeight * 0.95 && r.bottom > 0;
     };
 
+    // Track already-observed elements in JS, NOT via a DOM attribute — writing
+    // data-* onto React-rendered nodes triggers a hydration mismatch when a
+    // Suspense boundary (route loading.tsx) commits the page after this runs.
+    const seen = new WeakSet<Element>();
+
     function scan() {
       let batch = 0;
       document.querySelectorAll<HTMLElement>('.reveal-up:not(.in)').forEach((el) => {
         if (inViewport(el)) {
           reveal(el, batch++); // visible now → reveal immediately (fail-safe)
-        } else if (!el.dataset.rv) {
-          el.dataset.rv = '1';
+        } else if (!seen.has(el)) {
+          seen.add(el);
           io.observe(el); // below the fold → reveal on scroll
         }
       });

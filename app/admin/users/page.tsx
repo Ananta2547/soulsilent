@@ -1,5 +1,7 @@
 'use client';
 
+import { PageLoader } from '@/components/design/PageLoader';
+
 import { useState, useEffect } from 'react';
 import { sqliteToMs } from '@/lib/datetime';
 import { isOwnerEmail } from '@/lib/constants';
@@ -103,7 +105,7 @@ export default function AdminUsersPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <PageLoader />
       </div>
     );
   }

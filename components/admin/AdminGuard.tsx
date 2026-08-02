@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
+import { PageLoader } from '@/components/design/PageLoader';
 
 type Me = { id: string; name: string; email: string; role: string };
 type State = 'loading' | 'ok' | 'not-logged-in' | 'forbidden';
@@ -33,11 +34,7 @@ export function AdminGuard({ children }: { children: ReactNode }) {
   }, []);
 
   if (state === 'loading') {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <PageLoader variant="inline" />;
   }
 
   if (state === 'not-logged-in') {

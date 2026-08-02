@@ -1,5 +1,7 @@
 'use client';
 
+import { PageLoader } from '@/components/design/PageLoader';
+
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -86,7 +88,7 @@ export default function TeacherWorkshopDetail() {
   if (!data) {
     return (
       <div className="flex items-center justify-center h-40">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <PageLoader />
       </div>
     );
   }

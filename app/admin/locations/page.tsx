@@ -1,5 +1,7 @@
 'use client';
 
+import { PageLoader } from '@/components/design/PageLoader';
+
 import { useEffect, useState } from 'react';
 import type { Location, User, ImageMeta } from '@/lib/types';
 import { AddressPicker } from '@/components/admin/AddressPicker';
@@ -129,7 +131,7 @@ export default function AdminLocationsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <PageLoader />
       </div>
     );
   }

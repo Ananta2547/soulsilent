@@ -1,5 +1,7 @@
 'use client';
 
+import { PageLoader } from '@/components/design/PageLoader';
+
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useLang, T, tr } from '@/lib/i18n';
@@ -51,7 +53,7 @@ export default function PortfolioShowcasePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <PageLoader />
       </div>
     );
   }

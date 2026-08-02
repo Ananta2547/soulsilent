@@ -1,5 +1,7 @@
 'use client';
 
+import { PageLoader } from '@/components/design/PageLoader';
+
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -73,7 +75,7 @@ export default function SettingsPage() {
 function LoadingBlock() {
   return (
     <div className="flex items-center justify-center h-64">
-      <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      <PageLoader />
     </div>
   );
 }
