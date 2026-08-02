@@ -209,98 +209,38 @@ export default function WorkshopDetailPage() {
 
   return (
     <>
-      {/* Hero */}
-      <section className="section" style={{ paddingTop: 32, paddingBottom: 32, position: 'relative', overflow: 'hidden' }}>
-        <div className="container">
-          <Link
-            href="/workshops"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              fontSize: 13,
-              color: 'var(--muted)',
-              textDecoration: 'none',
-              marginBottom: 24,
-            }}
+      {/* Hero banner */}
+      <section className="bg-teal-section" style={{ padding: '40px 0' }}>
+        <div className="container" style={{ textAlign: 'center' }}>
+          <h1
+            className="display-th"
+            style={{ fontSize: 'clamp(28px, 4.2vw, 44px)', margin: 0, lineHeight: 1.15, color: '#fff' }}
           >
-            <span className="mono">←</span> {tr(lang, 'กลับไปหน้ารวมกิจกรรม', 'All events')}
-          </Link>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 48 }} className="ws-detail-grid">
-            <Reveal>
-              <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
-                {hasWorkshopEnded(workshop) ? (
-                  <span className="tag" style={{ background: 'var(--cream-deep)', color: 'var(--muted)' }}>{tr(lang, 'ปิดรับ', 'Closed')}</span>
-                ) : workshop.status === 'cancelled' ? (
-                  <span className="tag" style={{ background: '#fde7d3', color: '#a04a14' }}>{tr(lang, 'ยกเลิก', 'Cancelled')}</span>
-                ) : (
-                  <span className="tag tag-accent">{tr(lang, 'เปิดจอง', 'Open')}</span>
-                )}
-                <span className="tag">Workshop · Onsite</span>
-              </div>
-              <h1
-                className="display-th"
-                style={{
-                  fontSize: 'clamp(34px, 5.5vw, 68px)',
-                  margin: '0 0 18px',
-                  lineHeight: 1.05,
-                }}
-              >
-                {workshop.title}
-              </h1>
-              {workshop.short_description && (
-                <p
-                  style={{
-                    fontSize: 'clamp(15px, 1.3vw, 18px)',
-                    color: 'var(--muted)',
-                    margin: 0,
-                    lineHeight: 1.65,
-                    maxWidth: 580,
-                  }}
-                >
-                  {workshop.short_description}
-                </p>
-              )}
-            </Reveal>
-
-            <Reveal variant="reveal-right">
-              <div
-                className="ph ph-teal-100"
-                style={{ aspectRatio: '297 / 420', maxWidth: 360, marginLeft: 'auto', borderRadius: 22, position: 'relative', overflow: 'hidden' }}
-              >
-                {workshop.image_url ? (
-                  <img
-                    src={workshop.image_url}
-                    alt={workshop.title}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
-                ) : (
-                  <>
-                    <Cloud
-                      color="var(--teal)"
-                      stroke={3}
-                      style={{ position: 'absolute', top: 24, right: 24, width: 88, height: 56 }}
-                    />
-                    <WaveLine
-                      color="var(--teal-200)"
-                      stroke={2.5}
-                      style={{ position: 'absolute', bottom: 24, left: 24, right: 24, width: 'calc(100% - 48px)', height: 36 }}
-                      count={2}
-                    />
-                  </>
-                )}
-              </div>
-            </Reveal>
-          </div>
+            {workshop.title}
+          </h1>
         </div>
       </section>
 
       {/* Content + sticky booking */}
-      <section className="section" style={{ paddingTop: 0, paddingBottom: 96 }}>
+      <section className="section" style={{ paddingTop: 48, paddingBottom: 96 }}>
         <div className="container">
           <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 48 }} className="ws-detail-grid">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 48 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 48, minWidth: 0 }}>
+              {/* Tags */}
+              <Reveal>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {hasWorkshopEnded(workshop) ? (
+                    <span className="tag" style={{ background: 'var(--cream-deep)', color: 'var(--muted)' }}>{tr(lang, 'ปิดรับ', 'Closed')}</span>
+                  ) : workshop.status === 'cancelled' ? (
+                    <span className="tag" style={{ background: '#fde7d3', color: '#a04a14' }}>{tr(lang, 'ยกเลิก', 'Cancelled')}</span>
+                  ) : (
+                    <span className="tag tag-accent">{tr(lang, 'เปิดจอง', 'Open')}</span>
+                  )}
+                  <span className="tag">Workshop · Onsite</span>
+                  {workshop.category && <span className="tag">{workshop.category}</span>}
+                </div>
+              </Reveal>
+
               {workshop.description && (
                 <Reveal>
                   <p
@@ -707,8 +647,35 @@ export default function WorkshopDetailPage() {
               )}
             </div>
 
-            {/* Sticky booking card */}
-            <div>
+            {/* Poster (static) + sticky booking card */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <div
+                className="ph ph-teal-100"
+                style={{ aspectRatio: '297 / 420', borderRadius: 22, overflow: 'hidden', position: 'relative' }}
+              >
+                {workshop.image_url ? (
+                  <img
+                    src={workshop.image_url}
+                    alt={workshop.title}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <>
+                    <Cloud
+                      color="var(--teal)"
+                      stroke={3}
+                      style={{ position: 'absolute', top: 24, right: 24, width: 88, height: 56 }}
+                    />
+                    <WaveLine
+                      color="var(--teal-200)"
+                      stroke={2.5}
+                      style={{ position: 'absolute', bottom: 24, left: 24, right: 24, width: 'calc(100% - 48px)', height: 36 }}
+                      count={2}
+                    />
+                  </>
+                )}
+              </div>
+
               <div
                 style={{
                   position: 'sticky',
