@@ -1,9 +1,11 @@
 'use client';
 
-/* Clean date + time picker built on the browser's native <input type="date">
- * and <input type="time"> widgets (calendar popup + 24h time, per Thai locale).
- * Value is "YYYY-MM-DDTHH:MM" — same shape as datetime-local — so callers need
- * no other changes. `invalid` draws a red border for validation feedback. */
+/* Clean date + time picker: native <input type="date"> calendar popup for the
+ * date, TimeField24 (24h hour/minute dropdowns) for the time. Value is
+ * "YYYY-MM-DDTHH:MM" — same shape as datetime-local — so callers need no other
+ * changes. `invalid` draws a red border for validation feedback. */
+import { TimeField24 } from './TimeField24';
+
 export function DateTimePicker({
   value,
   onChange,
@@ -33,13 +35,7 @@ export function DateTimePicker({
         onChange={(e) => setDate(e.target.value)}
         className={`${className}${ring} !w-auto`}
       />
-      <input
-        type="time"
-        aria-label="เวลา"
-        value={time}
-        onChange={(e) => setTime(e.target.value)}
-        className={`${className}${ring} !w-auto`}
-      />
+      <TimeField24 value={time || '00:00'} onChange={setTime} className={`${className}${ring}`} />
     </div>
   );
 }
