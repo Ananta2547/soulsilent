@@ -64,6 +64,9 @@ export default function WorkshopDetailPage() {
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(false);
+  const [loginPromptOpen, setLoginPromptOpen] = useState(false);
+  // null = still checking; true/false = known login state.
+  const [authed, setAuthed] = useState<boolean | null>(null);
   const [openDays, setOpenDays] = useState<number[]>([0]);
 
   const load = useCallback(async () => {
@@ -96,6 +99,30 @@ export default function WorkshopDetailPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Login status — gate the booking form so guests are prompted to sign in first.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/auth/me');
+        const data = (await res.json()) as { user: { id: string } | null };
+        if (!cancelled) setAuthed(!!data.user);
+      } catch {
+        if (!cancelled) setAuthed(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Booking CTA: guests get the login/register prompt; signed-in users get the
+  // application form.
+  function handleBookClick() {
+    if (authed) setBookingOpen(true);
+    else setLoginPromptOpen(true);
+  }
 
   // When Stripe redirects back with ?session_id=..., verify the payment
   // server-side, then strip the query param and refetch. This is the path
@@ -696,7 +723,7 @@ export default function WorkshopDetailPage() {
                   userIncompleteReason={userIncompleteReason}
                   userReview={userReview}
                   booking={booking}
-                  onBook={() => setBookingOpen(true)}
+                  onBook={handleBookClick}
                   onResume={resumePayment}
                   onReview={() => setReviewOpen(true)}
                   onViewApplication={() => setConsentOpen(true)}
@@ -722,6 +749,14 @@ export default function WorkshopDetailPage() {
           workshop={workshop}
           submitting={booking}
           onSubmit={(application) => handleBooking(application)}
+        />
+      )}
+
+      {loginPromptOpen && (
+        <LoginPromptModal
+          redirectTo={`/workshops/${id}`}
+          onClose={() => setLoginPromptOpen(false)}
+          lang={lang}
         />
       )}
 
@@ -792,7 +827,6 @@ function BookingCardContent({
   onViewApplication: () => void;
   lang: 'th' | 'en';
 }) {
-  const [saved, setSaved] = useState(false);
   const eff = getEffectivePrice(workshop);
   // Show "Free" when the payment model is free OR the effective price is ฿0.
   const isFree = (workshop.payment_type || 'paid') === 'free' || eff.price <= 0;
@@ -1142,32 +1176,6 @@ function BookingCardContent({
                   : tr(lang, 'จองที่นั่งเลย', 'Book a seat')}{' '}
             <span className="mono">→</span>
           </button>
-
-          {/* Save for later */}
-          <button
-            type="button"
-            onClick={() => setSaved((s) => !s)}
-            className="btn"
-            style={{
-              width: '100%',
-              justifyContent: 'center',
-              background: 'var(--cream)',
-              color: 'var(--ink)',
-              fontSize: 14,
-              padding: '13px 22px',
-            }}
-          >
-            {saved ? (
-              <>
-                {tr(lang, 'บันทึกแล้ว', 'Saved')}{' '}
-                <span style={{ color: 'var(--cal-orange, #ee7c2a)' }}>♥</span>
-              </>
-            ) : (
-              <>
-                {tr(lang, 'บันทึกไว้ก่อน', 'Save for later')} <span>♡</span>
-              </>
-            )}
-          </button>
         </>
       )}
 
@@ -1195,6 +1203,53 @@ function BookingCardContent({
         ))}
       </ul>
     </>
+  );
+}
+
+/**
+ * Guests who tap the booking CTA get this instead of the application form — a
+ * prompt to sign in or register, each carrying a redirect back to the workshop.
+ */
+function LoginPromptModal({
+  redirectTo,
+  onClose,
+  lang,
+}: {
+  redirectTo: string;
+  onClose: () => void;
+  lang: 'th' | 'en';
+}) {
+  const q = `redirect=${encodeURIComponent(redirectTo)}`;
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={tr(lang, 'ปิด', 'Close')}
+          style={{ position: 'absolute', top: 16, right: 18, background: 'none', border: 0, fontSize: 22, lineHeight: 1, color: 'var(--muted)', cursor: 'pointer' }}
+        >
+          ×
+        </button>
+        <div className="mono" style={{ fontSize: 11, color: 'var(--teal)', letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: 10 }}>
+          {tr(lang, 'ต้องเข้าสู่ระบบก่อน', 'Sign in required')}
+        </div>
+        <h3 className="display-th" style={{ fontSize: 22, margin: '0 0 12px', lineHeight: 1.3 }}>
+          {tr(lang, 'เข้าสู่ระบบเพื่อจองที่นั่ง', 'Sign in to book a seat')}
+        </h3>
+        <p style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.6, margin: '0 0 24px' }}>
+          {tr(lang, 'กรุณาเข้าสู่ระบบหรือสมัครสมาชิกก่อน เพื่อดำเนินการจองและกรอกใบสมัคร', 'Please sign in or create an account to continue with your booking.')}
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <Link href={`/auth/login?${q}`} className="btn btn-teal" style={{ width: '100%', justifyContent: 'center', fontSize: 15, padding: '14px 22px' }}>
+            {tr(lang, 'เข้าสู่ระบบ', 'Sign in')} <span className="mono">→</span>
+          </Link>
+          <Link href={`/auth/register?${q}`} className="btn" style={{ width: '100%', justifyContent: 'center', background: 'var(--cream)', color: 'var(--ink)', fontSize: 14, padding: '13px 22px' }}>
+            {tr(lang, 'สมัครสมาชิก', 'Create an account')}
+          </Link>
+        </div>
+      </div>
+    </div>
   );
 }
 
