@@ -27,6 +27,9 @@ export default function JourneyDetailPage() {
   const [showApp, setShowApp] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [slipOpen, setSlipOpen] = useState(false);
+  const [note, setNote] = useState('');
+  const [noteSaving, setNoteSaving] = useState(false);
+  const [noteJustSaved, setNoteJustSaved] = useState(false);
 
   function load() {
     fetch('/api/me/journey')
@@ -40,6 +43,34 @@ export default function JourneyDetailPage() {
       .finally(() => setLoading(false));
   }
   useEffect(load, [workshopId]);
+
+  // Hydrate the note editor when a (different) booking loads.
+  useEffect(() => {
+    if (item) setNote(item.journey_note || '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item?.booking_id]);
+
+  async function saveNote() {
+    if (!item) return;
+    setNoteSaving(true);
+    setNoteJustSaved(false);
+    try {
+      const res = await fetch('/api/me/journey', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ booking_id: item.booking_id, note }),
+      });
+      if (res.ok) {
+        const d = (await res.json()) as { note: string | null };
+        setItem((p) => (p ? { ...p, journey_note: d.note } : p));
+        setNote(d.note || '');
+        setNoteJustSaved(true);
+        setTimeout(() => setNoteJustSaved(false), 2000);
+      }
+    } finally {
+      setNoteSaving(false);
+    }
+  }
 
   const snap = useMemo<AppSnapshot | null>(() => {
     if (!item?.application_json) return null;
@@ -139,6 +170,34 @@ export default function JourneyDetailPage() {
               {tr(lang, 'เขียนรีวิว', 'Write a review')} ★
             </Btn>
           ) : null}
+        </div>
+
+        {/* Personal memory note — private, free-text, saved per booking */}
+        <div className="card" style={{ marginTop: 16, padding: '16px 18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <span aria-hidden style={{ fontSize: 18 }}>📝</span>
+            <span className="display-th" style={{ fontSize: 16 }}>{tr(lang, 'บันทึกความทรงจำ', 'My note')}</span>
+            <span style={{ fontSize: 12, color: 'var(--muted)' }}>· {tr(lang, 'ส่วนตัว เห็นคนเดียว', 'private to you')}</span>
+          </div>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder={tr(lang, 'จดสิ่งที่ได้เรียนรู้ ความรู้สึก หรือความทรงจำจากกิจกรรมนี้...', 'Jot down what you learned or want to remember from this workshop...')}
+            rows={4}
+            style={{ width: '100%', resize: 'vertical', border: '1px solid var(--cream-deep)', borderRadius: 12, padding: '12px 14px', fontSize: 14, lineHeight: 1.6, fontFamily: 'inherit', color: 'var(--ink)', background: 'var(--paper)', boxSizing: 'border-box' }}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10 }}>
+            <button
+              type="button"
+              onClick={saveNote}
+              disabled={noteSaving || note === (item.journey_note || '')}
+              className="btn btn-teal btn-sm"
+              style={{ opacity: noteSaving || note === (item.journey_note || '') ? 0.5 : 1 }}
+            >
+              {noteSaving ? tr(lang, 'กำลังบันทึก...', 'Saving...') : tr(lang, 'บันทึก', 'Save')}
+            </button>
+            {noteJustSaved && <span style={{ fontSize: 13, color: 'var(--teal)' }}>✓ {tr(lang, 'บันทึกแล้ว', 'Saved')}</span>}
+          </div>
         </div>
 
         {/* Your review (read-only, one-time) */}

@@ -579,11 +579,11 @@ function ReviewsSection({ reviews }: { reviews: PublicReview[] }) {
     <section className="section bg-teal-section" style={{ textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
       <span className="mono" style={{ position: 'absolute', right: '8%', top: 64, color: 'var(--accent)', fontSize: 22 }}>+</span>
       <div className="container">
-        <div className="mono" style={{ letterSpacing: '.14em', fontSize: 11, textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 14 }}>03 — พื้นที่รีวิว</div>
+        <div className="mono" style={{ letterSpacing: '.14em', fontSize: 11, textTransform: 'uppercase', color: '#fff', marginBottom: 14 }}>03 — พื้นที่รีวิว</div>
         <h2 className="display-en" style={{ fontSize: 'clamp(48px,9vw,110px)', margin: 0, color: '#fff', lineHeight: 0.9 }}>
-          <span style={{ color: 'var(--accent)' }}>&ldquo;</span>ECHOES<span style={{ color: 'var(--accent)' }}>&rdquo;</span>
+          <span style={{ color: '#fff' }}>&ldquo;</span>ECHOES<span style={{ color: '#fff' }}>&rdquo;</span>
         </h2>
-        <p style={{ fontFamily: 'Mitr', fontSize: 18, color: 'var(--accent)', margin: '14px 0 48px' }}>— เสียงสะท้อนจากผู้เข้าร่วม</p>
+        <p style={{ fontFamily: 'Mitr', fontSize: 18, color: '#fff', margin: '14px 0 48px' }}>— เสียงสะท้อนจากผู้เข้าร่วม</p>
 
         <div className="dc-rev-slider">
           <button type="button" className="dc-rev-arrow mono" aria-label="รีวิวก่อนหน้า" onClick={() => slide(-1)} disabled={!canPrev}>←</button>

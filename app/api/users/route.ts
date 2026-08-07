@@ -15,13 +15,27 @@ export async function GET(request: Request) {
 
     const baseQuery =
       'SELECT id, email, name, role, avatar_url, account_status, deleted_at, is_team, created_at, updated_at FROM users';
-    const stmt = roles.length
-      ? db
-          .prepare(
-            `${baseQuery} WHERE role IN (${roles.map(() => '?').join(',')}) ORDER BY name`,
-          )
-          .bind(...roles)
-      : db.prepare(`${baseQuery} ORDER BY created_at DESC`);
+
+    // `q` = typeahead search by name or email (used by the attendance
+    // "add participant" picker). Case-insensitive substring, capped at 20.
+    const q = (url.searchParams.get('q') || '').trim();
+    let stmt;
+    if (q) {
+      const like = `%${q}%`;
+      stmt = roles.length
+        ? db
+            .prepare(
+              `${baseQuery} WHERE role IN (${roles.map(() => '?').join(',')}) AND (name LIKE ? OR email LIKE ?) ORDER BY name LIMIT 20`,
+            )
+            .bind(...roles, like, like)
+        : db.prepare(`${baseQuery} WHERE name LIKE ? OR email LIKE ? ORDER BY name LIMIT 20`).bind(like, like);
+    } else {
+      stmt = roles.length
+        ? db
+            .prepare(`${baseQuery} WHERE role IN (${roles.map(() => '?').join(',')}) ORDER BY name`)
+            .bind(...roles)
+        : db.prepare(`${baseQuery} ORDER BY created_at DESC`);
+    }
 
     const result = await stmt.all();
     return NextResponse.json({ users: result.results });

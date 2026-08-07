@@ -28,6 +28,7 @@ export type JourneyItem = {
   review_rating: number | null;
   review_comment: string | null;
   review_created_at?: string | null;
+  journey_note: string | null;
 };
 
 type DateShape = Pick<Workshop, 'workshop_type' | 'date' | 'end_date' | 'dates_json' | 'time_end'>;

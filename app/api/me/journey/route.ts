@@ -23,7 +23,7 @@ export async function GET() {
     const rows = await db
       .prepare(
         `SELECT b.id AS booking_id, b.workshop_id, b.status, b.payment_status, b.app_status,
-                b.attended, b.attendance_json, b.refund_slip_url, b.application_json, b.created_at,
+                b.attended, b.attendance_json, b.refund_slip_url, b.application_json, b.journey_note, b.created_at,
                 w.title, w.image_url, w.date, w.end_date, w.dates_json, w.workshop_type,
                 w.time_start, w.time_end, w.day_times_json, w.master_id,
                 w.require_consent, w.photos_drive_url,
@@ -60,6 +60,40 @@ export async function GET() {
       }));
 
     return NextResponse.json({ items });
+  } catch (error) {
+    const err = error as Error;
+    if (err.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 });
+    }
+    return NextResponse.json({ error: 'เกิดข้อผิดพลาด' }, { status: 500 });
+  }
+}
+
+/**
+ * PATCH /api/me/journey — save the caller's personal memory note for one of
+ * their bookings. Scoped by user_id so a user can only write on their own row.
+ */
+export async function PATCH(request: Request) {
+  try {
+    const user = await requireAuth();
+    const { booking_id, note } = (await request.json()) as {
+      booking_id?: string;
+      note?: string;
+    };
+    if (!booking_id) {
+      return NextResponse.json({ error: 'ไม่พบรายการ' }, { status: 400 });
+    }
+    // Cap length defensively; trim so an all-whitespace note clears to null.
+    const clean = typeof note === 'string' ? note.slice(0, 5000).trim() : '';
+    const db = await getDB();
+    const res = await db
+      .prepare('UPDATE bookings SET journey_note = ? WHERE id = ? AND user_id = ?')
+      .bind(clean || null, booking_id, user.sub)
+      .run();
+    if (!res.meta.changes) {
+      return NextResponse.json({ error: 'ไม่พบรายการของคุณ' }, { status: 404 });
+    }
+    return NextResponse.json({ ok: true, note: clean || null });
   } catch (error) {
     const err = error as Error;
     if (err.message === 'Unauthorized') {

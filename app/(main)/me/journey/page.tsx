@@ -115,6 +115,17 @@ export default function MyJourneyPage() {
                     <div className="mono" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '.06em' }}>
                       {fmtJourneyDate(it.date)}
                     </div>
+                    {it.journey_note ? (
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 12, color: 'var(--ink)', background: 'var(--cream)', borderRadius: 10, padding: '8px 10px', lineHeight: 1.5 }}>
+                        <span aria-hidden>📝</span>
+                        <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.journey_note}</span>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--teal)' }}>
+                        <span aria-hidden>📝</span>
+                        {tr(lang, 'จดบันทึกความทรงจำ', 'Add a memory note')}
+                      </div>
+                    )}
                   </div>
                 </Link>
               );
