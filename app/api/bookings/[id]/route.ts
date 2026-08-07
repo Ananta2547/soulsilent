@@ -89,7 +89,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       args.push(body.waitlist_rank ?? null);
     }
 
-    // Admin attaches (or clears) the deposit-refund slip for this booking.
+    // Admin attaches (or clears) a refund slip for this booking.
     if (Object.prototype.hasOwnProperty.call(body, 'refund_slip_url')) {
       if (user.role !== 'admin') {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -98,6 +98,25 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       args.push(body.refund_slip_url || null);
       sets.push('refund_slip_meta = ?');
       args.push(body.refund_slip_meta ? JSON.stringify(body.refund_slip_meta) : null);
+
+      // Attaching a FULL refund slip (non-deposit workshop) means the booking is
+      // being refunded → auto-move it to the user's "ดำเนินการไม่สำเร็จ" tab.
+      // Deposit refunds are a normal success (deposit returned on event day) and
+      // must NOT change status. Skip if the caller already set status explicitly.
+      if (body.refund_slip_url && typeof body.status !== 'string') {
+        const info = await db
+          .prepare(
+            'SELECT w.payment_type AS pt, b.status AS st FROM bookings b JOIN workshops w ON b.workshop_id = w.id WHERE b.id = ?',
+          )
+          .bind(id)
+          .first<{ pt: string | null; st: string }>();
+        if (info && (info.pt || 'paid') !== 'deposit' && info.st !== 'cancelled') {
+          sets.push('status = ?');
+          args.push('cancelled');
+          sets.push('cancel_reason = ?');
+          args.push('refunded');
+        }
+      }
     }
 
     if (sets.length === 0) {

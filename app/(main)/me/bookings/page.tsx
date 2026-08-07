@@ -73,6 +73,7 @@ function cancelRemark(reason: string | null | undefined, lang: 'th' | 'en'): str
     case 'not_registered': return tr(lang, 'เกินกำหนดเวลาลงทะเบียน', 'Missed the registration window');
     case 'incomplete_days': return tr(lang, 'เงื่อนไขเวลาเข้าร่วมไม่ครบถ้วน', 'Attendance requirement not met');
     case 'workshop_changed': return tr(lang, 'กิจกรรมมีการเปลี่ยนแปลงกำหนดการ', 'The event schedule was changed');
+    case 'refunded': return tr(lang, 'ดำเนินการไม่สำเร็จ', 'Not completed');
     default: return null;
   }
 }
@@ -132,7 +133,12 @@ function outcome(b: Booking): { bucket: Bucket; reason: string | null } {
   // it into another tab or surface a remark/badge until announce_at passes.)
   // A workshop cancellation is not a "result" — never mask it, the user must
   // know the event is off.
-  if (b.ws_admission_type === 'selection' && b.ws_announce_at && b.cancel_reason !== 'workshop_changed') {
+  if (
+    b.ws_admission_type === 'selection' &&
+    b.ws_announce_at &&
+    b.cancel_reason !== 'workshop_changed' &&
+    b.cancel_reason !== 'refunded'
+  ) {
     const announceMs = new Date(b.ws_announce_at).getTime();
     if (!Number.isNaN(announceMs) && Date.now() < announceMs) {
       return { bucket: 'active', reason: null };

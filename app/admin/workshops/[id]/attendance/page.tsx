@@ -74,7 +74,6 @@ export default function AttendancePage() {
   const [showAdd, setShowAdd] = useState(false);
 
   const isDeposit = workshop?.payment_type === 'deposit';
-  const wsCancelled = workshop?.status === 'cancelled';
   const days = workshop ? getWorkshopDays(workshop) : [];
   const isMultiDay = days.length > 1;
   const dayTimes = workshop ? safeParseArray<DayTime>(workshop.day_times_json, []) : [];
@@ -167,11 +166,11 @@ export default function AttendancePage() {
   const missed = bookings.filter((b) => b.attended === 0).length;
   const unmarked = bookings.filter((b) => b.attended == null).length;
 
-  // Slip column: shown for deposit workshops (existing "คืนมัดจำ" flow) OR when
-  // any paid booking is cancelled (refund needed). Per row the button flips to
-  // "คืนเงิน" for a cancelled+paid booking.
-  const anyRefund = bookings.some((b) => b.status === 'cancelled' && b.payment_status === 'paid');
-  const showSlipCol = isDeposit || anyRefund;
+  // Slip column: shown for any paid workshop (deposit or full). Wording follows
+  // the payment model — "คืนมัดจำ" for deposit, "คืนเงิน" otherwise. Admin can
+  // attach to any paid participant without cancelling the whole event first.
+  const showSlipCol = workshop.payment_type !== 'free';
+  const slipNoun = isDeposit ? 'สลิปคืนมัดจำ' : 'สลิปคืนเงิน';
 
   // Per-day (active session) stats for multi-day workshops.
   const day = Math.min(activeDay, Math.max(0, days.length - 1));
@@ -285,9 +284,7 @@ export default function AttendancePage() {
                     {isMultiDay ? `เช็คอิน · วันที่ ${day + 1}` : 'การเข้าร่วม'}
                   </th>
                   {showSlipCol && (
-                    <th className="text-center py-3 px-5 text-gray font-medium">
-                      {isDeposit && !wsCancelled ? 'สลิปคืนมัดจำ' : 'สลิปคืนเงิน'}
-                    </th>
+                    <th className="text-center py-3 px-5 text-gray font-medium">{slipNoun}</th>
                   )}
                 </tr>
               </thead>
@@ -357,11 +354,9 @@ export default function AttendancePage() {
                         {showSlipCol && (
                           <td className="py-3 px-5">
                             {(() => {
-                              // Cancelled + paid → full-refund slip; otherwise the
-                              // existing deposit-refund slip. A non-deposit, non-
-                              // cancelled row has nothing to refund.
-                              const rowRefund = b.status === 'cancelled' && b.payment_status === 'paid';
-                              const applicable = isDeposit || rowRefund;
+                              // Any paid participant can get a refund slip. No
+                              // money in → nothing to refund.
+                              const applicable = b.payment_status === 'paid' && b.amount > 0;
                               if (!applicable) {
                                 return <div className="text-center text-gray text-xs">—</div>;
                               }
@@ -396,7 +391,7 @@ export default function AttendancePage() {
                                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                                       </svg>
-                                      {rowRefund ? 'แนบสลิปคืนเงิน' : 'แนบสลิป'}
+                                      {isDeposit ? 'แนบสลิปคืนมัดจำ' : 'แนบสลิปคืนเงิน'}
                                     </button>
                                   )}
                                 </div>
@@ -424,12 +419,20 @@ export default function AttendancePage() {
       {slipFor && (
         <RefundSlipModal
           booking={slipFor}
-          title={slipFor.status === 'cancelled' ? 'สลิปโอนเงินคืน' : 'สลิปคืนมัดจำ'}
+          title={slipNoun}
           onClose={() => setSlipFor(null)}
           onSaved={(url, meta) => {
+            // A full refund (non-deposit) auto-cancels the booking server-side —
+            // mirror that locally so the row reflects it immediately.
+            const autoCancel = !!url && !isDeposit;
             const patch = (r: BookingRow) =>
               r.id === slipFor.id
-                ? { ...r, refund_slip_url: url, refund_slip_meta: meta ? JSON.stringify(meta) : null }
+                ? {
+                    ...r,
+                    refund_slip_url: url,
+                    refund_slip_meta: meta ? JSON.stringify(meta) : null,
+                    status: autoCancel ? 'cancelled' : r.status,
+                  }
                 : r;
             setBookings((rows) => rows.map(patch));
             setSlipFor(null);
