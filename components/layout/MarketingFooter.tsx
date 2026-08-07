@@ -67,7 +67,7 @@ export function MarketingFooter() {
           <div style={{ height: 1, background: 'rgba(255,255,255,.12)', margin: '36px 0 24px' }} />
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, justifyContent: 'space-between', alignItems: 'center' }}>
             <div className="mono" style={{ fontSize: 11.5, color: 'rgba(255,255,255,.5)' }}>© {be} soulsilent. สงวนลิขสิทธิ์.</div>
-            <div className="mono" style={{ fontSize: 11.5, color: 'rgba(255,255,255,.35)' }}>soulsilent.site</div>
+            <div className="mono" style={{ fontSize: 11.5, color: 'rgba(255,255,255,.35)' }}>allsoullearn.com</div>
           </div>
         </div>
       </div>

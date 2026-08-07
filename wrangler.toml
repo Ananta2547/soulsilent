@@ -16,6 +16,16 @@ database_id = "78ed04be-4e8e-4b38-864d-dd899c987106"
 binding = "R2"
 bucket_name = "soulsilent-media"
 
+# Custom domains — bound on deploy (zone must be Active on this Cloudflare
+# account). Provisions the hostname + universal SSL cert automatically.
+[[routes]]
+pattern = "allsoullearn.com"
+custom_domain = true
+
+[[routes]]
+pattern = "www.allsoullearn.com"
+custom_domain = true
+
 # Non-secret vars only. Secrets are managed via `wrangler secret put`:
 #   - JWT_SECRET            (set as secret)
 #   - STRIPE_SECRET_KEY     (set as secret)
@@ -25,7 +35,7 @@ bucket_name = "soulsilent-media"
 #   - RESEND_API_KEY        (wrangler secret put RESEND_API_KEY)
 [vars]
 GOOGLE_CLIENT_ID = "798833181382-0sf30qcflhmpo6sepoke9i8ojab71fbp.apps.googleusercontent.com"
-SITE_URL = "https://soulsilent.site"
-# Verified Resend "from" address. Until your domain is verified you can use
-# "onboarding@resend.dev" (Resend's shared sandbox sender).
+SITE_URL = "https://allsoullearn.com"
+# Verified Resend "from" address. Keep on soulsilent.site until allsoullearn.com
+# is verified in Resend, then switch to noreply@allsoullearn.com.
 EMAIL_FROM = "soulsilent <noreply@soulsilent.site>"
