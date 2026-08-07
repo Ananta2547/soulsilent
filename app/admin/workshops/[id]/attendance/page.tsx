@@ -5,12 +5,10 @@ import { PageLoader } from '@/components/design/PageLoader';
 import { Fragment, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import type { DayTime, ImageMeta, Workshop } from '@/lib/types';
-import { ImageUploader } from '@/components/admin/image/ImageUploader';
-import { ASPECTS } from '@/lib/image-aspects';
-import { parseImageMeta } from '@/lib/image-meta';
+import type { DayTime, Workshop } from '@/lib/types';
 import { getWorkshopDays, safeParseArray } from '@/lib/workshop-utils';
 import { PdpaBadge } from '@/components/workshops/PdpaBadge';
+import { RefundSlipModal } from '@/components/admin/RefundSlipModal';
 
 type BookingRow = {
   id: string;
@@ -68,6 +66,8 @@ export default function AttendancePage() {
   const { id } = useParams<{ id: string }>();
   const [workshop, setWorkshop] = useState<Workshop | null>(null);
   const [bookings, setBookings] = useState<BookingRow[]>([]);
+  // Paid-then-cancelled bookings for this workshop → refund candidates.
+  const [refunds, setRefunds] = useState<BookingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [openId, setOpenId] = useState<string | null>(null);
@@ -88,12 +88,12 @@ export default function AttendancePage() {
     const wsData = (await wsRes.json()) as { workshop: Workshop };
     const bData = (await bRes.json()) as { bookings: BookingRow[] };
     setWorkshop(wsData.workshop);
-    // Show only paid bookings — pending/cancelled never showed up to be marked
-    setBookings(
-      (bData.bookings || []).filter(
-        (b) => b.payment_status === 'paid' || b.status === 'confirmed'
-      )
-    );
+    const all = bData.bookings || [];
+    // Roster: paid/confirmed, not cancelled — the people to check in.
+    setBookings(all.filter((b) => b.status !== 'cancelled' && (b.payment_status === 'paid' || b.status === 'confirmed')));
+    // Refund candidates: money came in, then cancelled (user cancelled or event
+    // cancelled) → admin attaches the transfer-back slip.
+    setRefunds(all.filter((b) => b.status === 'cancelled' && b.payment_status === 'paid' && b.amount > 0));
     setLoading(false);
   }
 
@@ -401,18 +401,75 @@ export default function AttendancePage() {
         )}
       </div>
 
+      {/* Refunds — paid bookings that were later cancelled (any paid workshop) */}
+      {refunds.length > 0 && (
+        <div className="card !p-0 overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-lighter bg-surface">
+            <h2 className="text-sm font-semibold text-dark">การคืนเงิน (การจองที่ยกเลิก)</h2>
+            <p className="text-xs text-gray mt-0.5">แนบสลิปโอนเงินคืนให้ผู้ใช้ · ผู้ใช้จะเห็นในหน้าการจองของตัวเอง</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-surface">
+                <tr>
+                  <th className="text-left py-3 px-5 text-gray font-medium">ผู้ใช้</th>
+                  <th className="text-left py-3 px-5 text-gray font-medium">อีเมล</th>
+                  <th className="text-right py-3 px-5 text-gray font-medium">ยอดที่จ่าย</th>
+                  <th className="text-center py-3 px-5 text-gray font-medium">สลิปโอนเงินคืน</th>
+                </tr>
+              </thead>
+              <tbody>
+                {refunds.map((b) => (
+                  <tr key={b.id} className="border-t border-gray-lighter">
+                    <td className="py-3 px-5 text-dark font-medium">{b.user_name || '—'}</td>
+                    <td className="py-3 px-5 text-gray text-xs">{b.user_email || '—'}</td>
+                    <td className="py-3 px-5 text-right text-dark font-medium">฿{b.amount.toLocaleString()}</td>
+                    <td className="py-3 px-5">
+                      <div className="flex items-center justify-center gap-2">
+                        {b.refund_slip_url ? (
+                          <>
+                            <a
+                              href={b.refund_slip_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center justify-center w-9 h-11 rounded-md overflow-hidden border border-gray-lighter shrink-0 bg-cream"
+                              title="ดูสลิป"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={b.refund_slip_url} alt="slip" className="max-w-full max-h-full object-contain" />
+                            </a>
+                            <button type="button" onClick={() => setSlipFor(b)} className="text-xs font-medium text-primary hover:underline">แก้ไข</button>
+                          </>
+                        ) : (
+                          <button type="button" onClick={() => setSlipFor(b)} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                            แนบสลิปโอนเงินคืน
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {slipFor && (
         <RefundSlipModal
           booking={slipFor}
+          title={slipFor.status === 'cancelled' ? 'สลิปโอนเงินคืน' : 'สลิปคืนมัดจำ'}
           onClose={() => setSlipFor(null)}
           onSaved={(url, meta) => {
-            setBookings((rows) =>
-              rows.map((r) =>
-                r.id === slipFor.id
-                  ? { ...r, refund_slip_url: url, refund_slip_meta: meta ? JSON.stringify(meta) : null }
-                  : r
-              )
-            );
+            const patch = (r: BookingRow) =>
+              r.id === slipFor.id
+                ? { ...r, refund_slip_url: url, refund_slip_meta: meta ? JSON.stringify(meta) : null }
+                : r;
+            setBookings((rows) => rows.map(patch));
+            setRefunds((rows) => rows.map(patch));
             setSlipFor(null);
           }}
         />
@@ -572,97 +629,6 @@ function AddParticipantModal({
               {saving ? 'กำลังเพิ่ม...' : 'ยืนยันเพิ่มเข้ารายชื่อ'}
             </button>
             <button type="button" onClick={onClose} className="btn-ghost flex-1">ยกเลิก</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function RefundSlipModal({
-  booking,
-  onClose,
-  onSaved,
-}: {
-  booking: BookingRow;
-  onClose: () => void;
-  onSaved: (url: string | null, meta: ImageMeta | null) => void;
-}) {
-  const [url, setUrl] = useState(booking.refund_slip_url || '');
-  const [meta, setMeta] = useState<ImageMeta | null>(parseImageMeta(booking.refund_slip_meta));
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function save() {
-    setSaving(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/bookings/${booking.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refund_slip_url: url || null, refund_slip_meta: meta }),
-      });
-      const data = (await res.json()) as { error?: string };
-      if (!res.ok) {
-        setError(data.error || 'บันทึกไม่สำเร็จ');
-        return;
-      }
-      onSaved(url || null, meta);
-    } catch {
-      setError('เชื่อมต่อไม่ได้');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div
-      onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden"
-      >
-        <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-gray-lighter flex-shrink-0">
-          <div>
-            <h2 className="font-heading text-lg text-dark">สลิปคืนมัดจำ</h2>
-            <p className="text-xs text-gray mt-0.5">{booking.user_name || booking.user_email || '—'}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="ปิด"
-            className="flex-shrink-0 w-9 h-9 rounded-full bg-surface hover:bg-gray-lighter text-dark flex items-center justify-center transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="overflow-y-auto p-6 space-y-4">
-          {error && (
-            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">{error}</div>
-          )}
-          <ImageUploader
-            label="รูปสลิปโอนเงินมัดจำคืน"
-            folder="refund"
-            primary={ASPECTS.REFUND_SLIP}
-            value={url}
-            meta={meta}
-            onChange={({ url: u, meta: m }) => {
-              setUrl(u);
-              setMeta(m);
-            }}
-          />
-          <div className="flex items-center gap-3 pt-2">
-            <button type="button" onClick={save} disabled={saving} className="btn-primary flex-1">
-              {saving ? 'กำลังบันทึก...' : 'บันทึก'}
-            </button>
-            <button type="button" onClick={onClose} className="btn-ghost flex-1">
-              ยกเลิก
-            </button>
           </div>
         </div>
       </div>
