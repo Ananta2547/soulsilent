@@ -4,9 +4,8 @@ import { LangProvider } from '@/lib/i18n';
 import { RouteTransition } from '@/components/design/RouteTransition';
 
 export const metadata: Metadata = {
-  title: 'soulsilent · learn outside the room',
+  title: 'AllSoulLearn · learn outside the room',
   description: 'Workshop · Camp · Organize — เรียนรู้นอกห้องเรียน',
-  icons: { icon: '/favicon.ico' },
 };
 
 export default function RootLayout({
@@ -17,7 +16,7 @@ export default function RootLayout({
   return (
     <html lang="th" className="h-full antialiased" data-scroll-behavior="smooth">
       <head>
-        <meta name="theme-color" content="#0d8a7e" />
+        <meta name="theme-color" content="#0C8577" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link
