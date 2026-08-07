@@ -354,9 +354,10 @@ export default function AttendancePage() {
                         {showSlipCol && (
                           <td className="py-3 px-5">
                             {(() => {
-                              // Any paid participant can get a refund slip. No
-                              // money in → nothing to refund.
-                              const applicable = b.payment_status === 'paid' && b.amount > 0;
+                              // Any secured participant (paid or confirmed) can get
+                              // a refund slip — the amount may be ฿0 for manually
+                              // added or free-confirmed seats and that's fine.
+                              const applicable = b.payment_status === 'paid' || b.status === 'confirmed';
                               if (!applicable) {
                                 return <div className="text-center text-gray text-xs">—</div>;
                               }

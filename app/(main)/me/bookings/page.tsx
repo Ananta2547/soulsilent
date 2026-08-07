@@ -475,7 +475,9 @@ export default function MyBookingsPage() {
                           <rect x="4" y="3" width="16" height="18" rx="2" strokeWidth={1.7} />
                           <path strokeLinecap="round" strokeWidth={1.7} d="M8 8h8M8 12h8M8 16h5" />
                         </svg>
-                        {tr(lang, 'ดูสลิปคืนมัดจำ', 'View refund slip')}
+                        {b.ws_payment_type === 'deposit'
+                          ? tr(lang, 'ดูสลิปคืนมัดจำ', 'View deposit refund slip')
+                          : tr(lang, 'ดูสลิปโอนเงินคืน', 'View refund slip')}
                       </button>
                     )}
 
