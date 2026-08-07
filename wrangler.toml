@@ -36,6 +36,5 @@ custom_domain = true
 [vars]
 GOOGLE_CLIENT_ID = "798833181382-0sf30qcflhmpo6sepoke9i8ojab71fbp.apps.googleusercontent.com"
 SITE_URL = "https://allsoullearn.com"
-# Verified Resend "from" address. Keep on soulsilent.site until allsoullearn.com
-# is verified in Resend, then switch to noreply@allsoullearn.com.
-EMAIL_FROM = "soulsilent <noreply@soulsilent.site>"
+# Verified Resend "from" address (allsoullearn.com verified 2026-08-03).
+EMAIL_FROM = "soulsilent <noreply@allsoullearn.com>"
