@@ -12,10 +12,10 @@ export function Logo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
   return (
     <Link href="/" className="inline-flex items-center gap-2">
       <div className={`${s.circle} bg-primary rounded-full flex items-center justify-center`}>
-        <span className={`text-white font-heading font-medium ${s.letter}`}>s</span>
+        <span className={`text-white font-heading font-medium ${s.letter}`}>a</span>
       </div>
       <span className={`font-heading ${s.text} text-dark`}>
-        soulsilent<span className="text-primary">.</span>
+        allsoullearn<span className="text-primary">.</span>
       </span>
     </Link>
   );

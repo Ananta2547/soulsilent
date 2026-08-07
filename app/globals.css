@@ -224,88 +224,105 @@ body {
   .page-enter { animation: none !important; }
 }
 
-/* ── Branded page loader ─────────────────────────────────────────────
-   Calm "soul silent" loader: a breathing teal orb with the "s" mark,
-   wrapped in expanding sound-wave rings, wordmark pulsing softly below. */
-.ss-loader {
+/* ── AllSoulLearn page loader ────────────────────────────────────────
+   Wordmark logo (with a blinking, looking-around eye), a sliding progress
+   bar, and a pulsing "กำลังโหลด" label. Imported from Design Composer. */
+.asl-loader {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 22px;
+  gap: 44px;
   min-height: 60vh;
   width: 100%;
   padding: 40px 16px;
+  font-family: 'Poppins', var(--font-heading, 'Mitr'), sans-serif;
 }
-.ss-loader--inline { min-height: 16rem; }
-.ss-loader--full {
+.asl-loader--inline { min-height: 16rem; }
+.asl-loader--full {
   position: fixed;
   inset: 0;
   z-index: 60;
   min-height: 100vh;
-  background: var(--cream);
+  background: #fafaf9;
 }
-.ss-orb-wrap {
-  position: relative;
-  width: 88px;
-  height: 88px;
-  display: grid;
-  place-items: center;
-}
-.ss-orb {
-  position: relative;
-  z-index: 2;
-  width: 56px;
-  height: 56px;
-  border-radius: 999px;
-  background: var(--teal);
-  color: #fff;
-  display: grid;
-  place-items: center;
-  font-family: var(--font-heading, 'Mitr', sans-serif);
-  font-size: 26px;
-  font-weight: 500;
-  box-shadow: 0 8px 22px -8px rgba(13, 138, 126, 0.55);
-  animation: ss-breathe 2.4s ease-in-out infinite;
-}
-.ss-ring {
-  position: absolute;
-  inset: 0;
-  margin: auto;
-  width: 56px;
-  height: 56px;
-  border-radius: 999px;
-  border: 2px solid var(--teal);
-  opacity: 0;
-  animation: ss-ripple 2.4s ease-out infinite;
-}
-.ss-ring:nth-child(2) { animation-delay: 0.8s; }
-.ss-ring:nth-child(3) { animation-delay: 1.6s; }
-.ss-loader-word {
-  font-family: var(--font-heading, 'Mitr', sans-serif);
-  font-size: 18px;
-  color: var(--ink);
-  letter-spacing: 0.01em;
-  animation: ss-word-pulse 2.4s ease-in-out infinite;
-}
-.ss-loader-word b { color: var(--teal); font-weight: 600; }
 
-@keyframes ss-breathe {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.08); }
+/* Route-transition curtain — a full-screen loader shown on every navigation
+   that slides DOWN to reveal the new page. */
+.asl-curtain {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: #fafaf9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-@keyframes ss-ripple {
-  0% { transform: scale(1); opacity: 0.55; }
-  100% { transform: scale(2.6); opacity: 0; }
+.asl-curtain--exit {
+  animation: aslSlideDown 0.9s cubic-bezier(0.5, 0, 0.2, 1) forwards;
 }
-@keyframes ss-word-pulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
+@keyframes aslSlideDown {
+  from { transform: translateY(0); }
+  to   { transform: translateY(100%); }
+}
+.asl-logo { width: min(560px, 72vw); height: auto; }
+.asl-loader--inline .asl-logo { width: min(360px, 64vw); }
+.asl-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+.asl-bar-track {
+  width: min(220px, 44vw);
+  height: 3px;
+  border-radius: 3px;
+  background: #e7e5e4;
+  overflow: hidden;
+}
+.asl-bar {
+  width: 55%;
+  height: 100%;
+  border-radius: 3px;
+  background: #0c8577;
+  animation: aslBar 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+.asl-label {
+  font-family: 'JetBrains Mono', var(--font-mono, monospace);
+  font-size: 11px;
+  letter-spacing: 2.4px;
+  text-transform: uppercase;
+  color: #6b7280;
+  animation: aslFade 2s ease-in-out infinite;
+}
+.asl-eye-blink { transform-origin: 226px 92.6px; animation: aslBlink 4.2s steps(1, end) infinite; }
+.asl-eye-look { animation: aslLook 4.2s cubic-bezier(0.3, 1.4, 0.4, 1) infinite; }
+
+@keyframes aslLook {
+  0%, 8%   { transform: translate(0px, 0px); }
+  16%, 26% { transform: translate(-5px, -1.5px); }
+  34%, 46% { transform: translate(5px, -1.5px); }
+  54%, 60% { transform: translate(0px, 3.5px); }
+  68%, 78% { transform: translate(4px, 2.5px); }
+  86%, 94% { transform: translate(-4px, 1px); }
+  100%     { transform: translate(0px, 0px); }
+}
+@keyframes aslBlink {
+  0%, 44%, 49%, 100% { transform: scaleY(1); }
+  46%, 47%           { transform: scaleY(0.06); }
+}
+@keyframes aslBar {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+@keyframes aslFade {
+  0%, 100% { opacity: 0.35; }
+  50%      { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ss-orb, .ss-ring, .ss-loader-word { animation: none !important; }
-  .ss-ring { display: none; }
-  .ss-loader-word { opacity: 0.85; }
+  .asl-eye-blink, .asl-eye-look, .asl-bar, .asl-label, .asl-curtain--exit { animation: none !important; }
+  .asl-bar { width: 100%; }
+  .asl-label { opacity: 0.85; }
 }
 
 .btn-teal {

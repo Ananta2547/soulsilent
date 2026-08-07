@@ -7,6 +7,7 @@ import { useLang, T, tr } from '@/lib/i18n';
 import { LangSwitch } from '@/components/design/LangSwitch';
 import { Btn } from '@/components/design/RippleButton';
 import { ProfileDropdown, type ProfileUser } from '@/components/layout/ProfileDropdown';
+import { AllSoulLearnLogo } from '@/components/layout/AllSoulLearnLogo';
 
 type UserInfo = ProfileUser;
 
@@ -54,45 +55,7 @@ export function SiteHeader() {
               color: 'var(--ink)',
             }}
           >
-            <span
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: '50%',
-                background: 'var(--teal)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#fff',
-                fontFamily: 'Mitr',
-                fontWeight: 600,
-                fontSize: 17,
-                position: 'relative',
-              }}
-            >
-              s
-              <span
-                style={{
-                  position: 'absolute',
-                  top: -3,
-                  right: -3,
-                  width: 9,
-                  height: 9,
-                  background: 'var(--accent)',
-                  borderRadius: '50%',
-                }}
-              />
-            </span>
-            <span
-              style={{
-                fontFamily: 'Mitr',
-                fontWeight: 500,
-                fontSize: 19,
-                letterSpacing: '-.01em',
-              }}
-            >
-              soulsilent<span style={{ color: 'var(--teal)' }}>.</span>
-            </span>
+            <AllSoulLearnLogo height={24} />
           </Link>
 
           {/* Nav sits next to the logo (design: Home Hero.dc.html). */}
@@ -224,9 +187,7 @@ export function SiteHeader() {
 
       <div className={`drawer ${drawerOpen ? 'open' : ''}`} aria-hidden={!drawerOpen}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontFamily: 'Mitr', fontWeight: 500, fontSize: 19 }}>
-            soulsilent<span style={{ color: 'var(--teal)' }}>.</span>
-          </span>
+          <AllSoulLearnLogo height={24} />
           <button
             onClick={() => setDrawerOpen(false)}
             style={{
