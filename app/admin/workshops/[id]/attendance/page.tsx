@@ -66,8 +66,6 @@ export default function AttendancePage() {
   const { id } = useParams<{ id: string }>();
   const [workshop, setWorkshop] = useState<Workshop | null>(null);
   const [bookings, setBookings] = useState<BookingRow[]>([]);
-  // Paid-then-cancelled bookings for this workshop → refund candidates.
-  const [refunds, setRefunds] = useState<BookingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [openId, setOpenId] = useState<string | null>(null);
@@ -76,6 +74,7 @@ export default function AttendancePage() {
   const [showAdd, setShowAdd] = useState(false);
 
   const isDeposit = workshop?.payment_type === 'deposit';
+  const wsCancelled = workshop?.status === 'cancelled';
   const days = workshop ? getWorkshopDays(workshop) : [];
   const isMultiDay = days.length > 1;
   const dayTimes = workshop ? safeParseArray<DayTime>(workshop.day_times_json, []) : [];
@@ -88,12 +87,13 @@ export default function AttendancePage() {
     const wsData = (await wsRes.json()) as { workshop: Workshop };
     const bData = (await bRes.json()) as { bookings: BookingRow[] };
     setWorkshop(wsData.workshop);
-    const all = bData.bookings || [];
-    // Roster: paid/confirmed, not cancelled — the people to check in.
-    setBookings(all.filter((b) => b.status !== 'cancelled' && (b.payment_status === 'paid' || b.status === 'confirmed')));
-    // Refund candidates: money came in, then cancelled (user cancelled or event
-    // cancelled) → admin attaches the transfer-back slip.
-    setRefunds(all.filter((b) => b.status === 'cancelled' && b.payment_status === 'paid' && b.amount > 0));
+    // Keep every paid booking on the roster — including ones later cancelled
+    // (user cancellation or a cancelled event), so admin never loses the list
+    // and can still attach a refund slip. `payment_status='paid'` survives a
+    // status→'cancelled' change, so those rows stay visible.
+    setBookings(
+      (bData.bookings || []).filter((b) => b.payment_status === 'paid' || b.status === 'confirmed'),
+    );
     setLoading(false);
   }
 
@@ -166,6 +166,12 @@ export default function AttendancePage() {
   const attended = bookings.filter((b) => b.attended === 1).length;
   const missed = bookings.filter((b) => b.attended === 0).length;
   const unmarked = bookings.filter((b) => b.attended == null).length;
+
+  // Slip column: shown for deposit workshops (existing "คืนมัดจำ" flow) OR when
+  // any paid booking is cancelled (refund needed). Per row the button flips to
+  // "คืนเงิน" for a cancelled+paid booking.
+  const anyRefund = bookings.some((b) => b.status === 'cancelled' && b.payment_status === 'paid');
+  const showSlipCol = isDeposit || anyRefund;
 
   // Per-day (active session) stats for multi-day workshops.
   const day = Math.min(activeDay, Math.max(0, days.length - 1));
@@ -278,8 +284,10 @@ export default function AttendancePage() {
                   <th className="text-center py-3 px-5 text-gray font-medium">
                     {isMultiDay ? `เช็คอิน · วันที่ ${day + 1}` : 'การเข้าร่วม'}
                   </th>
-                  {isDeposit && (
-                    <th className="text-center py-3 px-5 text-gray font-medium">สลิปคืนมัดจำ</th>
+                  {showSlipCol && (
+                    <th className="text-center py-3 px-5 text-gray font-medium">
+                      {isDeposit && !wsCancelled ? 'สลิปคืนมัดจำ' : 'สลิปคืนเงิน'}
+                    </th>
                   )}
                 </tr>
               </thead>
@@ -346,48 +354,60 @@ export default function AttendancePage() {
                             </div>
                           )}
                         </td>
-                        {isDeposit && (
+                        {showSlipCol && (
                           <td className="py-3 px-5">
-                            <div className="flex items-center justify-center gap-2">
-                              {b.refund_slip_url ? (
-                                <>
-                                  <a
-                                    href={b.refund_slip_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center justify-center w-9 h-11 rounded-md overflow-hidden border border-gray-lighter shrink-0 bg-cream"
-                                    title="ดูสลิป"
-                                  >
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={b.refund_slip_url} alt="slip" className="max-w-full max-h-full object-contain" />
-                                  </a>
-                                  <button
-                                    type="button"
-                                    onClick={() => setSlipFor(b)}
-                                    className="text-xs font-medium text-primary hover:underline"
-                                  >
-                                    แก้ไข
-                                  </button>
-                                </>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => setSlipFor(b)}
-                                  className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                                >
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                  </svg>
-                                  แนบสลิป
-                                </button>
-                              )}
-                            </div>
+                            {(() => {
+                              // Cancelled + paid → full-refund slip; otherwise the
+                              // existing deposit-refund slip. A non-deposit, non-
+                              // cancelled row has nothing to refund.
+                              const rowRefund = b.status === 'cancelled' && b.payment_status === 'paid';
+                              const applicable = isDeposit || rowRefund;
+                              if (!applicable) {
+                                return <div className="text-center text-gray text-xs">—</div>;
+                              }
+                              return (
+                                <div className="flex items-center justify-center gap-2">
+                                  {b.refund_slip_url ? (
+                                    <>
+                                      <a
+                                        href={b.refund_slip_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center justify-center w-9 h-11 rounded-md overflow-hidden border border-gray-lighter shrink-0 bg-cream"
+                                        title="ดูสลิป"
+                                      >
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={b.refund_slip_url} alt="slip" className="max-w-full max-h-full object-contain" />
+                                      </a>
+                                      <button
+                                        type="button"
+                                        onClick={() => setSlipFor(b)}
+                                        className="text-xs font-medium text-primary hover:underline"
+                                      >
+                                        แก้ไข
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => setSlipFor(b)}
+                                      className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                                    >
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                      </svg>
+                                      {rowRefund ? 'แนบสลิปคืนเงิน' : 'แนบสลิป'}
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </td>
                         )}
                       </tr>
                       {open && (
                         <tr className="bg-surface/50">
-                          <td colSpan={isDeposit ? 6 : 5} className="px-5 py-4 border-t border-gray-lighter">
+                          <td colSpan={showSlipCol ? 6 : 5} className="px-5 py-4 border-t border-gray-lighter">
                             <ApplicationDetail json={b.application_json} />
                           </td>
                         </tr>
@@ -401,63 +421,6 @@ export default function AttendancePage() {
         )}
       </div>
 
-      {/* Refunds — paid bookings that were later cancelled (any paid workshop) */}
-      {refunds.length > 0 && (
-        <div className="card !p-0 overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-lighter bg-surface">
-            <h2 className="text-sm font-semibold text-dark">การคืนเงิน (การจองที่ยกเลิก)</h2>
-            <p className="text-xs text-gray mt-0.5">แนบสลิปโอนเงินคืนให้ผู้ใช้ · ผู้ใช้จะเห็นในหน้าการจองของตัวเอง</p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-surface">
-                <tr>
-                  <th className="text-left py-3 px-5 text-gray font-medium">ผู้ใช้</th>
-                  <th className="text-left py-3 px-5 text-gray font-medium">อีเมล</th>
-                  <th className="text-right py-3 px-5 text-gray font-medium">ยอดที่จ่าย</th>
-                  <th className="text-center py-3 px-5 text-gray font-medium">สลิปโอนเงินคืน</th>
-                </tr>
-              </thead>
-              <tbody>
-                {refunds.map((b) => (
-                  <tr key={b.id} className="border-t border-gray-lighter">
-                    <td className="py-3 px-5 text-dark font-medium">{b.user_name || '—'}</td>
-                    <td className="py-3 px-5 text-gray text-xs">{b.user_email || '—'}</td>
-                    <td className="py-3 px-5 text-right text-dark font-medium">฿{b.amount.toLocaleString()}</td>
-                    <td className="py-3 px-5">
-                      <div className="flex items-center justify-center gap-2">
-                        {b.refund_slip_url ? (
-                          <>
-                            <a
-                              href={b.refund_slip_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center justify-center w-9 h-11 rounded-md overflow-hidden border border-gray-lighter shrink-0 bg-cream"
-                              title="ดูสลิป"
-                            >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={b.refund_slip_url} alt="slip" className="max-w-full max-h-full object-contain" />
-                            </a>
-                            <button type="button" onClick={() => setSlipFor(b)} className="text-xs font-medium text-primary hover:underline">แก้ไข</button>
-                          </>
-                        ) : (
-                          <button type="button" onClick={() => setSlipFor(b)} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                            </svg>
-                            แนบสลิปโอนเงินคืน
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
       {slipFor && (
         <RefundSlipModal
           booking={slipFor}
@@ -469,7 +432,6 @@ export default function AttendancePage() {
                 ? { ...r, refund_slip_url: url, refund_slip_meta: meta ? JSON.stringify(meta) : null }
                 : r;
             setBookings((rows) => rows.map(patch));
-            setRefunds((rows) => rows.map(patch));
             setSlipFor(null);
           }}
         />
