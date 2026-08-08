@@ -46,7 +46,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     if (workshop.instructor_id) {
       instructor = await db
         .prepare(
-          `SELECT u.id, u.name, u.email, u.role, u.avatar_url,
+          // Display name = nickname (what the teacher edits in their profile)
+          // falling back to the registration name — always the latest from users.
+          `SELECT u.id, COALESCE(NULLIF(TRIM(u.nickname), ''), u.name) AS name, u.email, u.role, u.avatar_url,
                   (SELECT p.id FROM portfolios p
                     WHERE p.user_id = u.id AND p.published = 1 LIMIT 1) AS portfolio_id
              FROM users u WHERE u.id = ?`

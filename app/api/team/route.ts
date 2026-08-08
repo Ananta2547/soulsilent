@@ -11,7 +11,9 @@ export async function GET() {
     const db = await getDB();
     const rows = await db
       .prepare(
-        `SELECT name, avatar_url FROM users
+        // Display name = nickname (what users edit everywhere) falling back to
+        // the registration name — always fresh from the users table.
+        `SELECT COALESCE(NULLIF(TRIM(nickname), ''), name) AS name, avatar_url FROM users
           WHERE is_team = 1 AND (account_status = 'active' OR account_status IS NULL)
           ORDER BY name`,
       )
