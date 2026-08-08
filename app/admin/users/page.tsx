@@ -12,6 +12,7 @@ interface User {
   id: string;
   email: string;
   name: string;
+  nickname: string | null;
   role: string;
   account_status: AccountStatus | null;
   deleted_at: string | null;
@@ -185,14 +186,27 @@ export default function AdminUsersPage() {
                 return (
                 <tr key={user.id} className="border-t border-gray-lighter hover:bg-surface/50">
                   <td className="py-3 px-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                        <span className="text-primary font-medium text-xs">
-                          {user.name.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                      <span className="text-dark font-medium">{user.name}</span>
-                    </div>
+                    {(() => {
+                      // Display name = the nickname users edit everywhere else,
+                      // falling back to the registration name. Show the full name
+                      // underneath when it differs, so admin always sees the
+                      // latest of both.
+                      const display = (user.nickname && user.nickname.trim()) || user.name;
+                      const showFull = !!user.nickname && user.nickname.trim() !== user.name;
+                      return (
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
+                            <span className="text-primary font-medium text-xs">
+                              {(display || '?').charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-dark font-medium block truncate">{display}</span>
+                            {showFull && <span className="text-gray text-xs block truncate">{user.name}</span>}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className="py-3 px-4 text-gray">{user.email}</td>
                   <td className="py-3 px-4">

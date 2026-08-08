@@ -104,9 +104,9 @@ export default function HelpPage() {
   })).filter((g) => g.items.length);
 
   const contacts: { icon: 'mail' | 'phone' | 'calendar'; l: string; v: string }[] = [
-    { icon: 'mail', l: tr(lang, 'อีเมล', 'Email'), v: 'care@soulsilent.co' },
-    { icon: 'phone', l: tr(lang, 'โทร', 'Phone'), v: '+66 2 123 4567' },
-    { icon: 'calendar', l: tr(lang, 'เวลาทำการ', 'Support hours'), v: tr(lang, 'จ–ส · 09:00–18:00', 'Mon–Sat · 9–6') },
+    { icon: 'mail', l: tr(lang, 'อีเมล', 'Email'), v: 'allsoullearn@gmail.com' },
+    { icon: 'phone', l: tr(lang, 'โทร', 'Phone'), v: '0933984488' },
+    { icon: 'calendar', l: tr(lang, 'เวลาทำการ', 'Support hours'), v: tr(lang, 'จ–ศ 09.00–17.00', 'Mon–Fri 9–5') },
   ];
 
   return (
@@ -180,17 +180,9 @@ export default function HelpPage() {
                 </div>
               </div>
             ))}
-            <Btn kind="ink" href="mailto:care@soulsilent.co" style={{ width: '100%', justifyContent: 'center', marginTop: 18 }}>
+            <Btn kind="ink" href="mailto:allsoullearn@gmail.com" style={{ width: '100%', justifyContent: 'center', marginTop: 18 }}>
               {tr(lang, 'เปิดเรื่องใหม่ (Ticket)', 'Open a support ticket')}
             </Btn>
-            <div style={{ marginTop: 14, padding: '12px 14px', borderRadius: 14, background: '#f6e7e4', fontSize: 12, color: '#9a4a3f', display: 'flex', gap: 9 }}>
-              <span style={{ flexShrink: 0, color: '#9a4a3f', display: 'inline-flex' }}>
-                <Icon name="phone" size={16} />
-              </span>
-              <span>
-                <T th="เหตุฉุกเฉินระหว่างเวิร์กชอป: 081-000-0000" en="On-site emergency line: 081-000-0000" />
-              </span>
-            </div>
           </div>
         </div>
       </div>

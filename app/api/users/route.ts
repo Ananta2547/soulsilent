@@ -14,7 +14,7 @@ export async function GET(request: Request) {
       .filter(Boolean);
 
     const baseQuery =
-      'SELECT id, email, name, role, avatar_url, account_status, deleted_at, is_team, created_at, updated_at FROM users';
+      'SELECT id, email, name, nickname, role, avatar_url, account_status, deleted_at, is_team, created_at, updated_at FROM users';
 
     // `q` = typeahead search by name or email (used by the attendance
     // "add participant" picker). Case-insensitive substring, capped at 20.
