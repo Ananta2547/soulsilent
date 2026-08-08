@@ -17,7 +17,8 @@ async function getPortfolio(id: string) {
       .first<Portfolio>();
     if (!portfolio) return null;
     return { portfolio };
-  } catch {
+  } catch (e) {
+    console.error('Failed to load public portfolio', e);
     return null;
   }
 }

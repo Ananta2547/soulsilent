@@ -58,21 +58,30 @@ export default function AdminLocationsPage() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<LocationForm>(emptyLocation);
   const [saving, setSaving] = useState(false);
 
   async function fetchAll() {
-    const [locRes, userRes] = await Promise.all([
-      fetch('/api/locations'),
-      fetch('/api/users'),
-    ]);
-    const locData = (await locRes.json()) as { locations: Location[] };
-    const userData = (await userRes.json()) as { users: User[] };
-    setLocations(locData.locations || []);
-    setUsers(userData.users || []);
-    setLoading(false);
+    setLoadError(false);
+    try {
+      const [locRes, userRes] = await Promise.all([
+        fetch('/api/locations'),
+        fetch('/api/users'),
+      ]);
+      if (!locRes.ok || !userRes.ok) throw new Error(`HTTP ${locRes.status}/${userRes.status}`);
+      const locData = (await locRes.json()) as { locations: Location[] };
+      const userData = (await userRes.json()) as { users: User[] };
+      setLocations(locData.locations || []);
+      setUsers(userData.users || []);
+    } catch (e) {
+      console.error('Failed to load locations', e);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -132,6 +141,15 @@ export default function AdminLocationsPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <PageLoader />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4 text-muted">
+        <p>โหลดข้อมูลไม่สำเร็จ</p>
+        <button onClick={() => { setLoading(true); fetchAll(); }} className="border border-primary text-primary rounded-full px-6 py-2 text-sm font-semibold">ลองใหม่</button>
       </div>
     );
   }

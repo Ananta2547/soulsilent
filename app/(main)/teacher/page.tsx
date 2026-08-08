@@ -26,7 +26,8 @@ export default function TeacherWorkshopsPage() {
         const res = await fetch('/api/teacher/workshops');
         const data = (await res.json()) as { workshops?: Row[] };
         setRows(data.workshops || []);
-      } catch {
+      } catch (e) {
+        console.error('Failed to load teacher workshops', e);
         setRows([]);
       }
     })();

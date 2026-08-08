@@ -67,6 +67,7 @@ export default function AttendancePage() {
   const [workshop, setWorkshop] = useState<Workshop | null>(null);
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [openId, setOpenId] = useState<string | null>(null);
   const [slipFor, setSlipFor] = useState<BookingRow | null>(null);
@@ -79,21 +80,29 @@ export default function AttendancePage() {
   const dayTimes = workshop ? safeParseArray<DayTime>(workshop.day_times_json, []) : [];
 
   async function load() {
-    const [wsRes, bRes] = await Promise.all([
-      fetch(`/api/workshops/${id}`),
-      fetch(`/api/bookings?workshop_id=${id}`),
-    ]);
-    const wsData = (await wsRes.json()) as { workshop: Workshop };
-    const bData = (await bRes.json()) as { bookings: BookingRow[] };
-    setWorkshop(wsData.workshop);
-    // Keep every paid booking on the roster — including ones later cancelled
-    // (user cancellation or a cancelled event), so admin never loses the list
-    // and can still attach a refund slip. `payment_status='paid'` survives a
-    // status→'cancelled' change, so those rows stay visible.
-    setBookings(
-      (bData.bookings || []).filter((b) => b.payment_status === 'paid' || b.status === 'confirmed'),
-    );
-    setLoading(false);
+    setLoadError(false);
+    try {
+      const [wsRes, bRes] = await Promise.all([
+        fetch(`/api/workshops/${id}`),
+        fetch(`/api/bookings?workshop_id=${id}`),
+      ]);
+      if (!wsRes.ok || !bRes.ok) throw new Error(`HTTP ${wsRes.status}/${bRes.status}`);
+      const wsData = (await wsRes.json()) as { workshop: Workshop };
+      const bData = (await bRes.json()) as { bookings: BookingRow[] };
+      setWorkshop(wsData.workshop);
+      // Keep every paid booking on the roster — including ones later cancelled
+      // (user cancellation or a cancelled event), so admin never loses the list
+      // and can still attach a refund slip. `payment_status='paid'` survives a
+      // status→'cancelled' change, so those rows stay visible.
+      setBookings(
+        (bData.bookings || []).filter((b) => b.payment_status === 'paid' || b.status === 'confirmed'),
+      );
+    } catch (e) {
+      console.error('Failed to load attendance', e);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -154,6 +163,15 @@ export default function AttendancePage() {
     return (
       <div className="flex items-center justify-center h-64">
         <PageLoader />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 gap-4 text-gray">
+        <p>โหลดข้อมูลไม่สำเร็จ</p>
+        <button onClick={() => { setLoading(true); load(); }} className="border border-primary text-primary rounded-full px-6 py-2 text-sm font-semibold">ลองใหม่</button>
       </div>
     );
   }

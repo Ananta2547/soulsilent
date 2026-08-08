@@ -62,6 +62,8 @@ export default function WorkshopDetailPage() {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [consentOpen, setConsentOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [verifyFailed, setVerifyFailed] = useState(false);
   const [booking, setBooking] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(false);
   const [loginPromptOpen, setLoginPromptOpen] = useState(false);
@@ -70,8 +72,10 @@ export default function WorkshopDetailPage() {
   const [openDays, setOpenDays] = useState<number[]>([0]);
 
   const load = useCallback(async () => {
+    setLoadError(false);
     try {
       const res = await fetch(`/api/workshops/${id}`);
+      if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as {
         workshop: Workshop;
         location: Location | null;
@@ -92,7 +96,10 @@ export default function WorkshopDetailPage() {
       setUserCompleted(!!data.userCompleted);
       setUserIncompleteReason(data.userIncompleteReason ?? null);
       setUserReview(data.userReview || null);
-    } catch {}
+    } catch (e) {
+      console.error('Failed to load workshop', e);
+      setLoadError(true);
+    }
     setLoading(false);
   }, [id]);
 
@@ -133,12 +140,16 @@ export default function WorkshopDetailPage() {
     if (!sessionId) return;
     (async () => {
       try {
-        await fetch('/api/payments/verify', {
+        const res = await fetch('/api/payments/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ session_id: sessionId }),
         });
-      } catch {}
+        if (!res.ok) throw new Error(`verify HTTP ${res.status}`);
+      } catch (e) {
+        console.error('Payment verification failed', e);
+        setVerifyFailed(true);
+      }
       // Clean the URL so a refresh doesn't re-verify
       router.replace(`/workshops/${id}`);
       load();
@@ -207,11 +218,19 @@ export default function WorkshopDetailPage() {
     return (
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '120px 32px', textAlign: 'center' }}>
         <p style={{ color: 'var(--muted)', fontSize: 18, marginBottom: 16 }}>
-          {tr(lang, 'ไม่พบ Workshop นี้', 'Workshop not found')}
+          {loadError
+            ? tr(lang, 'โหลดข้อมูลไม่สำเร็จ กรุณาลองใหม่', 'Failed to load. Please try again.')
+            : tr(lang, 'ไม่พบ Workshop นี้', 'Workshop not found')}
         </p>
-        <Btn kind="teal" href="/workshops">
-          {tr(lang, 'กลับไปหน้ารวม', 'Back to all events')}
-        </Btn>
+        {loadError ? (
+          <Btn kind="teal" onClick={() => { setLoading(true); load(); }}>
+            {tr(lang, 'ลองใหม่', 'Retry')}
+          </Btn>
+        ) : (
+          <Btn kind="teal" href="/workshops">
+            {tr(lang, 'กลับไปหน้ารวม', 'Back to all events')}
+          </Btn>
+        )}
       </div>
     );
   }
@@ -251,6 +270,11 @@ export default function WorkshopDetailPage() {
       {/* Content + sticky booking */}
       <section className="section" style={{ paddingTop: 48, paddingBottom: 96 }}>
         <div className="container">
+          {verifyFailed && (
+            <div style={{ background: '#fdf1e7', border: '1px solid #e8b98a', color: '#8a4b1a', borderRadius: 12, padding: '12px 16px', fontSize: 14, marginBottom: 20 }}>
+              {tr(lang, 'ยืนยันการชำระเงินอัตโนมัติไม่สำเร็จ หากคุณชำระเงินแล้วแต่สถานะยังไม่อัปเดต กรุณารีเฟรชหน้าอีกครั้งหรือติดต่อผู้ดูแล', 'Automatic payment verification failed. If you paid but the status has not updated, please refresh or contact the admin.')}
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 48 }} className="ws-detail-grid">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 48, minWidth: 0 }}>
               {/* Tags */}

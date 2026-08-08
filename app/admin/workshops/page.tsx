@@ -37,21 +37,30 @@ export default function AdminWorkshopsPage() {
   const [workshops, setWorkshops] = useState<Workshop[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [modal, setModal] = useState<ModalState>(null);
   const [loadingEdit, setLoadingEdit] = useState<string | null>(null);
   const [formDirty, setFormDirty] = useState(false);
   const [pendingClose, setPendingClose] = useState(false);
 
   async function fetchAll() {
-    const [wsRes, locRes] = await Promise.all([
-      fetch('/api/workshops?counts=1'),
-      fetch('/api/locations'),
-    ]);
-    const wsData = (await wsRes.json()) as { workshops: Workshop[] };
-    const locData = (await locRes.json()) as { locations: Location[] };
-    setWorkshops(wsData.workshops || []);
-    setLocations(locData.locations || []);
-    setLoading(false);
+    setLoadError(false);
+    try {
+      const [wsRes, locRes] = await Promise.all([
+        fetch('/api/workshops?counts=1'),
+        fetch('/api/locations'),
+      ]);
+      if (!wsRes.ok || !locRes.ok) throw new Error(`HTTP ${wsRes.status}/${locRes.status}`);
+      const wsData = (await wsRes.json()) as { workshops: Workshop[] };
+      const locData = (await locRes.json()) as { locations: Location[] };
+      setWorkshops(wsData.workshops || []);
+      setLocations(locData.locations || []);
+    } catch (e) {
+      console.error('Failed to load workshops (admin)', e);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -166,6 +175,15 @@ export default function AdminWorkshopsPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <PageLoader />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4 text-muted">
+        <p>โหลดข้อมูลไม่สำเร็จ</p>
+        <button onClick={() => { setLoading(true); fetchAll(); }} className="border border-primary text-primary rounded-full px-6 py-2 text-sm font-semibold">ลองใหม่</button>
       </div>
     );
   }

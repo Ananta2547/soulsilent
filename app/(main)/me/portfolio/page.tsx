@@ -35,7 +35,9 @@ export default function PortfolioShowcasePage() {
             }
           }
         }
-      } catch {}
+      } catch (e) {
+        console.error('Failed to load portfolio', e);
+      }
       setLoading(false);
     })();
   }, []);

@@ -182,6 +182,8 @@ export default function MyBookingsPage() {
   const { lang } = useLang();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [verifyFailed, setVerifyFailed] = useState(false);
   const [unauthorized, setUnauthorized] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
@@ -191,18 +193,23 @@ export default function MyBookingsPage() {
   const [consentFor, setConsentFor] = useState<Booking | null>(null);
 
   const load = useCallback(() => {
+    setLoadError(false);
     fetch('/api/bookings?mine=1')
       .then((r) => {
         if (r.status === 401) {
           setUnauthorized(true);
           return null;
         }
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json() as Promise<{ bookings: Booking[] }>;
       })
       .then((d) => {
         if (d) setBookings(d.bookings || []);
       })
-      .catch(() => {})
+      .catch((e) => {
+        console.error('Failed to load bookings', e);
+        setLoadError(true);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -214,12 +221,16 @@ export default function MyBookingsPage() {
     (async () => {
       if (sessionId) {
         try {
-          await fetch('/api/payments/verify', {
+          const res = await fetch('/api/payments/verify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ session_id: sessionId }),
           });
-        } catch {}
+          if (!res.ok) throw new Error(`verify HTTP ${res.status}`);
+        } catch (e) {
+          console.error('Payment verification failed', e);
+          setVerifyFailed(true);
+        }
       }
       if (paid) {
         setThankYou(true);
@@ -334,6 +345,21 @@ export default function MyBookingsPage() {
             {tr(lang, 'ทั้งหมด', 'Total')} {bookings.length} {tr(lang, 'รายการ', 'bookings')}
           </p>
         </Reveal>
+
+        {verifyFailed && (
+          <div style={{ background: '#fdf1e7', border: '1px solid #e8b98a', color: '#8a4b1a', borderRadius: 12, padding: '12px 16px', fontSize: 14, marginBottom: 16 }}>
+            {tr(lang, 'ยืนยันการชำระเงินอัตโนมัติไม่สำเร็จ หากคุณชำระเงินแล้วแต่สถานะยังไม่อัปเดต กรุณารีเฟรชหน้าอีกครั้งหรือติดต่อผู้ดูแล', 'Automatic payment verification failed. If you paid but the status has not updated, please refresh or contact the admin.')}
+          </div>
+        )}
+
+        {loadError && (
+          <div style={{ background: '#fdecec', border: '1px solid #e6a5a5', color: '#9a2b2b', borderRadius: 12, padding: '12px 16px', fontSize: 14, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <span>{tr(lang, 'โหลดข้อมูลการจองไม่สำเร็จ', 'Failed to load your bookings')}</span>
+            <button type="button" onClick={() => { setLoading(true); load(); }} style={{ border: '1px solid #9a2b2b', background: 'transparent', color: '#9a2b2b', borderRadius: 999, padding: '4px 14px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}>
+              {tr(lang, 'ลองใหม่', 'Retry')}
+            </button>
+          </div>
+        )}
 
         {/* Tabs */}
         {(() => {

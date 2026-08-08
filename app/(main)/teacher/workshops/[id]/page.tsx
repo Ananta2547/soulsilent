@@ -81,7 +81,10 @@ export default function TeacherWorkshopDetail() {
         const res = await fetch(`/api/teacher/workshops/${id}`);
         if (res.ok) setData((await res.json()) as Data);
         else setData({ workshop: null as unknown as Workshop, bookings: [], finance: { gross: 0, deduction: 0, net: 0 } });
-      } catch {}
+      } catch (e) {
+        console.error('Failed to load teacher workshop', e);
+        setData({ workshop: null as unknown as Workshop, bookings: [], finance: { gross: 0, deduction: 0, net: 0 } });
+      }
     })();
   }, [id]);
 

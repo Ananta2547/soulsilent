@@ -72,6 +72,7 @@ export default function AdminArticlesPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [categories, setCategories] = useState<ArticleCategory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingSlug, setEditingSlug] = useState<string | null>(null);
   const [form, setForm] = useState<ArticleForm>(emptyForm);
@@ -80,18 +81,26 @@ export default function AdminArticlesPage() {
   const [catPanelOpen, setCatPanelOpen] = useState(false);
 
   async function fetchAll() {
-    const [aRes, uRes, cRes] = await Promise.all([
-      fetch('/api/articles?all=1'),
-      fetch('/api/users'),
-      fetch('/api/article-categories'),
-    ]);
-    const aData = (await aRes.json()) as { articles: Article[] };
-    const uData = (await uRes.json()) as { users: User[] };
-    const cData = (await cRes.json()) as { categories: ArticleCategory[] };
-    setArticles(aData.articles || []);
-    setUsers(uData.users || []);
-    setCategories(cData.categories || []);
-    setLoading(false);
+    setLoadError(false);
+    try {
+      const [aRes, uRes, cRes] = await Promise.all([
+        fetch('/api/articles?all=1'),
+        fetch('/api/users'),
+        fetch('/api/article-categories'),
+      ]);
+      if (!aRes.ok || !uRes.ok || !cRes.ok) throw new Error(`HTTP ${aRes.status}/${uRes.status}/${cRes.status}`);
+      const aData = (await aRes.json()) as { articles: Article[] };
+      const uData = (await uRes.json()) as { users: User[] };
+      const cData = (await cRes.json()) as { categories: ArticleCategory[] };
+      setArticles(aData.articles || []);
+      setUsers(uData.users || []);
+      setCategories(cData.categories || []);
+    } catch (e) {
+      console.error('Failed to load articles (admin)', e);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -171,6 +180,15 @@ export default function AdminArticlesPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <PageLoader />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4 text-muted">
+        <p>โหลดข้อมูลไม่สำเร็จ</p>
+        <button onClick={() => { setLoading(true); fetchAll(); }} className="border border-primary text-primary rounded-full px-6 py-2 text-sm font-semibold">ลองใหม่</button>
       </div>
     );
   }

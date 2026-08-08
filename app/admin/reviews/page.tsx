@@ -24,6 +24,7 @@ export default function AdminReviewsPage() {
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [workshops, setWorkshops] = useState<Opt[]>([]);
   const [users, setUsers] = useState<Opt[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -37,11 +38,19 @@ export default function AdminReviewsPage() {
   const [err, setErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const res = await fetch('/api/reviews');
-    const data = (await res.json()) as { reviews: ReviewRow[]; total: number };
-    setRows(data.reviews || []);
-    setTotal(data.total || 0);
-    setLoading(false);
+    setLoadError(false);
+    try {
+      const res = await fetch('/api/reviews');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as { reviews: ReviewRow[]; total: number };
+      setRows(data.reviews || []);
+      setTotal(data.total || 0);
+    } catch (e) {
+      console.error('Failed to load reviews', e);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -53,7 +62,9 @@ export default function AdminReviewsPage() {
         const ud = (await u.json()) as { users: { id: string; name: string; email: string }[] };
         setWorkshops((wd.workshops || []).map((x) => ({ id: x.id, label: x.title })));
         setUsers((ud.users || []).map((x) => ({ id: x.id, label: `${x.name} (${x.email})` })));
-      } catch {}
+      } catch (e) {
+        console.error('Failed to load review form options', e);
+      }
     })();
   }, [load]);
 
@@ -174,6 +185,11 @@ export default function AdminReviewsPage() {
       {/* List */}
       {loading ? (
         <p className="text-gray text-sm">กำลังโหลด…</p>
+      ) : loadError ? (
+        <p className="text-gray text-sm">
+          โหลดรีวิวไม่สำเร็จ{' '}
+          <button onClick={() => { setLoading(true); load(); }} className="underline text-primary">ลองใหม่</button>
+        </p>
       ) : rows.length === 0 ? (
         <p className="text-gray text-sm">ยังไม่มีรีวิว</p>
       ) : (

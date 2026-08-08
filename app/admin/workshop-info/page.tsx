@@ -11,14 +11,23 @@ type Modal = { mode: 'create' } | { mode: 'edit'; master: WorkshopMaster } | nul
 export default function WorkshopInfoAdminPage() {
   const [masters, setMasters] = useState<WorkshopMaster[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [modal, setModal] = useState<Modal>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const res = await fetch('/api/workshop-masters');
-    const data = (await res.json()) as { masters: WorkshopMaster[] };
-    setMasters(data.masters || []);
-    setLoading(false);
+    setLoadError(false);
+    try {
+      const res = await fetch('/api/workshop-masters');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as { masters: WorkshopMaster[] };
+      setMasters(data.masters || []);
+    } catch (e) {
+      console.error('Failed to load workshop-info', e);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -61,6 +70,11 @@ export default function WorkshopInfoAdminPage() {
 
       {loading ? (
         <p className="text-gray text-sm">กำลังโหลด…</p>
+      ) : loadError ? (
+        <p className="text-gray text-sm">
+          โหลดข้อมูลไม่สำเร็จ{' '}
+          <button onClick={() => { setLoading(true); load(); }} className="underline text-primary">ลองใหม่</button>
+        </p>
       ) : masters.length === 0 ? (
         <div className="border border-dashed border-gray-lighter rounded-xl p-10 text-center text-gray text-sm">
           ยังไม่มีข้อมูล Workshop —{' '}

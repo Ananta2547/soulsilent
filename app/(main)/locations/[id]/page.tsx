@@ -7,7 +7,8 @@ async function getLocation(id: string): Promise<Location | null> {
   try {
     const db = await getDB();
     return await db.prepare('SELECT * FROM locations WHERE id = ?').bind(id).first<Location>();
-  } catch {
+  } catch (e) {
+    console.error('Failed to load location', e);
     return null;
   }
 }

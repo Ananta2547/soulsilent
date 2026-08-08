@@ -42,16 +42,21 @@ export default function AdminUsersPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
 
   async function fetchUsers() {
-    const res = await fetch('/api/users');
-    if (!res.ok) {
-      const body = (await res.json()) as { error?: string };
-      setAuthError(body.error || `HTTP ${res.status}`);
+    try {
+      const res = await fetch('/api/users');
+      if (!res.ok) {
+        const body = (await res.json()) as { error?: string };
+        setAuthError(body.error || `HTTP ${res.status}`);
+        return;
+      }
+      const data = (await res.json()) as { users: User[] };
+      setUsers(data.users || []);
+    } catch (e) {
+      console.error('Failed to load users', e);
+      setAuthError('โหลดข้อมูลไม่สำเร็จ');
+    } finally {
       setLoading(false);
-      return;
     }
-    const data = (await res.json()) as { users: User[] };
-    setUsers(data.users || []);
-    setLoading(false);
   }
 
   useEffect(() => { fetchUsers(); }, []);

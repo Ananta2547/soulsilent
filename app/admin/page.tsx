@@ -54,7 +54,8 @@ export default function AdminDashboard() {
           workshopRevenue: revenue.soulsilent?.total || 0,
           recentBookings: (bookings.bookings || []).slice(0, 5),
         });
-      } catch {
+      } catch (e) {
+        console.error('Failed to load admin stats', e);
       } finally {
         setLoading(false);
       }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { Workshop } from '@/lib/types';
 import { getWorkshopTags, getEffectivePrice, getWorkshopStatusBadge, isNewWorkshop, compareWorkshopsForListing } from '@/lib/workshop-utils';
@@ -65,16 +65,29 @@ function fmtLocation(w: Workshop): string {
 export default function WorkshopsListingPage() {
   const [workshops, setWorkshops] = useState<Workshop[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [tagFilter, setTagFilter] = useState('');
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
+    setLoadError(false);
     fetch('/api/workshops?public=1')
-      .then((r) => r.json() as Promise<{ workshops: Workshop[] }>)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json() as Promise<{ workshops: Workshop[] }>;
+      })
       .then((d) => setWorkshops(d.workshops || []))
-      .catch(() => {})
+      .catch((e) => {
+        console.error('Failed to load workshops', e);
+        setLoadError(true);
+      })
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -160,6 +173,11 @@ export default function WorkshopsListingPage() {
           {loading ? (
             <div style={{ textAlign: 'center', padding: '80px 0' }}>
               <div style={{ width: 32, height: 32, border: '2px solid var(--teal)', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto', animation: 'float 1s linear infinite' }} />
+            </div>
+          ) : loadError ? (
+            <div style={{ textAlign: 'center', padding: '56px 0', color: 'var(--muted)' }}>
+              <p style={{ marginBottom: 16 }}>โหลดกิจกรรมไม่สำเร็จ</p>
+              <button onClick={load} style={{ fontFamily: 'inherit', cursor: 'pointer', border: '1px solid var(--teal)', background: 'transparent', color: 'var(--teal)', borderRadius: 999, padding: '8px 22px', fontSize: 14, fontWeight: 600 }}>ลองใหม่</button>
             </div>
           ) : filtered.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '56px 0', color: 'var(--muted)' }}>ไม่พบกิจกรรมที่ตรงกับตัวกรอง</div>

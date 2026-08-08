@@ -109,7 +109,9 @@ function SettingsHub() {
         const res = await fetch('/api/auth/me');
         const data = (await res.json()) as { user: MeData | null };
         setMe(data.user);
-      } catch {}
+      } catch (e) {
+        console.error('Failed to load account settings', e);
+      }
       setLoading(false);
     })();
   }, []);

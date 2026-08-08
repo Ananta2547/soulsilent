@@ -48,19 +48,28 @@ export default function ApplicantsPage() {
   const [workshop, setWorkshop] = useState<Workshop | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [wsRes, bRes] = await Promise.all([
-      fetch(`/api/workshops/${id}`),
-      fetch(`/api/bookings?workshop_id=${id}`),
-    ]);
-    const wsData = (await wsRes.json()) as { workshop: Workshop };
-    const bData = (await bRes.json()) as { bookings: Row[] };
-    setWorkshop(wsData.workshop);
-    setRows(bData.bookings || []);
-    setLoading(false);
+    setLoadError(false);
+    try {
+      const [wsRes, bRes] = await Promise.all([
+        fetch(`/api/workshops/${id}`),
+        fetch(`/api/bookings?workshop_id=${id}`),
+      ]);
+      if (!wsRes.ok || !bRes.ok) throw new Error(`HTTP ${wsRes.status}/${bRes.status}`);
+      const wsData = (await wsRes.json()) as { workshop: Workshop };
+      const bData = (await bRes.json()) as { bookings: Row[] };
+      setWorkshop(wsData.workshop);
+      setRows(bData.bookings || []);
+    } catch (e) {
+      console.error('Failed to load applicants', e);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
 
   useEffect(() => {
@@ -85,6 +94,15 @@ export default function ApplicantsPage() {
 
   if (loading) {
     return <div className="p-8 text-gray">กำลังโหลด…</div>;
+  }
+
+  if (loadError) {
+    return (
+      <div className="p-8 text-gray flex flex-col items-start gap-3">
+        <p>โหลดข้อมูลไม่สำเร็จ</p>
+        <button onClick={() => { setLoading(true); load(); }} className="border border-primary text-primary rounded-full px-6 py-2 text-sm font-semibold">ลองใหม่</button>
+      </div>
+    );
   }
 
   const fmt = (d: string | null) => fmtDateTime(d, 'th');

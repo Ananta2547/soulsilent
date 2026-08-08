@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { Workshop } from '@/lib/types';
 import { useLang, T, tr } from '@/lib/i18n';
@@ -128,6 +128,7 @@ export default function CalendarPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [seatCounts, setSeatCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const [monthDate, setMonthDate] = useState(() => {
     const t = new Date();
@@ -136,17 +137,29 @@ export default function CalendarPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selected, setSelected] = useState<Workshop | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
+    setLoadError(false);
     fetch('/api/calendar')
-      .then((r) => r.json() as Promise<{ workshops: Workshop[]; bookings: Booking[]; seatCounts?: Record<string, number> }>)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json() as Promise<{ workshops: Workshop[]; bookings: Booking[]; seatCounts?: Record<string, number> }>;
+      })
       .then((d) => {
         setWorkshops(d.workshops || []);
         setBookings(d.bookings || []);
         setSeatCounts(d.seatCounts || {});
-        setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((e) => {
+        console.error('Failed to load calendar', e);
+        setLoadError(true);
+      })
+      .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -291,6 +304,11 @@ export default function CalendarPage() {
               }}
             />
           </div>
+        ) : loadError ? (
+          <div style={{ padding: 72, textAlign: 'center', color: 'var(--muted)' }}>
+            <p style={{ marginBottom: 16 }}>โหลดปฏิทินไม่สำเร็จ</p>
+            <button onClick={load} style={{ fontFamily: 'inherit', cursor: 'pointer', border: '1px solid var(--teal)', background: 'transparent', color: 'var(--teal)', borderRadius: 999, padding: '8px 22px', fontSize: 14, fontWeight: 600 }}>ลองใหม่</button>
+          </div>
         ) : (
           <Reveal variant="reveal-zoom">
             <CalendarGrid
@@ -332,7 +350,7 @@ export default function CalendarPage() {
           </span>
         </div>
 
-        {filtered.length === 0 && !loading && (
+        {filtered.length === 0 && !loading && !loadError && (
           <div
             style={{
               marginTop: 24,
