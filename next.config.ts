@@ -14,7 +14,8 @@ const csp = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
   "img-src 'self' data: blob: https:",
-  "connect-src 'self' https://accounts.google.com https://oauth2.googleapis.com https://www.googleapis.com",
+  // data:/blob: needed by the image cropper (fetch(canvas.toDataURL()) → Blob).
+  "connect-src 'self' data: blob: https://accounts.google.com https://oauth2.googleapis.com https://www.googleapis.com",
   // Google Maps embeds (workshop/location pages) + Stripe checkout return.
   "frame-src 'self' https://maps.google.com https://www.google.com https://checkout.stripe.com",
   "frame-ancestors 'self'",
