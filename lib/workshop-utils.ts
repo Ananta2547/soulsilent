@@ -304,12 +304,26 @@ export function getWorkshopStatusBadge(w: Workshop, now: Date = new Date()): { l
   return { label: open ? 'เปิดจอง' : 'ปิดรับ', open };
 }
 
-/** Public listing order: New (≤7d) → Open → Closed; within each group the
- *  soonest event date is pushed up first. "Open" uses the effective badge so a
- *  started (auto-closed) workshop sinks into the Closed group. */
+/** created_at (stored UTC "YYYY-MM-DD HH:MM:SS") as epoch ms, 0 if unparseable. */
+function createdAtMs(w: { created_at?: string | null }): number {
+  if (!w.created_at) return 0;
+  const iso = w.created_at.includes('T') ? w.created_at : w.created_at.replace(' ', 'T') + 'Z';
+  const t = new Date(iso).getTime();
+  return Number.isNaN(t) ? 0 : t;
+}
+
+/** Public listing order — three groups, each sorted differently:
+ *   1. New (≤7d, not yet ended)  → newest created first (created_at DESC)
+ *   2. Open (accepting bookings) → soonest event date first (start ASC)
+ *   3. Closed (full / ended)     → most recently passed first (start DESC)
+ *  "Open" uses the effective badge so a started (auto-closed) workshop sinks
+ *  into the Closed group. */
 export function compareWorkshopsForListing(a: Workshop, b: Workshop, now: Date = new Date()): number {
   const rank = (w: Workshop) => (isNewWorkshop(w, now) ? 0 : getWorkshopStatusBadge(w, now).open ? 1 : 2);
-  const diff = rank(a) - rank(b);
+  const ra = rank(a);
+  const diff = ra - rank(b);
   if (diff !== 0) return diff;
-  return getWorkshopStart(a).getTime() - getWorkshopStart(b).getTime();
+  if (ra === 0) return createdAtMs(b) - createdAtMs(a); // New: newest created first
+  if (ra === 1) return getWorkshopStart(a).getTime() - getWorkshopStart(b).getTime(); // Open: soonest first
+  return getWorkshopStart(b).getTime() - getWorkshopStart(a).getTime(); // Closed: latest date first
 }
