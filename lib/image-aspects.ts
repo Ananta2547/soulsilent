@@ -19,8 +19,8 @@ export const ASPECTS = {
   // Workshop cover poster — A3 portrait (29.7 × 42 cm).
   WORKSHOP_CARD: { ratio: 297 / 420, label: 'A3 · โปสเตอร์ (การ์ด)' },
   WORKSHOP_HERO: { ratio: 297 / 420, label: 'A3 · โปสเตอร์ 29.7×42' },
-  // Workshop master (info) cover — wide landscape hero.
-  WORKSHOP_MASTER: { ratio: 16 / 9, label: '16:9 · ปกข้อมูล Workshop' },
+  // Workshop master (info) cover — A3 portrait poster (29.7 × 42 cm).
+  WORKSHOP_MASTER: { ratio: 297 / 420, label: 'A3 · โปสเตอร์ (ปกข้อมูล Workshop)' },
 
   ARTICLE_COVER: { ratio: 16 / 9, label: '16:9 · article card' },
   ARTICLE_HERO: { ratio: 21 / 9, label: '21:9 · article header' },

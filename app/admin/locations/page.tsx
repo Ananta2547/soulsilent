@@ -414,6 +414,14 @@ export default function AdminLocationsPage() {
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <a
+                          href={`/locations/${loc.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-dark text-xs font-medium hover:text-primary hover:underline"
+                        >
+                          ดูหน้าจริง ↗
+                        </a>
                         <button
                           onClick={() => handleEdit(loc)}
                           className="text-primary text-xs font-medium hover:underline"

@@ -267,10 +267,16 @@ export function getEffectivePrice(w: Workshop, now: Date = new Date()):
 /** How long a freshly-created workshop wears the "ใหม่" (New) badge. */
 export const NEW_WORKSHOP_DAYS = 7;
 
-/** True for NEW_WORKSHOP_DAYS days after the workshop was created.
+/** True for NEW_WORKSHOP_DAYS days after the workshop was created — but never
+ *  once the event itself is over (a past event is never "new").
  *  created_at is stored UTC ("YYYY-MM-DD HH:MM:SS") — normalise to ISO/UTC. */
-export function isNewWorkshop(w: { created_at?: string | null }, now: Date = new Date()): boolean {
+export function isNewWorkshop(
+  w: { created_at?: string | null } & Partial<DateShape>,
+  now: Date = new Date(),
+): boolean {
   if (!w.created_at) return false;
+  // Past event → drop the "New" ribbon regardless of how recently it was created.
+  if (w.date && hasWorkshopEnded(w as DateShape, now)) return false;
   const iso = w.created_at.includes('T') ? w.created_at : w.created_at.replace(' ', 'T') + 'Z';
   const created = new Date(iso);
   if (Number.isNaN(created.getTime())) return false;

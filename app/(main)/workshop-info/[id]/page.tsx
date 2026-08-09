@@ -57,7 +57,7 @@ export default function WorkshopInfoPage() {
         {master.cover_image_url && (
           <Reveal>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={master.cover_image_url} alt={master.title} style={{ width: '100%', aspectRatio: '16 / 9', objectFit: 'cover', borderRadius: 22, marginBottom: 28 }} />
+            <img src={master.cover_image_url} alt={master.title} style={{ display: 'block', width: '100%', maxWidth: 480, margin: '0 auto 28px', aspectRatio: '297 / 420', objectFit: 'cover', borderRadius: 22 }} />
           </Reveal>
         )}
 

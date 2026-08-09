@@ -129,7 +129,7 @@ export function MasterForm({
       {err && <div className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{err}</div>}
 
       <ImageUploader
-        label="รูปตัวอย่างกิจกรรม (Cover · 16:9)"
+        label="โปสเตอร์กิจกรรม (Cover · A3 แนวตั้ง)"
         folder="workshop"
         primary={ASPECTS.WORKSHOP_MASTER}
         value={coverUrl}

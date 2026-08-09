@@ -88,9 +88,9 @@ export default function WorkshopInfoAdminPage() {
             <div key={m.id} className="border border-gray-lighter rounded-xl bg-white overflow-hidden">
               {m.cover_image_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={m.cover_image_url} alt={m.title} className="w-full aspect-video object-cover" />
+                <img src={m.cover_image_url} alt={m.title} className="w-full max-w-[240px] mx-auto aspect-[297/420] object-cover" />
               ) : (
-                <div className="w-full aspect-video bg-surface flex items-center justify-center text-gray text-sm">ไม่มีรูปปก</div>
+                <div className="w-full max-w-[240px] mx-auto aspect-[297/420] bg-surface flex items-center justify-center text-gray text-sm">ไม่มีรูปปก</div>
               )}
               <div className="p-4">
                 <h3 className="font-semibold text-dark">{m.title}</h3>
