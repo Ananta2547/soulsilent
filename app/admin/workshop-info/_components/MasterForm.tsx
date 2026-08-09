@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ImageUploader } from '@/components/admin/image/ImageUploader';
 import { ASPECTS } from '@/lib/image-aspects';
 import { parseImageMeta } from '@/lib/image-meta';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import type { ImageMeta, WorkshopMaster } from '@/lib/types';
 
 function toArr(json: string | null | undefined): string[] {
@@ -66,11 +67,20 @@ export function MasterForm({
   editingId,
   onSuccess,
   onCancel,
+  onDirtyChange,
+  pendingClose,
+  onStay,
 }: {
   initial?: WorkshopMaster | null;
   editingId?: string;
   onSuccess: () => void;
   onCancel: () => void;
+  /** Report unsaved-changes state up to the modal so it can guard close. */
+  onDirtyChange?: (dirty: boolean) => void;
+  /** Parent asked to close while there are unsaved edits → show the prompt. */
+  pendingClose?: boolean;
+  /** User chose to keep editing. */
+  onStay?: () => void;
 }) {
   const [title, setTitle] = useState(initial?.title || '');
   const [organizer, setOrganizer] = useState(initial?.organizer || '');
@@ -83,6 +93,28 @@ export function MasterForm({
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  // Unsaved-changes tracking: snapshot the loaded baseline once, then compare
+  // the live fields against it so the modal can warn before discarding edits.
+  const baseline = useMemo(
+    () =>
+      JSON.stringify({
+        title: initial?.title || '',
+        organizer: initial?.organizer || '',
+        description: initial?.description || '',
+        coverUrl: initial?.cover_image_url || '',
+        coverMeta: parseImageMeta(initial?.cover_image_meta ?? null),
+        target: toArr(initial?.target_json),
+        takeaways: toArr(initial?.takeaways_json),
+      }),
+    [initial],
+  );
+  const dirty =
+    JSON.stringify({ title, organizer, description, coverUrl, coverMeta, target, takeaways }) !== baseline;
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
+  useUnsavedGuard(dirty, 'คุณมีข้อมูลที่ยังไม่ได้บันทึก แน่ใจว่าต้องการออกจากหน้านี้?');
+
   useEffect(() => {
     fetch('/api/users?role=teacher,admin')
       .then((r) => r.json() as Promise<{ users: { id: string; name: string }[] }>)
@@ -90,12 +122,11 @@ export function MasterForm({
       .catch(() => {});
   }, []);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function doSave(): Promise<boolean> {
     setErr(null);
     if (!title.trim()) {
       setErr('กรุณากรอกชื่อกิจกรรม');
-      return;
+      return false;
     }
     setSaving(true);
     try {
@@ -116,12 +147,26 @@ export function MasterForm({
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
         setErr(data.error || 'บันทึกไม่สำเร็จ');
-        return;
+        return false;
       }
-      onSuccess();
+      return true;
+    } catch {
+      setErr('บันทึกไม่สำเร็จ');
+      return false;
     } finally {
       setSaving(false);
     }
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (await doSave()) onSuccess();
+  }
+
+  // "Save & close" from the unsaved-changes prompt.
+  async function saveAndClose() {
+    if (await doSave()) onSuccess();
+    // On failure the prompt stays open and the error banner explains why.
   }
 
   return (
@@ -172,6 +217,37 @@ export function MasterForm({
           {saving ? 'กำลังบันทึก...' : editingId ? 'บันทึกการแก้ไข' : 'เพิ่มข้อมูล'}
         </button>
       </div>
+
+      {/* Unsaved-changes prompt — warn before discarding edits on close. */}
+      {pendingClose && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-dark/55" onClick={() => onStay?.()}>
+          <div className="bg-paper rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-heading text-lg text-dark mb-2">ยังไม่ได้บันทึก</h3>
+            <p className="text-sm text-gray mb-5">คุณมีข้อมูลที่แก้ไขแต่ยังไม่ได้กดบันทึก ต้องการบันทึกก่อนออกหรือไม่?</p>
+            {err && <div className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2 mb-3">{err}</div>}
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                disabled={saving}
+                onClick={saveAndClose}
+                className="w-full px-4 py-2.5 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
+              >
+                {saving ? 'กำลังบันทึก...' : 'บันทึก แล้วออก'}
+              </button>
+              <button
+                type="button"
+                onClick={() => onCancel()}
+                className="w-full px-4 py-2.5 rounded-lg border border-gray-lighter text-sm text-dark hover:bg-surface"
+              >
+                ออกโดยไม่บันทึก
+              </button>
+              <button type="button" onClick={() => onStay?.()} className="w-full px-4 py-2.5 text-sm text-gray hover:underline">
+                อยู่ต่อ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 }

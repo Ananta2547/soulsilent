@@ -14,6 +14,9 @@ export default function WorkshopInfoAdminPage() {
   const [loadError, setLoadError] = useState(false);
   const [modal, setModal] = useState<Modal>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Unsaved-changes guard for the create/edit form modal.
+  const [formDirty, setFormDirty] = useState(false);
+  const [pendingClose, setPendingClose] = useState(false);
 
   const load = useCallback(async () => {
     setLoadError(false);
@@ -36,9 +39,21 @@ export default function WorkshopInfoAdminPage() {
     })();
   }, [load]);
 
-  function closeAndRefresh() {
+  function closeModal() {
     setModal(null);
+    setFormDirty(false);
+    setPendingClose(false);
+  }
+
+  function closeAndRefresh() {
+    closeModal();
     load();
+  }
+
+  // Guard the close of the create/edit form when it has unsaved changes.
+  function requestClose() {
+    if (formDirty) setPendingClose(true);
+    else closeModal();
   }
 
   async function remove(m: WorkshopMaster) {
@@ -116,12 +131,28 @@ export default function WorkshopInfoAdminPage() {
         open={modal !== null}
         title={modal?.mode === 'edit' ? 'แก้ไขข้อมูล Workshop' : 'เพิ่มข้อมูล Workshop'}
         subtitle={modal?.mode === 'edit' ? modal.master.title : undefined}
-        onClose={() => setModal(null)}
+        onClose={requestClose}
       >
         {modal?.mode === 'edit' ? (
-          <MasterForm key={modal.master.id} editingId={modal.master.id} initial={modal.master} onSuccess={closeAndRefresh} onCancel={() => setModal(null)} />
+          <MasterForm
+            key={modal.master.id}
+            editingId={modal.master.id}
+            initial={modal.master}
+            onSuccess={closeAndRefresh}
+            onCancel={closeModal}
+            onDirtyChange={setFormDirty}
+            pendingClose={pendingClose}
+            onStay={() => setPendingClose(false)}
+          />
         ) : modal?.mode === 'create' ? (
-          <MasterForm key="create" onSuccess={closeAndRefresh} onCancel={() => setModal(null)} />
+          <MasterForm
+            key="create"
+            onSuccess={closeAndRefresh}
+            onCancel={closeModal}
+            onDirtyChange={setFormDirty}
+            pendingClose={pendingClose}
+            onStay={() => setPendingClose(false)}
+          />
         ) : null}
       </AdminFormModal>
     </div>
