@@ -238,6 +238,7 @@ export default function WorkshopDetailPage() {
   const spotsLeft = workshop.max_participants - bookingCount;
   const scheduleDays = parseSchedule(workshop.schedule_json);
   const learnItems = safeParseArray<string>(workshop.learn_json, []);
+  const targetItems = safeParseArray<string>(workshop.target_json, []);
   const locationLabel = location
     ? `${location.name}, ${location.subdistrict}, ${location.district}, ${location.province}`
     : workshop.location;
@@ -374,6 +375,26 @@ export default function WorkshopDetailPage() {
                   </div>
                 </div>
               </Reveal>
+
+              {/* Target audience — who this workshop is for */}
+              {targetItems.length > 0 && (
+                <Reveal>
+                  <span className="eyebrow">
+                    <T th="เหมาะกับใคร" en="who it's for" />
+                  </span>
+                  <h2 className="display-th" style={{ fontSize: 'clamp(28px, 3.5vw, 40px)', margin: '14px 0 24px' }}>
+                    <T th="กิจกรรมนี้เหมาะกับใคร" en="Who it's for" />
+                  </h2>
+                  <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 40px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    {targetItems.map((item, idx) => (
+                      <li key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+                        <span style={{ flexShrink: 0, marginTop: 2, fontSize: 20, lineHeight: 1 }}>👥</span>
+                        <span style={{ fontSize: 16, lineHeight: 1.6, color: 'var(--ink)' }}>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </Reveal>
+              )}
 
               {/* Learn */}
               {learnItems.length > 0 && (
