@@ -78,7 +78,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     // window is fixed from submit/confirm.
     const env = await getEnv();
     const siteUrl = env.SITE_URL || 'http://localhost:3000';
-    const checkoutUrl = await createWorkshopCheckout({
+    const { url: checkoutUrl, sessionId } = await createWorkshopCheckout({
       workshopTitle: workshop.title,
       amount,
       bookingId: id,
@@ -86,6 +86,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       successUrl: `${siteUrl}/me/bookings?paid=1`,
       cancelUrl: `${siteUrl}/me/bookings`,
     });
+    await db.prepare('UPDATE bookings SET stripe_session_id = ? WHERE id = ?').bind(sessionId, id).run();
 
     return NextResponse.json({ checkoutUrl, amount });
   } catch (error) {

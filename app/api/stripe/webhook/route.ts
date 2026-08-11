@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { getDB, getEnv } from '@/lib/db';
-import { getStripe } from '@/lib/stripe';
+import { getStripe, refundPaymentIntent } from '@/lib/stripe';
 
 export async function POST(request: Request) {
   try {
@@ -38,12 +38,31 @@ export async function POST(request: Request) {
       const db = await getDB();
 
       if (metadata.type === 'workshop' && metadata.booking_id) {
-        await db
-          .prepare(
-            "UPDATE bookings SET status = 'confirmed', payment_status = 'paid', stripe_payment_id = ? WHERE id = ?"
-          )
-          .bind(session.payment_intent as string, metadata.booking_id)
-          .run();
+        const paymentIntentId = session.payment_intent as string;
+        const booking = await db
+          .prepare('SELECT status, payment_status FROM bookings WHERE id = ?')
+          .bind(metadata.booking_id)
+          .first<{ status: string; payment_status: string }>();
+
+        // Late payment: the hold already expired and the seat was released
+        // (booking cancelled/expired). Refund immediately so the user never
+        // pays for a seat they can't get, and leave the booking cancelled.
+        if (booking && (booking.status === 'cancelled' || booking.payment_status === 'expired')) {
+          if (paymentIntentId) {
+            try {
+              await refundPaymentIntent(paymentIntentId);
+            } catch (e) {
+              console.error('Late-payment refund failed', e);
+            }
+          }
+        } else {
+          await db
+            .prepare(
+              "UPDATE bookings SET status = 'confirmed', payment_status = 'paid', stripe_payment_id = ? WHERE id = ?"
+            )
+            .bind(paymentIntentId, metadata.booking_id)
+            .run();
+        }
       }
     }
 

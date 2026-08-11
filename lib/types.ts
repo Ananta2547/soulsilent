@@ -180,8 +180,10 @@ export interface Booking {
   workshop_id: string;
   user_id: string;
   status: 'pending' | 'confirmed' | 'cancelled';
-  payment_status: 'pending' | 'paid' | 'refunded';
+  payment_status: 'pending' | 'paid' | 'refunded' | 'expired';
   stripe_payment_id: string | null;
+  /** Stripe Checkout Session id — used to expire the session (kill the QR). */
+  stripe_session_id: string | null;
   amount: number;
   attended: number | null; // null=not marked, 1=attended, 0=no-show
   expires_at: string | null; // ISO datetime — null for legacy or paid rows

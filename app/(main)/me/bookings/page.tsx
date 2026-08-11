@@ -479,7 +479,7 @@ export default function MyBookingsPage() {
                     )}
                     {owesPayment && b.expires_at && (
                       <div style={{ marginTop: 6 }}>
-                        <PayCountdown expiresAt={b.expires_at} onExpire={load} lang={lang} />
+                        <PayCountdown bookingId={b.id} expiresAt={b.expires_at} onExpire={load} lang={lang} />
                       </div>
                     )}
                   </Link>
@@ -695,31 +695,71 @@ function StartCountdown({ booking: b, lang }: { booking: Booking; lang: 'th' | '
 }
 
 /** Live mm:ss countdown to the 10-min auto-cancel deadline. Calls onExpire once. */
-function PayCountdown({ expiresAt, onExpire, lang }: { expiresAt: string; onExpire: () => void; lang: 'th' | 'en' }) {
+function PayCountdown({ bookingId, expiresAt, onExpire, lang }: { bookingId: string; expiresAt: string; onExpire: () => void; lang: 'th' | 'en' }) {
   const [now, setNow] = useState(() => Date.now());
+  const [done, setDone] = useState(false);
   const targetMs = sqliteToMs(expiresAt);
   useEffect(() => {
+    if (Date.now() >= targetMs) {
+      setDone(true);
+      return;
+    }
     const id = setInterval(() => {
       setNow(Date.now());
       if (targetMs - Date.now() <= 0) {
         clearInterval(id);
-        onExpire();
+        setDone(true);
       }
     }, 1000);
     return () => clearInterval(id);
-  }, [targetMs, onExpire]);
+  }, [targetMs]);
+
+  // On timeout: tell the server to expire the Stripe session (kills the saved
+  // QR) + mark the booking, then refresh the list. Runs once.
+  useEffect(() => {
+    if (!done) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        await fetch(`/api/bookings/${bookingId}/expire`, { method: 'POST' });
+      } catch (e) {
+        console.error('Failed to expire booking', e);
+      }
+      if (!cancelled) onExpire();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [done, bookingId, onExpire]);
+
+  if (done) {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: '#c0392b' }}>
+        ⛔ {tr(lang, 'หมดเวลาชำระเงิน', 'Payment time expired')}
+      </span>
+    );
+  }
 
   const total = Math.max(0, Math.floor((targetMs - now) / 1000));
   const mm = String(Math.floor(total / 60)).padStart(2, '0');
   const ss = String(total % 60).padStart(2, '0');
   const urgent = total <= 120;
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: urgent ? '#c0392b' : '#a04a14' }}>
-      ⏳ {tr(lang, 'ชำระเงินภายใน', 'Pay within')}{' '}
-      <span style={{ fontFamily: 'Archivo Black, Mitr, sans-serif', fontVariantNumeric: 'tabular-nums', letterSpacing: '.02em' }}>
-        {mm}:{ss}
-      </span>{' '}
-      {tr(lang, 'นาที ไม่งั้นจะยกเลิกอัตโนมัติ', "or it's auto-cancelled")}
+    <span style={{ display: 'block' }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: urgent ? '#c0392b' : '#a04a14' }}>
+        ⏳ {tr(lang, 'ชำระเงินภายใน', 'Pay within')}{' '}
+        <span style={{ fontFamily: 'Archivo Black, Mitr, sans-serif', fontVariantNumeric: 'tabular-nums', letterSpacing: '.02em' }}>
+          {mm}:{ss}
+        </span>{' '}
+        {tr(lang, 'นาที ไม่งั้นจะยกเลิกอัตโนมัติ', "or it's auto-cancelled")}
+      </span>
+      <span style={{ display: 'block', marginTop: 4, fontSize: 11.5, lineHeight: 1.4, color: '#c0392b' }}>
+        {tr(
+          lang,
+          'กรุณาชำระเงินภายในเวลาที่กำหนด หากเกิน 10 นาที QR Code รูปนี้จะถูกยกเลิกและไม่สามารถใช้งานได้',
+          'Please pay within the time limit. After 10 minutes this QR code is cancelled and can no longer be used.',
+        )}
+      </span>
     </span>
   );
 }

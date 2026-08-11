@@ -329,7 +329,7 @@ export async function POST(request: Request) {
     // whether to redirect immediately (paid) or after a notice popup (deposit).
     const env = await getEnv();
     const siteUrl = env.SITE_URL || 'http://localhost:3000';
-    const checkoutUrl = await createWorkshopCheckout({
+    const { url: checkoutUrl, sessionId } = await createWorkshopCheckout({
       workshopTitle: workshop.title,
       amount: chargeAmount,
       bookingId,
@@ -337,6 +337,8 @@ export async function POST(request: Request) {
       successUrl: `${siteUrl}/me/bookings?paid=1`,
       cancelUrl: `${siteUrl}/workshops/${workshop_id}?booking=cancelled`,
     });
+    // Persist the session id so the hold can be expired later (kills the QR).
+    await db.prepare('UPDATE bookings SET stripe_session_id = ? WHERE id = ?').bind(sessionId, bookingId).run();
 
     return NextResponse.json({
       checkoutUrl,

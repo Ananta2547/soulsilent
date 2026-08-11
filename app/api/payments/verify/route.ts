@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
-import { fetchCheckoutSession } from '@/lib/stripe';
+import { fetchCheckoutSession, refundPaymentIntent } from '@/lib/stripe';
 
 /**
  * POST /api/payments/verify { session_id }
@@ -44,6 +44,23 @@ export async function POST(request: Request) {
         : session.payment_intent?.id ?? null;
 
     if (metadata.type === 'workshop' && metadata.booking_id) {
+      const booking = await db
+        .prepare('SELECT status, payment_status FROM bookings WHERE id = ?')
+        .bind(metadata.booking_id)
+        .first<{ status: string; payment_status: string }>();
+
+      // Late payment: hold already expired and seat released → refund, keep cancelled.
+      if (booking && (booking.status === 'cancelled' || booking.payment_status === 'expired')) {
+        if (paymentIntentId) {
+          try {
+            await refundPaymentIntent(paymentIntentId);
+          } catch (e) {
+            console.error('Late-payment refund failed (verify)', e);
+          }
+        }
+        return NextResponse.json({ ok: false, expired: true, message: 'หมดเวลาชำระเงิน ระบบได้คืนเงินให้แล้ว' });
+      }
+
       await db
         .prepare(
           "UPDATE bookings SET status = 'confirmed', payment_status = 'paid', stripe_payment_id = ? WHERE id = ?"

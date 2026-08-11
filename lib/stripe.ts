@@ -33,7 +33,7 @@ export async function createWorkshopCheckout(params: {
   userId: string;
   successUrl: string;
   cancelUrl: string;
-}): Promise<string> {
+}): Promise<{ url: string; sessionId: string }> {
   const stripe = await getStripe();
   const session = await stripe.checkout.sessions.create({
     // 'promptpay' = Thai QR payment via mobile banking apps (SCB/KBank/KMA/etc.)
@@ -57,7 +57,36 @@ export async function createWorkshopCheckout(params: {
       user_id: params.userId,
     },
   });
-  return session.url!;
+  return { url: session.url!, sessionId: session.id };
+}
+
+/**
+ * Expire an open Checkout Session immediately. This cancels the session's
+ * underlying PaymentIntent, so the PromptPay QR it produced stops working —
+ * a QR saved to the phone then fails when scanned. Safe to call anytime (no
+ * 30-minute minimum, unlike the session's own auto-`expires_at`).
+ *
+ * Returns `{ paid }`: if the session already completed (the user paid in the
+ * race just before we expired it), Stripe refuses to expire it and we report
+ * `paid: true` so the caller confirms the booking instead of cancelling it.
+ */
+export async function expireCheckoutSession(sessionId: string): Promise<{ paid: boolean }> {
+  const stripe = await getStripe();
+  const session = await stripe.checkout.sessions.retrieve(sessionId);
+  if (session.payment_status === 'paid' || session.status === 'complete') {
+    return { paid: true };
+  }
+  if (session.status === 'open') {
+    await stripe.checkout.sessions.expire(sessionId);
+  }
+  return { paid: false };
+}
+
+/** Full refund of a PaymentIntent — used when a payment lands after the hold
+ *  already expired (seat was released), so the user never pays for nothing. */
+export async function refundPaymentIntent(paymentIntentId: string): Promise<void> {
+  const stripe = await getStripe();
+  await stripe.refunds.create({ payment_intent: paymentIntentId });
 }
 
 /**

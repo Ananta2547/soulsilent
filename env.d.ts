@@ -12,6 +12,8 @@ declare global {
     RESEND_API_KEY: string;
     /** Verified "from" address, e.g. "soulsilent <no-reply@soulsilent.co>". */
     EMAIL_FROM: string;
+    /** Shared secret guarding the cron sweep endpoint (/api/cron/expire-holds). */
+    CRON_SECRET: string;
   }
 
   namespace NodeJS {
