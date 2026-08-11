@@ -47,9 +47,11 @@ export async function GET(request: Request) {
       params.push(tag);
     }
 
-    const countSelect = withCounts
-      ? ", (SELECT COUNT(*) FROM bookings WHERE bookings.workshop_id = workshops.id AND bookings.status != 'cancelled') AS booking_count"
-      : '';
+    // booking_count is always included so cards can show a "full" state (it's
+    // already exposed per-workshop on the public detail page). The `counts=1`
+    // admin flag still gates other admin-only concerns but no longer this.
+    const countSelect =
+      ", (SELECT COUNT(*) FROM bookings WHERE bookings.workshop_id = workshops.id AND bookings.status != 'cancelled' AND bookings.payment_status != 'expired') AS booking_count";
     // Join the linked location so cards can format "name-province, district"
     // without a second round-trip (public read of name/province/district only).
     let query = `SELECT workshops.*, l.name AS loc_name, l.province AS loc_province, l.district AS loc_district${countSelect}

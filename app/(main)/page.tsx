@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { Workshop, Article, ArticleCategory } from '@/lib/types';
 import { useLang } from '@/lib/i18n';
-import { getEffectivePrice, hasWorkshopEnded, getWorkshopStatusBadge, isNewWorkshop, compareWorkshopsForListing } from '@/lib/workshop-utils';
+import { getEffectivePrice, hasWorkshopEnded, getWorkshopStatusBadge, isNewWorkshop, isWorkshopFull, compareWorkshopsForListing } from '@/lib/workshop-utils';
 import { categoryLabel, formatArticleDate } from '@/lib/article-utils';
 
 /* ============================================================
@@ -103,7 +103,7 @@ type SiteStats = { workshops: number; participants: number; locations: number };
 
 /* ---------------- Hero fan ---------------- */
 
-type Ticket = { id: string | null; cat: string; title: string; subtitle: string; date: string; price: string; latin: boolean; image: string | null };
+type Ticket = { id: string | null; cat: string; title: string; subtitle: string; date: string; price: string; latin: boolean; image: string | null; discountPct?: number | null; originalPrice?: string | null; full?: boolean };
 
 /** The 5 fan positions (from the design), outer cards lower + rotated more. */
 const FAN_SLOTS = [
@@ -124,6 +124,8 @@ const SAMPLE_TICKETS: Ticket[] = [
 ];
 
 function ticketFromWorkshop(w: Workshop): Ticket {
+  const eff = getEffectivePrice(w);
+  const promo = eff.isPromo && eff.originalPrice > 0;
   return {
     cat: w.category || 'WORKSHOP',
     title: w.title,
@@ -133,6 +135,9 @@ function ticketFromWorkshop(w: Workshop): Ticket {
     latin: false,
     image: w.image_url ?? null,
     id: w.id,
+    discountPct: promo ? Math.round((1 - eff.price / eff.originalPrice) * 100) : null,
+    originalPrice: promo ? `฿${eff.originalPrice.toLocaleString()}` : null,
+    full: isWorkshopFull(w),
   };
 }
 
@@ -175,6 +180,16 @@ function FanCard({ slot, index, ticket, onEnter }: { slot: (typeof FAN_SLOTS)[nu
       {ticket.id && (
         <Link href={`/workshops/${ticket.id}`} aria-label={ticket.title} style={{ position: 'absolute', inset: 0, zIndex: 6 }} />
       )}
+      {ticket.discountPct ? (
+        <span style={{ position: 'absolute', top: 10, right: 10, zIndex: 7, background: 'var(--accent)', color: 'var(--ink)', fontFamily: 'Archivo Black', fontSize: 12, borderRadius: 8, padding: '3px 8px', boxShadow: '0 4px 10px rgba(0,0,0,.25)' }}>
+          ลด {ticket.discountPct}%
+        </span>
+      ) : null}
+      {ticket.full ? (
+        <span style={{ position: 'absolute', top: 10, left: 10, zIndex: 7, background: '#3a3a3a', color: '#fff', fontFamily: 'Mitr', fontWeight: 600, fontSize: 12, borderRadius: 8, padding: '3px 10px', boxShadow: '0 4px 10px rgba(0,0,0,.3)' }}>
+          เต็มแล้ว
+        </span>
+      ) : null}
       <div style={{ position: 'relative', height: '100%', padding: '18px 18px 20px', display: 'flex', flexDirection: 'column', color: '#fff', textShadow: ticket.image ? '0 1px 10px rgba(0,0,0,.4)' : 'none', pointerEvents: 'none' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span className="mono" style={{ fontSize: 9.5, letterSpacing: '.16em', color: 'rgba(255,255,255,.85)', textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 150 }}>
@@ -191,7 +206,12 @@ function FanCard({ slot, index, ticket, onEnter }: { slot: (typeof FAN_SLOTS)[nu
           <div style={{ fontFamily: 'Mitr', fontSize: 13, color: 'rgba(255,255,255,.9)', marginTop: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ticket.subtitle}</div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}>
             <span className="mono" style={{ fontSize: 10, letterSpacing: '.08em', color: 'rgba(255,255,255,.85)' }}>{ticket.date}</span>
-            <span style={{ background: 'rgba(255,255,255,.2)', borderRadius: 999, padding: '4px 11px', fontFamily: 'Archivo Black', fontSize: 13 }}>{ticket.price}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6 }}>
+              {ticket.originalPrice ? (
+                <span style={{ fontFamily: 'Mitr', fontSize: 11, color: 'rgba(255,255,255,.7)', textDecoration: 'line-through' }}>{ticket.originalPrice}</span>
+              ) : null}
+              <span style={{ background: 'rgba(255,255,255,.2)', borderRadius: 999, padding: '4px 11px', fontFamily: 'Archivo Black', fontSize: 13 }}>{ticket.price}</span>
+            </span>
           </div>
         </div>
       </div>
@@ -202,10 +222,21 @@ function FanCard({ slot, index, ticket, onEnter }: { slot: (typeof FAN_SLOTS)[nu
 function Hero({ workshops }: { workshops: Workshop[] }) {
   const fanRef = useRef<HTMLDivElement>(null);
 
-  // Fill the 5-slot fan with live upcoming workshops, padded with samples.
+  // Fill the 5-slot fan with starred workshops, newest first, placed so the
+  // newest sits centre-front and older ones fan outward:
+  //   rank 0 (newest) → centre (slot 2), 1 → left (1), 2 → right (3),
+  //   3 → far-left (0), 4 (oldest) → far-right (4).
+  // FAN_SLOTS index = physical position; RANK_TO_SLOT maps rank → that index.
   const tickets: Ticket[] = useMemo(() => {
-    const live = workshops.slice(0, 5).map(ticketFromWorkshop);
-    return Array.from({ length: 5 }, (_, i) => live[i] ?? SAMPLE_TICKETS[i]);
+    const RANK_TO_SLOT = [2, 1, 3, 0, 4];
+    const sorted = [...workshops]
+      .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+      .slice(0, 5);
+    const bySlot: (Ticket | undefined)[] = new Array(5);
+    sorted.forEach((w, rank) => {
+      bySlot[RANK_TO_SLOT[rank]] = ticketFromWorkshop(w);
+    });
+    return Array.from({ length: 5 }, (_, i) => bySlot[i] ?? SAMPLE_TICKETS[i]);
   }, [workshops]);
 
   /**

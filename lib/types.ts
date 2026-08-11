@@ -165,8 +165,8 @@ export interface Workshop {
   updated_at: string;
   /** 1 = starred by admin → featured in the homepage Hero fan (migration 035). */
   featured: number;
-  /** Live count of non-cancelled bookings. Computed — only present when the
-   *  workshops API is called with ?counts=1 (admin-only). */
+  /** Live count of non-cancelled, non-expired bookings. Computed by the
+   *  workshops API on every GET so cards can show a "full" state. */
   booking_count?: number;
   /** Joined from the linked location (GET /api/workshops). Used by cards to
    *  format "name-province, district". Null when no location_id. */

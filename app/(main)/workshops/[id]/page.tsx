@@ -966,7 +966,11 @@ function BookingCardContent({
             >
               ฿{eff.originalPrice.toLocaleString()}
             </span>
+            <span style={{ background: 'var(--accent)', color: 'var(--ink)', fontWeight: 700, fontSize: 13, borderRadius: 8, padding: '2px 8px', lineHeight: 1.4 }}>
+              {tr(lang, 'ลด', 'Save')} {Math.round((1 - eff.price / eff.originalPrice) * 100)}%
+            </span>
           </div>
+          {eff.promoEnd && <PromoCountdown endsAt={eff.promoEnd} lang={lang} />}
         </div>
       ) : (
         <div
@@ -1605,5 +1609,31 @@ function FindUs({
         </div>
       </div>
     </>
+  );
+}
+
+/** Promo end countdown — nudges FOMO in the booking box. Thai wall-clock (UTC+7). */
+function PromoCountdown({ endsAt, lang }: { endsAt: string; lang: 'th' | 'en' }) {
+  const iso = (endsAt.length <= 10 ? endsAt + 'T23:59' : endsAt) + ':00+07:00';
+  const target = new Date(iso).getTime();
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(id);
+  }, []);
+  const diff = target - now;
+  if (Number.isNaN(target) || diff <= 0) return null;
+  const totalMin = Math.floor(diff / 60000);
+  const days = Math.floor(totalMin / 1440);
+  const hours = Math.floor((totalMin % 1440) / 60);
+  const mins = totalMin % 60;
+  const left =
+    days > 0
+      ? tr(lang, `${days} วัน ${hours} ชม.`, `${days}d ${hours}h`)
+      : tr(lang, `${hours} ชม. ${mins} นาที`, `${hours}h ${mins}m`);
+  return (
+    <div style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fff3cd', color: '#8a5a00', border: '1px solid #ffe08a', borderRadius: 999, padding: '4px 12px', fontSize: 13, fontWeight: 700 }}>
+      ⏳ {tr(lang, 'โปรโมชันเหลือเวลาอีก', 'Promo ends in')} {left}
+    </div>
   );
 }

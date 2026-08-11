@@ -289,6 +289,15 @@ export function hasWorkshopStarted(w: TimeShape, now: Date = new Date()): boolea
   return !Number.isNaN(start.getTime()) && now.getTime() >= start.getTime();
 }
 
+/** Seats are full when non-cancelled bookings reach the quota. Selection
+ *  workshops admit by review (no seat race), so they're never "full" this way.
+ *  Needs `booking_count` (present on list + detail API responses). */
+export function isWorkshopFull(w: Workshop): boolean {
+  if (w.admission_type === 'selection') return false;
+  if (w.booking_count == null || !w.max_participants) return false;
+  return w.booking_count >= w.max_participants;
+}
+
 /** Public booking-status badge. active = open (accent), everything else
  *  non-draft = closed (muted). Draft is never shown publicly. Once the event
  *  has STARTED, booking auto-closes → "ปิดรับ" regardless of the stored status. */

@@ -794,8 +794,8 @@ const SECTION_FIELDS: Record<SectionKey, (keyof Vault)[]> = {
 };
 
 const REQUIRED_BASE: Record<SectionKey, (keyof Vault)[]> = {
-  // Line ID stays optional. DOB + Facebook are required (needed for applications).
-  identity: ['prefix', 'firstName', 'lastName', 'nickname', 'dob', 'gender', 'phone', 'facebook'],
+  // LINE ID is required (main contact channel); Facebook is optional.
+  identity: ['prefix', 'firstName', 'lastName', 'nickname', 'dob', 'gender', 'phone', 'lineId'],
   health: ['medical', 'dietary'],
   emergency: [], // optional — always saveable
 };
@@ -1096,16 +1096,16 @@ export function AutofillPanel({
             {showErr('phone', 'identity') && renderErr()}
           </div>
           <div>
-            <label className={fieldLabel}>Line ID</label>
-            <input value={v.lineId} onChange={set('lineId')} className="field" />
-          </div>
-          <div>
             <label className={fieldLabel}>
-              Facebook
+              Line ID
               {req()}
             </label>
-            <input value={v.facebook} onChange={set('facebook')} onBlur={onBlurField('facebook')} className="field" style={showErr('facebook', 'identity') ? ERR_RING : undefined} placeholder={tr(lang, 'ลิงก์หรือชื่อโปรไฟล์ Facebook', 'Facebook profile link or name')} />
-            {showErr('facebook', 'identity') && renderErr()}
+            <input value={v.lineId} onChange={set('lineId')} onBlur={onBlurField('lineId')} className="field" style={showErr('lineId', 'identity') ? ERR_RING : undefined} />
+            {showErr('lineId', 'identity') && renderErr()}
+          </div>
+          <div>
+            <label className={fieldLabel}>Facebook</label>
+            <input value={v.facebook} onChange={set('facebook')} className="field" placeholder={tr(lang, 'ลิงก์หรือชื่อโปรไฟล์ Facebook (ไม่บังคับ)', 'Facebook profile link or name (optional)')} />
           </div>
         </div>
         {saveBar('identity')}

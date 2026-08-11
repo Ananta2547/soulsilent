@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { Workshop } from '@/lib/types';
-import { getWorkshopTags, getEffectivePrice, getWorkshopStatusBadge, isNewWorkshop, compareWorkshopsForListing } from '@/lib/workshop-utils';
+import { getWorkshopTags, getEffectivePrice, getWorkshopStatusBadge, isNewWorkshop, isWorkshopFull, compareWorkshopsForListing } from '@/lib/workshop-utils';
 
 /* ============================================================
    Workshops listing — port of Design Composer "Workshops.dc.html".
@@ -208,6 +208,9 @@ function Card({ w }: { w: Workshop }) {
   const eff = getEffectivePrice(w);
   const free = w.payment_type === 'free' || eff.price <= 0;
   const badge = getWorkshopStatusBadge(w);
+  // Seats full → sink the card into a closed/"เต็ม" state (matches the detail page).
+  const full = isWorkshopFull(w);
+  const open = badge.open && !full;
 
   return (
     <Link href={`/workshops/${w.id}`} className="card reveal-up" style={{ padding: 16, background: 'var(--paper)', display: 'flex', flexDirection: 'column', textDecoration: 'none', color: 'var(--ink)' }}>
@@ -249,8 +252,8 @@ function Card({ w }: { w: Workshop }) {
       </div>
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-        <span className={badge.open ? 'tag tag-accent' : 'tag'} style={badge.open ? undefined : { background: '#e6e3da', color: 'var(--muted)' }}>
-          {badge.label}
+        <span className={open ? 'tag tag-accent' : 'tag'} style={open ? undefined : { background: '#e6e3da', color: 'var(--muted)' }}>
+          {full ? 'เต็ม' : badge.label}
         </span>
         {w.category && <span className="tag">{w.category}</span>}
       </div>
@@ -286,7 +289,7 @@ function Card({ w }: { w: Workshop }) {
             <div style={{ fontFamily: 'var(--font-display-th)', fontWeight: 600, fontSize: 19 }}>฿{eff.price.toLocaleString()}</div>
           )}
         </div>
-        {badge.open ? (
+        {open ? (
           <span className="btn btn-teal btn-sm" aria-hidden>จอง <span className="mono">→</span></span>
         ) : (
           <span
@@ -294,7 +297,7 @@ function Card({ w }: { w: Workshop }) {
             aria-hidden
             style={{ background: '#e6e3da', color: 'var(--muted)', cursor: 'not-allowed' }}
           >
-            ปิดรับ
+            {full ? 'เต็มแล้ว' : 'ปิดรับ'}
           </span>
         )}
       </div>
