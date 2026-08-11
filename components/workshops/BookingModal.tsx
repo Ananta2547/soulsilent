@@ -145,7 +145,7 @@ export function BookingModal({
     !vault.gender ||
     (vault.gender === 'other' && !(vault.genderOther || '').trim()) ||
     !(vault.phone || profile?.phone || '').trim() ||
-    !(vault.facebook || '').trim() ||
+    !(vault.lineId || '').trim() ||
     !(vault.medical || '').trim();
 
   function goNext() {
@@ -350,8 +350,8 @@ export function BookingModal({
               <ReadGroup lang={lang} title={tr(lang, 'ช่องทางติดต่อ', 'Contact')}>
                 <Row label={tr(lang, 'โทร', 'Phone')} value={vault.phone || profile?.phone || '—'} required missing={!(vault.phone || profile?.phone || '').trim()} />
                 <Row label={tr(lang, 'อีเมล', 'Email')} value={profile?.email || '—'} />
-                <Row label="Facebook" value={vault.facebook || '—'} required missing={!(vault.facebook || '').trim()} />
-                <Row label="Line ID" value={vault.lineId || '—'} />
+                <Row label="Line ID" value={vault.lineId || '—'} required missing={!(vault.lineId || '').trim()} />
+                <Row label="Facebook" value={vault.facebook || '—'} />
               </ReadGroup>
               <ReadGroup lang={lang} title={tr(lang, 'สุขภาพ & อาหาร', 'Health & food')}>
                 <Row label={tr(lang, 'เงื่อนไขสุขภาพ / แพ้', 'Medical / allergies')} value={vault.medical || '—'} required missing={!(vault.medical || '').trim()} />
