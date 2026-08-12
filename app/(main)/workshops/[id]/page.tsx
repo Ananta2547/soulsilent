@@ -1242,7 +1242,7 @@ function BookingCardContent({
         }}
       >
         {[
-          tr(lang, 'จองที่นั่งทันที · ชำระเงินภายใน 10 นาที', 'Seat held instantly · pay within 10 min'),
+          tr(lang, 'จองที่นั่งทันที · ชำระเงินภายใน 1 ชั่วโมง', 'Seat held instantly · pay within 1 hour'),
           tr(lang, 'ที่นั่งจำกัด · ชำระแล้วไม่คืนเงิน', 'Limited seats · paid bookings non-refundable'),
         ].map((line) => (
           <li key={line} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

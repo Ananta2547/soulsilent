@@ -756,8 +756,8 @@ function PayCountdown({ bookingId, expiresAt, onExpire, lang }: { bookingId: str
       <span style={{ display: 'block', marginTop: 4, fontSize: 11.5, lineHeight: 1.4, color: '#c0392b' }}>
         {tr(
           lang,
-          'กรุณาชำระเงินภายในเวลาที่กำหนด หากเกิน 10 นาที QR Code รูปนี้จะถูกยกเลิกและไม่สามารถใช้งานได้',
-          'Please pay within the time limit. After 10 minutes this QR code is cancelled and can no longer be used.',
+          'กรุณาชำระเงินภายในเวลาที่กำหนด ห้ามบันทึก QR ไว้จ่ายภายหลังหรือสแกนซ้ำ — จ่ายหลังหมดเวลา/จ่ายซ้ำ เงินจะถูกตัดจากบัญชีแต่ระบบไม่รับชำระและไม่ได้ที่นั่งเพิ่ม (ธนาคารจะคืนเงินให้ภายหลัง)',
+          'Pay within the time limit. Do not save this QR to pay later or scan it twice — a late or repeat payment is deducted by your bank but rejected by us and grants no extra seat (your bank returns the money later).',
         )}
       </span>
     </span>

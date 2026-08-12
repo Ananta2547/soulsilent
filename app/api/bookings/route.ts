@@ -9,7 +9,7 @@ import { expireStaleHolds } from '@/lib/holds';
 import type { Workshop } from '@/lib/types';
 
 /** Minutes a booking holds its seat for after creation. */
-const HOLD_MINUTES = 10;
+const HOLD_MINUTES = 60;
 
 /** Whole years from a YYYY-MM-DD birthdate, or null. Mirrors the client. */
 function ageFromDob(dob: string | null): number | null {

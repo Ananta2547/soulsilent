@@ -16,6 +16,7 @@ export async function expireStaleHolds(db: Db): Promise<void> {
   await db
     .prepare(
       `UPDATE bookings SET status = 'cancelled',
+         payment_status = 'expired',
          cancel_reason = COALESCE(cancel_reason, 'payment_failed')
        WHERE status != 'cancelled'
          AND payment_status = 'pending'

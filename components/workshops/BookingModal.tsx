@@ -157,6 +157,12 @@ export function BookingModal({
     setStep(2);
   }
 
+  // Holds the built application while the QR warning popup is shown — the booking
+  // is NOT created until the user confirms, so Cancel leaves nothing in the DB and
+  // takes no seat quota.
+  const [pendingApp, setPendingApp] = useState<Record<string, unknown> | null>(null);
+  const [paying, setPaying] = useState(false);
+
   async function submit() {
     setErr(null);
     for (const q of questions) {
@@ -194,18 +200,76 @@ export function BookingModal({
         ? { consent: { photoVideo: consent, label: consent === 'granted' ? 'ยินยอม' : 'ไม่ยินยอม' } }
         : {}),
     };
+    // Anything that leads to a Stripe QR (paid / deposit) → show the QR warning
+    // popup FIRST and create the booking only after the user confirms. This means
+    // Cancel creates no booking and takes no seat. Free / selection never pay, so
+    // they submit straight away.
+    const willPay = workshop.payment_type !== 'free' && workshop.admission_type !== 'selection';
+    if (willPay) {
+      setPendingApp(application);
+      return;
+    }
     const r = await onSubmit(application);
     if (r.error) {
       setErr(r.error);
       return;
     }
-    // PAID direct → straight to Stripe (no intermediate popup).
+    setResult(r);
+  }
+
+  // Confirm from the QR warning popup → NOW create the booking (holds the seat +
+  // starts the 10-min countdown) and continue to payment.
+  async function confirmAndPay() {
+    if (!pendingApp || paying) return;
+    setErr(null);
+    setPaying(true);
+    const r = await onSubmit(pendingApp);
+    setPaying(false);
+    if (r.error) {
+      setErr(r.error);
+      setPendingApp(null);
+      return;
+    }
     if (r.mode === 'paid' && r.checkoutUrl) {
       window.location.href = r.checkoutUrl;
       return;
     }
-    // selection / free / deposit → show the matching success popup.
+    // deposit → the matching success popup (with its own Proceed-to-Payment button)
+    setPendingApp(null);
     setResult(r);
+  }
+
+  // ---- QR payment warning popup — shown BEFORE the booking is created ----
+  if (pendingApp) {
+    return (
+      <div
+        onMouseDown={(e) => { if (e.target === e.currentTarget && !paying) setPendingApp(null); }}
+        style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(13,30,29,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}
+      >
+        <div style={{ width: '100%', maxWidth: 440, background: 'var(--paper)', borderRadius: 22, boxShadow: '0 30px 80px -24px rgba(13,30,29,.5)', overflow: 'hidden', padding: '32px 28px' }}>
+          <div style={{ width: 60, height: 60, borderRadius: '50%', background: '#fdecec', color: '#a13030', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, margin: '0 auto 18px' }}>
+            ⚠️
+          </div>
+          <h2 className="display-th" style={{ fontSize: 20, margin: '0 0 12px', textAlign: 'center' }}>
+            <T th="ขั้นตอนถัดไปคือ QR ชำระเงิน (หมดอายุ 1 ชั่วโมง)" en="Next is the payment QR (expires in 1 hour)" />
+          </h2>
+          <div style={{ background: '#fdecec', border: '1px solid #f0b4b4', borderRadius: 14, padding: '13px 16px', margin: '0 0 22px', fontSize: 13, color: '#a13030', lineHeight: 1.6 }}>
+            <T
+              th="ห้ามบันทึก QR ไว้จ่ายภายหลัง หรือสแกนซ้ำ — จ่ายหลังหมดเวลา/จ่ายซ้ำ เงินจะถูกตัดจากบัญชีแต่ระบบไม่รับชำระและไม่ได้ที่นั่งเพิ่ม (ธนาคารจะคืนเงินให้ภายหลัง)"
+              en="Do not save this QR to pay later or scan it twice — a late or repeat payment is deducted by your bank but rejected by us and grants no extra seat (your bank returns the money later)."
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button type="button" onClick={() => setPendingApp(null)} disabled={paying} className="btn btn-paper" style={{ flex: 1, justifyContent: 'center' }}>
+              {tr(lang, 'ยกเลิก', 'Cancel')}
+            </button>
+            <Btn kind="teal" onClick={confirmAndPay} disabled={paying} style={{ flex: 1, justifyContent: 'center' }}>
+              {paying ? tr(lang, 'กำลังดำเนินการ…', 'Processing…') : <>{tr(lang, 'รับทราบ ไปชำระเงิน', 'Got it, pay now')} <span className="mono">→</span></>}
+            </Btn>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // ---- Success popup (after submit, except paid which redirects) ----
@@ -242,6 +306,17 @@ export function BookingModal({
             </div>
           )}
           {result.mode === 'free' && <div style={{ height: 8 }} />}
+
+          {isDeposit && result.checkoutUrl && (
+            <div style={{ background: '#fdecec', border: '1px solid #f0b4b4', borderRadius: 14, padding: '11px 15px', margin: '0 0 14px', fontSize: 12.5, color: '#a13030', lineHeight: 1.55, textAlign: 'left' }}>
+              <strong><T th="⚠️ QR หมดอายุใน 10 นาที" en="⚠️ QR expires in 1 hour" /></strong>
+              <br />
+              <T
+                th="ห้ามบันทึก QR ไว้จ่ายภายหลัง หรือสแกนซ้ำ — จ่ายหลังหมดเวลา/จ่ายซ้ำ เงินจะถูกตัดจากบัญชีแต่ระบบไม่รับชำระและไม่ได้ที่นั่งเพิ่ม (ต้องรอธนาคารคืนเงินภายหลัง)"
+                en="Do not save this QR to pay later or scan it twice — a late or repeat payment is deducted by your bank but rejected by us and grants no extra seat (your bank returns the money later)."
+              />
+            </div>
+          )}
 
           {isDeposit && result.checkoutUrl ? (
             <Btn kind="teal" onClick={() => { window.location.href = result.checkoutUrl!; }} style={{ width: '100%', justifyContent: 'center' }}>
@@ -490,6 +565,23 @@ export function BookingModal({
             </>
           )}
         </div>
+
+        {/* Payment warning — shown on step 2 when submitting leads straight to the
+            Stripe PromptPay QR (paid/deposit). PromptPay QR can be re-scanned at the
+            bank, so warn before redirect: a late/repeat payment is taken by the bank
+            but rejected by us and grants no extra seat. */}
+        {step === 2 && workshop.payment_type !== 'free' && workshop.admission_type !== 'selection' && (
+          <div style={{ padding: '0 24px', marginTop: -4 }}>
+            <div style={{ background: '#fdecec', border: '1px solid #f0b4b4', borderRadius: 14, padding: '11px 15px', fontSize: 12.5, color: '#a13030', lineHeight: 1.55 }}>
+              <strong><T th="⚠️ ขั้นตอนถัดไปคือ QR ชำระเงิน (หมดอายุ 1 ชั่วโมง)" en="⚠️ Next is the payment QR (expires in 1 hour)" /></strong>
+              <br />
+              <T
+                th="ห้ามบันทึก QR ไว้จ่ายภายหลัง หรือสแกนซ้ำ — จ่ายหลังหมดเวลา/จ่ายซ้ำ เงินจะถูกตัดจากบัญชีแต่ระบบไม่รับชำระและไม่ได้ที่นั่งเพิ่ม (ธนาคารจะคืนเงินให้ภายหลัง)"
+                en="Do not save this QR to pay later or scan it twice — a late or repeat payment is deducted by your bank but rejected by us and grants no extra seat (your bank returns the money later)."
+              />
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         <div style={{ padding: '16px 24px', borderTop: '1px solid var(--cream-deep)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>

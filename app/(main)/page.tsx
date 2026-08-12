@@ -325,6 +325,13 @@ function EventCard({ w }: { w: Workshop }) {
   const eff = getEffectivePrice(w);
   const free = w.payment_type === 'free' || eff.price <= 0;
   const badge = getWorkshopStatusBadge(w);
+  // Seats full → closed/"เต็ม" state, matching the /workshops card + detail page.
+  const full = isWorkshopFull(w);
+  const open = badge.open && !full;
+  const discountPct =
+    !free && eff.originalPrice && eff.originalPrice > eff.price
+      ? Math.round((1 - eff.price / eff.originalPrice) * 100)
+      : 0;
   return (
     <Link href={`/workshops/${w.id}`} className="card reveal-up" style={{ padding: 16, display: 'flex', flexDirection: 'column', textDecoration: 'none', color: 'var(--ink)' }}>
       <div className="ph ph-teal card-media" style={{ aspectRatio: '3/4', borderRadius: 14, marginBottom: 14, position: 'relative', overflow: 'hidden' }}>
@@ -357,10 +364,31 @@ function EventCard({ w }: { w: Workshop }) {
             ใหม่
           </span>
         )}
+        {discountPct > 0 && (
+          <span
+            style={{
+              position: 'absolute',
+              top: 10,
+              right: 10,
+              background: 'var(--accent)',
+              color: 'var(--ink)',
+              fontFamily: 'Mitr',
+              fontWeight: 600,
+              fontSize: 12,
+              letterSpacing: '.03em',
+              padding: '3px 9px',
+              borderRadius: 999,
+              boxShadow: '0 2px 8px rgba(13,30,29,.28)',
+              pointerEvents: 'none',
+            }}
+          >
+            ลด {discountPct}%
+          </span>
+        )}
       </div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-        <span className={badge.open ? 'tag tag-accent' : 'tag'} style={badge.open ? undefined : { background: '#e6e3da', color: 'var(--muted)' }}>
-          {badge.label}
+        <span className={open ? 'tag tag-accent' : 'tag'} style={open ? undefined : { background: '#e6e3da', color: 'var(--muted)' }}>
+          {full ? 'เต็ม' : badge.label}
         </span>
         <span className="tag">{w.category || 'ONSITE'}</span>
       </div>
@@ -384,9 +412,14 @@ function EventCard({ w }: { w: Workshop }) {
       <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12 }}>
         <div>
           <div className="mono" style={{ fontSize: 9.5, color: 'var(--muted)', letterSpacing: '.1em', textTransform: 'uppercase' }}>เริ่มต้น</div>
-          <div style={{ fontFamily: 'var(--font-display-th)', fontWeight: 600, fontSize: 19, color: 'var(--teal)' }}>{free ? 'ฟรี' : `฿${eff.price.toLocaleString()}`}</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
+            <div style={{ fontFamily: 'var(--font-display-th)', fontWeight: 600, fontSize: 19, color: 'var(--teal)' }}>{free ? 'ฟรี' : `฿${eff.price.toLocaleString()}`}</div>
+            {discountPct > 0 && eff.originalPrice && (
+              <div style={{ fontSize: 13, color: 'var(--muted)', textDecoration: 'line-through' }}>฿{eff.originalPrice.toLocaleString()}</div>
+            )}
+          </div>
         </div>
-        {badge.open ? (
+        {open ? (
           <span className="btn btn-teal btn-sm" aria-hidden>จอง <span className="mono">→</span></span>
         ) : (
           <span
@@ -394,7 +427,7 @@ function EventCard({ w }: { w: Workshop }) {
             aria-hidden
             style={{ background: '#e6e3da', color: 'var(--muted)', cursor: 'not-allowed' }}
           >
-            ปิดรับ
+            {full ? 'เต็มแล้ว' : 'ปิดรับ'}
           </span>
         )}
       </div>

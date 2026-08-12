@@ -6,7 +6,7 @@ import { getEffectivePrice } from '@/lib/workshop-utils';
 import { visibleAppStatus, confirmDeadlineFor } from '@/lib/selection';
 import type { Workshop, Booking } from '@/lib/types';
 
-const HOLD_MINUTES = 10;
+const HOLD_MINUTES = 60;
 
 /**
  * A selected (approved) user confirms their seat. For free workshops this

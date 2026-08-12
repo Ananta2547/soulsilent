@@ -73,9 +73,14 @@ export async function GET(request: Request) {
     const staleWindow = deep ? '-7 days' : '-30 minutes';
     const stale = await db
       .prepare(
+        // Catch both post-fix rows (payment_status='expired') AND pre-fix rows
+        // left by the old lazy path (status='cancelled' + payment_status still
+        // 'pending') — those older bookings have a live PaymentIntent whose saved
+        // QR is still scannable until swept here or Stripe's 24h session expiry.
         `SELECT stripe_session_id AS sid FROM bookings
-         WHERE payment_status = 'expired'
-           AND stripe_session_id IS NOT NULL
+         WHERE stripe_session_id IS NOT NULL
+           AND (payment_status = 'expired'
+                OR (status = 'cancelled' AND payment_status = 'pending'))
            AND datetime(created_at) >= datetime('now', '${staleWindow}')
          LIMIT 50`
       )

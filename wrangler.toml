@@ -1,7 +1,17 @@
 name = "soulsilent"
-main = ".open-next/worker.js"
+# Custom wrapper around the OpenNext worker — adds the `scheduled` handler the
+# generated `.open-next/worker.js` lacks (it delegates `fetch` back to it).
+# Required for the Cron Trigger below to do anything.
+main = "worker.ts"
 compatibility_date = "2024-12-01"
 compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
+
+# Runs every minute: pings /api/cron/expire-holds (guarded by CRON_SECRET) to
+# cancel the Stripe session/PaymentIntent of any hold past its 10-min window,
+# voiding a saved PromptPay QR at minute 10 instead of waiting for Stripe's
+# 30-min session auto-expiry.
+[triggers]
+crons = ["* * * * *"]
 
 [assets]
 directory = ".open-next/assets"

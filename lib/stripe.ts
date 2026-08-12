@@ -36,6 +36,12 @@ export async function createWorkshopCheckout(params: {
 }): Promise<{ url: string; sessionId: string }> {
   const stripe = await getStripe();
   const session = await stripe.checkout.sessions.create({
+    // Hard safety net for saved-QR abuse: Stripe auto-expires the session (and
+    // cancels its PaymentIntent, voiding the PromptPay QR) at `expires_at`, even
+    // if nothing on our side ever calls expireCheckoutSession. Matches our 60-min
+    // seat hold, so the QR dies exactly when the hold lapses (Stripe allows
+    // 30 min–24 h; 60 min is within range).
+    expires_at: Math.floor(Date.now() / 1000) + 60 * 60,
     // 'promptpay' = Thai QR payment via mobile banking apps (SCB/KBank/KMA/etc.)
     payment_method_types: ['promptpay'],
     line_items: [

@@ -32,6 +32,77 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
     }
 
+    // A charge succeeding on Stripe that does NOT correspond to a legitimately
+    // owed booking = money we shouldn't keep: a late payment on a saved QR, or a
+    // repeat scan of the same QR (excess). PromptPay can't block these at the
+    // bank, so we record every such charge for the admin reconcile page. The
+    // normal, expected charge for a live booking is ignored here (the
+    // checkout.session.completed branch confirms those).
+    if (event.type === 'charge.succeeded') {
+      const charge = event.data.object;
+      const db = await getDB();
+      const piId = typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id;
+
+      if (piId) {
+        // The booking this PI belongs to — first by the id we store on confirm,
+        // else via the Checkout Session's metadata (set before confirmation).
+        let booking = await db
+          .prepare('SELECT id, status, payment_status, stripe_payment_id FROM bookings WHERE stripe_payment_id = ?')
+          .bind(piId)
+          .first<{ id: string; status: string; payment_status: string; stripe_payment_id: string | null }>();
+
+        if (!booking) {
+          try {
+            const stripe = await getStripe();
+            const sessions = await stripe.checkout.sessions.list({ payment_intent: piId, limit: 1 });
+            const bookingId = sessions.data[0]?.metadata?.booking_id;
+            if (bookingId) {
+              booking = await db
+                .prepare('SELECT id, status, payment_status, stripe_payment_id FROM bookings WHERE id = ?')
+                .bind(bookingId)
+                .first<{ id: string; status: string; payment_status: string; stripe_payment_id: string | null }>();
+            }
+          } catch (e) {
+            console.error('charge.succeeded session lookup failed', e);
+          }
+        }
+
+        let reason: string | null = null;
+        if (!booking) {
+          reason = 'unknown';
+        } else if (booking.status === 'cancelled' || booking.payment_status === 'expired') {
+          reason = 'late_cancelled';
+        } else if (
+          (booking.status === 'confirmed' || booking.payment_status === 'paid') &&
+          booking.stripe_payment_id &&
+          booking.stripe_payment_id !== piId
+        ) {
+          // Seat already paid by a different charge → this one is a duplicate.
+          reason = 'duplicate';
+        }
+        // reason stays null when this charge is the booking's own legitimate
+        // payment (pending awaiting confirmation, or confirmed by this same PI).
+
+        if (reason) {
+          await db
+            .prepare(
+              `INSERT OR IGNORE INTO orphan_payments (id, payment_intent, booking_id, amount, currency, email, reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?)`
+            )
+            .bind(
+              charge.id,
+              piId,
+              booking?.id ?? null,
+              charge.amount,
+              charge.currency || 'thb',
+              charge.receipt_email ?? null,
+              reason
+            )
+            .run();
+        }
+      }
+    }
+
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
       const metadata = session.metadata || {};
