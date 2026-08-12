@@ -76,8 +76,36 @@ export async function expireCheckoutSession(sessionId: string): Promise<{ paid: 
   if (session.payment_status === 'paid' || session.status === 'complete') {
     return { paid: true };
   }
+
+  // The reliable QR-killer is cancelling the underlying PaymentIntent: once the
+  // PromptPay QR is displayed, the PI sits in `requires_action`, and Stripe
+  // REFUSES to expire a Checkout Session whose PI is mid async-payment — so
+  // `sessions.expire()` alone leaves the saved QR scannable. Cancelling the PI
+  // voids the QR (a later scan fails in the banking app).
+  const piId = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
+  if (piId) {
+    try {
+      const pi = await stripe.paymentIntents.retrieve(piId);
+      if (pi.status === 'succeeded') {
+        return { paid: true };
+      }
+      // `processing` = customer is mid-payment and can't be cancelled — let it
+      // land so the caller's refund guard handles the late money.
+      if (pi.status !== 'processing' && pi.status !== 'canceled') {
+        await stripe.paymentIntents.cancel(piId);
+      }
+    } catch (e) {
+      console.error('cancel PaymentIntent failed', e);
+    }
+  }
+
+  // Best-effort: also close the session so it can't be reopened.
   if (session.status === 'open') {
-    await stripe.checkout.sessions.expire(sessionId);
+    try {
+      await stripe.checkout.sessions.expire(sessionId);
+    } catch {
+      // Expected to fail once the PI reached requires_action — safe to ignore.
+    }
   }
   return { paid: false };
 }
