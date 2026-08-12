@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDB, getEnv } from '@/lib/db';
-import { expireCheckoutSession } from '@/lib/stripe';
+import { expireCheckoutSession, fetchCheckoutSession, refundPaymentIntent } from '@/lib/stripe';
 
 /**
  * Sweep unpaid bookings whose 10-minute hold has lapsed and expire their Stripe
@@ -61,7 +61,42 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json({ ok: true, scanned: rows.results.length, expired, paid });
+    // Retroactive cleanup: recently-expired bookings whose PaymentIntent may
+    // still be live (e.g. expired by an older code path where session.expire
+    // couldn't cancel a PromptPay PI in requires_action → the saved QR stayed
+    // scannable). Re-run expire (now cancels the PI); if the customer already
+    // paid the stale QR, refund. Bounded to 30 min so each row is only
+    // re-checked a handful of times before it ages out.
+    const stale = await db
+      .prepare(
+        `SELECT stripe_session_id AS sid FROM bookings
+         WHERE payment_status = 'expired'
+           AND stripe_session_id IS NOT NULL
+           AND datetime(created_at) >= datetime('now', '-30 minutes')
+         LIMIT 50`
+      )
+      .all<{ sid: string }>();
+    let cleaned = 0;
+    let refunded = 0;
+    for (const r of stale.results) {
+      try {
+        const res = await expireCheckoutSession(r.sid);
+        if (res.paid) {
+          const s = await fetchCheckoutSession(r.sid);
+          const pi = typeof s.payment_intent === 'string' ? s.payment_intent : s.payment_intent?.id;
+          if (pi) {
+            await refundPaymentIntent(pi);
+            refunded++;
+          }
+        } else {
+          cleaned++;
+        }
+      } catch (e) {
+        console.error('cron retroactive cleanup failed', r.sid, e);
+      }
+    }
+
+    return NextResponse.json({ ok: true, scanned: rows.results.length, expired, paid, cleaned, refunded });
   } catch (error) {
     console.error('Cron expire-holds error:', error);
     return NextResponse.json({ error: 'เกิดข้อผิดพลาด' }, { status: 500 });
