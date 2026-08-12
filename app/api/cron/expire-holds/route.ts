@@ -67,12 +67,16 @@ export async function GET(request: Request) {
     // scannable). Re-run expire (now cancels the PI); if the customer already
     // paid the stale QR, refund. Bounded to 30 min so each row is only
     // re-checked a handful of times before it ages out.
+    // ?deep=1 → one-off wide sweep (7 days) to clean up QRs left live by the
+    // old code path. The scheduled cron uses the narrow 30-min window.
+    const deep = new URL(request.url).searchParams.get('deep') === '1';
+    const staleWindow = deep ? '-7 days' : '-30 minutes';
     const stale = await db
       .prepare(
         `SELECT stripe_session_id AS sid FROM bookings
          WHERE payment_status = 'expired'
            AND stripe_session_id IS NOT NULL
-           AND datetime(created_at) >= datetime('now', '-30 minutes')
+           AND datetime(created_at) >= datetime('now', '${staleWindow}')
          LIMIT 50`
       )
       .all<{ sid: string }>();
