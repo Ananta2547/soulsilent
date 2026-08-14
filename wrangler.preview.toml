@@ -33,7 +33,7 @@ binding = "ASSETS"
 [[d1_databases]]
 binding = "DB"
 database_name = "soulsilent-preview"
-database_id = "PASTE_PREVIEW_D1_ID_HERE"
+database_id = "4d23828a-fffb-41ad-89bb-d0f4ca339400"
 
 # Dedicated media bucket. Create it with:
 #   npx wrangler r2 bucket create soulsilent-preview-media
