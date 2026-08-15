@@ -10,6 +10,7 @@ import { getWorkshopDays, safeParseArray } from '@/lib/workshop-utils';
 import { formatTravel, type TravelInfo } from '@/lib/travel';
 import { PdpaBadge } from '@/components/workshops/PdpaBadge';
 import { RefundSlipModal } from '@/components/admin/RefundSlipModal';
+import { FacilitatorNote } from '@/components/admin/FacilitatorNote';
 
 type BookingRow = {
   id: string;
@@ -20,6 +21,8 @@ type BookingRow = {
   amount: number;
   attended: number | null;
   application_json: string | null;
+  /** Staff-only note about this participant (migration 045). */
+  facilitator_note: string | null;
   attendance_json: string | null;
   refund_slip_url: string | null;
   refund_slip_meta: string | null;
@@ -426,6 +429,13 @@ export default function AttendancePage() {
                         <tr className="bg-surface/50">
                           <td colSpan={showSlipCol ? 6 : 5} className="px-5 py-4 border-t border-gray-lighter">
                             <ApplicationDetail json={b.application_json} />
+                            <FacilitatorNote
+                              // Remount per booking so the textarea always
+                              // starts from that participant's saved note.
+                              key={b.id}
+                              initial={b.facilitator_note ?? null}
+                              endpoint={`/api/bookings/${b.id}`}
+                            />
                           </td>
                         </tr>
                       )}

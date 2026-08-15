@@ -32,7 +32,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const bookingsRes = await db
     .prepare(
       `SELECT b.id, b.user_id, b.amount, b.payment_status, b.status, b.attended,
-              b.attendance_json, b.application_json, b.created_at,
+              b.attendance_json, b.application_json, b.facilitator_note, b.created_at,
               b.app_status, b.waitlist_rank, b.confirmed_at,
               us.name AS user_name, us.email AS user_email,
               sn.nickname AS teacher_nickname

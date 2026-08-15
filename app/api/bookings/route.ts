@@ -113,9 +113,15 @@ export async function GET(request: Request) {
 
     const result = await stmt.all<Record<string, unknown>>();
 
+    // `facilitator_note` is a private staff note about the participant and the
+    // queries above use `b.*`, so drop it on every path except the admin
+    // all-rows read. Participants must never receive it.
+    const staffView = user.role === 'admin' && !mine;
+
     // For the personal page, attach the user-visible (masked) status + the
     // confirm-by deadline so the UI doesn't need the round logic.
     const rows = (result.results || []).map((b) => {
+      if (!staffView) delete b.facilitator_note;
       const admission = (b.ws_admission_type as string) || 'direct';
       const w = {
         admission_type: admission as Workshop['admission_type'],
