@@ -46,6 +46,9 @@ export type WorkshopFormValues = {
   instructor_id: string;
   /** Every facilitator, in the order they should appear publicly. */
   instructor_ids: string[];
+  /** Co-facilitators allowed into this workshop's teacher dashboard. The first
+   *  facilitator is never listed — they always have access. */
+  dashboard_access: string[];
   /** Per-day timelines. One_day workshops use a single day. */
   scheduleDays: ScheduleDay[];
   learn_items: string[];
@@ -98,6 +101,7 @@ export const emptyWorkshopForm: WorkshopFormValues = {
   online_url: '',
   instructor_id: '',
   instructor_ids: [],
+  dashboard_access: [],
   scheduleDays: [{ label: '', items: [] }],
   learn_items: [],
   target_items: [],
@@ -252,6 +256,10 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
       status,
       instructor_ids: instructorIds,
       instructor_id: instructorIds[0] || '',
+      // Drop anyone no longer a facilitator, and the owner (implicit access).
+      dashboard_access: form.dashboard_access.filter(
+        (id) => instructorIds.includes(id) && id !== instructorIds[0],
+      ),
       workshop_type: form.workshop_type,
       date: canonicalDate,
       end_date: endDate,
@@ -1000,27 +1008,68 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
         </label>
 
         {form.instructor_ids.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-2">
+          <div className="mb-2 space-y-1.5">
             {form.instructor_ids.map((id, i) => {
               const t = teachers.find((x) => x.id === id);
+              const isOwner = i === 0;
+              const allowed = isOwner || form.dashboard_access.includes(id);
               return (
-                <span
+                <div
                   key={id}
-                  className="inline-flex items-center gap-2 rounded-full bg-primary/10 text-primary text-xs px-3 py-1.5"
+                  className="flex items-center gap-3 flex-wrap rounded-xl bg-primary/5 px-3 py-2"
                 >
-                  {i === 0 && <span className="font-mono text-[10px] uppercase opacity-70">หลัก</span>}
-                  {t ? t.name : id}
+                  <span className="inline-flex items-center gap-2 text-sm text-dark">
+                    {isOwner && (
+                      <span className="font-mono text-[10px] uppercase text-primary">หลัก</span>
+                    )}
+                    {t ? t.name : id}
+                  </span>
+
+                  {/* Dashboard access. The owner is ticked and locked — they own
+                      the payout and can never be shut out of their own event. */}
+                  <label
+                    className={`flex items-center gap-1.5 text-xs ml-auto ${
+                      isOwner ? 'text-gray cursor-not-allowed' : 'text-dark cursor-pointer'
+                    }`}
+                    title={
+                      isOwner
+                        ? 'ผู้สอนหลักเข้าถึงแดชบอร์ดได้เสมอ'
+                        : 'อนุญาตให้เข้าถึง Dashboard ของกิจกรรมนี้ได้'
+                    }
+                  >
+                    <input
+                      type="checkbox"
+                      checked={allowed}
+                      disabled={isOwner}
+                      onChange={() =>
+                        setForm({
+                          ...form,
+                          dashboard_access: allowed
+                            ? form.dashboard_access.filter((x) => x !== id)
+                            : [...form.dashboard_access, id],
+                        })
+                      }
+                    />
+                    เข้าถึง Dashboard
+                    {isOwner && <span className="text-[10px]">(อัตโนมัติ)</span>}
+                  </label>
+
                   <button
                     type="button"
                     aria-label={`เอา ${t ? t.name : id} ออก`}
                     onClick={() =>
-                      setForm({ ...form, instructor_ids: form.instructor_ids.filter((x) => x !== id) })
+                      setForm({
+                        ...form,
+                        instructor_ids: form.instructor_ids.filter((x) => x !== id),
+                        // Revoking a facilitator revokes their access too.
+                        dashboard_access: form.dashboard_access.filter((x) => x !== id),
+                      })
                     }
                     className="text-primary/60 hover:text-red-500"
                   >
                     ×
                   </button>
-                </span>
+                </div>
               );
             })}
           </div>
@@ -1048,6 +1097,9 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
                         instructor_ids: checked
                           ? form.instructor_ids.filter((x) => x !== t.id)
                           : [...form.instructor_ids, t.id],
+                        dashboard_access: checked
+                          ? form.dashboard_access.filter((x) => x !== t.id)
+                          : form.dashboard_access,
                       })
                     }
                   />

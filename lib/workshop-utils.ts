@@ -44,6 +44,28 @@ export function parseInstructorIds(
   );
 }
 
+type AccessShape = Pick<Workshop, 'instructor_id' | 'instructor_ids_json' | 'dashboard_access_json'>;
+
+/** Co-facilitators an admin allowed into this workshop's teacher dashboard.
+ *  Restricted to people who are actually facilitators, and never includes the
+ *  owner (who is allowed implicitly) — so removing someone from the facilitator
+ *  list also removes their access, with no stale row left behind. */
+export function parseDashboardAccess(w: AccessShape): string[] {
+  const facilitators = parseInstructorIds(w);
+  const owner = facilitators[0];
+  const allowed = safeParseArray<string>(w.dashboard_access_json, []);
+  return facilitators.filter((id) => id !== owner && allowed.includes(id));
+}
+
+/** May this user open the teacher dashboard for this workshop?
+ *  The owning teacher always may; co-facilitators only when ticked. Admins are
+ *  handled by the callers, which check the role first. */
+export function canAccessTeacherDashboard(w: AccessShape, userId: string): boolean {
+  const facilitators = parseInstructorIds(w);
+  if (facilitators[0] === userId) return true;
+  return parseDashboardAccess(w).includes(userId);
+}
+
 type DateShape = Pick<Workshop, 'workshop_type' | 'date' | 'end_date' | 'dates_json' | 'time_end'>;
 
 /** Ordered list of YYYY-MM-DD the workshop runs on (1 for one-day, a range for

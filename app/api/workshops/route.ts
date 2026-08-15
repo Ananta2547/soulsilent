@@ -81,6 +81,8 @@ export async function POST(request: Request) {
       instructor_id?: string;
       /** Every facilitator, in display order. instructor_id = the first one. */
       instructor_ids?: string[];
+      /** Co-facilitators allowed into the teacher dashboard. */
+      dashboard_access?: string[];
       workshop_type?: 'one_day' | 'multi_day' | 'multi_part';
       date: string;
       end_date?: string | null;
@@ -128,6 +130,11 @@ export async function POST(request: Request) {
     // off it) and is simply the first of the selected facilitators.
     const instructorIds = normalizeInstructorIds(body.instructor_ids, body.instructor_id);
     const online = normalizeOnlineFields(body);
+    // Keep only co-facilitators: the owner is allowed implicitly and storing
+    // them would let the two sources of truth drift.
+    const dashboardAccess = (body.dashboard_access || []).filter(
+      (uid) => instructorIds.includes(uid) && uid !== instructorIds[0],
+    );
 
     await db
       .prepare(
@@ -140,8 +147,9 @@ export async function POST(request: Request) {
           max_participants, min_age, max_age, price, image_url, image_meta, status,
           admission_type, payment_type, deposit_amount, announce_at, confirm_main_by, confirm_waitlist_by,
           require_consent, master_id, day_times_json, photos_drive_url,
-          is_online, online_platform, online_platform_other, online_url
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          is_online, online_platform, online_platform_other, online_url,
+          dashboard_access_json
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         id,
@@ -188,7 +196,8 @@ export async function POST(request: Request) {
         online.is_online,
         online.platform,
         online.platform_other,
-        online.url
+        online.url,
+        JSON.stringify(dashboardAccess)
       )
       .run();
 

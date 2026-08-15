@@ -20,9 +20,15 @@ export async function GET() {
                   AND (b.payment_status = 'paid' OR b.status = 'confirmed')) AS booked
          FROM workshops w
         WHERE w.instructor_id = ?
+           OR EXISTS (
+                SELECT 1 FROM json_each(COALESCE(w.dashboard_access_json, '[]'))
+                 WHERE json_each.value = ?
+              )
         ORDER BY w.date DESC`,
     )
-    .bind(u.sub)
+    // Owner, or a co-facilitator the admin ticked (migration 046). COALESCE
+    // keeps json_each from choking on the NULL every pre-046 row still has.
+    .bind(u.sub, u.sub)
     .all<Workshop & { booked: number }>();
 
   return NextResponse.json({ workshops: rows.results || [] });

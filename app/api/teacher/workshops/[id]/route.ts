@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
-import { computePayout } from '@/lib/workshop-utils';
+import { computePayout, canAccessTeacherDashboard } from '@/lib/workshop-utils';
 import { settleSelection } from '@/lib/selection';
 import type { Workshop } from '@/lib/types';
 
@@ -18,7 +18,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const workshop = await db.prepare('SELECT * FROM workshops WHERE id = ?').bind(id).first<Workshop>();
   if (!workshop) return NextResponse.json({ error: 'ไม่พบเวิร์กชอป' }, { status: 404 });
-  if (workshop.instructor_id !== u.sub && u.role !== 'admin') {
+  // Owner, or a co-facilitator the admin ticked (migration 046).
+  if (u.role !== 'admin' && !canAccessTeacherDashboard(workshop, u.sub)) {
     return NextResponse.json({ error: 'ไม่มีสิทธิ์เข้าถึง' }, { status: 403 });
   }
 

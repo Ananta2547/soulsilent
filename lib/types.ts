@@ -107,6 +107,10 @@ export interface Workshop {
   /** JSON string[] of users.id — every facilitator shown to the public, in
    *  display order. null on rows created before migration 043. */
   instructor_ids_json: string | null;
+  /** JSON string[] of users.id — co-facilitators an admin allowed into the
+   *  teacher dashboard for this workshop. The owner is never listed here; they
+   *  always have access. null = owner only (migration 046). */
+  dashboard_access_json: string | null;
   /** Scheduling shape. Affects how date(s) are interpreted. */
   workshop_type: 'one_day' | 'multi_day' | 'multi_part';
   /** Canonical/first day (YYYY-MM-DD). Used everywhere for sorting & display. */

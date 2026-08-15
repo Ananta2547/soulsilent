@@ -196,6 +196,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       instructor_id?: string;
       /** Every facilitator, in display order. instructor_id = the first one. */
       instructor_ids?: string[];
+      /** Co-facilitators allowed into the teacher dashboard. */
+      dashboard_access?: string[];
       workshop_type?: 'one_day' | 'multi_day' | 'multi_part';
       date: string;
       end_date?: string | null;
@@ -240,6 +242,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     // instructor_id stays the owning teacher and is the first facilitator.
     const putInstructorIds = normalizeInstructorIds(body.instructor_ids, body.instructor_id);
     const online = normalizeOnlineFields(body);
+    // Keep only co-facilitators: the owner is allowed implicitly.
+    const dashboardAccess = (body.dashboard_access || []).filter(
+      (uid) => putInstructorIds.includes(uid) && uid !== putInstructorIds[0],
+    );
 
     await db
       .prepare(
@@ -255,6 +261,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
            announce_at = ?, confirm_main_by = ?, confirm_waitlist_by = ?,
            require_consent = ?, photos_drive_url = ?, master_id = ?,
            is_online = ?, online_platform = ?, online_platform_other = ?, online_url = ?,
+           dashboard_access_json = ?,
            updated_at = datetime('now')
          WHERE id = ?`
       )
@@ -303,6 +310,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         online.platform,
         online.platform_other,
         online.url,
+        JSON.stringify(dashboardAccess),
         id
       )
       .run();
