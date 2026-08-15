@@ -14,6 +14,36 @@ export function getWorkshopTags(w: Workshop): string[] {
   return safeParseArray<string>(w.tags_json, []);
 }
 
+/** Clean a submitted facilitator list before storing it: trim, drop blanks and
+ *  duplicates, preserve the admin's chosen order. Falls back to the legacy
+ *  single `instructor_id` so an older client that only sends that still works. */
+export function normalizeInstructorIds(
+  ids: string[] | null | undefined,
+  legacyId?: string | null,
+): string[] {
+  const out: string[] = [];
+  for (const raw of ids || []) {
+    const id = (raw || '').trim();
+    if (id && !out.includes(id)) out.push(id);
+  }
+  if (out.length === 0) {
+    const legacy = (legacyId || '').trim();
+    if (legacy) out.push(legacy);
+  }
+  return out;
+}
+
+/** Read the stored facilitator list. Rows written before migration 043 have a
+ *  null column, so fall back to the single `instructor_id`. */
+export function parseInstructorIds(
+  w: Pick<Workshop, 'instructor_id' | 'instructor_ids_json'>,
+): string[] {
+  return normalizeInstructorIds(
+    safeParseArray<string>(w.instructor_ids_json, []),
+    w.instructor_id,
+  );
+}
+
 type DateShape = Pick<Workshop, 'workshop_type' | 'date' | 'end_date' | 'dates_json' | 'time_end'>;
 
 /** Ordered list of YYYY-MM-DD the workshop runs on (1 for one-day, a range for

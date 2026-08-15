@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { v4 as uuid } from 'uuid';
 import { getDB } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
+import { normalizeInstructorIds } from '@/lib/workshop-utils';
 import type { Workshop } from '@/lib/types';
 
 export async function GET(request: Request) {
@@ -77,6 +78,8 @@ export async function POST(request: Request) {
       description?: string;
       short_description?: string;
       instructor_id?: string;
+      /** Every facilitator, in display order. instructor_id = the first one. */
+      instructor_ids?: string[];
       workshop_type?: 'one_day' | 'multi_day' | 'multi_part';
       date: string;
       end_date?: string | null;
@@ -116,10 +119,14 @@ export async function POST(request: Request) {
     const db = await getDB();
     const id = uuid();
 
+    // instructor_id stays the owning teacher (teacher dashboard / payout key
+    // off it) and is simply the first of the selected facilitators.
+    const instructorIds = normalizeInstructorIds(body.instructor_ids, body.instructor_id);
+
     await db
       .prepare(
         `INSERT INTO workshops (
-          id, title, description, short_description, instructor_id,
+          id, title, description, short_description, instructor_id, instructor_ids_json,
           workshop_type, date, end_date, dates_json,
           time_start, time_end, location, location_id,
           schedule_json, learn_json, target_json, category, tags_json,
@@ -127,14 +134,15 @@ export async function POST(request: Request) {
           max_participants, min_age, max_age, price, image_url, image_meta, status,
           admission_type, payment_type, deposit_amount, announce_at, confirm_main_by, confirm_waitlist_by,
           require_consent, master_id, day_times_json, photos_drive_url
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         id,
         body.title,
         body.description || null,
         body.short_description || null,
-        body.instructor_id || null,
+        instructorIds[0] || null,
+        JSON.stringify(instructorIds),
         body.workshop_type || 'one_day',
         body.date,
         body.end_date || null,

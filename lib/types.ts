@@ -101,7 +101,12 @@ export interface Workshop {
   title: string;
   description: string | null;
   short_description: string | null;
+  /** Owning teacher — drives the teacher dashboard, payout and nicknames.
+   *  Always the FIRST id of `instructor_ids_json`. */
   instructor_id: string | null;
+  /** JSON string[] of users.id — every facilitator shown to the public, in
+   *  display order. null on rows created before migration 043. */
+  instructor_ids_json: string | null;
   /** Scheduling shape. Affects how date(s) are interpreted. */
   workshop_type: 'one_day' | 'multi_day' | 'multi_part';
   /** Canonical/first day (YYYY-MM-DD). Used everywhere for sorting & display. */

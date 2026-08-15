@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { DayTime, Location, Workshop, ApplicationQuestion } from '@/lib/types';
 import { parseImageMeta } from '@/lib/image-meta';
-import { parseSchedule } from '@/lib/workshop-utils';
+import { parseSchedule, parseInstructorIds } from '@/lib/workshop-utils';
 import { AdminFormModal } from '@/components/admin/AdminFormModal';
 import {
   WorkshopForm,
@@ -118,6 +118,7 @@ export default function AdminWorkshopsPage() {
         location: w.location || '',
         location_id: w.location_id || '',
         instructor_id: w.instructor_id || '',
+        instructor_ids: parseInstructorIds(w),
         scheduleDays: (() => {
           const days = parseSchedule(w.schedule_json);
           return days.length > 0 ? days : [{ label: '', items: [] }];

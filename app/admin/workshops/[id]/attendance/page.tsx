@@ -7,6 +7,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import type { DayTime, Workshop } from '@/lib/types';
 import { getWorkshopDays, safeParseArray } from '@/lib/workshop-utils';
+import { formatTravel, type TravelInfo } from '@/lib/travel';
 import { PdpaBadge } from '@/components/workshops/PdpaBadge';
 import { RefundSlipModal } from '@/components/admin/RefundSlipModal';
 
@@ -59,6 +60,8 @@ type AppProfile = {
 type ApplicationSnapshot = {
   profile?: AppProfile;
   answers?: AppAnswer[];
+  /** Absent on applications submitted before the travel question existed. */
+  travel?: TravelInfo;
   consent?: { photoVideo?: string; label?: string };
 };
 
@@ -643,6 +646,7 @@ function ApplicationDetail({ json }: { json: string | null }) {
     ['ผู้ติดต่อฉุกเฉิน', p.emergency ? `${p.emergency.name || '—'} (${p.emergency.relation || '—'}) ${p.emergency.phone || ''}` : '—'],
     ['สุขภาพ/แพ้', p.medical || '—'],
     ['อาหาร', p.dietary || '—'],
+    ['การเดินทาง', formatTravel(snap.travel)],
   ];
   return (
     <div className="space-y-3">

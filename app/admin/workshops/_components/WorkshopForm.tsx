@@ -33,7 +33,10 @@ export type WorkshopFormValues = {
   dayTimes: DayTime[];
   location: string;
   location_id: string;
+  /** Owning teacher — kept in sync with instructor_ids[0] on save. */
   instructor_id: string;
+  /** Every facilitator, in the order they should appear publicly. */
+  instructor_ids: string[];
   /** Per-day timelines. One_day workshops use a single day. */
   scheduleDays: ScheduleDay[];
   learn_items: string[];
@@ -81,6 +84,7 @@ export const emptyWorkshopForm: WorkshopFormValues = {
   location: '',
   location_id: '',
   instructor_id: '',
+  instructor_ids: [],
   scheduleDays: [{ label: '', items: [] }],
   learn_items: [],
   target_items: [],
@@ -220,9 +224,14 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
     // Canonical single time = day-1 hours for multi types (keeps cards/lists working).
     const timeStart = dayTimes[0]?.time_start ?? form.time_start;
     const timeEnd = dayTimes[0]?.time_end ?? form.time_end;
+    // The owning teacher is always the first facilitator, so the teacher
+    // dashboard / payout / nickname features keep resolving to one person.
+    const instructorIds = form.instructor_ids.filter(Boolean);
     return {
       ...form,
       status,
+      instructor_ids: instructorIds,
+      instructor_id: instructorIds[0] || '',
       workshop_type: form.workshop_type,
       date: canonicalDate,
       end_date: endDate,
@@ -483,7 +492,13 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
       master_id: mid,
       title: m.title || form.title,
       description: m.description || form.description,
-      instructor_id: m.organizer || form.instructor_id, // organizer = teacher user id
+      // organizer = teacher user id. Seed the facilitator list with it, but keep
+      // anyone the admin already picked for this session.
+      instructor_id: m.organizer || form.instructor_id,
+      instructor_ids:
+        m.organizer && !form.instructor_ids.includes(m.organizer)
+          ? [m.organizer, ...form.instructor_ids]
+          : form.instructor_ids,
       learn_items: safeParseArray<string>(m.takeaways_json, form.learn_items),
       target_items: safeParseArray<string>(m.target_json, form.target_items),
       image_url: m.cover_image_url || form.image_url,
@@ -900,21 +915,77 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
         </div>
       </div>
 
-      {/* Instructor */}
+      {/* Facilitators — multi-select. Order matters: the first one is the
+          owning teacher (teacher dashboard, payout and student nicknames all
+          resolve to that single person) and heads the public list. */}
       <div>
-        <label className="block text-sm font-medium text-dark mb-1">ผู้สอน / ผู้จัด</label>
-        <select
-          value={form.instructor_id ?? ''}
-          onChange={(e) => setForm({ ...form, instructor_id: e.target.value })}
-          className="input-field"
-        >
-          <option value="">— เลือกผู้สอน —</option>
-          {teachers.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name} ({t.email})
-            </option>
-          ))}
-        </select>
+        <label className="block text-sm font-medium text-dark mb-1">
+          ผู้สอน / ผู้จัด <span className="text-gray font-normal">(เลือกได้หลายคน)</span>
+        </label>
+
+        {form.instructor_ids.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-2">
+            {form.instructor_ids.map((id, i) => {
+              const t = teachers.find((x) => x.id === id);
+              return (
+                <span
+                  key={id}
+                  className="inline-flex items-center gap-2 rounded-full bg-primary/10 text-primary text-xs px-3 py-1.5"
+                >
+                  {i === 0 && <span className="font-mono text-[10px] uppercase opacity-70">หลัก</span>}
+                  {t ? t.name : id}
+                  <button
+                    type="button"
+                    aria-label={`เอา ${t ? t.name : id} ออก`}
+                    onClick={() =>
+                      setForm({ ...form, instructor_ids: form.instructor_ids.filter((x) => x !== id) })
+                    }
+                    className="text-primary/60 hover:text-red-500"
+                  >
+                    ×
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="border border-gray-lighter rounded-xl divide-y divide-gray-lighter max-h-56 overflow-y-auto bg-surface/40">
+          {teachers.length === 0 ? (
+            <p className="text-sm text-gray p-3">ยังไม่มีผู้สอนในระบบ</p>
+          ) : (
+            teachers.map((t) => {
+              const checked = form.instructor_ids.includes(t.id);
+              return (
+                <label
+                  key={t.id}
+                  className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-surface"
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() =>
+                      setForm({
+                        ...form,
+                        // Append (not sort) so the admin controls the order and
+                        // the first pick stays the owning teacher.
+                        instructor_ids: checked
+                          ? form.instructor_ids.filter((x) => x !== t.id)
+                          : [...form.instructor_ids, t.id],
+                      })
+                    }
+                  />
+                  <span className="text-sm text-dark">
+                    {t.name} <span className="text-gray">({t.email})</span>
+                  </span>
+                </label>
+              );
+            })
+          )}
+        </div>
+        <p className="text-xs text-gray mt-1.5">
+          คนแรกที่เลือก = ผู้รับผิดชอบหลัก (เห็นกิจกรรมนี้ในแดชบอร์ดผู้สอน และเป็นผู้รับเงินโอน)
+        </p>
       </div>
 
       {/* Category + tags */}

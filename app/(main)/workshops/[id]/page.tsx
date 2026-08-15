@@ -52,7 +52,8 @@ export default function WorkshopDetailPage() {
   const { lang } = useLang();
   const [workshop, setWorkshop] = useState<Workshop | null>(null);
   const [location, setLocation] = useState<Location | null>(null);
-  const [instructor, setInstructor] = useState<Instructor | null>(null);
+  // A workshop can have several facilitators; index 0 is the owning teacher.
+  const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [bookingCount, setBookingCount] = useState(0);
   const [userBooking, setUserBooking] = useState<UserBooking | null>(null);
   const [userAttended, setUserAttended] = useState(false);
@@ -80,6 +81,7 @@ export default function WorkshopDetailPage() {
         workshop: Workshop;
         location: Location | null;
         instructor: Instructor | null;
+        instructors?: Instructor[];
         bookingCount: number;
         userBooking: UserBooking | null;
         userAttended?: boolean;
@@ -89,7 +91,15 @@ export default function WorkshopDetailPage() {
       };
       setWorkshop(data.workshop);
       setLocation(data.location);
-      setInstructor(data.instructor);
+      // `instructors` is the current shape; fall back to the single-instructor
+      // key so a cached/older API response still renders.
+      setInstructors(
+        data.instructors && data.instructors.length > 0
+          ? data.instructors
+          : data.instructor
+            ? [data.instructor]
+            : [],
+      );
       setBookingCount(data.bookingCount || 0);
       setUserBooking(data.userBooking);
       setUserAttended(!!data.userAttended);
@@ -564,8 +574,8 @@ export default function WorkshopDetailPage() {
                 );
               })()}
 
-              {/* Instructor / Facilitator */}
-              {instructor && (
+              {/* Facilitators — one card per person, in the admin's order */}
+              {instructors.length > 0 && (
                 <Reveal>
                   <span className="eyebrow">
                     <T th="ผู้นำกิจกรรม" en="facilitator" />
@@ -576,7 +586,10 @@ export default function WorkshopDetailPage() {
                   >
                     <T th="คนที่จะอยู่กับคุณทั้งวัน" en="Who'll be with you all day" />
                   </h2>
+                  <div style={{ display: 'grid', gap: 16 }}>
+                  {instructors.map((ins) => (
                   <div
+                    key={ins.id}
                     style={{
                       display: 'flex',
                       gap: 24,
@@ -601,10 +614,10 @@ export default function WorkshopDetailPage() {
                         overflow: 'hidden',
                       }}
                     >
-                      {instructor.avatar_url ? (
+                      {ins.avatar_url ? (
                         <img
-                          src={instructor.avatar_url}
-                          alt={instructor.name}
+                          src={ins.avatar_url}
+                          alt={ins.name}
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         />
                       ) : (
@@ -616,7 +629,7 @@ export default function WorkshopDetailPage() {
                             color: 'var(--teal-deep)',
                           }}
                         >
-                          {instructor.name[0]?.toUpperCase() || '?'}
+                          {ins.name[0]?.toUpperCase() || '?'}
                         </span>
                       )}
                     </div>
@@ -631,9 +644,9 @@ export default function WorkshopDetailPage() {
                           marginBottom: 6,
                         }}
                       >
-                        {instructor.role === 'teacher'
+                        {ins.role === 'teacher'
                           ? tr(lang, 'ผู้สอน · LEAD FACILITATOR', 'instructor · lead facilitator')
-                          : instructor.role === 'admin'
+                          : ins.role === 'admin'
                             ? tr(lang, 'ผู้ก่อตั้ง & LEAD FACILITATOR', 'founder & lead facilitator')
                             : tr(lang, 'ผู้ดูแลกิจกรรม', 'host')}
                       </div>
@@ -641,7 +654,7 @@ export default function WorkshopDetailPage() {
                         className="display-th"
                         style={{ fontSize: 22, margin: '0 0 10px', lineHeight: 1.25 }}
                       >
-                        {instructor.name}
+                        {ins.name}
                       </h3>
                       <p
                         style={{
@@ -656,9 +669,9 @@ export default function WorkshopDetailPage() {
                           en="Designs and leads this workshop — creating space for unhurried learning"
                         />
                       </p>
-                      {instructor.portfolio_id && (
+                      {ins.portfolio_id && (
                         <Link
-                          href={`/p/${instructor.portfolio_id}`}
+                          href={`/p/${ins.portfolio_id}`}
                           style={{
                             color: 'var(--teal)',
                             fontWeight: 600,
@@ -677,6 +690,8 @@ export default function WorkshopDetailPage() {
                         </Link>
                       )}
                     </div>
+                  </div>
+                  ))}
                   </div>
                 </Reveal>
               )}

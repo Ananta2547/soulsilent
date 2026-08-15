@@ -1,6 +1,7 @@
 'use client';
 
 import { PageLoader } from '@/components/design/PageLoader';
+import { sqliteToMs } from '@/lib/datetime';
 
 import { useEffect, useState } from 'react';
 
@@ -18,7 +19,12 @@ interface Stats {
   totalWorkshops: number;
   workshopRevenue: number;
   recentBookings: Booking[];
+  /** Newest-first feed behind the registration activity log. */
+  activity: Booking[];
 }
+
+/** Rows the activity log renders. The API already returns newest-first. */
+const ACTIVITY_LIMIT = 30;
 
 interface ApiResp {
   users?: { id: string }[];
@@ -53,6 +59,8 @@ export default function AdminDashboard() {
           totalWorkshops: workshops.workshops?.length || 0,
           workshopRevenue: revenue.soulsilent?.total || 0,
           recentBookings: (bookings.bookings || []).slice(0, 5),
+          // GET /api/bookings already sorts by created_at DESC for admins.
+          activity: (bookings.bookings || []).slice(0, ACTIVITY_LIMIT),
         });
       } catch (e) {
         console.error('Failed to load admin stats', e);
@@ -177,8 +185,89 @@ export default function AdminDashboard() {
           <p className="text-gray text-sm py-8 text-center">ยังไม่มีการจอง</p>
         )}
       </section>
+
+      {/* Registration activity log — who applied to what, when. Grouped by day
+          so bursts of sign-ups are obvious at a glance. */}
+      <section className="card !p-0 overflow-hidden">
+        <div className="p-5 border-b border-gray-lighter flex items-baseline justify-between gap-3">
+          <div>
+            <h2 className="font-heading text-lg text-dark">ความเคลื่อนไหวการสมัคร</h2>
+            <p className="text-xs text-gray mt-0.5">ใหม่ล่าสุดอยู่บนสุด · แสดง {ACTIVITY_LIMIT} รายการล่าสุด</p>
+          </div>
+          <span className="font-mono text-[11px] tracking-[.12em] uppercase text-gray">
+            activity log
+          </span>
+        </div>
+
+        {stats?.activity && stats.activity.length > 0 ? (
+          <ol className="divide-y divide-gray-lighter">
+            {groupByDay(stats.activity).map(([dayLabel, rows]) => (
+              <li key={dayLabel}>
+                <div className="flex items-center gap-3 px-5 py-2 bg-surface">
+                  <span className="text-xs font-medium text-dark">{dayLabel}</span>
+                  <span className="text-[11px] text-gray">{rows.length} รายการ</span>
+                </div>
+                <ol>
+                  {rows.map((b) => (
+                    <li
+                      key={b.id}
+                      className="flex items-start gap-3 px-5 py-3 border-t border-gray-lighter hover:bg-surface/50"
+                    >
+                      <span className="font-mono text-xs text-gray tabular-nums pt-0.5 w-12 shrink-0">
+                        {fmtClock(b.created_at)}
+                      </span>
+                      <span className="text-sm text-dark min-w-0">
+                        <span className="font-medium">{b.user_name || 'ไม่ทราบชื่อ'}</span>
+                        <span className="text-gray"> สมัคร </span>
+                        <span className="font-medium">{b.workshop_title || 'ไม่ทราบกิจกรรม'}</span>
+                      </span>
+                      {b.status === 'cancelled' && (
+                        <span className="badge-danger ml-auto shrink-0">ยกเลิก</span>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="text-gray text-sm py-8 text-center">ยังไม่มีความเคลื่อนไหว</p>
+        )}
+      </section>
     </div>
   );
+}
+
+/** SQLite timestamps are UTC without a zone marker — normalise before parsing
+ *  so the clock shown matches the admin's local time. */
+function toDate(v: string): Date {
+  return new Date(sqliteToMs(v));
+}
+
+function fmtClock(v: string): string {
+  const d = toDate(v);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+/** Bucket the (already newest-first) feed into calendar days, keeping order. */
+function groupByDay(rows: Booking[]): [string, Booking[]][] {
+  const out: [string, Booking[]][] = [];
+  for (const r of rows) {
+    const d = toDate(r.created_at);
+    const label = Number.isNaN(d.getTime())
+      ? 'ไม่ทราบวันที่'
+      : d.toLocaleDateString('th-TH', {
+          weekday: 'short',
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        });
+    const last = out[out.length - 1];
+    if (last && last[0] === label) last[1].push(r);
+    else out.push([label, [r]]);
+  }
+  return out;
 }
 
 /* Inline icons (avoid emoji rendering inconsistencies) */

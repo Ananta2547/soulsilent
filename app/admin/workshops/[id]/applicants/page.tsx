@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import type { Workshop } from '@/lib/types';
 import { fmtDateTime } from '@/lib/datetime';
+import { formatTravel, type TravelInfo } from '@/lib/travel';
 
 type AppAnswer = { id: string; label: string; value: string | string[] };
 type AppProfile = {
@@ -20,7 +21,12 @@ type AppProfile = {
   medical?: string;
   dietary?: string;
 };
-type ApplicationSnapshot = { profile?: AppProfile; answers?: AppAnswer[] };
+type ApplicationSnapshot = {
+  profile?: AppProfile;
+  answers?: AppAnswer[];
+  /** Absent on applications submitted before the travel question existed. */
+  travel?: TravelInfo;
+};
 
 type Row = {
   id: string;
@@ -168,7 +174,7 @@ export default function ApplicantsPage() {
 
               {open && snap && (
                 <div className="px-4 pb-4 border-t border-gray-lighter pt-3 text-sm text-dark space-y-2">
-                  <Profile p={snap.profile} />
+                  <Profile p={snap.profile} travel={snap.travel} />
                   {(snap.answers || []).map((a) => (
                     <div key={a.id}>
                       <span className="text-gray">{a.label}: </span>
@@ -244,7 +250,7 @@ function parseSnap(json: string | null): ApplicationSnapshot | null {
   }
 }
 
-function Profile({ p }: { p?: AppProfile }) {
+function Profile({ p, travel }: { p?: AppProfile; travel?: TravelInfo }) {
   if (!p) return null;
   const items: [string, string][] = [
     ['ชื่อเล่น', p.nickname || '—'],
@@ -257,6 +263,7 @@ function Profile({ p }: { p?: AppProfile }) {
     ['ฉุกเฉิน', p.emergency ? `${p.emergency.name || '—'} (${p.emergency.relation || '—'}) ${p.emergency.phone || ''}` : '—'],
     ['สุขภาพ/แพ้', p.medical || '—'],
     ['อาหาร', p.dietary || '—'],
+    ['การเดินทาง', formatTravel(travel)],
   ];
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-xs bg-surface/40 rounded-lg p-3">
