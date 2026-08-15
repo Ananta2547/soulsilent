@@ -27,6 +27,7 @@ import {
   getWorkshopDays,
 } from '@/lib/workshop-utils';
 import { visibleAppStatus } from '@/lib/selection-status';
+import { platformStyle, platformLabel } from '@/lib/online-platform';
 
 type UserBooking = {
   id: string;
@@ -1243,6 +1244,13 @@ function BookingCardContent({
         </>
       )}
 
+      {/* Join link — online workshops only, and only once the seat is secured.
+          The API withholds `online_url` from everyone else, so its presence is
+          already the permission check; `booked` just avoids a flash. */}
+      {!!workshop.is_online && booked && workshop.online_url && (
+        <JoinOnlineButton workshop={workshop} lang={lang} />
+      )}
+
       {/* Perks list */}
       <ul
         style={{
@@ -1651,4 +1659,71 @@ function PromoCountdown({ endsAt, lang }: { endsAt: string; lang: 'th' | 'en' })
       ⏳ {tr(lang, 'โปรโมชันเหลือเวลาอีก', 'Promo ends in')} {left}
     </div>
   );
+}
+
+/** Join button for an ONLINE workshop. Colour and mark follow the platform the
+ *  admin picked; 'other' has no brand mark and shows the typed name instead. */
+function JoinOnlineButton({ workshop, lang }: { workshop: Workshop; lang: 'th' | 'en' }) {
+  const style = platformStyle(workshop.online_platform);
+  const name = platformLabel(workshop.online_platform, workshop.online_platform_other);
+  return (
+    <a
+      href={workshop.online_url || '#'}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        width: '100%',
+        padding: '14px 22px',
+        borderRadius: 999,
+        fontSize: 15,
+        fontWeight: 700,
+        textDecoration: 'none',
+        background: style.bg,
+        color: style.fg,
+        border: style.border ? `1px solid ${style.border}` : '1px solid transparent',
+      }}
+    >
+      <PlatformMark platform={style.value} />
+      {tr(lang, `เข้าร่วมทาง ${name}`, `Join on ${name}`)}
+    </a>
+  );
+}
+
+/** Simple brand-suggestive marks. Drawn inline because the page's CSP blocks
+ *  remote images, and 'other' deliberately renders nothing. */
+function PlatformMark({ platform }: { platform: string }) {
+  if (platform === 'zoom') {
+    return (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="2" y="6" width="13" height="12" rx="3" fill="currentColor" />
+        <path d="M16 11l5-3.2v8.4L16 13v-2z" fill="currentColor" />
+      </svg>
+    );
+  }
+  if (platform === 'meet') {
+    return (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="2" y="6" width="12" height="12" rx="2.5" fill="#1f7a45" />
+        <path d="M15 11l6-3.6v9.2L15 13v-2z" fill="#fbbc04" />
+        <path d="M15 11l6-3.6V11h-6z" fill="#ea4335" />
+      </svg>
+    );
+  }
+  if (platform === 'teams') {
+    return (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="3" y="5" width="12" height="14" rx="2.5" fill="currentColor" />
+        <text x="9" y="15.5" textAnchor="middle" fontSize="9" fontWeight="700" fill="#5059C9">
+          T
+        </text>
+        <circle cx="18.5" cy="8" r="2.6" fill="currentColor" opacity=".85" />
+        <path d="M16 12h5v4.2a2.6 2.6 0 01-5 0V12z" fill="currentColor" opacity=".85" />
+      </svg>
+    );
+  }
+  return null;
 }

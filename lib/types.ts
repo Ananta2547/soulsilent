@@ -122,6 +122,15 @@ export interface Workshop {
   day_times_json: string | null;
   location: string | null;
   location_id: string | null;
+  /** 1 = runs online; there is no venue and `location_id` stays null. */
+  is_online: number;
+  /** 'zoom' | 'meet' | 'teams' | 'other' — see lib/online-platform.ts. */
+  online_platform: string | null;
+  /** Admin-typed platform name, only used when online_platform = 'other'. */
+  online_platform_other: string | null;
+  /** Meeting link. The public API only returns it to a user with a secured
+   *  seat, so treat its presence as "this viewer may join". */
+  online_url: string | null;
   schedule_json: string;
   learn_json: string;
   /** JSON string[] — เหมาะกับใคร (target audience) for this session. */

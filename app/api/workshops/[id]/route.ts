@@ -8,6 +8,7 @@ import {
   normalizeInstructorIds,
   parseInstructorIds,
 } from '@/lib/workshop-utils';
+import { normalizeOnlineFields } from '@/lib/online-platform';
 import type { Workshop, Location, User } from '@/lib/types';
 
 type InstructorPublic = Pick<User, 'id' | 'name' | 'email' | 'role' | 'avatar_url'> & {
@@ -155,8 +156,19 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         .first<import('@/lib/types').Review>();
     }
 
+    // A secured seat = paid, or confirmed (free / selection workshops never
+    // pay). A pending hold does not count.
+    const mayJoinOnline =
+      !!userBooking &&
+      userBooking.status !== 'cancelled' &&
+      (userBooking.payment_status === 'paid' || userBooking.status === 'confirmed');
+
     return NextResponse.json({
-      workshop,
+      // The meeting link is only for people holding a secured seat (paid, or
+      // confirmed on a free/selection workshop). Everyone else — including
+      // signed-out visitors and users with a pending hold — gets it stripped,
+      // so the URL never reaches a browser that shouldn't have it.
+      workshop: { ...workshop, online_url: mayJoinOnline ? workshop.online_url : null },
       location,
       instructor,
       instructors,
@@ -219,10 +231,15 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       require_consent?: boolean | number;
       photos_drive_url?: string | null;
       master_id?: string | null;
+      is_online?: boolean | number;
+      online_platform?: string | null;
+      online_platform_other?: string | null;
+      online_url?: string | null;
     };
     const db = await getDB();
     // instructor_id stays the owning teacher and is the first facilitator.
     const putInstructorIds = normalizeInstructorIds(body.instructor_ids, body.instructor_id);
+    const online = normalizeOnlineFields(body);
 
     await db
       .prepare(
@@ -237,6 +254,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
            admission_type = ?, payment_type = ?, deposit_amount = ?,
            announce_at = ?, confirm_main_by = ?, confirm_waitlist_by = ?,
            require_consent = ?, photos_drive_url = ?, master_id = ?,
+           is_online = ?, online_platform = ?, online_platform_other = ?, online_url = ?,
            updated_at = datetime('now')
          WHERE id = ?`
       )
@@ -281,6 +299,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         body.require_consent ? 1 : 0,
         body.photos_drive_url || null,
         body.master_id || null,
+        online.is_online,
+        online.platform,
+        online.platform_other,
+        online.url,
         id
       )
       .run();

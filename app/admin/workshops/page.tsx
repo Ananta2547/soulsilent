@@ -117,6 +117,10 @@ export default function AdminWorkshopsPage() {
         dayTimes: safeParseArray<DayTime>(w.day_times_json, []),
         location: w.location || '',
         location_id: w.location_id || '',
+        is_online: !!w.is_online,
+        online_platform: w.online_platform || 'zoom',
+        online_platform_other: w.online_platform_other || '',
+        online_url: w.online_url || '',
         instructor_id: w.instructor_id || '',
         instructor_ids: parseInstructorIds(w),
         scheduleDays: (() => {

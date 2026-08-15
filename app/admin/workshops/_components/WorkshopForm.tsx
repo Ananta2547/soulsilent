@@ -12,6 +12,10 @@ import { ASPECTS } from '@/lib/image-aspects';
 import { parseImageMeta } from '@/lib/image-meta';
 import { safeParseArray } from '@/lib/workshop-utils';
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
+import { ONLINE_PLATFORMS } from '@/lib/online-platform';
+
+/** Sentinel value for the venue picker — ONLINE is not a `locations` row. */
+const ONLINE_OPTION = '__online__';
 
 export type WorkshopType = 'one_day' | 'multi_day' | 'multi_part';
 
@@ -33,6 +37,11 @@ export type WorkshopFormValues = {
   dayTimes: DayTime[];
   location: string;
   location_id: string;
+  /** true = runs online; no venue is picked and location_id stays ''. */
+  is_online: boolean;
+  online_platform: string;
+  online_platform_other: string;
+  online_url: string;
   /** Owning teacher — kept in sync with instructor_ids[0] on save. */
   instructor_id: string;
   /** Every facilitator, in the order they should appear publicly. */
@@ -83,6 +92,10 @@ export const emptyWorkshopForm: WorkshopFormValues = {
   dayTimes: [],
   location: '',
   location_id: '',
+  is_online: false,
+  online_platform: 'zoom',
+  online_platform_other: '',
+  online_url: '',
   instructor_id: '',
   instructor_ids: [],
   scheduleDays: [{ label: '', items: [] }],
@@ -229,6 +242,13 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
     const instructorIds = form.instructor_ids.filter(Boolean);
     return {
       ...form,
+      // The server re-normalises these, but sending clean values keeps an
+      // offline workshop from carrying leftover online fields.
+      is_online: form.is_online,
+      online_platform: form.is_online ? form.online_platform : null,
+      online_platform_other:
+        form.is_online && form.online_platform === 'other' ? form.online_platform_other.trim() : null,
+      online_url: form.is_online ? form.online_url.trim() : null,
       status,
       instructor_ids: instructorIds,
       instructor_id: instructorIds[0] || '',
@@ -788,12 +808,20 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
         <div>
           <label className="block text-sm font-medium text-dark mb-1">สถานที่</label>
           <select
-            value={form.location_id}
+            value={form.is_online ? ONLINE_OPTION : form.location_id}
             onChange={(e) => {
-              const loc = locations.find((l) => l.id === e.target.value);
+              const v = e.target.value;
+              // ONLINE has no venue row, so clear location_id/location and let
+              // is_online carry the choice.
+              if (v === ONLINE_OPTION) {
+                setForm({ ...form, is_online: true, location_id: '', location: '' });
+                return;
+              }
+              const loc = locations.find((l) => l.id === v);
               setForm({
                 ...form,
-                location_id: e.target.value,
+                is_online: false,
+                location_id: v,
                 location: loc
                   ? `${loc.name}, ${loc.subdistrict}, ${loc.district}, ${loc.province}`
                   : '',
@@ -802,12 +830,60 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
             className="input-field"
           >
             <option value="">— เลือกสถานที่ —</option>
+            <option value={ONLINE_OPTION}>ONLINE (จัดออนไลน์)</option>
             {locations.map((loc) => (
               <option key={loc.id} value={loc.id}>
                 {loc.name} ({loc.province})
               </option>
             ))}
           </select>
+
+          {/* Online-only fields. Rendered right under the picker so the whole
+              venue decision reads as one block. */}
+          {form.is_online && (
+            <div className="mt-3 space-y-3 border border-gray-lighter rounded-xl p-3 bg-surface/40">
+              <div>
+                <label className="block text-sm font-medium text-dark mb-1">แพลตฟอร์ม</label>
+                <select
+                  value={form.online_platform}
+                  onChange={(e) => setForm({ ...form, online_platform: e.target.value })}
+                  className="input-field"
+                >
+                  {ONLINE_PLATFORMS.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.value === 'other' ? 'อื่นๆ (Others)' : p.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {form.online_platform === 'other' && (
+                <div>
+                  <label className="block text-sm font-medium text-dark mb-1">ชื่อแพลตฟอร์ม</label>
+                  <input
+                    value={form.online_platform_other}
+                    onChange={(e) => setForm({ ...form, online_platform_other: e.target.value })}
+                    className="input-field"
+                    placeholder="เช่น Webex, LINE Meeting"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-dark mb-1">ลิงก์ห้องประชุม</label>
+                <input
+                  type="url"
+                  value={form.online_url}
+                  onChange={(e) => setForm({ ...form, online_url: e.target.value })}
+                  className="input-field"
+                  placeholder="https://…"
+                />
+                <p className="text-xs text-gray mt-1">
+                  ลิงก์นี้จะแสดงเฉพาะผู้ที่ได้ที่นั่งแล้ว (ชำระเงินสำเร็จ หรือยืนยันแล้วสำหรับกิจกรรมฟรี)
+                </p>
+              </div>
+            </div>
+          )}
           {locations.length === 0 && (
             <p className="text-xs text-gray mt-1">
               ยังไม่มีสถานที่ —{' '}
