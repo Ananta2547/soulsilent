@@ -101,7 +101,12 @@ export interface Workshop {
   title: string;
   description: string | null;
   short_description: string | null;
+  /** Owning teacher — drives the teacher dashboard, payout and nicknames.
+   *  Always the FIRST id of `instructor_ids_json`. */
   instructor_id: string | null;
+  /** JSON string[] of users.id — every facilitator shown to the public, in
+   *  display order. null on rows created before migration 043. */
+  instructor_ids_json: string | null;
   /** Scheduling shape. Affects how date(s) are interpreted. */
   workshop_type: 'one_day' | 'multi_day' | 'multi_part';
   /** Canonical/first day (YYYY-MM-DD). Used everywhere for sorting & display. */
@@ -117,6 +122,15 @@ export interface Workshop {
   day_times_json: string | null;
   location: string | null;
   location_id: string | null;
+  /** 1 = runs online; there is no venue and `location_id` stays null. */
+  is_online: number;
+  /** 'zoom' | 'meet' | 'teams' | 'other' — see lib/online-platform.ts. */
+  online_platform: string | null;
+  /** Admin-typed platform name, only used when online_platform = 'other'. */
+  online_platform_other: string | null;
+  /** Meeting link. The public API only returns it to a user with a secured
+   *  seat, so treat its presence as "this viewer may join". */
+  online_url: string | null;
   schedule_json: string;
   learn_json: string;
   /** JSON string[] — เหมาะกับใคร (target audience) for this session. */

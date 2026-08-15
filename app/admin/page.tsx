@@ -1,6 +1,7 @@
 'use client';
 
 import { PageLoader } from '@/components/design/PageLoader';
+import { sqliteToMs } from '@/lib/datetime';
 
 import { useEffect, useState } from 'react';
 
@@ -17,8 +18,13 @@ interface Stats {
   totalUsers: number;
   totalWorkshops: number;
   workshopRevenue: number;
-  recentBookings: Booking[];
+  /** Newest-first, unpaged. Both boxes below page through this one list. */
+  bookings: Booking[];
 }
+
+/** Rows per page in each box. */
+const BOOKINGS_PER_PAGE = 5;
+const ACTIVITY_PER_PAGE = 10;
 
 interface ApiResp {
   users?: { id: string }[];
@@ -30,6 +36,10 @@ interface ApiResp {
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  // Paging is per box and client-side: the dashboard already holds every
+  // booking, so switching pages never refetches or navigates.
+  const [bookingsPage, setBookingsPage] = useState(1);
+  const [activityPage, setActivityPage] = useState(1);
 
   useEffect(() => {
     async function fetchStats() {
@@ -52,7 +62,8 @@ export default function AdminDashboard() {
           totalUsers: users.users?.length || 0,
           totalWorkshops: workshops.workshops?.length || 0,
           workshopRevenue: revenue.soulsilent?.total || 0,
-          recentBookings: (bookings.bookings || []).slice(0, 5),
+          // GET /api/bookings already sorts by created_at DESC for admins.
+          bookings: bookings.bookings || [],
         });
       } catch (e) {
         console.error('Failed to load admin stats', e);
@@ -72,6 +83,19 @@ export default function AdminDashboard() {
   }
 
   const totalRevenue = stats?.workshopRevenue || 0;
+  const allBookings = stats?.bookings || [];
+
+  const bookingsPageCount = Math.max(1, Math.ceil(allBookings.length / BOOKINGS_PER_PAGE));
+  const pagedBookings = allBookings.slice(
+    (bookingsPage - 1) * BOOKINGS_PER_PAGE,
+    bookingsPage * BOOKINGS_PER_PAGE,
+  );
+
+  const activityPageCount = Math.max(1, Math.ceil(allBookings.length / ACTIVITY_PER_PAGE));
+  const pagedActivity = allBookings.slice(
+    (activityPage - 1) * ACTIVITY_PER_PAGE,
+    activityPage * ACTIVITY_PER_PAGE,
+  );
 
   const statCards = [
     { label: 'ผู้ใช้งาน', value: stats?.totalUsers || 0, suffix: 'คน', icon: UsersIcon, tint: 'bg-blue-50 text-blue-600' },
@@ -117,10 +141,11 @@ export default function AdminDashboard() {
 
       {/* Recent bookings */}
       <section className="card !p-0 overflow-hidden">
-        <div className="p-5 border-b border-gray-lighter">
+        <div className="p-5 border-b border-gray-lighter flex items-baseline justify-between gap-3">
           <h2 className="font-heading text-lg text-dark">การจองล่าสุด</h2>
+          <span className="text-xs text-gray">ทั้งหมด {allBookings.length} รายการ</span>
         </div>
-        {stats?.recentBookings && stats.recentBookings.length > 0 ? (
+        {pagedBookings.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-surface">
@@ -133,7 +158,7 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {stats.recentBookings.map((b) => (
+                {pagedBookings.map((b) => (
                   <tr key={b.id} className="border-t border-gray-lighter hover:bg-surface/50">
                     <td className="py-3 px-5 text-dark font-medium max-w-[200px] truncate">
                       {b.workshop_title || '—'}
@@ -161,24 +186,189 @@ export default function AdminDashboard() {
                               : b.status}
                       </span>
                     </td>
-                    <td className="py-3 px-5 text-right text-gray text-xs">
-                      {new Date(b.created_at).toLocaleDateString('th-TH', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                      })}
+                    <td className="py-3 px-5 text-right text-gray text-xs whitespace-nowrap">
+                      {fmtDayTime(b.created_at)}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            <Pager page={bookingsPage} pageCount={bookingsPageCount} onChange={setBookingsPage} />
           </div>
         ) : (
           <p className="text-gray text-sm py-8 text-center">ยังไม่มีการจอง</p>
         )}
       </section>
+
+      {/* Registration activity log — who applied to what, when. Grouped by day
+          so bursts of sign-ups are obvious at a glance. */}
+      <section className="card !p-0 overflow-hidden">
+        <div className="p-5 border-b border-gray-lighter flex items-baseline justify-between gap-3">
+          <div>
+            <h2 className="font-heading text-lg text-dark">ความเคลื่อนไหวการสมัคร</h2>
+            <p className="text-xs text-gray mt-0.5">
+              ใหม่ล่าสุดอยู่บนสุด · ทั้งหมด {allBookings.length} รายการ
+            </p>
+          </div>
+          <span className="font-mono text-[11px] tracking-[.12em] uppercase text-gray">
+            activity log
+          </span>
+        </div>
+
+        {pagedActivity.length > 0 ? (
+          <>
+          <ol className="divide-y divide-gray-lighter">
+            {groupByDay(pagedActivity).map(([dayLabel, rows]) => (
+              <li key={dayLabel}>
+                <div className="flex items-center gap-3 px-5 py-2 bg-surface">
+                  <span className="text-xs font-medium text-dark">{dayLabel}</span>
+                  <span className="text-[11px] text-gray">{rows.length} รายการ</span>
+                </div>
+                <ol>
+                  {rows.map((b) => (
+                    <li
+                      key={b.id}
+                      className="flex items-start gap-3 px-5 py-3 border-t border-gray-lighter hover:bg-surface/50"
+                    >
+                      <span className="font-mono text-xs text-gray tabular-nums pt-0.5 w-12 shrink-0">
+                        {fmtClock(b.created_at)}
+                      </span>
+                      <span className="text-sm text-dark min-w-0">
+                        <span className="font-medium">{b.user_name || 'ไม่ทราบชื่อ'}</span>
+                        <span className="text-gray"> สมัคร </span>
+                        <span className="font-medium">{b.workshop_title || 'ไม่ทราบกิจกรรม'}</span>
+                      </span>
+                      {b.status === 'cancelled' && (
+                        <span className="badge-danger ml-auto shrink-0">ยกเลิก</span>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              </li>
+            ))}
+          </ol>
+          <Pager page={activityPage} pageCount={activityPageCount} onChange={setActivityPage} />
+          </>
+        ) : (
+          <p className="text-gray text-sm py-8 text-center">ยังไม่มีความเคลื่อนไหว</p>
+        )}
+      </section>
     </div>
   );
+}
+
+/** `< 1 2 3 >` pager. Renders nothing for a single page. Long runs collapse to
+ *  a window around the current page with ellipses, so the row never wraps. */
+function Pager({
+  page,
+  pageCount,
+  onChange,
+}: {
+  page: number;
+  pageCount: number;
+  onChange: (p: number) => void;
+}) {
+  if (pageCount <= 1) return null;
+
+  const pages: (number | 'gap')[] = [];
+  const window = 1; // pages either side of the current one
+  for (let p = 1; p <= pageCount; p++) {
+    const near = Math.abs(p - page) <= window;
+    if (p === 1 || p === pageCount || near) pages.push(p);
+    else if (pages[pages.length - 1] !== 'gap') pages.push('gap');
+  }
+
+  const arrow =
+    'w-8 h-8 rounded-lg border border-gray-lighter text-gray hover:text-dark hover:border-gray disabled:opacity-40 disabled:hover:text-gray disabled:hover:border-gray-lighter disabled:cursor-not-allowed flex items-center justify-center';
+
+  return (
+    <nav
+      className="flex items-center justify-center gap-1.5 px-5 py-4 border-t border-gray-lighter"
+      aria-label="เปลี่ยนหน้า"
+    >
+      <button
+        type="button"
+        onClick={() => onChange(Math.max(1, page - 1))}
+        disabled={page === 1}
+        aria-label="ก่อนหน้า"
+        className={arrow}
+      >
+        ‹
+      </button>
+
+      {pages.map((p, i) =>
+        p === 'gap' ? (
+          <span key={`gap-${i}`} className="px-1 text-gray text-sm select-none">
+            …
+          </span>
+        ) : (
+          <button
+            key={p}
+            type="button"
+            onClick={() => onChange(p)}
+            aria-current={p === page ? 'page' : undefined}
+            className={`w-8 h-8 rounded-lg text-sm flex items-center justify-center border ${
+              p === page
+                ? 'bg-primary text-white border-primary font-medium'
+                : 'border-gray-lighter text-gray hover:text-dark hover:border-gray'
+            }`}
+          >
+            {p}
+          </button>
+        ),
+      )}
+
+      <button
+        type="button"
+        onClick={() => onChange(Math.min(pageCount, page + 1))}
+        disabled={page === pageCount}
+        aria-label="ถัดไป"
+        className={arrow}
+      >
+        ›
+      </button>
+    </nav>
+  );
+}
+
+/** SQLite timestamps are UTC without a zone marker — normalise before parsing
+ *  so the clock shown matches the admin's local time. */
+function toDate(v: string): Date {
+  return new Date(sqliteToMs(v));
+}
+
+/** "15 ส.ค. 2569 เวลา 18:03 น." — same clock as the activity log below. */
+function fmtDayTime(v: string): string {
+  const d = toDate(v);
+  if (Number.isNaN(d.getTime())) return '—';
+  const date = d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+  return `${date} เวลา ${fmtClock(v)} น.`;
+}
+
+function fmtClock(v: string): string {
+  const d = toDate(v);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+/** Bucket the (already newest-first) feed into calendar days, keeping order. */
+function groupByDay(rows: Booking[]): [string, Booking[]][] {
+  const out: [string, Booking[]][] = [];
+  for (const r of rows) {
+    const d = toDate(r.created_at);
+    const label = Number.isNaN(d.getTime())
+      ? 'ไม่ทราบวันที่'
+      : d.toLocaleDateString('th-TH', {
+          weekday: 'short',
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        });
+    const last = out[out.length - 1];
+    if (last && last[0] === label) last[1].push(r);
+    else out.push([label, [r]]);
+  }
+  return out;
 }
 
 /* Inline icons (avoid emoji rendering inconsistencies) */

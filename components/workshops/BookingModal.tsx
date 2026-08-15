@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useLang, T, tr, pick } from '@/lib/i18n';
 import { fmtDateTime } from '@/lib/datetime';
 import { getVault } from '@/lib/vault';
+import { TRAVEL_OPTIONS, type TravelMethod } from '@/lib/travel';
 import { Btn } from '@/components/design/RippleButton';
 import type { ApplicationQuestion, Workshop } from '@/lib/types';
 
@@ -84,6 +85,10 @@ export function BookingModal({
   const [vault, setVault] = useState<Vault>({});
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
   const [consent, setConsent] = useState<'' | 'granted' | 'denied'>('');
+  // How the applicant gets to the venue. Private vehicles must give a plate so
+  // staff can arrange parking and identify vehicles on site.
+  const [travel, setTravel] = useState<TravelMethod | ''>('');
+  const [plate, setPlate] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [result, setResult] = useState<BookingResult | null>(null);
 
@@ -148,6 +153,9 @@ export function BookingModal({
     !(vault.lineId || '').trim() ||
     !(vault.medical || '').trim();
 
+  const travelOption = TRAVEL_OPTIONS.find((o) => o.value === travel);
+  const travelNeedsPlate = !!travelOption?.needsPlate;
+
   function goNext() {
     if (incomplete) {
       setErr(tr(lang, 'ข้อมูลผู้สมัครไม่ครบ — กรุณาไปกรอกให้ครบที่หน้า "ข้อมูลกรอกอัตโนมัติ" ก่อน', 'Your applicant info is incomplete — please complete it on the Autofill page first.'));
@@ -174,6 +182,14 @@ export function BookingModal({
         return;
       }
     }
+    if (!travel) {
+      setErr(tr(lang, 'กรุณาเลือกวิธีการเดินทาง', 'Please choose how you will travel here.'));
+      return;
+    }
+    if (travelNeedsPlate && !plate.trim()) {
+      setErr(tr(lang, 'กรุณากรอกทะเบียนรถ', 'Please enter your vehicle plate number.'));
+      return;
+    }
     if (requireConsent && !consent) {
       setErr(tr(lang, 'กรุณาเลือกความยินยอมการบันทึกเสียง ภาพและวิดีโอ', 'Please choose your audio/photo/video consent.'));
       return;
@@ -196,6 +212,13 @@ export function BookingModal({
         dietary: vault.dietary || '',
       },
       answers: questions.map((q) => ({ id: q.id, label: q.label, value: answers[q.id] ?? '' })),
+      travel: {
+        method: travel,
+        // Store the Thai label too so admin screens read correctly without
+        // having to map the code back.
+        label: travelOption?.th || '',
+        plate: travelNeedsPlate ? plate.trim() : '',
+      },
       ...(requireConsent
         ? { consent: { photoVideo: consent, label: consent === 'granted' ? 'ยินยอม' : 'ไม่ยินยอม' } }
         : {}),
@@ -447,11 +470,48 @@ export function BookingModal({
               {err && (
                 <div style={{ marginBottom: 14, padding: 12, background: '#fde7d3', color: '#a04a14', borderRadius: 12, fontSize: 13 }}>{err}</div>
               )}
-              {questions.length === 0 ? (
-                <p style={{ fontSize: 14, color: 'var(--muted)', margin: 0 }}>
-                  <T th="เวิร์กชอปนี้ไม่มีคำถามเพิ่มเติม — กดยืนยันเพื่อชำระเงินได้เลย" en="No extra questions for this workshop — confirm to pay." />
-                </p>
-              ) : (
+              {/* Travel — asked on every workshop. A private vehicle also needs
+                  its plate so staff can sort out parking on the day. */}
+              <div style={{ marginBottom: questions.length > 0 ? 20 : 0 }}>
+                <label style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', marginBottom: 6 }}>
+                  <T th="คุณจะเดินทางมายังไง?" en="How will you travel here?" />
+                  <span style={{ color: '#d35d52' }}> *</span>
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {TRAVEL_OPTIONS.map((o) => (
+                    <label key={o.value} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--ink)', cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="travel-method"
+                        checked={travel === o.value}
+                        onChange={() => {
+                          setTravel(o.value);
+                          // Switching to public transport drops any plate typed
+                          // earlier so it can't be submitted by accident.
+                          if (!o.needsPlate) setPlate('');
+                        }}
+                      />
+                      {pick(o, lang)}
+                    </label>
+                  ))}
+                </div>
+                {travelNeedsPlate && (
+                  <div style={{ marginTop: 12 }}>
+                    <label style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', marginBottom: 6 }}>
+                      <T th="ทะเบียนรถ" en="Vehicle plate number" />
+                      <span style={{ color: '#d35d52' }}> *</span>
+                    </label>
+                    <input
+                      className="field"
+                      value={plate}
+                      onChange={(e) => setPlate(e.target.value)}
+                      placeholder={tr(lang, 'เช่น กข 1234 กรุงเทพมหานคร', 'e.g. 1กข 1234 Bangkok')}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {questions.length === 0 ? null : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   {questions.map((q) => (
                     <div key={q.id}>

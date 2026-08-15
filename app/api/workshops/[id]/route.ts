@@ -2,7 +2,13 @@ import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 import { requireAdmin, getCurrentUser } from '@/lib/auth';
 import { expireStaleHolds } from '@/lib/holds';
-import { hasWorkshopEnded, getWorkshopDays } from '@/lib/workshop-utils';
+import {
+  hasWorkshopEnded,
+  getWorkshopDays,
+  normalizeInstructorIds,
+  parseInstructorIds,
+} from '@/lib/workshop-utils';
+import { normalizeOnlineFields } from '@/lib/online-platform';
 import type { Workshop, Location, User } from '@/lib/types';
 
 type InstructorPublic = Pick<User, 'id' | 'name' | 'email' | 'role' | 'avatar_url'> & {
@@ -41,21 +47,32 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         .first<Location>();
     }
 
-    // Public instructor info (no password_hash, no google_id)
-    let instructor: InstructorPublic | null = null;
-    if (workshop.instructor_id) {
-      instructor = await db
+    // Public facilitator info (no password_hash, no google_id). A workshop can
+    // have several — `instructors` is the full ordered list; `instructor` stays
+    // the first one so older clients keep working.
+    const instructorIds = parseInstructorIds(workshop);
+    let instructors: InstructorPublic[] = [];
+    if (instructorIds.length > 0) {
+      const placeholders = instructorIds.map(() => '?').join(', ');
+      const rows = await db
         .prepare(
           // Display name = nickname (what the teacher edits in their profile)
           // falling back to the registration name — always the latest from users.
           `SELECT u.id, COALESCE(NULLIF(TRIM(u.nickname), ''), u.name) AS name, u.email, u.role, u.avatar_url,
                   (SELECT p.id FROM portfolios p
                     WHERE p.user_id = u.id AND p.published = 1 LIMIT 1) AS portfolio_id
-             FROM users u WHERE u.id = ?`
+             FROM users u WHERE u.id IN (${placeholders})`
         )
-        .bind(workshop.instructor_id)
-        .first<InstructorPublic>();
+        .bind(...instructorIds)
+        .all<InstructorPublic>();
+      // SQL `IN` loses the order, so re-apply the admin's chosen sequence and
+      // silently skip ids whose user has since been deleted.
+      const byId = new Map((rows.results || []).map((r) => [r.id, r]));
+      instructors = instructorIds
+        .map((id) => byId.get(id))
+        .filter((r): r is InstructorPublic => !!r);
     }
+    const instructor: InstructorPublic | null = instructors[0] || null;
 
     // Count "taken" seats: paid + holds that haven't expired yet
     const countResult = await db
@@ -139,10 +156,22 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         .first<import('@/lib/types').Review>();
     }
 
+    // A secured seat = paid, or confirmed (free / selection workshops never
+    // pay). A pending hold does not count.
+    const mayJoinOnline =
+      !!userBooking &&
+      userBooking.status !== 'cancelled' &&
+      (userBooking.payment_status === 'paid' || userBooking.status === 'confirmed');
+
     return NextResponse.json({
-      workshop,
+      // The meeting link is only for people holding a secured seat (paid, or
+      // confirmed on a free/selection workshop). Everyone else — including
+      // signed-out visitors and users with a pending hold — gets it stripped,
+      // so the URL never reaches a browser that shouldn't have it.
+      workshop: { ...workshop, online_url: mayJoinOnline ? workshop.online_url : null },
       location,
       instructor,
+      instructors,
       bookingCount: countResult?.count || 0,
       userBooking,
       userAttended,
@@ -165,6 +194,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       description?: string;
       short_description?: string;
       instructor_id?: string;
+      /** Every facilitator, in display order. instructor_id = the first one. */
+      instructor_ids?: string[];
       workshop_type?: 'one_day' | 'multi_day' | 'multi_part';
       date: string;
       end_date?: string | null;
@@ -200,13 +231,21 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       require_consent?: boolean | number;
       photos_drive_url?: string | null;
       master_id?: string | null;
+      is_online?: boolean | number;
+      online_platform?: string | null;
+      online_platform_other?: string | null;
+      online_url?: string | null;
     };
     const db = await getDB();
+    // instructor_id stays the owning teacher and is the first facilitator.
+    const putInstructorIds = normalizeInstructorIds(body.instructor_ids, body.instructor_id);
+    const online = normalizeOnlineFields(body);
 
     await db
       .prepare(
         `UPDATE workshops SET
-           title = ?, description = ?, short_description = ?, instructor_id = ?,
+           title = ?, description = ?, short_description = ?,
+           instructor_id = ?, instructor_ids_json = ?,
            workshop_type = ?, date = ?, end_date = ?, dates_json = ?,
            time_start = ?, time_end = ?, day_times_json = ?, location = ?, location_id = ?,
            schedule_json = ?, learn_json = ?, target_json = ?, category = ?, tags_json = ?,
@@ -215,6 +254,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
            admission_type = ?, payment_type = ?, deposit_amount = ?,
            announce_at = ?, confirm_main_by = ?, confirm_waitlist_by = ?,
            require_consent = ?, photos_drive_url = ?, master_id = ?,
+           is_online = ?, online_platform = ?, online_platform_other = ?, online_url = ?,
            updated_at = datetime('now')
          WHERE id = ?`
       )
@@ -222,7 +262,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         body.title,
         body.description || null,
         body.short_description || null,
-        body.instructor_id || null,
+        putInstructorIds[0] || null,
+        JSON.stringify(putInstructorIds),
         body.workshop_type || 'one_day',
         body.date,
         body.end_date || null,
@@ -258,6 +299,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         body.require_consent ? 1 : 0,
         body.photos_drive_url || null,
         body.master_id || null,
+        online.is_online,
+        online.platform,
+        online.platform_other,
+        online.url,
         id
       )
       .run();

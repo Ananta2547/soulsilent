@@ -9,12 +9,15 @@ import { useLang, T, tr } from '@/lib/i18n';
 import type { Workshop } from '@/lib/types';
 import { getWorkshopDays, hasWorkshopEnded } from '@/lib/workshop-utils';
 import { PdpaBadge } from '@/components/workshops/PdpaBadge';
+import { FacilitatorNote } from '@/components/admin/FacilitatorNote';
 
 type Row = {
   id: string;
   amount: number;
   attendance_json: string | null;
   application_json: string | null;
+  /** Staff-only note about this participant (migration 045). */
+  facilitator_note: string | null;
   user_name: string | null;
   user_email: string | null;
   teacher_nickname: string | null;
@@ -305,7 +308,19 @@ export default function TeacherWorkshopDetail() {
                       })}
                     </div>
 
-                    {expanded && <ApplicationDetail json={b.application_json} lang={lang} />}
+                    {expanded && (
+                      <>
+                        <ApplicationDetail json={b.application_json} lang={lang} />
+                        <FacilitatorNote
+                          // Remount per booking so the textarea always starts
+                          // from that participant's saved note.
+                          key={b.id}
+                          initial={b.facilitator_note ?? null}
+                          endpoint={`/api/teacher/bookings/${b.id}/note`}
+                          lang={lang}
+                        />
+                      </>
+                    )}
                   </div>
                 </div>
               );

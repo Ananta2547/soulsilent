@@ -27,6 +27,7 @@ import {
   getWorkshopDays,
 } from '@/lib/workshop-utils';
 import { visibleAppStatus } from '@/lib/selection-status';
+import { platformStyle, platformLabel } from '@/lib/online-platform';
 
 type UserBooking = {
   id: string;
@@ -52,7 +53,8 @@ export default function WorkshopDetailPage() {
   const { lang } = useLang();
   const [workshop, setWorkshop] = useState<Workshop | null>(null);
   const [location, setLocation] = useState<Location | null>(null);
-  const [instructor, setInstructor] = useState<Instructor | null>(null);
+  // A workshop can have several facilitators; index 0 is the owning teacher.
+  const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [bookingCount, setBookingCount] = useState(0);
   const [userBooking, setUserBooking] = useState<UserBooking | null>(null);
   const [userAttended, setUserAttended] = useState(false);
@@ -80,6 +82,7 @@ export default function WorkshopDetailPage() {
         workshop: Workshop;
         location: Location | null;
         instructor: Instructor | null;
+        instructors?: Instructor[];
         bookingCount: number;
         userBooking: UserBooking | null;
         userAttended?: boolean;
@@ -89,7 +92,15 @@ export default function WorkshopDetailPage() {
       };
       setWorkshop(data.workshop);
       setLocation(data.location);
-      setInstructor(data.instructor);
+      // `instructors` is the current shape; fall back to the single-instructor
+      // key so a cached/older API response still renders.
+      setInstructors(
+        data.instructors && data.instructors.length > 0
+          ? data.instructors
+          : data.instructor
+            ? [data.instructor]
+            : [],
+      );
       setBookingCount(data.bookingCount || 0);
       setUserBooking(data.userBooking);
       setUserAttended(!!data.userAttended);
@@ -564,8 +575,8 @@ export default function WorkshopDetailPage() {
                 );
               })()}
 
-              {/* Instructor / Facilitator */}
-              {instructor && (
+              {/* Facilitators — one card per person, in the admin's order */}
+              {instructors.length > 0 && (
                 <Reveal>
                   <span className="eyebrow">
                     <T th="ผู้นำกิจกรรม" en="facilitator" />
@@ -576,7 +587,10 @@ export default function WorkshopDetailPage() {
                   >
                     <T th="คนที่จะอยู่กับคุณทั้งวัน" en="Who'll be with you all day" />
                   </h2>
+                  <div style={{ display: 'grid', gap: 16 }}>
+                  {instructors.map((ins) => (
                   <div
+                    key={ins.id}
                     style={{
                       display: 'flex',
                       gap: 24,
@@ -601,10 +615,10 @@ export default function WorkshopDetailPage() {
                         overflow: 'hidden',
                       }}
                     >
-                      {instructor.avatar_url ? (
+                      {ins.avatar_url ? (
                         <img
-                          src={instructor.avatar_url}
-                          alt={instructor.name}
+                          src={ins.avatar_url}
+                          alt={ins.name}
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         />
                       ) : (
@@ -616,7 +630,7 @@ export default function WorkshopDetailPage() {
                             color: 'var(--teal-deep)',
                           }}
                         >
-                          {instructor.name[0]?.toUpperCase() || '?'}
+                          {ins.name[0]?.toUpperCase() || '?'}
                         </span>
                       )}
                     </div>
@@ -631,9 +645,9 @@ export default function WorkshopDetailPage() {
                           marginBottom: 6,
                         }}
                       >
-                        {instructor.role === 'teacher'
+                        {ins.role === 'teacher'
                           ? tr(lang, 'ผู้สอน · LEAD FACILITATOR', 'instructor · lead facilitator')
-                          : instructor.role === 'admin'
+                          : ins.role === 'admin'
                             ? tr(lang, 'ผู้ก่อตั้ง & LEAD FACILITATOR', 'founder & lead facilitator')
                             : tr(lang, 'ผู้ดูแลกิจกรรม', 'host')}
                       </div>
@@ -641,7 +655,7 @@ export default function WorkshopDetailPage() {
                         className="display-th"
                         style={{ fontSize: 22, margin: '0 0 10px', lineHeight: 1.25 }}
                       >
-                        {instructor.name}
+                        {ins.name}
                       </h3>
                       <p
                         style={{
@@ -656,9 +670,9 @@ export default function WorkshopDetailPage() {
                           en="Designs and leads this workshop — creating space for unhurried learning"
                         />
                       </p>
-                      {instructor.portfolio_id && (
+                      {ins.portfolio_id && (
                         <Link
-                          href={`/p/${instructor.portfolio_id}`}
+                          href={`/p/${ins.portfolio_id}`}
                           style={{
                             color: 'var(--teal)',
                             fontWeight: 600,
@@ -677,6 +691,8 @@ export default function WorkshopDetailPage() {
                         </Link>
                       )}
                     </div>
+                  </div>
+                  ))}
                   </div>
                 </Reveal>
               )}
@@ -1228,6 +1244,13 @@ function BookingCardContent({
         </>
       )}
 
+      {/* Join link — online workshops only, and only once the seat is secured.
+          The API withholds `online_url` from everyone else, so its presence is
+          already the permission check; `booked` just avoids a flash. */}
+      {!!workshop.is_online && booked && workshop.online_url && (
+        <JoinOnlineButton workshop={workshop} lang={lang} />
+      )}
+
       {/* Perks list */}
       <ul
         style={{
@@ -1636,4 +1659,71 @@ function PromoCountdown({ endsAt, lang }: { endsAt: string; lang: 'th' | 'en' })
       ⏳ {tr(lang, 'โปรโมชันเหลือเวลาอีก', 'Promo ends in')} {left}
     </div>
   );
+}
+
+/** Join button for an ONLINE workshop. Colour and mark follow the platform the
+ *  admin picked; 'other' has no brand mark and shows the typed name instead. */
+function JoinOnlineButton({ workshop, lang }: { workshop: Workshop; lang: 'th' | 'en' }) {
+  const style = platformStyle(workshop.online_platform);
+  const name = platformLabel(workshop.online_platform, workshop.online_platform_other);
+  return (
+    <a
+      href={workshop.online_url || '#'}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        width: '100%',
+        padding: '14px 22px',
+        borderRadius: 999,
+        fontSize: 15,
+        fontWeight: 700,
+        textDecoration: 'none',
+        background: style.bg,
+        color: style.fg,
+        border: style.border ? `1px solid ${style.border}` : '1px solid transparent',
+      }}
+    >
+      <PlatformMark platform={style.value} />
+      {tr(lang, `เข้าร่วมทาง ${name}`, `Join on ${name}`)}
+    </a>
+  );
+}
+
+/** Simple brand-suggestive marks. Drawn inline because the page's CSP blocks
+ *  remote images, and 'other' deliberately renders nothing. */
+function PlatformMark({ platform }: { platform: string }) {
+  if (platform === 'zoom') {
+    return (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="2" y="6" width="13" height="12" rx="3" fill="currentColor" />
+        <path d="M16 11l5-3.2v8.4L16 13v-2z" fill="currentColor" />
+      </svg>
+    );
+  }
+  if (platform === 'meet') {
+    return (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="2" y="6" width="12" height="12" rx="2.5" fill="#1f7a45" />
+        <path d="M15 11l6-3.6v9.2L15 13v-2z" fill="#fbbc04" />
+        <path d="M15 11l6-3.6V11h-6z" fill="#ea4335" />
+      </svg>
+    );
+  }
+  if (platform === 'teams') {
+    return (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="3" y="5" width="12" height="14" rx="2.5" fill="currentColor" />
+        <text x="9" y="15.5" textAnchor="middle" fontSize="9" fontWeight="700" fill="#5059C9">
+          T
+        </text>
+        <circle cx="18.5" cy="8" r="2.6" fill="currentColor" opacity=".85" />
+        <path d="M16 12h5v4.2a2.6 2.6 0 01-5 0V12z" fill="currentColor" opacity=".85" />
+      </svg>
+    );
+  }
+  return null;
 }

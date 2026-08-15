@@ -68,10 +68,16 @@ export async function GET(request: Request) {
           .first<SettleWorkshop>();
         if (w) await settleSelection(db, w);
 
-        query = 'SELECT b.*, u.name as user_name, u.email as user_email, w.title as workshop_title FROM bookings b LEFT JOIN users u ON b.user_id = u.id LEFT JOIN workshops w ON b.workshop_id = w.id WHERE b.workshop_id = ? ORDER BY b.created_at DESC';
+        // Display name = nickname (edited in the profile) falling back to the
+        // registration name — the same rule used everywhere else.
+        query =
+          'SELECT b.*, COALESCE(NULLIF(TRIM(u.nickname), \'\'), u.name) AS user_name, u.email as user_email, w.title as workshop_title FROM bookings b LEFT JOIN users u ON b.user_id = u.id LEFT JOIN workshops w ON b.workshop_id = w.id WHERE b.workshop_id = ? ORDER BY b.created_at DESC';
         bindings = [workshopId];
       } else {
-        query = 'SELECT b.*, u.name as user_name, u.email as user_email, w.title as workshop_title FROM bookings b LEFT JOIN users u ON b.user_id = u.id LEFT JOIN workshops w ON b.workshop_id = w.id ORDER BY b.created_at DESC';
+        // Display name = nickname (edited in the profile) falling back to the
+        // registration name — the same rule used everywhere else.
+        query =
+          'SELECT b.*, COALESCE(NULLIF(TRIM(u.nickname), \'\'), u.name) AS user_name, u.email as user_email, w.title as workshop_title FROM bookings b LEFT JOIN users u ON b.user_id = u.id LEFT JOIN workshops w ON b.workshop_id = w.id ORDER BY b.created_at DESC';
         bindings = [];
       }
     } else {
@@ -107,9 +113,15 @@ export async function GET(request: Request) {
 
     const result = await stmt.all<Record<string, unknown>>();
 
+    // `facilitator_note` is a private staff note about the participant and the
+    // queries above use `b.*`, so drop it on every path except the admin
+    // all-rows read. Participants must never receive it.
+    const staffView = user.role === 'admin' && !mine;
+
     // For the personal page, attach the user-visible (masked) status + the
     // confirm-by deadline so the UI doesn't need the round logic.
     const rows = (result.results || []).map((b) => {
+      if (!staffView) delete b.facilitator_note;
       const admission = (b.ws_admission_type as string) || 'direct';
       const w = {
         admission_type: admission as Workshop['admission_type'],

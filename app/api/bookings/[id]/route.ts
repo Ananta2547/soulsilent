@@ -16,6 +16,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       /** Per-day check-in: mark day index `attendance_day` present/absent. */
       attendance_day?: number;
       present?: boolean;
+      /** Private staff note about this participant. Never sent to the user. */
+      facilitator_note?: string | null;
     };
     const db = await getDB();
 
@@ -26,6 +28,11 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (typeof body.status === 'string') {
       sets.push('status = ?');
       args.push(body.status);
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'facilitator_note')) {
+      const note = (body.facilitator_note || '').trim();
+      sets.push('facilitator_note = ?');
+      args.push(note || null);
     }
     if (Object.prototype.hasOwnProperty.call(body, 'attended')) {
       if (user.role !== 'admin') {

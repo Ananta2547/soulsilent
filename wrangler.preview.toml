@@ -1,0 +1,58 @@
+# Preview / staging Worker — completely separate from production.
+#
+# This is a SEPARATE FILE on purpose (not an `[env.preview]` block inside
+# wrangler.toml): wrangler treats `routes` and `triggers` as *inheritable*
+# keys, so an env block would inherit the `allsoullearn.com` custom domain and
+# the every-minute cron from production. Deploying that would re-point the live
+# domain at the preview Worker. A separate config file cannot inherit anything.
+#
+# Deploy with:  npx opennextjs-cloudflare deploy --config wrangler.preview.toml
+#
+# Differences from wrangler.toml (production):
+#   - name            : soulsilent-preview     (a different Worker entirely)
+#   - workers_dev     : true                   (preview URL instead of a domain)
+#   - no [[routes]]                            (never touches allsoullearn.com)
+#   - no [triggers]                            (no cron; prod's sweep is enough)
+#   - D1 / R2         : dedicated preview database + bucket
+#   - SITE_URL        : the workers.dev preview URL
+name = "soulsilent-preview"
+main = "worker.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
+
+# Serve on <name>.<account-subdomain>.workers.dev.
+workers_dev = true
+
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
+
+# Dedicated preview database. Create it with:
+#   npx wrangler d1 create soulsilent-preview
+# then paste the returned id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "soulsilent-preview"
+database_id = "4d23828a-fffb-41ad-89bb-d0f4ca339400"
+
+# Dedicated media bucket. Create it with:
+#   npx wrangler r2 bucket create soulsilent-preview-media
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "soulsilent-preview-media"
+
+# Non-secret vars only. Preview secrets are set per Worker with:
+#   npx wrangler secret put <NAME> --config wrangler.preview.toml
+# Use TEST credentials only:
+#   - JWT_SECRET            (a different value from production)
+#   - STRIPE_SECRET_KEY     (sk_test_... — never the live key)
+#   - STRIPE_WEBHOOK_SECRET (whsec_... from a separate test endpoint)
+#   - GOOGLE_CLIENT_SECRET
+#   - RESEND_API_KEY
+#   - CRON_SECRET           (only if a preview cron is ever added)
+[vars]
+GOOGLE_CLIENT_ID = "798833181382-0sf30qcflhmpo6sepoke9i8ojab71fbp.apps.googleusercontent.com"
+# Must match the real preview hostname, or e-mail links and OAuth/Stripe
+# redirects will bounce users to production.
+SITE_URL = "https://soulsilent-preview.soulsilent-official.workers.dev"
+EMAIL_FROM = "AllSoulLearn Preview <noreply@allsoullearn.com>"
