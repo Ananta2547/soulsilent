@@ -74,11 +74,19 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ paid: true });
     }
 
-    // Keep the original 10-min deadline (do not extend) — the auto-cancel
-    // window is fixed from submit/confirm.
+    // Keep the original deadline (do not extend) — the auto-cancel window is
+    // fixed at submit/confirm. The new link must expire WITH the seat rather
+    // than on the default full window: an hour-long link over a hold with 20
+    // minutes left is exactly the gap where someone pays for a released seat.
+    const remainingMs = booking.expires_at
+      ? new Date(booking.expires_at.replace(' ', 'T') + 'Z').getTime() - Date.now()
+      : 0;
+    const remainingMinutes = Math.max(1, Math.ceil(remainingMs / 60000));
+
     const env = await getEnv();
     const siteUrl = env.SITE_URL || 'http://localhost:3000';
     const { url: checkoutUrl, sessionId } = await createWorkshopCheckout({
+      holdMinutes: remainingMinutes,
       workshopTitle: workshop.title,
       amount,
       bookingId: id,

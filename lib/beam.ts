@@ -113,17 +113,30 @@ export function makeReference(bookingId: string, siteUrl: string): string {
     // Unparseable SITE_URL — send an untagged reference rather than block the
     // payment.
   }
-  return host ? `${host}|${bookingId}` : bookingId;
+  // The nonce keeps every link distinct. Beam answers 502 — not a 4xx — when a
+  // second link reuses a referenceId, which made "continue payment" fail every
+  // single time while a fresh booking always worked.
+  const nonce = Date.now().toString(36);
+  return host ? `${host}|${bookingId}|${nonce}` : `${bookingId}|${nonce}`;
 }
 
+/**
+ * Read a reference back. Handles all three generations: bare booking id,
+ * "<host>|<bookingId>", and "<host>|<bookingId>|<nonce>".
+ */
 export function parseReference(reference: string | null | undefined): {
   host: string | null;
   bookingId: string | null;
 } {
   if (!reference) return { host: null, bookingId: null };
-  const i = reference.indexOf('|');
-  if (i === -1) return { host: null, bookingId: reference };
-  return { host: reference.slice(0, i), bookingId: reference.slice(i + 1) };
+  const parts = reference.split('|');
+  if (parts.length === 1) return { host: null, bookingId: parts[0] };
+  // A bare "<bookingId>|<nonce>" has no host, which only happens when SITE_URL
+  // could not be parsed. A UUID has dashes; the nonce never does.
+  if (parts.length === 2 && parts[0].includes('-')) {
+    return { host: null, bookingId: parts[0] };
+  }
+  return { host: parts[0], bookingId: parts[1] };
 }
 
 /** Baht → satang. The single conversion point in the whole integration. */
