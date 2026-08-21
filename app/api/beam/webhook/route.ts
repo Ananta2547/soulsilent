@@ -148,9 +148,19 @@ export async function POST(request: Request) {
     // Classify by shape, since there is no name to switch on. A refund must be
     // checked first: it is a transaction too, and would otherwise be booked as
     // an incoming payment.
+    // Money going back out is a transaction too, so it has to be recognised
+    // before the incoming-payment branch — otherwise a refund reads as fresh
+    // suspicious money and the system tries to refund the refund. Beam labels
+    // it VOID rather than REFUND, and its transactionId is the refund's own
+    // `re_…` id, not the charge it reverses.
+    const isRefund =
+      transactionType === 'REFUND' ||
+      transactionType === 'VOID' ||
+      (chargeId?.startsWith('re_') ?? false);
+
     let effective = type;
     if (!effective) {
-      if (transactionType === 'REFUND') effective = 'refund.succeeded';
+      if (isRefund) effective = 'refund.succeeded';
       else if (chargeId) effective = 'charge.succeeded';
       else if (linkId && (state === 'COMPLETE' || state === 'PAID')) {
         effective = 'payment_link.paid';
@@ -228,6 +238,7 @@ export async function POST(request: Request) {
             try {
               await refundCharge(
                 chargeId,
+                amount,
                 reason === 'duplicate'
                   ? 'Duplicate payment for the same booking'
                   : 'Payment received after the seat hold expired',
@@ -259,14 +270,25 @@ export async function POST(request: Request) {
       }
 
       case 'refund.succeeded': {
-        if (chargeId) {
+        // The payload identifies the refund, not the charge it reverses, so
+        // close the reconcile entry by booking rather than by charge id.
+        if (bookingId) {
           await db
-            .prepare("UPDATE bookings SET payment_status='refunded' WHERE beam_charge_id = ?")
-            .bind(chargeId)
+            .prepare(
+              "UPDATE bookings SET payment_status='refunded' WHERE id = ? AND payment_status = 'paid'",
+            )
+            .bind(bookingId)
             .run();
           await db
             .prepare(
-              "UPDATE orphan_payments SET resolved = 1, resolved_note = 'refunded by Beam webhook' WHERE id = ?",
+              "UPDATE orphan_payments SET resolved = 1, resolved_note = 'refunded — confirmed by Beam' WHERE booking_id = ? AND resolved = 0",
+            )
+            .bind(bookingId)
+            .run();
+        } else if (chargeId) {
+          await db
+            .prepare(
+              "UPDATE orphan_payments SET resolved = 1, resolved_note = 'refunded — confirmed by Beam' WHERE id = ?",
             )
             .bind(chargeId)
             .run();

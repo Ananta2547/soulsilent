@@ -325,13 +325,23 @@ export async function fetchPaymentLink(linkId: string): Promise<{
  */
 export async function refundCharge(
   chargeId: string,
+  amount: number,
   reason = 'Payment received after the seat hold expired',
 ): Promise<void> {
-  // `reason` is REQUIRED. Omitting it made Beam answer 502 — the same
-  // unhelpful response it gives for a duplicate referenceId — which read as a
-  // flaky gateway rather than a malformed request. `amount` is left out so
-  // Beam refunds the full charge; partial refunds are card-only anyway.
-  const { ok, status } = await beamFetch('POST', '/api/v1/refunds', { chargeId, reason });
+  // Both extra fields are required in practice, and neither is described that
+  // way. Omitting `reason` returns 502 — the same unhelpful status Beam gives
+  // for a duplicate referenceId, so it reads as a flaky gateway rather than a
+  // malformed request. Omitting `amount` returns 400 "Amount must be 1 or
+  // greater", despite the docs saying it is optional and that 0 means the full
+  // charge. `amount` is in satang, like every other amount here.
+  if (!Number.isFinite(amount) || amount < 1) {
+    throw new Error(`Beam refund needs a positive amount (got ${amount})`);
+  }
+  const { ok, status } = await beamFetch('POST', '/api/v1/refunds', {
+    chargeId,
+    amount: Math.round(amount),
+    reason,
+  });
   if (!ok) throw new Error(`Beam refund failed (HTTP ${status})`);
 }
 
