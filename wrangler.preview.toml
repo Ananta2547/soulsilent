@@ -52,6 +52,10 @@ bucket_name = "soulsilent-preview-media"
 #   - CRON_SECRET           (only if a preview cron is ever added)
 [vars]
 GOOGLE_CLIENT_ID = "798833181382-0sf30qcflhmpo6sepoke9i8ojab71fbp.apps.googleusercontent.com"
+# Beam merchant identifier — not a secret (the API key and the webhook HMAC key
+# are, and both are set with `wrangler secret put`). This preview Worker points
+# at the LIVE Beam account, so any link it creates can really be paid.
+BEAM_MERCHANT_ID = "allsoullearn-vg1ez5"
 # Must match the real preview hostname, or e-mail links and OAuth/Stripe
 # redirects will bounce users to production.
 SITE_URL = "https://soulsilent-preview.soulsilent-official.workers.dev"

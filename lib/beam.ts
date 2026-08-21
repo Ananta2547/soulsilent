@@ -47,12 +47,34 @@ async function beamFetch<T>(
   body?: unknown,
 ): Promise<{ status: number; ok: boolean; data: T | null }> {
   const { base, auth } = await getConfig();
-  const res = await fetch(base + path, {
-    method,
-    headers: { Authorization: auth, 'content-type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const text = await res.text();
+
+  // Beam intermittently answers 502 (observed while testing against the live
+  // API), which would otherwise fail a booking outright. One retry fixes it.
+  // The idempotency key makes that retry safe: if the first attempt actually
+  // reached Beam, the retry returns that same result instead of creating a
+  // second payment link. Keys are honoured for 12 hours.
+  const idempotencyKey = method === 'POST' ? crypto.randomUUID() : null;
+  const headers: Record<string, string> = {
+    Authorization: auth,
+    'content-type': 'application/json',
+  };
+  if (idempotencyKey) headers['x-beam-idempotency-key'] = idempotencyKey;
+
+  let res: Response | null = null;
+  let text = '';
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    res = await fetch(base + path, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    text = await res.text();
+    // Only server-side failures are worth retrying — a 4xx is our mistake and
+    // will fail identically.
+    if (res.status < 500 || attempt === 2) break;
+    console.warn(`Beam ${method} ${path} → ${res.status}, retrying once`);
+  }
+
   let data: T | null = null;
   try {
     data = text ? (JSON.parse(text) as T) : null;
@@ -60,10 +82,10 @@ async function beamFetch<T>(
     // Not JSON — leave data null; the status code still tells the caller what
     // happened.
   }
-  if (!res.ok) {
-    console.error(`Beam ${method} ${path} → ${res.status}`, text.slice(0, 500));
+  if (!res!.ok) {
+    console.error(`Beam ${method} ${path} → ${res!.status}`, text.slice(0, 500));
   }
-  return { status: res.status, ok: res.ok, data };
+  return { status: res!.status, ok: res!.ok, data };
 }
 
 /** Baht → satang. The single conversion point in the whole integration. */
