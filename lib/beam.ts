@@ -120,9 +120,17 @@ export function makeReference(bookingId: string, siteUrl: string): string {
   return host ? `${host}|${bookingId}|${nonce}` : `${bookingId}|${nonce}`;
 }
 
+/** Booking ids are v4 UUIDs, which is what makes them findable in a reference. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
- * Read a reference back. Handles all three generations: bare booking id,
+ * Read a reference back. Handles all three generations: a bare booking id,
  * "<host>|<bookingId>", and "<host>|<bookingId>|<nonce>".
+ *
+ * Identify the booking id by its UUID shape rather than by position or by
+ * "has dashes" — hostnames have dashes too, so that guess read
+ * "soulsilent-preview.…workers.dev|<uuid>" as a booking id of the host, and
+ * genuine payments were filed as unknown money.
  */
 export function parseReference(reference: string | null | undefined): {
   host: string | null;
@@ -130,13 +138,14 @@ export function parseReference(reference: string | null | undefined): {
 } {
   if (!reference) return { host: null, bookingId: null };
   const parts = reference.split('|');
-  if (parts.length === 1) return { host: null, bookingId: parts[0] };
-  // A bare "<bookingId>|<nonce>" has no host, which only happens when SITE_URL
-  // could not be parsed. A UUID has dashes; the nonce never does.
-  if (parts.length === 2 && parts[0].includes('-')) {
-    return { host: null, bookingId: parts[0] };
+
+  const idx = parts.findIndex((p) => UUID_RE.test(p));
+  if (idx !== -1) {
+    return { host: idx > 0 ? parts[0] : null, bookingId: parts[idx] };
   }
-  return { host: parts[0], bookingId: parts[1] };
+  // No UUID in sight — an id shape we don't generate. Treat the whole thing as
+  // the booking id and let the lookup fail loudly rather than guess a host.
+  return { host: null, bookingId: reference };
 }
 
 /** Baht → satang. The single conversion point in the whole integration. */
@@ -314,8 +323,15 @@ export async function fetchPaymentLink(linkId: string): Promise<{
  * As with Stripe, a PromptPay refund is not instant and may need the payer to
  * supply bank details, so this starts a refund rather than completing one.
  */
-export async function refundCharge(chargeId: string): Promise<void> {
-  const { ok, status } = await beamFetch('POST', '/api/v1/refunds', { chargeId });
+export async function refundCharge(
+  chargeId: string,
+  reason = 'Payment received after the seat hold expired',
+): Promise<void> {
+  // `reason` is REQUIRED. Omitting it made Beam answer 502 — the same
+  // unhelpful response it gives for a duplicate referenceId — which read as a
+  // flaky gateway rather than a malformed request. `amount` is left out so
+  // Beam refunds the full charge; partial refunds are card-only anyway.
+  const { ok, status } = await beamFetch('POST', '/api/v1/refunds', { chargeId, reason });
   if (!ok) throw new Error(`Beam refund failed (HTTP ${status})`);
 }
 

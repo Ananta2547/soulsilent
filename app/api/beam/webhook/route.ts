@@ -226,7 +226,12 @@ export async function POST(request: Request) {
           const refundable = reason !== 'unknown';
           if (chargeId && refundable) {
             try {
-              await refundCharge(chargeId);
+              await refundCharge(
+                chargeId,
+                reason === 'duplicate'
+                  ? 'Duplicate payment for the same booking'
+                  : 'Payment received after the seat hold expired',
+              );
             } catch (e) {
               console.error('Beam late/duplicate refund failed', chargeId, e);
             }
