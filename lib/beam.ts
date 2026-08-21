@@ -60,9 +60,10 @@ async function beamFetch<T>(
   };
   if (idempotencyKey) headers['x-beam-idempotency-key'] = idempotencyKey;
 
+  const MAX_ATTEMPTS = 3;
   let res: Response | null = null;
   let text = '';
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     res = await fetch(base + path, {
       method,
       headers,
@@ -71,8 +72,11 @@ async function beamFetch<T>(
     text = await res.text();
     // Only server-side failures are worth retrying — a 4xx is our mistake and
     // will fail identically.
-    if (res.status < 500 || attempt === 2) break;
-    console.warn(`Beam ${method} ${path} → ${res.status}, retrying once`);
+    if (res.status < 500 || attempt === MAX_ATTEMPTS) break;
+    console.warn(`Beam ${method} ${path} → ${res.status}, retry ${attempt}/${MAX_ATTEMPTS - 1}`);
+    // Beam has answered 502 twice in a row, so give it a moment rather than
+    // firing the retry into the same bad second.
+    await new Promise((r) => setTimeout(r, 400 * attempt));
   }
 
   let data: T | null = null;
@@ -86,6 +90,40 @@ async function beamFetch<T>(
     console.error(`Beam ${method} ${path} → ${res!.status}`, text.slice(0, 500));
   }
   return { status: res!.status, ok: res!.ok, data };
+}
+
+/**
+ * Beam fans every event for a merchant account out to EVERY registered webhook
+ * endpoint. Preview and production share one live account, so each site hears
+ * about the other's payments — and a booking id from the other environment
+ * simply is not in this database.
+ *
+ * So the reference we send carries the site that created it, and each side
+ * skips anything that is not its own instead of treating a stranger's payment
+ * as money it has to deal with.
+ *
+ * Format: "<host>|<bookingId>". Rows created before this carry a bare booking
+ * id and are still accepted (host comes back null).
+ */
+export function makeReference(bookingId: string, siteUrl: string): string {
+  let host = '';
+  try {
+    host = new URL(siteUrl).host;
+  } catch {
+    // Unparseable SITE_URL — send an untagged reference rather than block the
+    // payment.
+  }
+  return host ? `${host}|${bookingId}` : bookingId;
+}
+
+export function parseReference(reference: string | null | undefined): {
+  host: string | null;
+  bookingId: string | null;
+} {
+  if (!reference) return { host: null, bookingId: null };
+  const i = reference.indexOf('|');
+  if (i === -1) return { host: null, bookingId: reference };
+  return { host: reference.slice(0, i), bookingId: reference.slice(i + 1) };
 }
 
 /** Baht → satang. The single conversion point in the whole integration. */
@@ -186,8 +224,9 @@ export async function createWorkshopCheckout(params: {
         netAmount,
         currency: 'THB',
         description: params.workshopTitle,
-        // How the webhook finds its way back to our row.
-        referenceId: params.bookingId,
+        // How the webhook finds its way back to our row — tagged with this
+        // site's host so the other environment ignores it.
+        referenceId: makeReference(params.bookingId, params.successUrl),
       },
       expiresAt: new Date(Date.now() + holdMinutes * 60 * 1000).toISOString(),
       redirectUrl: params.successUrl,

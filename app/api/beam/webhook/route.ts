@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { v4 as uuid } from 'uuid';
 import { getDB, getEnv } from '@/lib/db';
-import { verifyBeamSignature, refundCharge, findChargeId } from '@/lib/beam';
+import { verifyBeamSignature, refundCharge, findChargeId, parseReference } from '@/lib/beam';
 
 /**
  * POST /api/beam/webhook — Beam event receiver.
@@ -95,33 +95,75 @@ export async function POST(request: Request) {
     const data = (event.data || (event as Record<string, unknown>)) as Record<string, unknown>;
     const db = await getDB();
 
-    // Our booking id, sent as order.referenceId when the link was created.
+    // Field names taken from real deliveries — the docs publish no payload
+    // schema, and none of the names they imply are the ones actually sent.
+    // Two shapes arrive, neither carrying an event name:
+    //
+    //   transaction  { transactionId: "ch_…", sourceId: <linkId>,
+    //                  referenceId: <bookingId>, chargeSource: "PAYMENT_LINK",
+    //                  transactionType: "PAYMENT" | "REFUND",
+    //                  grossAmount, netAmount, feeAmount }
+    //   purchase     { purchaseId: <linkId>, state: "complete",
+    //                  customer: { email, contactNumber } }
+    //
+    // The purchase shape has no referenceId, so its booking is found through
+    // the stored link id instead.
     const order = (data.order || {}) as Record<string, unknown>;
-    const bookingId = pick(data, 'referenceId') || pick(order, 'referenceId');
-    const linkId = pick(data, 'paymentLinkId', 'id', 'linkId');
-    // Beam publishes no payload schema, so search the whole object rather than
-    // trusting one spelling — the first live payment carried no top-level
-    // `chargeId` and left the booking with nothing to refund against.
-    const chargeId = findChargeId(event);
+    const customer = (data.customer || {}) as Record<string, unknown>;
 
-    // Fall back to the payload's shape when the event name is missing or
-    // unfamiliar. A charge id means money moved; a link id with no charge means
-    // the link was paid. Without this an unrecognised name silently drops a
-    // payment on the floor, which is exactly what happened on the first tests.
+    const linkId = pick(data, 'sourceId', 'purchaseId', 'paymentLinkId', 'linkId');
+    // `transactionId` is the charge (it carries the ch_ prefix); findChargeId
+    // stays as a backstop for any future naming.
+    const chargeId =
+      pick(data, 'transactionId', 'chargeId', 'charge_id') || findChargeId(event);
+    const transactionType = (pick(data, 'transactionType') || '').toUpperCase();
+    const state = (pick(data, 'state', 'status') || '').toUpperCase();
+
+    // Preview and production share one Beam account, and Beam delivers every
+    // event to every registered endpoint — so much of what arrives here belongs
+    // to the other site. The reference carries the host that created it.
+    const reference = pick(data, 'referenceId') || pick(order, 'referenceId');
+    const { host: refHost, bookingId: refBookingId } = parseReference(reference);
+    const ourHost = (() => {
+      try {
+        return new URL(env.SITE_URL || '').host;
+      } catch {
+        return '';
+      }
+    })();
+    if (refHost && ourHost && refHost !== ourHost) {
+      console.log(`Beam webhook: ignoring event for ${refHost} (we are ${ourHost})`);
+      return NextResponse.json({ received: true, ignored: 'other-environment' });
+    }
+
+    let bookingId = refBookingId;
+    if (!bookingId && linkId) {
+      const row = await db
+        .prepare('SELECT id FROM bookings WHERE beam_payment_link_id = ?')
+        .bind(linkId)
+        .first<{ id: string }>();
+      bookingId = row?.id ?? null;
+    }
+
+    // Classify by shape, since there is no name to switch on. A refund must be
+    // checked first: it is a transaction too, and would otherwise be booked as
+    // an incoming payment.
     let effective = type;
-    if (effective !== 'refund.succeeded') {
-      if (chargeId) effective = 'charge.succeeded';
-      else if (linkId && bookingId) effective = 'payment_link.paid';
+    if (!effective) {
+      if (transactionType === 'REFUND') effective = 'refund.succeeded';
+      else if (chargeId) effective = 'charge.succeeded';
+      else if (linkId && (state === 'COMPLETE' || state === 'PAID')) {
+        effective = 'payment_link.paid';
+      }
     }
 
     console.log(
-      `Beam webhook "${type}" → ${effective || 'ignored'} booking=${bookingId ?? '-'} link=${linkId ?? '-'} charge=${chargeId ?? '-'}`,
+      `Beam webhook ${effective || 'ignored'} booking=${bookingId ?? '-'} link=${linkId ?? '-'} charge=${chargeId ?? '-'} txType=${transactionType || '-'} state=${state || '-'}`,
     );
-    if (!type) {
-      // Temporary: Beam publishes no payload schema and the event name is not
-      // where the docs imply. Log the body so the field can be pinned down and
-      // this removed.
-      console.warn('Beam webhook: unnamed event, payload=', raw.slice(0, 800));
+    if (!effective) {
+      // Shape we don't recognise — log it rather than dropping a payment
+      // silently, which is exactly what the first live tests did.
+      console.warn('Beam webhook: unclassified payload=', raw.slice(0, 800));
     }
 
     switch (effective) {
@@ -149,8 +191,11 @@ export async function POST(request: Request) {
       }
 
       case 'charge.succeeded': {
-        const amount = pickNum(data, 'amount', 'netAmount');
-        const email = pick(data, 'email', 'receiptEmail', 'customerEmail');
+        // grossAmount is what the payer was charged; netAmount is after Beam's
+        // fee. Record the gross, since that is what has to be given back.
+        const amount = pickNum(data, 'grossAmount', 'amount', 'netAmount');
+        const email =
+          pick(data, 'email', 'receiptEmail', 'customerEmail') || pick(customer, 'email');
 
         const booking = bookingId
           ? await db
@@ -173,7 +218,13 @@ export async function POST(request: Request) {
         else if (booking.beam_charge_id && booking.beam_charge_id !== chargeId) reason = 'duplicate';
 
         if (reason) {
-          if (chargeId) {
+          // Refund only money we can positively tie to one of our own bookings.
+          // `unknown` means no matching row — which, on a shared Beam account,
+          // is most likely somebody else's legitimate payment. Refunding on a
+          // guess moves real money, so it goes to the reconcile page for a human
+          // instead.
+          const refundable = reason !== 'unknown';
+          if (chargeId && refundable) {
             try {
               await refundCharge(chargeId);
             } catch (e) {
