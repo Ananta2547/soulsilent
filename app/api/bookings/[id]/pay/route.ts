@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDB, getEnv } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
-import { createWorkshopCheckout } from '@/lib/stripe';
+import { createWorkshopCheckout } from '@/lib/beam';
 import type { Workshop, Booking } from '@/lib/types';
 
 /**
@@ -83,10 +83,15 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       amount,
       bookingId: id,
       userId: user.sub,
-      successUrl: `${siteUrl}/me/bookings?paid=1`,
+      // Beam has no {SESSION_ID} placeholder like Stripe, so carry the booking
+      // id instead — /api/payments/verify looks the link id up from the row.
+      successUrl: `${siteUrl}/me/bookings?paid=1&booking=${id}`,
       cancelUrl: `${siteUrl}/me/bookings`,
     });
-    await db.prepare('UPDATE bookings SET stripe_session_id = ? WHERE id = ?').bind(sessionId, id).run();
+    await db
+      .prepare('UPDATE bookings SET beam_payment_link_id = ? WHERE id = ?')
+      .bind(sessionId, id)
+      .run();
 
     return NextResponse.json({ checkoutUrl, amount });
   } catch (error) {

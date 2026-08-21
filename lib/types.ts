@@ -202,6 +202,12 @@ export interface Booking {
   stripe_payment_id: string | null;
   /** Stripe Checkout Session id — used to expire the session (kill the QR). */
   stripe_session_id: string | null;
+  /** Beam payment link id — disabled to kill the QR. Which of this and
+   *  stripe_session_id is set decides which gateway a booking belongs to
+   *  while both are live (migration 047). */
+  beam_payment_link_id: string | null;
+  /** Beam charge id, set once payment lands. A refund is issued against it. */
+  beam_charge_id: string | null;
   amount: number;
   attended: number | null; // null=not marked, 1=attended, 0=no-show
   expires_at: string | null; // ISO datetime — null for legacy or paid rows

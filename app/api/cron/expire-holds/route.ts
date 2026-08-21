@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDB, getEnv } from '@/lib/db';
 import { expireCheckoutSession, fetchCheckoutSession, refundPaymentIntent } from '@/lib/stripe';
+import { disablePaymentLink } from '@/lib/beam';
 
 /**
  * Sweep unpaid bookings whose 10-minute hold has lapsed and expire their Stripe
@@ -23,20 +24,29 @@ export async function GET(request: Request) {
     // Lapsed holds still awaiting payment.
     const rows = await db
       .prepare(
-        `SELECT id, stripe_session_id FROM bookings
+        `SELECT id, stripe_session_id, beam_payment_link_id FROM bookings
          WHERE payment_status = 'pending'
            AND status != 'cancelled'
            AND expires_at IS NOT NULL
            AND datetime(expires_at) <= datetime('now')
          LIMIT 100`
       )
-      .all<{ id: string; stripe_session_id: string | null }>();
+      .all<{ id: string; stripe_session_id: string | null; beam_payment_link_id: string | null }>();
 
     let expired = 0;
     let paid = 0;
     for (const b of rows.results) {
       let becamePaid = false;
-      if (b.stripe_session_id) {
+      // Beam for rows booked since the switchover, Stripe for holds still in
+      // flight from before it.
+      if (b.beam_payment_link_id) {
+        try {
+          const r = await disablePaymentLink(b.beam_payment_link_id);
+          becamePaid = r.paid;
+        } catch (e) {
+          console.error('cron disablePaymentLink failed', b.id, e);
+        }
+      } else if (b.stripe_session_id) {
         try {
           const r = await expireCheckoutSession(b.stripe_session_id);
           becamePaid = r.paid;
@@ -77,31 +87,44 @@ export async function GET(request: Request) {
         // left by the old lazy path (status='cancelled' + payment_status still
         // 'pending') — those older bookings have a live PaymentIntent whose saved
         // QR is still scannable until swept here or Stripe's 24h session expiry.
-        `SELECT stripe_session_id AS sid FROM bookings
-         WHERE stripe_session_id IS NOT NULL
+        `SELECT id, stripe_session_id AS sid, beam_payment_link_id AS beam FROM bookings
+         WHERE (stripe_session_id IS NOT NULL OR beam_payment_link_id IS NOT NULL)
            AND (payment_status = 'expired'
                 OR (status = 'cancelled' AND payment_status = 'pending'))
            AND datetime(created_at) >= datetime('now', '${staleWindow}')
          LIMIT 50`
       )
-      .all<{ sid: string }>();
+      .all<{ id: string; sid: string | null; beam: string | null }>();
     let cleaned = 0;
     let refunded = 0;
     for (const r of stale.results) {
       try {
-        const res = await expireCheckoutSession(r.sid);
-        if (res.paid) {
-          const s = await fetchCheckoutSession(r.sid);
-          const pi = typeof s.payment_intent === 'string' ? s.payment_intent : s.payment_intent?.id;
-          if (pi) {
-            await refundPaymentIntent(pi);
-            refunded++;
+        if (r.beam) {
+          // Beam: closing the link tells us whether money landed anyway. The
+          // charge id needed for a refund comes from the charge.succeeded
+          // webhook, so refunds for late Beam payments are issued there rather
+          // than here.
+          const res = await disablePaymentLink(r.beam);
+          if (res.paid) {
+            console.warn('cron: Beam link paid after expiry, refund via webhook', r.id);
+          } else {
+            cleaned++;
           }
-        } else {
-          cleaned++;
+        } else if (r.sid) {
+          const res = await expireCheckoutSession(r.sid);
+          if (res.paid) {
+            const s = await fetchCheckoutSession(r.sid);
+            const pi = typeof s.payment_intent === 'string' ? s.payment_intent : s.payment_intent?.id;
+            if (pi) {
+              await refundPaymentIntent(pi);
+              refunded++;
+            }
+          } else {
+            cleaned++;
+          }
         }
       } catch (e) {
-        console.error('cron retroactive cleanup failed', r.sid, e);
+        console.error('cron retroactive cleanup failed', r.id, e);
       }
     }
 

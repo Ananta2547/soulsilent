@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDB, getEnv } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
-import { createWorkshopCheckout } from '@/lib/stripe';
+import { createWorkshopCheckout } from '@/lib/beam';
 import { getEffectivePrice } from '@/lib/workshop-utils';
 import { visibleAppStatus, confirmDeadlineFor } from '@/lib/selection';
 import type { Workshop, Booking } from '@/lib/types';
@@ -77,14 +77,23 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
     const env = await getEnv();
     const siteUrl = env.SITE_URL || 'http://localhost:3000';
-    const checkoutUrl = await createWorkshopCheckout({
+    // Destructure: the helper returns { url, sessionId }. This used to assign
+    // the whole object to `checkoutUrl` and hand it back as the redirect
+    // target, and it never stored the id — so a QR created down this path
+    // could not be killed when the hold lapsed.
+    const { url: checkoutUrl, sessionId } = await createWorkshopCheckout({
       workshopTitle: workshop.title,
       amount,
       bookingId: id,
       userId: user.sub,
-      successUrl: `${siteUrl}/me/bookings?paid=1`,
+      successUrl: `${siteUrl}/me/bookings?paid=1&booking=${id}`,
       cancelUrl: `${siteUrl}/me/bookings`,
+      holdMinutes: HOLD_MINUTES,
     });
+    await db
+      .prepare('UPDATE bookings SET beam_payment_link_id = ? WHERE id = ?')
+      .bind(sessionId, id)
+      .run();
 
     return NextResponse.json({ confirmed: true, mode: paymentType, checkoutUrl, amount });
   } catch (error) {

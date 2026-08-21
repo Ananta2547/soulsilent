@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { fetchCheckoutSession, refundPaymentIntent } from '@/lib/stripe';
+import { fetchPaymentLink } from '@/lib/beam';
 
 /**
  * POST /api/payments/verify { session_id }
@@ -15,10 +16,19 @@ import { fetchCheckoutSession, refundPaymentIntent } from '@/lib/stripe';
 export async function POST(request: Request) {
   try {
     const user = await requireAuth();
-    const { session_id } = (await request.json()) as { session_id?: string };
+    const { session_id, booking_id } = (await request.json()) as {
+      session_id?: string;
+      booking_id?: string;
+    };
+
+    // Beam path. Beam has no {SESSION_ID} placeholder, so the redirect carries
+    // the booking id and the link id is read back from the row.
+    if (booking_id) {
+      return await verifyBeamBooking(booking_id, user.sub);
+    }
 
     if (!session_id) {
-      return NextResponse.json({ error: 'missing session_id' }, { status: 400 });
+      return NextResponse.json({ error: 'missing session_id or booking_id' }, { status: 400 });
     }
 
     const session = await fetchCheckoutSession(session_id);
@@ -79,4 +89,62 @@ export async function POST(request: Request) {
     console.error('Verify payment error:', error);
     return NextResponse.json({ error: 'เกิดข้อผิดพลาด' }, { status: 500 });
   }
+}
+
+/**
+ * Verify a Beam booking after the shopper is redirected back.
+ *
+ * Ownership is checked against the booking row (Beam carries no metadata of
+ * ours beyond `referenceId`), then the payment link's live status decides the
+ * outcome. A late payment is NOT refunded here: the refund needs a charge id,
+ * which only arrives with the `charge.succeeded` webhook, so that path owns it.
+ */
+async function verifyBeamBooking(bookingId: string, userId: string) {
+  const db = await getDB();
+  const booking = await db
+    .prepare(
+      'SELECT user_id, status, payment_status, beam_payment_link_id FROM bookings WHERE id = ?',
+    )
+    .bind(bookingId)
+    .first<{
+      user_id: string | null;
+      status: string;
+      payment_status: string;
+      beam_payment_link_id: string | null;
+    }>();
+
+  if (!booking) {
+    return NextResponse.json({ ok: false, error: 'booking not found' }, { status: 404 });
+  }
+  // Defence in depth: only the user who created the booking can verify it.
+  if (booking.user_id !== userId) {
+    return NextResponse.json({ error: 'booking does not belong to you' }, { status: 403 });
+  }
+  if (!booking.beam_payment_link_id) {
+    return NextResponse.json({ ok: false, error: 'no payment link on this booking' }, { status: 400 });
+  }
+
+  const link = await fetchPaymentLink(booking.beam_payment_link_id);
+  if (!link.paid) {
+    return NextResponse.json({
+      ok: false,
+      payment_status: link.status,
+      message: 'Payment not completed yet',
+    });
+  }
+
+  // Paid, but the hold already lapsed and the seat went back to the pool.
+  if (booking.status === 'cancelled' || booking.payment_status === 'expired') {
+    return NextResponse.json({
+      ok: false,
+      expired: true,
+      message: 'หมดเวลาชำระเงิน ระบบจะคืนเงินให้อัตโนมัติ',
+    });
+  }
+
+  await db
+    .prepare("UPDATE bookings SET status = 'confirmed', payment_status = 'paid' WHERE id = ?")
+    .bind(bookingId)
+    .run();
+  return NextResponse.json({ ok: true, type: 'workshop', booking_id: bookingId });
 }

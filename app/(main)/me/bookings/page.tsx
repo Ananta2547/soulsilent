@@ -213,18 +213,21 @@ export default function MyBookingsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  // On return from Stripe (?paid=1[&session_id=...]) → verify + show thank-you.
+  // On return from the gateway → verify + show thank-you.
+  //   Beam   : ?paid=1&booking=<bookingId>   (Beam has no session-id placeholder)
+  //   Stripe : ?paid=1&session_id=<id>       (legacy, for holds still in flight)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sessionId = params.get('session_id');
+    const bookingId = params.get('booking');
     const paid = params.get('paid');
     (async () => {
-      if (sessionId) {
+      if (sessionId || bookingId) {
         try {
           const res = await fetch('/api/payments/verify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ session_id: sessionId }),
+            body: JSON.stringify(bookingId ? { booking_id: bookingId } : { session_id: sessionId }),
           });
           if (!res.ok) throw new Error(`verify HTTP ${res.status}`);
         } catch (e) {

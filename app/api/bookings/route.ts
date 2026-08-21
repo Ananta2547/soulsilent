@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { v4 as uuid } from 'uuid';
 import { getDB, getEnv } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
-import { createWorkshopCheckout } from '@/lib/stripe';
+import { createWorkshopCheckout } from '@/lib/beam';
 import { getEffectivePrice, hasWorkshopStarted } from '@/lib/workshop-utils';
 import { settleSelection, visibleAppStatus, confirmDeadlineFor, type SettleWorkshop } from '@/lib/selection';
 import { expireStaleHolds } from '@/lib/holds';
@@ -337,7 +337,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ submitted: true, mode: 'free', bookingId });
     }
 
-    // Direct deposit / paid → create the Stripe checkout. The modal decides
+    // Direct deposit / paid → create the Beam checkout. The modal decides
     // whether to redirect immediately (paid) or after a notice popup (deposit).
     const env = await getEnv();
     const siteUrl = env.SITE_URL || 'http://localhost:3000';
@@ -346,11 +346,17 @@ export async function POST(request: Request) {
       amount: chargeAmount,
       bookingId,
       userId: user.sub,
-      successUrl: `${siteUrl}/me/bookings?paid=1`,
+      // Beam has no {SESSION_ID} placeholder like Stripe, so carry the booking
+      // id instead — /api/payments/verify looks the link id up from the row.
+      successUrl: `${siteUrl}/me/bookings?paid=1&booking=${bookingId}`,
       cancelUrl: `${siteUrl}/workshops/${workshop_id}?booking=cancelled`,
+      holdMinutes: HOLD_MINUTES,
     });
-    // Persist the session id so the hold can be expired later (kills the QR).
-    await db.prepare('UPDATE bookings SET stripe_session_id = ? WHERE id = ?').bind(sessionId, bookingId).run();
+    // Persist the link id so the hold can be disabled later (kills the QR).
+    await db
+      .prepare('UPDATE bookings SET beam_payment_link_id = ? WHERE id = ?')
+      .bind(sessionId, bookingId)
+      .run();
 
     return NextResponse.json({
       checkoutUrl,

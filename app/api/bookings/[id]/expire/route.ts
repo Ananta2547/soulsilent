@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { expireCheckoutSession } from '@/lib/stripe';
+import { disablePaymentLink } from '@/lib/beam';
 import type { Booking } from '@/lib/types';
 
 /**
@@ -43,11 +44,17 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       }
     }
 
-    // Kill the QR by expiring the checkout session. If Stripe reports the user
-    // paid in the race just before this, confirm the booking instead.
-    if (booking.stripe_session_id) {
+    // Kill the QR by closing the checkout. Which gateway to talk to is decided
+    // by whichever id the row carries: Beam for anything booked since the
+    // switchover, Stripe for holds still in flight from before it. If the
+    // gateway reports the user paid in the race just before this, confirm the
+    // booking instead of cancelling it.
+    const linkId = booking.beam_payment_link_id || booking.stripe_session_id;
+    if (linkId) {
       try {
-        const { paid } = await expireCheckoutSession(booking.stripe_session_id);
+        const { paid } = booking.beam_payment_link_id
+          ? await disablePaymentLink(booking.beam_payment_link_id)
+          : await expireCheckoutSession(linkId);
         if (paid) {
           await db
             .prepare("UPDATE bookings SET status='confirmed', payment_status='paid', expires_at=NULL WHERE id = ?")

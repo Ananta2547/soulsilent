@@ -14,6 +14,16 @@ declare global {
     EMAIL_FROM: string;
     /** Shared secret guarding the cron sweep endpoint (/api/cron/expire-holds). */
     CRON_SECRET: string;
+    /** Beam Checkout merchant id, e.g. "allsoullearn-xxxxxx". Not secret. */
+    BEAM_MERCHANT_ID: string;
+    /** Beam API key. Playground and production keys are NOT interchangeable. */
+    BEAM_API_KEY: string;
+    /** Base64 HMAC key used to verify the X-Beam-Signature webhook header. */
+    BEAM_WEBHOOK_SECRET: string;
+    /** Override the API host. Defaults to production
+     *  (https://api.beamcheckout.com); set to
+     *  https://playground.api.beamcheckout.com for the sandbox. */
+    BEAM_BASE_URL?: string;
   }
 
   namespace NodeJS {
