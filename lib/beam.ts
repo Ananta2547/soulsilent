@@ -164,7 +164,8 @@ export async function createWorkshopCheckout(params: {
   bookingId: string;
   userId: string;
   successUrl: string;
-  /** Beam documents no cancel URL; accepted for signature parity, unused. */
+  /** Where to send a shopper who backs out. Beam's guide never mentions it, but
+   *  a fetched link echoes `cancelUrl` back, so the field is real. */
   cancelUrl?: string;
   holdMinutes?: number;
 }): Promise<{ url: string; sessionId: string }> {
@@ -190,6 +191,7 @@ export async function createWorkshopCheckout(params: {
       },
       expiresAt: new Date(Date.now() + holdMinutes * 60 * 1000).toISOString(),
       redirectUrl: params.successUrl,
+      ...(params.cancelUrl ? { cancelUrl: params.cancelUrl } : {}),
       linkSettings: {
         qrPromptPay: { isEnabled: true },
         mobileBanking: { isEnabled: true },

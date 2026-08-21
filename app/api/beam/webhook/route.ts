@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { v4 as uuid } from 'uuid';
 import { getDB, getEnv } from '@/lib/db';
-import { verifyBeamSignature, refundCharge, fetchPaymentLink, findChargeId } from '@/lib/beam';
+import { verifyBeamSignature, refundCharge, findChargeId } from '@/lib/beam';
 
 /**
  * POST /api/beam/webhook — Beam event receiver.
@@ -22,6 +22,35 @@ import { verifyBeamSignature, refundCharge, fetchPaymentLink, findChargeId } fro
  * Anything else is acknowledged and ignored: a 200 stops Beam retrying an event
  * we have no use for.
  */
+
+/**
+ * Find the event name in a Beam payload.
+ *
+ * The first live payments arrived with neither `eventType` nor `type` set, so
+ * every event fell through to the default branch and nothing was processed —
+ * bookings only looked correct because the redirect-time verify was quietly
+ * doing the work. Match on any key that reads like an event name, and accept
+ * the value only if it looks like one ("charge.succeeded", "payment_link.paid").
+ */
+function readEventType(event: Record<string, unknown>): string {
+  for (const [key, v] of Object.entries(event)) {
+    if (typeof v !== 'string' || !v) continue;
+    const k = key.toLowerCase().replace(/[_-]/g, '');
+    if (k === 'eventtype' || k === 'type' || k === 'event' || k === 'eventname' || k === 'name') {
+      return v;
+    }
+  }
+  // Some senders put the name one level down, next to the resource.
+  const data = event.data;
+  if (data && typeof data === 'object') {
+    for (const [key, v] of Object.entries(data as Record<string, unknown>)) {
+      if (typeof v !== 'string' || !v) continue;
+      const k = key.toLowerCase().replace(/[_-]/g, '');
+      if (k === 'eventtype' || k === 'type' || k === 'event' || k === 'eventname') return v;
+    }
+  }
+  return '';
+}
 
 /** Beam's payload field names are not published; read the usual spellings. */
 function pick(o: Record<string, unknown> | undefined, ...keys: string[]): string | null {
@@ -58,12 +87,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'invalid signature' }, { status: 400 });
     }
 
-    const event = JSON.parse(raw) as {
-      eventType?: string;
-      type?: string;
+    const event = JSON.parse(raw) as Record<string, unknown> & {
       data?: Record<string, unknown>;
     };
-    const type = event.eventType || event.type || '';
+    const type = readEventType(event);
     // Some gateways nest the resource under `data`, some send it flat.
     const data = (event.data || (event as Record<string, unknown>)) as Record<string, unknown>;
     const db = await getDB();
@@ -75,24 +102,29 @@ export async function POST(request: Request) {
     // Beam publishes no payload schema, so search the whole object rather than
     // trusting one spelling — the first live payment carried no top-level
     // `chargeId` and left the booking with nothing to refund against.
-    let chargeId = findChargeId(event);
+    const chargeId = findChargeId(event);
 
-    // Second chance: the event may not carry the charge, but the payment link
-    // does once it is PAID. Without an id we can never refund this money.
-    if (!chargeId && linkId && (type === 'payment_link.paid' || type === 'charge.succeeded')) {
-      const link = await fetchPaymentLink(linkId);
-      chargeId = findChargeId(link.raw);
-    }
-    if (!chargeId && (type === 'payment_link.paid' || type === 'charge.succeeded')) {
-      // Log the shape once so the next real payment tells us where it hides.
-      console.warn(`Beam webhook ${type}: no charge id found. payload=`, raw.slice(0, 800));
+    // Fall back to the payload's shape when the event name is missing or
+    // unfamiliar. A charge id means money moved; a link id with no charge means
+    // the link was paid. Without this an unrecognised name silently drops a
+    // payment on the floor, which is exactly what happened on the first tests.
+    let effective = type;
+    if (effective !== 'refund.succeeded') {
+      if (chargeId) effective = 'charge.succeeded';
+      else if (linkId && bookingId) effective = 'payment_link.paid';
     }
 
     console.log(
-      `Beam webhook ${type} booking=${bookingId ?? '-'} link=${linkId ?? '-'} charge=${chargeId ?? '-'}`,
+      `Beam webhook "${type}" → ${effective || 'ignored'} booking=${bookingId ?? '-'} link=${linkId ?? '-'} charge=${chargeId ?? '-'}`,
     );
+    if (!type) {
+      // Temporary: Beam publishes no payload schema and the event name is not
+      // where the docs imply. Log the body so the field can be pinned down and
+      // this removed.
+      console.warn('Beam webhook: unnamed event, payload=', raw.slice(0, 800));
+    }
 
-    switch (type) {
+    switch (effective) {
       case 'payment_link.paid': {
         if (!bookingId) break;
         const booking = await db
