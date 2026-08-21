@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { v4 as uuid } from 'uuid';
 import { getDB, getEnv } from '@/lib/db';
-import { verifyBeamSignature, refundCharge } from '@/lib/beam';
+import { verifyBeamSignature, refundCharge, fetchPaymentLink, findChargeId } from '@/lib/beam';
 
 /**
  * POST /api/beam/webhook — Beam event receiver.
@@ -72,9 +72,25 @@ export async function POST(request: Request) {
     const order = (data.order || {}) as Record<string, unknown>;
     const bookingId = pick(data, 'referenceId') || pick(order, 'referenceId');
     const linkId = pick(data, 'paymentLinkId', 'id', 'linkId');
-    const chargeId = pick(data, 'chargeId', 'charge_id');
+    // Beam publishes no payload schema, so search the whole object rather than
+    // trusting one spelling — the first live payment carried no top-level
+    // `chargeId` and left the booking with nothing to refund against.
+    let chargeId = findChargeId(event);
 
-    console.log(`Beam webhook ${type} booking=${bookingId ?? '-'} link=${linkId ?? '-'}`);
+    // Second chance: the event may not carry the charge, but the payment link
+    // does once it is PAID. Without an id we can never refund this money.
+    if (!chargeId && linkId && (type === 'payment_link.paid' || type === 'charge.succeeded')) {
+      const link = await fetchPaymentLink(linkId);
+      chargeId = findChargeId(link.raw);
+    }
+    if (!chargeId && (type === 'payment_link.paid' || type === 'charge.succeeded')) {
+      // Log the shape once so the next real payment tells us where it hides.
+      console.warn(`Beam webhook ${type}: no charge id found. payload=`, raw.slice(0, 800));
+    }
+
+    console.log(
+      `Beam webhook ${type} booking=${bookingId ?? '-'} link=${linkId ?? '-'} charge=${chargeId ?? '-'}`,
+    );
 
     switch (type) {
       case 'payment_link.paid': {
@@ -88,11 +104,14 @@ export async function POST(request: Request) {
         // handles giving the money back.
         if (booking.status === 'cancelled' || booking.payment_status === 'expired') break;
 
+        // Store the charge id here too: whichever event lands first should
+        // leave the booking refundable. COALESCE keeps an id already set by
+        // charge.succeeded rather than blanking it.
         await db
           .prepare(
-            "UPDATE bookings SET status='confirmed', payment_status='paid', expires_at=NULL WHERE id = ?",
+            "UPDATE bookings SET status='confirmed', payment_status='paid', expires_at=NULL, beam_charge_id = COALESCE(beam_charge_id, ?) WHERE id = ?",
           )
-          .bind(bookingId)
+          .bind(chargeId, bookingId)
           .run();
         break;
       }

@@ -5,11 +5,9 @@ import { requireAuth } from '@/lib/auth';
 import { createWorkshopCheckout } from '@/lib/beam';
 import { getEffectivePrice, hasWorkshopStarted } from '@/lib/workshop-utils';
 import { settleSelection, visibleAppStatus, confirmDeadlineFor, type SettleWorkshop } from '@/lib/selection';
-import { expireStaleHolds } from '@/lib/holds';
+import { expireStaleHolds, HOLD_MINUTES } from '@/lib/holds';
 import type { Workshop } from '@/lib/types';
 
-/** Minutes a booking holds its seat for after creation. */
-const HOLD_MINUTES = 60;
 
 /** Whole years from a YYYY-MM-DD birthdate, or null. Mirrors the client. */
 function ageFromDob(dob: string | null): number | null {

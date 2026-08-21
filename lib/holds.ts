@@ -12,6 +12,22 @@
  */
 type Db = Awaited<ReturnType<typeof import('./db').getDB>>;
 
+/**
+ * How long a pending booking holds its seat, and the life of the payment QR —
+ * the two are always set to the same value so the QR dies exactly when the seat
+ * is released.
+ *
+ * Declared here as the single source of truth: it used to be copied into each
+ * route, which is how the modal ended up telling Thai users "10 นาที" while the
+ * English string beside it said "1 hour".
+ *
+ * It was 60 only because Stripe refused a Checkout Session shorter than 30
+ * minutes. Beam has no such floor, so this is a free product decision now.
+ * Changing it also means changing the copy that names the duration
+ * (BookingModal, the workshop detail perks list).
+ */
+export const HOLD_MINUTES = 30;
+
 export async function expireStaleHolds(db: Db): Promise<void> {
   await db
     .prepare(

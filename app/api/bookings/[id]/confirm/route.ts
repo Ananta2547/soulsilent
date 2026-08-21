@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server';
 import { getDB, getEnv } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { createWorkshopCheckout } from '@/lib/beam';
+import { HOLD_MINUTES } from '@/lib/holds';
 import { getEffectivePrice } from '@/lib/workshop-utils';
 import { visibleAppStatus, confirmDeadlineFor } from '@/lib/selection';
 import type { Workshop, Booking } from '@/lib/types';
 
-const HOLD_MINUTES = 60;
+
 
 /**
  * A selected (approved) user confirms their seat. For free workshops this

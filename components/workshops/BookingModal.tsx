@@ -274,7 +274,7 @@ export function BookingModal({
             ⚠️
           </div>
           <h2 className="display-th" style={{ fontSize: 20, margin: '0 0 12px', textAlign: 'center' }}>
-            <T th="ขั้นตอนถัดไปคือ QR ชำระเงิน (หมดอายุ 1 ชั่วโมง)" en="Next is the payment QR (expires in 1 hour)" />
+            <T th="ขั้นตอนถัดไปคือ QR ชำระเงิน (หมดอายุ 30 นาที)" en="Next is the payment QR (expires in 30 minutes)" />
           </h2>
           <div style={{ background: '#fdecec', border: '1px solid #f0b4b4', borderRadius: 14, padding: '13px 16px', margin: '0 0 22px', fontSize: 13, color: '#a13030', lineHeight: 1.6 }}>
             <T
@@ -332,7 +332,7 @@ export function BookingModal({
 
           {isDeposit && result.checkoutUrl && (
             <div style={{ background: '#fdecec', border: '1px solid #f0b4b4', borderRadius: 14, padding: '11px 15px', margin: '0 0 14px', fontSize: 12.5, color: '#a13030', lineHeight: 1.55, textAlign: 'left' }}>
-              <strong><T th="⚠️ QR หมดอายุใน 10 นาที" en="⚠️ QR expires in 1 hour" /></strong>
+              <strong><T th="⚠️ QR หมดอายุใน 30 นาที" en="⚠️ QR expires in 30 minutes" /></strong>
               <br />
               <T
                 th="ห้ามบันทึก QR ไว้จ่ายภายหลัง หรือสแกนซ้ำ — จ่ายหลังหมดเวลา/จ่ายซ้ำ เงินจะถูกตัดจากบัญชีแต่ระบบไม่รับชำระและไม่ได้ที่นั่งเพิ่ม (ต้องรอธนาคารคืนเงินภายหลัง)"
@@ -633,7 +633,7 @@ export function BookingModal({
         {step === 2 && workshop.payment_type !== 'free' && workshop.admission_type !== 'selection' && (
           <div style={{ padding: '0 24px', marginTop: -4 }}>
             <div style={{ background: '#fdecec', border: '1px solid #f0b4b4', borderRadius: 14, padding: '11px 15px', fontSize: 12.5, color: '#a13030', lineHeight: 1.55 }}>
-              <strong><T th="⚠️ ขั้นตอนถัดไปคือ QR ชำระเงิน (หมดอายุ 1 ชั่วโมง)" en="⚠️ Next is the payment QR (expires in 1 hour)" /></strong>
+              <strong><T th="⚠️ ขั้นตอนถัดไปคือ QR ชำระเงิน (หมดอายุ 30 นาที)" en="⚠️ Next is the payment QR (expires in 30 minutes)" /></strong>
               <br />
               <T
                 th="ห้ามบันทึก QR ไว้จ่ายภายหลัง หรือสแกนซ้ำ — จ่ายหลังหมดเวลา/จ่ายซ้ำ เงินจะถูกตัดจากบัญชีแต่ระบบไม่รับชำระและไม่ได้ที่นั่งเพิ่ม (ธนาคารจะคืนเงินให้ภายหลัง)"

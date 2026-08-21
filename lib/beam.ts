@@ -108,6 +108,45 @@ function readUrl(o: Record<string, unknown> | null): string | null {
 }
 
 /**
+ * Dig a charge id out of any Beam object.
+ *
+ * Beam publishes no payload schema, and the first live payment proved the point:
+ * `payment_link.paid` confirmed the booking but no `chargeId` was found at the
+ * top level, so nothing was stored to refund against. Rather than betting on one
+ * spelling, walk the object for a key that looks like a charge id — `chargeId`,
+ * `charge_id`, or a nested `charge: { id }`.
+ *
+ * Depth-limited so a malformed or deeply nested payload can't spin.
+ */
+export function findChargeId(value: unknown, depth = 0): string | null {
+  if (!value || typeof value !== 'object' || depth > 5) return null;
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const hit = findChargeId(item, depth + 1);
+      if (hit) return hit;
+    }
+    return null;
+  }
+
+  const obj = value as Record<string, unknown>;
+  for (const [key, v] of Object.entries(obj)) {
+    const k = key.toLowerCase();
+    if (typeof v === 'string' && v && (k === 'chargeid' || k === 'charge_id')) return v;
+    // { charge: { id: "..." } }
+    if (k === 'charge' && v && typeof v === 'object') {
+      const id = (v as Record<string, unknown>).id;
+      if (typeof id === 'string' && id) return id;
+    }
+  }
+  for (const v of Object.values(obj)) {
+    const hit = findChargeId(v, depth + 1);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/**
  * Create a hosted Beam checkout for one booking.
  *
  * `expiresAt` matches the seat-hold window so the QR dies exactly when the hold
