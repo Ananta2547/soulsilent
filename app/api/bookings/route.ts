@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { v4 as uuid } from 'uuid';
 import { getDB, getEnv } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
-import { createWorkshopCheckout } from '@/lib/beam';
+import { createWorkshopCheckout, reusableCheckoutUrl, BeamError } from '@/lib/beam';
 import { getEffectivePrice, hasWorkshopStarted } from '@/lib/workshop-utils';
 import { settleSelection, visibleAppStatus, confirmDeadlineFor, type SettleWorkshop } from '@/lib/selection';
 import { expireStaleHolds, HOLD_MINUTES } from '@/lib/holds';
@@ -243,7 +243,7 @@ export async function POST(request: Request) {
     //   - EXPIRED PENDING → ignore, create a fresh booking with a new hold
     const existing = await db
       .prepare(
-        `SELECT id, status, payment_status, expires_at FROM bookings
+        `SELECT id, status, payment_status, expires_at, beam_payment_link_id FROM bookings
          WHERE workshop_id = ? AND user_id = ? AND status != 'cancelled'
          ORDER BY created_at DESC LIMIT 1`
       )
@@ -253,6 +253,7 @@ export async function POST(request: Request) {
         status: string;
         payment_status: string;
         expires_at: string | null;
+        beam_payment_link_id: string | null;
       }>();
 
     if (existing && (existing.payment_status === 'paid' || existing.status === 'confirmed')) {
@@ -339,6 +340,22 @@ export async function POST(request: Request) {
     // whether to redirect immediately (paid) or after a notice popup (deposit).
     const env = await getEnv();
     const siteUrl = env.SITE_URL || 'http://localhost:3000';
+    // If this booking already has a payable link (the user backed out of
+    // checkout and submitted again), hand back the same one. Minting another
+    // leaves two valid QR images for one seat — pay the older and the
+    // purchase-shaped webhook cannot match it to a booking.
+    const reuse = await reusableCheckoutUrl(existing?.beam_payment_link_id ?? null);
+    if (reuse) {
+      return NextResponse.json({
+        checkoutUrl: reuse,
+        bookingId,
+        mode: paymentType,
+        amount: chargeAmount,
+        holdMinutes: HOLD_MINUTES,
+        reused: true,
+      });
+    }
+
     const { url: checkoutUrl, sessionId } = await createWorkshopCheckout({
       workshopTitle: workshop.title,
       amount: chargeAmount,
@@ -367,6 +384,13 @@ export async function POST(request: Request) {
     const err = error as Error;
     if (err.message === 'Unauthorized') {
       return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 });
+    }
+    if (error instanceof BeamError && error.retryable) {
+      console.error('Create booking: Beam unavailable', error.status);
+      return NextResponse.json(
+        { error: 'ระบบชำระเงินขัดข้องชั่วคราว กรุณากดอีกครั้ง', retryable: true },
+        { status: 503 },
+      );
     }
     console.error('Create booking error:', error);
     return NextResponse.json({ error: 'เกิดข้อผิดพลาด' }, { status: 500 });

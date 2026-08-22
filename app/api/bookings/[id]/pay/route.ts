@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDB, getEnv } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
-import { createWorkshopCheckout, fetchPaymentLink, disablePaymentLink } from '@/lib/beam';
+import { createWorkshopCheckout, reusableCheckoutUrl, BeamError } from '@/lib/beam';
 import type { Workshop, Booking } from '@/lib/types';
 
 /**
@@ -97,21 +97,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     //
     // Handing back the same link keeps one QR per booking, so whichever image
     // the user kept is the one we know about.
-    if (booking.beam_payment_link_id) {
-      const existing = await fetchPaymentLink(booking.beam_payment_link_id);
-      if (existing.status === 'ACTIVE') {
-        const url = (existing.raw?.url as string) || null;
-        if (url) {
-          return NextResponse.json({ checkoutUrl: url, amount, reused: true });
-        }
-        // Active but no URL to hand back — close it rather than leave a second
-        // payable QR behind the one we are about to create.
-        try {
-          await disablePaymentLink(booking.beam_payment_link_id);
-        } catch (e) {
-          console.error('Beam: could not disable superseded link', e);
-        }
-      }
+    const reuse = await reusableCheckoutUrl(booking.beam_payment_link_id);
+    if (reuse) {
+      return NextResponse.json({ checkoutUrl: reuse, amount, reused: true });
     }
 
     const { url: checkoutUrl, sessionId } = await createWorkshopCheckout({
@@ -135,6 +123,13 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     const err = error as Error;
     if (err.message === 'Unauthorized') {
       return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 });
+    }
+    if (error instanceof BeamError && error.retryable) {
+      console.error('Resume payment: Beam unavailable', error.status);
+      return NextResponse.json(
+        { error: 'ระบบชำระเงินขัดข้องชั่วคราว กรุณากดอีกครั้ง', retryable: true },
+        { status: 503 },
+      );
     }
     console.error('Resume payment error:', error);
     return NextResponse.json({ error: 'เกิดข้อผิดพลาด' }, { status: 500 });

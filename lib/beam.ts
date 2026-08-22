@@ -26,6 +26,26 @@ import { getEnv } from './db';
 /** Statuses a payment link moves through (Beam's Payment Links overview). */
 export type BeamLinkStatus = 'ACTIVE' | 'PAID' | 'EXPIRED' | 'DISABLED' | 'VOIDED' | 'REFUNDED';
 
+/**
+ * Thrown when Beam itself refuses the request, so callers can tell "the
+ * gateway is having a moment, press the button again" apart from "something in
+ * this booking is wrong". Both used to surface as the same
+ * "เกิดข้อผิดพลาด", which left the user with no idea whether retrying helps.
+ */
+export class BeamError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = 'BeamError';
+  }
+  /** 5xx is Beam's side; a retry is genuinely worth offering. */
+  get retryable(): boolean {
+    return this.status >= 500 || this.status === 0;
+  }
+}
+
 async function getConfig(): Promise<{ base: string; auth: string }> {
   const env = await getEnv();
   const merchantId = env.BEAM_MERCHANT_ID || '';
@@ -265,9 +285,30 @@ export async function createWorkshopCheckout(params: {
   const url = readUrl(data);
   const id = readId(data);
   if (!ok || !url || !id) {
-    throw new Error(`Beam create payment link failed (HTTP ${status})`);
+    throw new BeamError(`Beam create payment link failed (HTTP ${status})`, status);
   }
   return { url, sessionId: id };
+}
+
+/**
+ * The still-payable URL for a link, or null if it can't be handed out again.
+ *
+ * Used by both routes that send a user to checkout so a booking only ever has
+ * ONE live QR: minting a fresh link on every visit is how a user ended up with
+ * two valid QR images, paid the older one, and had nothing update.
+ */
+export async function reusableCheckoutUrl(linkId: string | null | undefined): Promise<string | null> {
+  if (!linkId) return null;
+  try {
+    const link = await fetchPaymentLink(linkId);
+    if (link.status !== 'ACTIVE') return null;
+    const url = link.raw?.url;
+    return typeof url === 'string' && url ? url : null;
+  } catch {
+    // Couldn't ask Beam — fall through and mint a new link rather than block
+    // the booking.
+    return null;
+  }
 }
 
 /**
