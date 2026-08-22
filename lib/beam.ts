@@ -65,22 +65,24 @@ async function beamFetch<T>(
   method: 'GET' | 'POST',
   path: string,
   body?: unknown,
+  opts: { idempotent?: boolean; attempts?: number } = {},
 ): Promise<{ status: number; ok: boolean; data: T | null }> {
   const { base, auth } = await getConfig();
+  const { idempotent = true, attempts: maxAttempts = 3 } = opts;
 
   // Beam intermittently answers 502 (observed while testing against the live
   // API), which would otherwise fail a booking outright. One retry fixes it.
   // The idempotency key makes that retry safe: if the first attempt actually
   // reached Beam, the retry returns that same result instead of creating a
   // second payment link. Keys are honoured for 12 hours.
-  const idempotencyKey = method === 'POST' ? crypto.randomUUID() : null;
+  const idempotencyKey = method === 'POST' && idempotent ? crypto.randomUUID() : null;
   const headers: Record<string, string> = {
     Authorization: auth,
     'content-type': 'application/json',
   };
   if (idempotencyKey) headers['x-beam-idempotency-key'] = idempotencyKey;
 
-  const MAX_ATTEMPTS = 3;
+  const MAX_ATTEMPTS = maxAttempts;
   let res: Response | null = null;
   let text = '';
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -380,8 +382,28 @@ export async function refundCharge(
   //
   // A 400 "Amount must be 1 or greater" does NOT mean the amount is missing:
   // it means the charge has nothing left to refund because it already was.
-  const { ok, status } = await beamFetch('POST', '/api/v1/refunds', { chargeId, reason });
-  if (!ok) throw new Error(`Beam refund failed (HTTP ${status})`);
+  // NO idempotency key and NO retry here, unlike every other POST.
+  //
+  // Beam blocks a repeated refund on the same charge —
+  // 409 "db failed to create refund: request blocked due to conflict" — and the
+  // retry surfaces as a 502. That is why automatic refunds kept failing while
+  // the identical body sent by hand (which carries no key) returned 201 every
+  // time. A refund is also the call where a silent retry is least welcome:
+  // better to leave it for a human than to risk sending money twice.
+  const { ok, status } = await beamFetch(
+    'POST',
+    '/api/v1/refunds',
+    { chargeId, reason },
+    { idempotent: false, attempts: 1 },
+  );
+
+  // Beam's way of saying "nothing left to refund" — the money is already back,
+  // so this is the outcome we wanted, not a failure.
+  if (status === 400 || status === 409) {
+    console.warn(`Beam refund ${chargeId}: HTTP ${status} — treating as already refunded`);
+    return;
+  }
+  if (!ok) throw new BeamError(`Beam refund failed (HTTP ${status})`, status);
 }
 
 /**
