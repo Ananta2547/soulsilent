@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
+import { sqliteToMs } from '@/lib/datetime';
 import { requireAuth } from '@/lib/auth';
 import { fetchCheckoutSession, refundPaymentIntent } from '@/lib/stripe';
 import { fetchPaymentLink } from '@/lib/beam';
@@ -103,13 +104,14 @@ async function verifyBeamBooking(bookingId: string, userId: string) {
   const db = await getDB();
   const booking = await db
     .prepare(
-      'SELECT user_id, status, payment_status, beam_payment_link_id FROM bookings WHERE id = ?',
+      'SELECT user_id, status, payment_status, expires_at, beam_payment_link_id FROM bookings WHERE id = ?',
     )
     .bind(bookingId)
     .first<{
       user_id: string | null;
       status: string;
       payment_status: string;
+      expires_at: string | null;
       beam_payment_link_id: string | null;
     }>();
 
@@ -134,7 +136,28 @@ async function verifyBeamBooking(bookingId: string, userId: string) {
   }
 
   // Paid, but the hold already lapsed and the seat went back to the pool.
-  if (booking.status === 'cancelled' || booking.payment_status === 'expired') {
+  //
+  // `expires_at` decides, not the status flags: the sweep that sets them runs
+  // lazily on reads and on a cron a minute apart, so a row can still read
+  // "pending" well after its deadline. Going by the flags alone handed a seat
+  // to a payment that arrived too late.
+  const holdMs = booking.expires_at ? sqliteToMs(booking.expires_at) : NaN;
+  const lapsed =
+    booking.status === 'cancelled' ||
+    booking.payment_status === 'expired' ||
+    (Number.isFinite(holdMs) && holdMs <= Date.now());
+
+  if (lapsed) {
+    // Close it here too — the webhook refunds off this same state, and a row
+    // still reading "pending" is a seat waiting to be handed out by mistake.
+    if (booking.status !== 'cancelled') {
+      await db
+        .prepare(
+          "UPDATE bookings SET status='cancelled', payment_status='expired', expires_at=NULL, cancel_reason=COALESCE(cancel_reason,'payment_timeout') WHERE id = ?",
+        )
+        .bind(bookingId)
+        .run();
+    }
     return NextResponse.json({
       ok: false,
       expired: true,

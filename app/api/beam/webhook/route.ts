@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { v4 as uuid } from 'uuid';
 import { getDB, getEnv } from '@/lib/db';
+import { sqliteToMs } from '@/lib/datetime';
 import {
   verifyBeamSignature,
   refundCharge,
@@ -56,6 +57,23 @@ function readEventType(event: Record<string, unknown>): string {
     }
   }
   return '';
+}
+
+/**
+ * Has this booking's payment window closed?
+ *
+ * `expires_at` is the authority, NOT the status flags. Those flags are set by a
+ * sweep that runs lazily when someone reads the bookings list, plus a cron a
+ * minute apart — so a hold can be well past its deadline while the row still
+ * reads "pending". Trusting the flags alone let a payment arriving after the
+ * window confirm the booking and take a seat that had already been released.
+ */
+function isLate(b: { status: string; payment_status: string; expires_at: string | null }): boolean {
+  if (b.status === 'cancelled' || b.payment_status === 'expired') return true;
+  if (b.payment_status === 'paid') return false;
+  if (!b.expires_at) return false; // selection applications carry no hold
+  const ms = sqliteToMs(b.expires_at);
+  return Number.isFinite(ms) && ms <= Date.now();
 }
 
 /** Beam's payload field names are not published; read the usual spellings. */
@@ -207,13 +225,13 @@ export async function POST(request: Request) {
       case 'payment_link.paid': {
         if (!bookingId) break;
         const booking = await db
-          .prepare('SELECT status, payment_status FROM bookings WHERE id = ?')
+          .prepare('SELECT status, payment_status, expires_at FROM bookings WHERE id = ?')
           .bind(bookingId)
-          .first<{ status: string; payment_status: string }>();
+          .first<{ status: string; payment_status: string; expires_at: string | null }>();
         if (!booking) break;
         // A lapsed hold stays cancelled — the seat is gone. charge.succeeded
         // handles giving the money back.
-        if (booking.status === 'cancelled' || booking.payment_status === 'expired') break;
+        if (isLate(booking)) break;
 
         // Store the charge id here too: whichever event lands first should
         // leave the booking refundable. COALESCE keeps an id already set by
@@ -236,12 +254,15 @@ export async function POST(request: Request) {
 
         const booking = bookingId
           ? await db
-              .prepare('SELECT id, status, payment_status, beam_charge_id FROM bookings WHERE id = ?')
+              .prepare(
+                'SELECT id, status, payment_status, expires_at, beam_charge_id FROM bookings WHERE id = ?',
+              )
               .bind(bookingId)
               .first<{
                 id: string;
                 status: string;
                 payment_status: string;
+                expires_at: string | null;
                 beam_charge_id: string | null;
               }>()
           : null;
@@ -250,9 +271,20 @@ export async function POST(request: Request) {
         // the admin reconcile page shows anything the refund could not fix.
         let reason: string | null = null;
         if (!booking) reason = 'unknown';
-        else if (booking.status === 'cancelled' || booking.payment_status === 'expired')
-          reason = 'late_cancelled';
+        else if (isLate(booking)) reason = 'late_cancelled';
         else if (booking.beam_charge_id && booking.beam_charge_id !== chargeId) reason = 'duplicate';
+
+        // The row may still read "pending" simply because nothing has swept it
+        // yet — the sweep is lazy and the cron runs a minute apart. Close it here
+        // so the seat is not handed out by a later code path.
+        if (booking && reason === 'late_cancelled' && booking.status !== 'cancelled') {
+          await db
+            .prepare(
+              "UPDATE bookings SET status='cancelled', payment_status='expired', expires_at=NULL, cancel_reason=COALESCE(cancel_reason,'payment_timeout') WHERE id = ?",
+            )
+            .bind(booking.id)
+            .run();
+        }
 
         if (reason) {
           // Beam re-delivers the same charge several times, so the refund has

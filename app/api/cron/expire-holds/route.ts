@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDB, getEnv } from '@/lib/db';
 import { expireCheckoutSession, fetchCheckoutSession, refundPaymentIntent } from '@/lib/stripe';
-import { disablePaymentLink } from '@/lib/beam';
+import { disablePaymentLink, refundCharge } from '@/lib/beam';
 
 /**
  * Sweep unpaid bookings whose 10-minute hold has lapsed and expire their Stripe
@@ -128,7 +128,74 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json({ ok: true, scanned: rows.results.length, expired, paid, cleaned, refunded });
+    // ── Retry refunds that did not go through when the money arrived ─────────
+    //
+    // Refunding straight from the webhook fails: every automatic attempt, fired
+    // a second or two after the charge, comes back 502, while the identical
+    // request sent minutes later succeeds. Beam appears not to accept a refund
+    // on a charge that fresh.
+    //
+    // Without this, one failed attempt left the money stranded until somebody
+    // noticed and refunded it by hand. Anything still unresolved and older than
+    // a couple of minutes gets another try, every minute, until it lands.
+    //
+    // `unknown` is never retried: that is money we could not tie to any booking
+    // of ours, and refunding on a guess moves real money.
+    let retried = 0;
+    let retryOk = 0;
+    const pending = await db
+      .prepare(
+        `SELECT id, booking_id, reason FROM orphan_payments
+          WHERE resolved = 0
+            AND reason != 'unknown'
+            AND id LIKE 'ch_%'
+            AND datetime(created_at) <= datetime('now', '-2 minutes')
+            AND datetime(created_at) >= datetime('now', '-7 days')
+          LIMIT 20`,
+      )
+      .all<{ id: string; booking_id: string | null; reason: string }>();
+
+    for (const p of pending.results || []) {
+      retried++;
+      try {
+        await refundCharge(
+          p.id,
+          p.reason === 'duplicate'
+            ? 'Duplicate payment for the same booking'
+            : 'Payment received after the seat hold expired',
+        );
+        retryOk++;
+        await db
+          .prepare(
+            "UPDATE orphan_payments SET resolved = 1, resolved_note = 'refunded by cron retry' WHERE id = ?",
+          )
+          .bind(p.id)
+          .run();
+        // Tell the user the refund actually happened, so the notice on their
+        // booking stops saying it is still being processed.
+        if (p.booking_id) {
+          await db
+            .prepare(
+              "UPDATE bookings SET cancel_reason = 'late_refunded' WHERE id = ? AND cancel_reason = 'late_refund_pending'",
+            )
+            .bind(p.booking_id)
+            .run();
+        }
+      } catch (e) {
+        console.error('cron refund retry failed', p.id, e);
+      }
+    }
+
+    return NextResponse.json({
+      ok: true,
+      scanned: rows.results.length,
+      expired,
+      paid,
+      cleaned,
+      refunded,
+      refundRetries: retried,
+      refundRetryOk: retryOk,
+    });
   } catch (error) {
     console.error('Cron expire-holds error:', error);
     return NextResponse.json({ error: 'เกิดข้อผิดพลาด' }, { status: 500 });
