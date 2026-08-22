@@ -74,6 +74,10 @@ function cancelRemark(reason: string | null | undefined, lang: 'th' | 'en'): str
     case 'incomplete_days': return tr(lang, 'เงื่อนไขเวลาเข้าร่วมไม่ครบถ้วน', 'Attendance requirement not met');
     case 'workshop_changed': return tr(lang, 'กิจกรรมมีการเปลี่ยนแปลงกำหนดการ', 'The event schedule was changed');
     case 'refunded': return tr(lang, 'ดำเนินการไม่สำเร็จ', 'Not completed');
+    case 'late_refunded':
+      return tr(lang, 'ชำระเงินหลังหมดเวลา · คืนเงินแล้ว', 'Paid after the deadline · refunded');
+    case 'late_refund_pending':
+      return tr(lang, 'ชำระเงินหลังหมดเวลา · กำลังคืนเงิน', 'Paid after the deadline · refund in progress');
     default: return null;
   }
 }
@@ -193,6 +197,8 @@ export default function MyBookingsPage() {
   const [consentFor, setConsentFor] = useState<Booking | null>(null);
   /** Set when a booking flips to paid while this page is open. */
   const [justPaid, setJustPaid] = useState<string | null>(null);
+  /** Late-refund notices the user has acknowledged this visit. */
+  const [dismissedLate, setDismissedLate] = useState<string[]>([]);
 
   const load = useCallback(() => {
     setLoadError(false);
@@ -257,6 +263,20 @@ export default function MyBookingsPage() {
       load();
     })();
   }, [load]);
+
+  // Money arrived after the hold lapsed and is being sent back. Raised as a
+  // popup because the row alone only says "cancelled", which tells someone who
+  // just paid nothing about where their money went.
+  //
+  // Derived rather than pushed from an effect, and dismissal is per visit: a
+  // notice about money the user is owed is worth showing again on a reload
+  // until they have acted on it.
+  const lateRefund =
+    bookings.find(
+      (b) =>
+        (b.cancel_reason === 'late_refunded' || b.cancel_reason === 'late_refund_pending') &&
+        !dismissedLate.includes(b.id),
+    ) ?? null;
 
   // Anything still waiting on payment. No clock reading here — that would be an
   // impure call during render, and it isn't needed: once the hold lapses the
@@ -709,6 +729,59 @@ export default function MyBookingsPage() {
           </div>
         </div>
       )}
+
+      {/* Late payment → refund notice. Deliberately a modal, not a banner: the
+          user has just paid money for a seat they did not get, and that must
+          not be something they can scroll past. */}
+      {lateRefund && (() => {
+        const done = lateRefund.cancel_reason === 'late_refunded';
+        const dismiss = () => setDismissedLate((prev) => [...prev, lateRefund.id]);
+        return (
+          <div
+            onMouseDown={(e) => { if (e.target === e.currentTarget) dismiss(); }}
+            style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(13,30,29,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}
+          >
+            <div style={{ width: '100%', maxWidth: 460, background: 'var(--paper)', borderRadius: 22, boxShadow: '0 30px 80px -24px rgba(13,30,29,.5)', padding: '34px 28px' }}>
+              <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#fdf1e7', color: '#a04a14', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, margin: '0 auto 18px' }}>
+                ↩
+              </div>
+              <h2 className="display-th" style={{ fontSize: 21, margin: '0 0 12px', textAlign: 'center' }}>
+                {tr(lang, 'ชำระเงินหลังหมดเวลา — ระบบคืนเงินให้แล้ว', 'Paid after the deadline — your money is on its way back')}
+              </h2>
+              <p style={{ fontSize: 14.5, color: 'var(--muted)', lineHeight: 1.7, margin: '0 0 14px' }}>
+                {tr(
+                  lang,
+                  `เราได้รับเงินของคุณสำหรับ "${lateRefund.workshop_title || 'กิจกรรม'}" หลังหมดเวลาชำระเงิน 10 นาที ที่นั่งจึงถูกปล่อยให้ผู้อื่นไปแล้ว`,
+                  `We received your payment for "${lateRefund.workshop_title || 'the workshop'}" after the 10-minute window closed, so the seat had already been released to someone else.`,
+                )}
+              </p>
+              <div style={{ background: done ? '#e6f4f1' : '#fdf1e7', border: `1px solid ${done ? '#0d8a7e' : '#e8b98a'}`, color: done ? '#0b5f57' : '#8a4b1a', borderRadius: 14, padding: '13px 16px', fontSize: 13.5, lineHeight: 1.65, marginBottom: 20 }}>
+                {done
+                  ? tr(
+                      lang,
+                      'ระบบได้สั่งคืนเงินเต็มจำนวนอัตโนมัติแล้ว — เงินจะกลับเข้าบัญชีของคุณตามรอบของธนาคาร (ปกติ 1–3 วันทำการ) ไม่ต้องดำเนินการใด ๆ เพิ่ม',
+                      'A full refund has been issued automatically. The money returns on your bank\'s schedule — usually 1–3 business days. Nothing further is needed from you.',
+                    )
+                  : tr(
+                      lang,
+                      'ระบบกำลังดำเนินการคืนเงินให้ หากยังไม่ได้รับเงินคืนภายใน 3 วันทำการ กรุณาติดต่อทีมงานพร้อมแจ้งวันเวลาที่โอน',
+                      'The refund is being processed. If it has not arrived within 3 business days, please contact us with the date and time you paid.',
+                    )}
+              </div>
+              <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, margin: '0 0 20px' }}>
+                {tr(
+                  lang,
+                  'หากยังต้องการเข้าร่วม สามารถจองใหม่ได้หากยังมีที่นั่งว่าง',
+                  'If you still want to join, you can book again while seats remain.',
+                )}
+              </p>
+              <Btn kind="teal" onClick={dismiss} style={{ width: '100%', justifyContent: 'center' }}>
+                {tr(lang, 'รับทราบ', 'Got it')}
+              </Btn>
+            </div>
+          </div>
+        );
+      })()}
 
       {thankYou && (
         <div

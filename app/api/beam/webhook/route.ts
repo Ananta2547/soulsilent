@@ -272,6 +272,7 @@ export async function POST(request: Request) {
           // guess moves real money, so it goes to the reconcile page for a
           // human instead.
           const refundable = reason !== 'unknown';
+          let refunded = false;
           if (chargeId && refundable && !seen) {
             try {
               await refundCharge(
@@ -280,9 +281,21 @@ export async function POST(request: Request) {
                   ? 'Duplicate payment for the same booking'
                   : 'Payment received after the seat hold expired',
               );
+              refunded = true;
             } catch (e) {
               console.error('Beam late/duplicate refund failed', chargeId, e);
             }
+          }
+
+          // Leave a mark on the booking so the site can tell the user what
+          // became of their money. Without it they see only "cancelled" and
+          // have no idea a refund is coming — which is how someone pays again,
+          // or contacts support in a panic.
+          if (bookingId && refundable && !seen) {
+            await db
+              .prepare('UPDATE bookings SET cancel_reason = ? WHERE id = ?')
+              .bind(refunded ? 'late_refunded' : 'late_refund_pending', bookingId)
+              .run();
           }
           // Recorded whether or not the refund went through — without a charge
           // id we cannot refund automatically and a human must chase it.
