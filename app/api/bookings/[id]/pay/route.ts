@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDB, getEnv } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
-import { createWorkshopCheckout } from '@/lib/beam';
+import { createWorkshopCheckout, fetchPaymentLink, disablePaymentLink } from '@/lib/beam';
 import type { Workshop, Booking } from '@/lib/types';
 
 /**
@@ -85,6 +85,35 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
     const env = await getEnv();
     const siteUrl = env.SITE_URL || 'http://localhost:3000';
+
+    // Reuse the link this booking already has, if it is still payable.
+    //
+    // Minting a new one on every visit is how a booking ended up with two live
+    // QR codes: the user opens checkout, goes back, opens it again, and the
+    // first QR stays valid while the booking only remembers the second. Pay the
+    // first, and the purchase-shaped webhook — which carries no referenceId —
+    // cannot find the booking from a link id we no longer store, so the money
+    // arrives and nothing updates.
+    //
+    // Handing back the same link keeps one QR per booking, so whichever image
+    // the user kept is the one we know about.
+    if (booking.beam_payment_link_id) {
+      const existing = await fetchPaymentLink(booking.beam_payment_link_id);
+      if (existing.status === 'ACTIVE') {
+        const url = (existing.raw?.url as string) || null;
+        if (url) {
+          return NextResponse.json({ checkoutUrl: url, amount, reused: true });
+        }
+        // Active but no URL to hand back — close it rather than leave a second
+        // payable QR behind the one we are about to create.
+        try {
+          await disablePaymentLink(booking.beam_payment_link_id);
+        } catch (e) {
+          console.error('Beam: could not disable superseded link', e);
+        }
+      }
+    }
+
     const { url: checkoutUrl, sessionId } = await createWorkshopCheckout({
       holdMinutes: remainingMinutes,
       workshopTitle: workshop.title,

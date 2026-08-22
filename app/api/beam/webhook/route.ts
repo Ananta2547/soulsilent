@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
 import { v4 as uuid } from 'uuid';
 import { getDB, getEnv } from '@/lib/db';
-import { verifyBeamSignature, refundCharge, findChargeId, parseReference } from '@/lib/beam';
+import {
+  verifyBeamSignature,
+  refundCharge,
+  findChargeId,
+  parseReference,
+  fetchPaymentLink,
+} from '@/lib/beam';
 
 /**
  * POST /api/beam/webhook — Beam event receiver.
@@ -143,6 +149,27 @@ export async function POST(request: Request) {
         .bind(linkId)
         .first<{ id: string }>();
       bookingId = row?.id ?? null;
+
+      // The link we hold is only the newest one. If a booking ever had an
+      // earlier link — the user opened checkout, went back, opened it again —
+      // paying that older QR arrives here with a link id the row no longer
+      // stores. Ask Beam who the link belongs to: its referenceId names the
+      // booking, so the payment is still honoured instead of silently ignored.
+      if (!bookingId) {
+        const link = await fetchPaymentLink(linkId);
+        const linkOrder = (link.raw?.order || {}) as Record<string, unknown>;
+        const fromLink = parseReference(
+          typeof linkOrder.referenceId === 'string' ? linkOrder.referenceId : null,
+        );
+        if (fromLink.host && ourHost && fromLink.host !== ourHost) {
+          console.log(`Beam webhook: ignoring event for ${fromLink.host} (we are ${ourHost})`);
+          return NextResponse.json({ received: true, ignored: 'other-environment' });
+        }
+        bookingId = fromLink.bookingId;
+        if (bookingId) {
+          console.log(`Beam webhook: recovered booking ${bookingId} from link ${linkId}`);
+        }
+      }
     }
 
     // Classify by shape, since there is no name to switch on. A refund must be
