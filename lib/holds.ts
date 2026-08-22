@@ -26,7 +26,7 @@ type Db = Awaited<ReturnType<typeof import('./db').getDB>>;
  * Changing it also means changing the copy that names the duration
  * (BookingModal, the workshop detail perks list).
  */
-export const HOLD_MINUTES = 30;
+export const HOLD_MINUTES = 10;
 
 export async function expireStaleHolds(db: Db): Promise<void> {
   await db

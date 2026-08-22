@@ -1265,7 +1265,7 @@ function BookingCardContent({
         }}
       >
         {[
-          tr(lang, 'จองที่นั่งทันที · ชำระเงินภายใน 30 นาที', 'Seat held instantly · pay within 30 minutes'),
+          tr(lang, 'จองที่นั่งทันที · ชำระเงินภายใน 10 นาที', 'Seat held instantly · pay within 10 minutes'),
           tr(lang, 'ที่นั่งจำกัด · ชำระแล้วไม่คืนเงิน', 'Limited seats · paid bookings non-refundable'),
         ].map((line) => (
           <li key={line} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
