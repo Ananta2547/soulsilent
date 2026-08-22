@@ -228,17 +228,27 @@ export async function POST(request: Request) {
         else if (booking.beam_charge_id && booking.beam_charge_id !== chargeId) reason = 'duplicate';
 
         if (reason) {
+          // Beam re-delivers the same charge several times, so the refund has
+          // to fire once. The reconcile row is keyed by charge id: if it is
+          // already there, this charge has been handled, and a second refund
+          // would only collect a 400 for having nothing left to refund.
+          const seen = chargeId
+            ? await db
+                .prepare('SELECT id FROM orphan_payments WHERE id = ?')
+                .bind(chargeId)
+                .first<{ id: string }>()
+            : null;
+
           // Refund only money we can positively tie to one of our own bookings.
           // `unknown` means no matching row — which, on a shared Beam account,
           // is most likely somebody else's legitimate payment. Refunding on a
-          // guess moves real money, so it goes to the reconcile page for a human
-          // instead.
+          // guess moves real money, so it goes to the reconcile page for a
+          // human instead.
           const refundable = reason !== 'unknown';
-          if (chargeId && refundable) {
+          if (chargeId && refundable && !seen) {
             try {
               await refundCharge(
                 chargeId,
-                amount,
                 reason === 'duplicate'
                   ? 'Duplicate payment for the same booking'
                   : 'Payment received after the seat hold expired',
