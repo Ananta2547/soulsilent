@@ -191,6 +191,8 @@ export default function MyBookingsPage() {
   const [filter, setFilter] = useState<'all' | 'active' | 'done' | 'other'>('all');
   const [slipUrl, setSlipUrl] = useState<string | null>(null);
   const [consentFor, setConsentFor] = useState<Booking | null>(null);
+  /** Set when a booking flips to paid while this page is open. */
+  const [justPaid, setJustPaid] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setLoadError(false);
@@ -204,7 +206,20 @@ export default function MyBookingsPage() {
         return r.json() as Promise<{ bookings: Booking[] }>;
       })
       .then((d) => {
-        if (d) setBookings(d.bookings || []);
+        if (!d) return;
+        const next = d.bookings || [];
+        // Announce a booking that became paid while the page was open, so the
+        // user is told rather than left staring at a countdown.
+        setBookings((prev) => {
+          const wasPending = new Set(
+            prev.filter((b) => b.payment_status === 'pending' && b.status !== 'cancelled').map((b) => b.id),
+          );
+          const flipped = next.find(
+            (b) => wasPending.has(b.id) && (b.payment_status === 'paid' || b.status === 'confirmed'),
+          );
+          if (flipped) setJustPaid(flipped.id);
+          return next;
+        });
       })
       .catch((e) => {
         console.error('Failed to load bookings', e);
@@ -242,6 +257,39 @@ export default function MyBookingsPage() {
       load();
     })();
   }, [load]);
+
+  // Anything still waiting on payment. No clock reading here — that would be an
+  // impure call during render, and it isn't needed: once the hold lapses the
+  // server marks the row cancelled/expired, this turns false, and the poll below
+  // stops on its own.
+  const awaitingPayment = bookings.some(
+    (b) => b.payment_status === 'pending' && b.status !== 'cancelled' && !!b.expires_at,
+  );
+
+  // While a payment is outstanding, keep this page in step with reality.
+  //
+  // The user pays on Beam's hosted page — often by scanning with a phone while
+  // this tab sits idle — and nothing there tells them we received it. Someone
+  // who came back to a stale countdown assumed it had failed and paid a second
+  // time. Polling means the moment the webhook confirms the booking, this page
+  // says so.
+  //
+  // Only while the tab is actually visible: a hidden tab has nobody to inform,
+  // and the refresh on becoming visible covers the "switch back" case, which is
+  // the moment that matters most.
+  useEffect(() => {
+    if (!awaitingPayment) return;
+
+    const tick = () => {
+      if (document.visibilityState === 'visible') load();
+    };
+    const timer = setInterval(tick, 4000);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', tick);
+    };
+  }, [awaitingPayment, load]);
 
   async function cancel(b: Booking) {
     const msg = tr(
@@ -348,6 +396,29 @@ export default function MyBookingsPage() {
             {tr(lang, 'ทั้งหมด', 'Total')} {bookings.length} {tr(lang, 'รายการ', 'bookings')}
           </p>
         </Reveal>
+
+        {/* Payment landed while the page was open. Shown prominently and left
+            up until dismissed — a user who does not see this is a user who
+            scans the QR again and pays twice. */}
+        {justPaid && (
+          <div
+            role="status"
+            style={{ background: '#e6f4f1', border: '1px solid #0d8a7e', color: '#0b5f57', borderRadius: 12, padding: '14px 16px', fontSize: 14.5, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}
+          >
+            <span style={{ fontSize: 20 }}>✓</span>
+            <strong>{tr(lang, 'ได้รับการชำระเงินแล้ว', 'Payment received')}</strong>
+            <span style={{ color: '#0b5f57' }}>
+              {tr(lang, 'ที่นั่งของคุณได้รับการยืนยันเรียบร้อย — ไม่ต้องสแกนจ่ายซ้ำ', 'Your seat is confirmed — no need to scan and pay again.')}
+            </span>
+            <button
+              type="button"
+              onClick={() => setJustPaid(null)}
+              style={{ marginLeft: 'auto', border: '1px solid #0d8a7e', background: 'transparent', color: '#0b5f57', borderRadius: 999, padding: '4px 14px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}
+            >
+              {tr(lang, 'รับทราบ', 'Got it')}
+            </button>
+          </div>
+        )}
 
         {verifyFailed && (
           <div style={{ background: '#fdf1e7', border: '1px solid #e8b98a', color: '#8a4b1a', borderRadius: 12, padding: '12px 16px', fontSize: 14, marginBottom: 16 }}>
