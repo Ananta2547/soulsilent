@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { Workshop, Article, ArticleCategory } from '@/lib/types';
 import { useLang } from '@/lib/i18n';
+import { Icon } from '@/components/design/Icon';
 import { getEffectivePrice, hasWorkshopEnded, getWorkshopStatusBadge, isNewWorkshop, isWorkshopFull, compareWorkshopsForListing } from '@/lib/workshop-utils';
 import { categoryLabel, formatArticleDate } from '@/lib/article-utils';
 
@@ -395,16 +396,16 @@ function EventCard({ w }: { w: Workshop }) {
       <h3 className="display-th u-clamp-2" style={{ fontSize: 17, margin: '0 0 8px', lineHeight: 1.25, minHeight: '2.5em' }}>{w.title}</h3>
       <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: 3 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span aria-hidden>📅</span>
+          <Icon name="date" size={14} />
           <span>{cardDateLabel(w)}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span aria-hidden>🕐</span>
+          <Icon name="time" size={14} />
           <span>{w.time_start} – {w.time_end}</span>
         </div>
         {fmtLocation(w) && (
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-            <span aria-hidden>📍</span>
+            <Icon name="location" size={14} style={{ marginTop: 1 }} />
             <span className="u-clamp-2">{fmtLocation(w)}</span>
           </div>
         )}

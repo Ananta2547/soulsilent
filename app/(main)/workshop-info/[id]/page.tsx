@@ -7,6 +7,7 @@ import { Reveal } from '@/components/design/Reveal';
 import { Btn } from '@/components/design/RippleButton';
 import { getEffectivePrice, safeParseArray } from '@/lib/workshop-utils';
 import type { WorkshopMaster, Workshop } from '@/lib/types';
+import { Icon } from '@/components/design/Icon';
 
 type Session = Workshop & { booked: number };
 
@@ -79,7 +80,7 @@ export default function WorkshopInfoPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20, marginTop: 36 }}>
             {target.length > 0 && (
               <Reveal as="div" className="card" style={{ padding: 24, background: 'var(--cream)' }}>
-                <h2 className="display-th" style={{ fontSize: 20, margin: '0 0 14px' }}>👥 {tr(lang, 'เหมาะกับใคร', 'Who it\'s for')}</h2>
+                <h2 className="display-th" style={{ fontSize: 20, margin: '0 0 14px' }}><Icon name="participants" size={19} /> {tr(lang, 'เหมาะกับใคร', 'Who it\'s for')}</h2>
                 <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {target.map((t, i) => <li key={i} style={{ fontSize: 15, lineHeight: 1.5 }}>{t}</li>)}
                 </ul>
@@ -143,7 +144,11 @@ function SessionCard({ s, lang }: { s: Session; lang: 'th' | 'en' }) {
         </div>
         <h3 className="display-th" style={{ fontSize: 18, margin: '0 0 4px' }}>{s.title}</h3>
         <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>
-          {s.location ? `📍 ${s.location} · ` : ''}
+          {s.location ? (
+            <>
+              <Icon name="location" size={13} /> {s.location} ·{' '}
+            </>
+          ) : null}
           {s.admission_type === 'selection'
             ? tr(lang, 'รับสมัครแบบคัดเลือก', 'By selection')
             : soldOut

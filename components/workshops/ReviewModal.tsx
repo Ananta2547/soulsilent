@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useLang, T, tr } from '@/lib/i18n';
 import { Btn } from '@/components/design/RippleButton';
 import type { Review } from '@/lib/types';
+import { Icon } from '@/components/design/Icon';
 
 export function ReviewModal({
   workshopId,
@@ -98,9 +99,9 @@ export function ReviewModal({
                   onMouseEnter={() => setHover(n)}
                   onMouseLeave={() => setHover(0)}
                   aria-label={`${n} star`}
-                  style={{ background: 'none', border: 0, cursor: 'pointer', fontSize: 38, lineHeight: 1, padding: 2, color: n <= shown ? '#f5b301' : 'var(--cream-deep)', transition: 'transform .1s', transform: n <= hover ? 'scale(1.12)' : 'scale(1)' }}
+                  style={{ background: 'none', border: 0, cursor: 'pointer', lineHeight: 0, padding: 2, color: n <= shown ? '#f5b301' : 'var(--cream-deep)', transition: 'transform .1s', transform: n <= hover ? 'scale(1.12)' : 'scale(1)' }}
                 >
-                  ★
+                  <Icon name="rating" size={38} filled={n <= shown} align="baseline" />
                 </button>
               ))}
             </div>

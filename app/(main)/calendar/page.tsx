@@ -6,6 +6,7 @@ import type { Workshop } from '@/lib/types';
 import { useLang, T, tr } from '@/lib/i18n';
 import { Reveal } from '@/components/design/Reveal';
 import { getEffectivePrice, getWorkshopDays, hasWorkshopEnded } from '@/lib/workshop-utils';
+import { Icon } from '@/components/design/Icon';
 
 type Booking = {
   workshop_id: string;
@@ -19,7 +20,7 @@ type Booking = {
 type CalStatus = 'available' | 'applied' | 'full' | 'past';
 
 /** Green = open, Yellow = you applied/registered (today/upcoming), Red = full,
- *  Gray = ended (past — the ⭐/🌧️ icon then tells attended vs no-show). */
+ *  Gray = ended (past — the star/rain mark then tells attended vs no-show). */
 function calStatusOf(w: Workshop, hasBooking: boolean, taken: number): CalStatus {
   const ended = hasWorkshopEnded(w);
   if (hasBooking && !ended) return 'applied'; // 🟡 booked & today/upcoming
@@ -29,10 +30,14 @@ function calStatusOf(w: Workshop, hasBooking: boolean, taken: number): CalStatus
 }
 
 /** Star for a registered/attended booking, rain-cloud for a past no-show. */
-function bookingIcon(w: Workshop, booking: Booking | undefined): '⭐' | '🌧️' | null {
+/** Which mark a day's bar carries. Names, not glyphs, so the bar and the
+ *  legend below draw the same icon from one source. */
+type BookingMark = 'rating' | 'weather';
+
+function bookingIcon(w: Workshop, booking: Booking | undefined): BookingMark | null {
   if (!booking) return null;
-  if (hasWorkshopEnded(w) && booking.attended === 0) return '🌧️'; // จองแต่ไม่ได้ไป
-  return '⭐'; // จองแล้ว / กำลังจะมา / เคยเข้าร่วม
+  if (hasWorkshopEnded(w) && booking.attended === 0) return 'weather'; // จองแต่ไม่ได้ไป
+  return 'rating'; // จองแล้ว / กำลังจะมา / เคยเข้าร่วม
 }
 
 /** Contiguous date ranges the workshop occupies (for the calendar bar).
@@ -329,7 +334,7 @@ export default function CalendarPage() {
             {tr(lang, 'มีที่นั่งว่าง · ยังไม่ได้สมัคร', 'seats open · not applied')}
           </span>
           <span className="swatch">
-            <span className="demo bar-applied">★ {tr(lang, 'จองแล้ว', 'registered')}</span>
+            <span className="demo bar-applied"><Icon name="rating" size={11} filled /> {tr(lang, 'จองแล้ว', 'registered')}</span>
             {tr(lang, 'คุณสมัคร / ลงทะเบียนแล้ว · กำลังจะมา', 'you applied / registered · upcoming')}
           </span>
           <span className="swatch">
@@ -341,11 +346,11 @@ export default function CalendarPage() {
             {tr(lang, 'กิจกรรมที่ผ่านไปแล้ว', 'past events')}
           </span>
           <span className="swatch">
-            <span className="demo bar-past">★ {tr(lang, 'เข้าร่วม', 'attended')}</span>
+            <span className="demo bar-past"><Icon name="rating" size={11} filled /> {tr(lang, 'เข้าร่วม', 'attended')}</span>
             {tr(lang, 'เคยเข้าร่วม', 'past attended')}
           </span>
           <span className="swatch">
-            <span className="demo bar-past">🌧️ {tr(lang, 'ไม่ได้ไป', 'no-show')}</span>
+            <span className="demo bar-past"><Icon name="weather" size={11} /> {tr(lang, 'ไม่ได้ไป', 'no-show')}</span>
             {tr(lang, 'จองแต่ไม่ได้ไป', 'booked but missed')}
           </span>
         </div>
@@ -469,7 +474,7 @@ function CalendarWeek({
   const weekStart = week[0].date;
   const weekEnd = week[6].date;
 
-  type RawBar = { w: Workshop; startCol: number; endCol: number; cl: boolean; cr: boolean; status: CalStatus; icon: '⭐' | '🌧️' | null };
+  type RawBar = { w: Workshop; startCol: number; endCol: number; cl: boolean; cr: boolean; status: CalStatus; icon: BookingMark | null };
   const raw: RawBar[] = [];
   for (const w of workshops) {
     const booking = bookingMap.get(w.id);
@@ -539,7 +544,11 @@ function CalendarWeek({
             title={b.w.title}
           >
             {b.cl && <span className="cal-bar-arrow">‹</span>}
-            {b.icon && <span className="cal-bar-ico">{b.icon}</span>}
+            {b.icon && (
+              <span className="cal-bar-ico">
+                <Icon name={b.icon} size={11} filled={b.icon === 'rating'} align="baseline" />
+              </span>
+            )}
             <span className="cal-bar-title">{b.w.title}</span>
             {b.cr && <span className="cal-bar-arrow">›</span>}
           </button>
@@ -593,7 +602,7 @@ function WorkshopModal({
                 {w.category}
               </span>
             )}
-            {upcomingPaid && <span className="tag tag-accent">★ {tr(lang, 'จองแล้ว', 'registered')}</span>}
+            {upcomingPaid && <span className="tag tag-accent"><Icon name="rating" size={12} filled /> {tr(lang, 'จองแล้ว', 'registered')}</span>}
             {today && <span className="tag tag-accent">{tr(lang, 'วันนี้', 'today')}</span>}
           </div>
           <h3

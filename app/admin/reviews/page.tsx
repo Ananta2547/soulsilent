@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { Stars as IconStars } from '@/components/design/Icon';
 
 type ReviewRow = {
   id: string;
@@ -13,12 +14,8 @@ type ReviewRow = {
 };
 type Opt = { id: string; label: string };
 
-const Stars = ({ n }: { n: number }) => (
-  <span style={{ color: '#f5b301', letterSpacing: 1 }}>
-    {'★'.repeat(Math.max(0, Math.min(5, n)))}
-    <span style={{ color: '#d9d2c2' }}>{'★'.repeat(5 - Math.max(0, Math.min(5, n)))}</span>
-  </span>
-);
+/** Local alias so this page keeps its slightly warmer empty-star grey. */
+const Stars = ({ n }: { n: number }) => <IconStars value={n} size={13} emptyColor="#d9d2c2" />;
 
 export default function AdminReviewsPage() {
   const [rows, setRows] = useState<ReviewRow[]>([]);

@@ -9,6 +9,7 @@ import { fmtDateTime, sqliteToMs } from '@/lib/datetime';
 import { AnnounceCountdown } from '@/components/workshops/AnnounceCountdown';
 import { ApplicationConsentModal } from '@/components/workshops/ApplicationConsentModal';
 import { isWorkshopOngoing, hasWorkshopEnded, getWorkshopStart, getWorkshopDays } from '@/lib/workshop-utils';
+import { Icon } from '@/components/design/Icon';
 
 type Booking = {
   id: string;
@@ -835,7 +836,7 @@ function StartCountdown({ booking: b, lang }: { booking: Booking; lang: 'th' | '
     : `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: 'var(--muted)' }}>
-      ⏳ {tr(lang, 'เริ่มในอีก', 'Starts in')}{' '}
+      <Icon name="duration" size={14} /> {tr(lang, 'เริ่มในอีก', 'Starts in')}{' '}
       <span style={{ fontFamily: 'Archivo Black, Mitr, sans-serif', fontVariantNumeric: 'tabular-nums', color: 'var(--ink)' }}>{parts}</span>
     </span>
   );
@@ -894,7 +895,7 @@ function PayCountdown({ bookingId, expiresAt, onExpire, lang }: { bookingId: str
   return (
     <span style={{ display: 'block' }}>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: urgent ? '#c0392b' : '#a04a14' }}>
-        ⏳ {tr(lang, 'ชำระเงินภายใน', 'Pay within')}{' '}
+        <Icon name="duration" size={14} /> {tr(lang, 'ชำระเงินภายใน', 'Pay within')}{' '}
         <span style={{ fontFamily: 'Archivo Black, Mitr, sans-serif', fontVariantNumeric: 'tabular-nums', letterSpacing: '.02em' }}>
           {mm}:{ss}
         </span>{' '}
@@ -922,14 +923,14 @@ function StatusBadge({ booking: b, expired, owesPayment, unsuccessful, lang }: {
 
   // Awaiting payment (application submitted, checkout not completed).
   if (owesPayment) {
-    return <span className="tag tag-warn">⏳ {tr(lang, 'รอชำระเงิน', 'Pending payment')}</span>;
+    return <span className="tag tag-warn"><Icon name="duration" size={12} /> {tr(lang, 'รอชำระเงิน', 'Pending payment')}</span>;
   }
 
   // Selection-specific badges (use the masked view_status).
   if (isSelection && !paid) {
     const view = b.view_status || 'applied';
     if (view === 'applied') {
-      return <span className="tag" style={{ background: 'var(--cream-deep)', color: 'var(--muted)' }}>{tr(lang, '🕓 อยู่ระหว่างพิจารณา', '🕓 Under review')}</span>;
+      return <span className="tag" style={{ background: 'var(--cream-deep)', color: 'var(--muted)' }}><Icon name="duration" size={12} /> {tr(lang, 'อยู่ระหว่างพิจารณา', 'Under review')}</span>;
     }
     if (view === 'approved') {
       return <span className="tag" style={{ background: '#e7f3ee', color: 'var(--teal-deep)' }}>{tr(lang, '✓ ผ่านการคัดเลือก', '✓ Approved')}</span>;
@@ -943,7 +944,7 @@ function StatusBadge({ booking: b, expired, owesPayment, unsuccessful, lang }: {
   }
 
   if (expired) {
-    return <span className="tag" style={{ background: 'var(--cream-deep)', color: 'var(--muted)' }}>⏱ {tr(lang, 'หมดเวลาจอง', 'hold expired')}</span>;
+    return <span className="tag" style={{ background: 'var(--cream-deep)', color: 'var(--muted)' }}><Icon name="duration" size={12} /> {tr(lang, 'หมดเวลาจอง', 'hold expired')}</span>;
   }
   if (b.status === 'cancelled') {
     if (b.payment_status === 'refunded') {

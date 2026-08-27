@@ -5,6 +5,7 @@
  * Once the time passes it prompts the user to refresh for their result. */
 import { useEffect, useState } from 'react';
 import { useLang, tr } from '@/lib/i18n';
+import { Icon } from '@/components/design/Icon';
 import { fmtDateTime } from '@/lib/datetime';
 
 function parts(diffMs: number) {
@@ -52,7 +53,7 @@ export function AnnounceCountdown({
       }}
     >
       <div className="mono" style={{ fontSize: 10.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--teal-deep)', marginBottom: 4 }}>
-        🗓 {heading ?? tr(lang, 'ประกาศผลคัดเลือก', 'Results announcement')}
+        <Icon name="date" size={16} /> {heading ?? tr(lang, 'ประกาศผลคัดเลือก', 'Results announcement')}
       </div>
       <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>
         {fmtDateTime(announceAt, lang, 'long')}

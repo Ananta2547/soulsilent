@@ -2,7 +2,7 @@
 
 import { PageLoader } from '@/components/design/PageLoader';
 
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import type { DayTime, Workshop } from '@/lib/types';
@@ -11,6 +11,7 @@ import { formatTravel, type TravelInfo } from '@/lib/travel';
 import { PdpaBadge } from '@/components/workshops/PdpaBadge';
 import { RefundSlipModal } from '@/components/admin/RefundSlipModal';
 import { FacilitatorNote } from '@/components/admin/FacilitatorNote';
+import { Icon } from '@/components/design/Icon';
 
 type BookingRow = {
   id: string;
@@ -369,8 +370,8 @@ export default function AttendancePage() {
                             })()
                           ) : (
                             <div className="flex items-center justify-center gap-2">
-                              <AttendChip label="มา ⭐" active={b.attended === 1} disabled={busy} tone="green" onClick={() => mark(b.id, 1)} />
-                              <AttendChip label="ไม่มา 🌧️" active={b.attended === 0} disabled={busy} tone="orange" onClick={() => mark(b.id, 0)} />
+                              <AttendChip label={<><span>มา</span> <Icon name="rating" size={13} filled /></>} active={b.attended === 1} disabled={busy} tone="green" onClick={() => mark(b.id, 1)} />
+                              <AttendChip label={<><span>ไม่มา</span> <Icon name="weather" size={13} /></>} active={b.attended === 0} disabled={busy} tone="orange" onClick={() => mark(b.id, 0)} />
                               <AttendChip label="—" active={b.attended == null} disabled={busy} tone="gray" onClick={() => mark(b.id, null)} />
                             </div>
                           )}
@@ -720,7 +721,7 @@ function AttendChip({
   tone,
   onClick,
 }: {
-  label: string;
+  label: ReactNode;
   active: boolean;
   disabled: boolean;
   tone: 'green' | 'orange' | 'gray';

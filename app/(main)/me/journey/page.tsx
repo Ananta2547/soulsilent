@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useLang, T, tr } from '@/lib/i18n';
 import { Reveal } from '@/components/design/Reveal';
 import { Btn } from '@/components/design/RippleButton';
+import { Icon } from '@/components/design/Icon';
 import { type JourneyItem, journeyStatus, fmtJourneyDate } from '@/lib/journey';
 
 export default function MyJourneyPage() {
@@ -105,11 +106,11 @@ export default function MyJourneyPage() {
                         </span>
                       ) : (
                         <span className="tag" style={{ background: '#e6f4f1', color: 'var(--teal-deep)' }}>
-                          ⏳ {tr(lang, `นับถอยหลัง ${st.daysLeft} วัน`, `${st.daysLeft} days left`)}
+                          <Icon name="duration" size={13} /> {tr(lang, `นับถอยหลัง ${st.daysLeft} วัน`, `${st.daysLeft} days left`)}
                         </span>
                       )}
                       {it.attended === 1 && (
-                        <span className="tag" style={{ background: 'var(--teal)', color: '#fff' }}>★ {tr(lang, 'เข้าร่วมแล้ว', 'Attended')}</span>
+                        <span className="tag" style={{ background: 'var(--teal)', color: '#fff' }}><Icon name="rating" size={12} filled /> {tr(lang, 'เข้าร่วมแล้ว', 'Attended')}</span>
                       )}
                     </div>
                     <div className="mono" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '.06em' }}>
@@ -117,12 +118,12 @@ export default function MyJourneyPage() {
                     </div>
                     {it.journey_note ? (
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 12, color: 'var(--ink)', background: 'var(--cream)', borderRadius: 10, padding: '8px 10px', lineHeight: 1.5 }}>
-                        <span aria-hidden>📝</span>
+                        <Icon name="notes" size={14} />
                         <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.journey_note}</span>
                       </div>
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--teal)' }}>
-                        <span aria-hidden>📝</span>
+                        <Icon name="notes" size={14} />
                         {tr(lang, 'จดบันทึกความทรงจำ', 'Add a memory note')}
                       </div>
                     )}

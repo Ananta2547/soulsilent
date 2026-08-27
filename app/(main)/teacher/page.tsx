@@ -5,6 +5,7 @@ import { PageLoader } from '@/components/design/PageLoader';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useLang, T, tr } from '@/lib/i18n';
+import { Icon } from '@/components/design/Icon';
 import type { Workshop } from '@/lib/types';
 import { getWorkshopDays, hasWorkshopEnded } from '@/lib/workshop-utils';
 
@@ -77,9 +78,9 @@ export default function TeacherWorkshopsPage() {
                     {w.title}
                   </h3>
                   <div style={{ fontSize: 13, color: 'var(--muted)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <span>📅 {dateLabel}{days.length > 1 ? tr(lang, ` · ${days.length} วัน`, ` · ${days.length} days`) : ''}</span>
-                    {w.location && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📍 {w.location}</span>}
-                    <span>👥 {w.booked}/{w.max_participants} {tr(lang, 'ที่นั่ง', 'seats')}</span>
+                    <span><Icon name="date" size={13} /> {dateLabel}{days.length > 1 ? tr(lang, ` · ${days.length} วัน`, ` · ${days.length} days`) : ''}</span>
+                    {w.location && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><Icon name="location" size={13} /> {w.location}</span>}
+                    <span><Icon name="participants" size={13} /> {w.booked}/{w.max_participants} {tr(lang, 'ที่นั่ง', 'seats')}</span>
                   </div>
                 </div>
               </Link>

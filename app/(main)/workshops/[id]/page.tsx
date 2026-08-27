@@ -7,6 +7,7 @@ import type { Workshop, Location, Review } from '@/lib/types';
 import { useLang, T, tr } from '@/lib/i18n';
 import { Reveal } from '@/components/design/Reveal';
 import { Btn } from '@/components/design/RippleButton';
+import { Icon, Stars } from '@/components/design/Icon';
 import { Cloud, WaveLine, Star } from '@/components/design/Doodles';
 import { Countdown } from '@/components/design/Countdown';
 import { BookingModal, type BookingResult } from '@/components/workshops/BookingModal';
@@ -336,7 +337,7 @@ export default function WorkshopDetailPage() {
                     maxWidth: '100%',
                   }}
                 >
-                  <span style={{ fontSize: 24, lineHeight: 1, marginTop: 2 }}>📅</span>
+                  <Icon name="date" size={24} align="baseline" style={{ marginTop: 2, color: 'var(--teal)' }} />
                   <div style={{ minWidth: 0 }}>
                     {workshopType === 'multi_day' && workshop.end_date ? (
                       <>
@@ -380,7 +381,7 @@ export default function WorkshopDetailPage() {
                     </div>
                     {workshop.admission_type === 'selection' && workshop.announce_at && (
                       <div style={{ fontSize: 13.5, color: 'var(--teal-deep)', marginTop: 6, fontWeight: 600 }}>
-                        📣 {tr(lang, 'ประกาศผลคัดเลือก', 'Results announced')}: {fmtDateTime(workshop.announce_at, lang, 'long')}
+                        <Icon name="reminder" size={16} /> {tr(lang, 'ประกาศผลคัดเลือก', 'Results announced')}: {fmtDateTime(workshop.announce_at, lang, 'long')}
                       </div>
                     )}
                   </div>
@@ -399,7 +400,7 @@ export default function WorkshopDetailPage() {
                   <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 40px', display: 'flex', flexDirection: 'column', gap: 14 }}>
                     {targetItems.map((item, idx) => (
                       <li key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-                        <span style={{ flexShrink: 0, marginTop: 2, fontSize: 20, lineHeight: 1 }}>👥</span>
+                        <Icon name="participants" size={20} align="baseline" style={{ marginTop: 2, color: 'var(--teal)' }} />
                         <span style={{ fontSize: 16, lineHeight: 1.6, color: 'var(--ink)' }}>{item}</span>
                       </li>
                     ))}
@@ -1111,10 +1112,7 @@ function BookingCardContent({
                 <span className="mono" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '.1em', textTransform: 'uppercase' }}>
                   {tr(lang, 'รีวิวของคุณ', 'Your review')}
                 </span>
-                <span style={{ color: '#f5b301', letterSpacing: 2, fontSize: 15 }}>
-                  {'★'.repeat(userReview.rating)}
-                  <span style={{ color: 'var(--cream-deep)' }}>{'★'.repeat(5 - userReview.rating)}</span>
-                </span>
+                <Stars value={userReview.rating} size={14} />
               </div>
               {userReview.comment && (
                 <p style={{ fontSize: 13.5, color: 'var(--ink)', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>
@@ -1129,7 +1127,7 @@ function BookingCardContent({
               className="btn btn-teal"
               style={{ width: '100%', justifyContent: 'center', fontSize: 15, padding: '15px 22px' }}
             >
-              {tr(lang, 'รีวิวกิจกรรม', 'Review workshop')} <span aria-hidden>★</span>
+              {tr(lang, 'รีวิวกิจกรรม', 'Review workshop')} <Icon name="rating" size={16} filled />
             </button>
           )
         ) : (
@@ -1394,7 +1392,7 @@ function HoldCountdown({ expiresAt, lang }: { expiresAt: string; lang: 'th' | 'e
           marginBottom: 4,
         }}
       >
-        ⏱ {tr(lang, 'ที่นั่งถูก hold ไว้', 'Seat on hold')}
+        <Icon name="duration" size={15} /> {tr(lang, 'ที่นั่งถูก hold ไว้', 'Seat on hold')}
       </div>
       <div
         style={{
@@ -1656,7 +1654,7 @@ function PromoCountdown({ endsAt, lang }: { endsAt: string; lang: 'th' | 'en' })
       : tr(lang, `${hours} ชม. ${mins} นาที`, `${hours}h ${mins}m`);
   return (
     <div style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fff3cd', color: '#8a5a00', border: '1px solid #ffe08a', borderRadius: 999, padding: '4px 12px', fontSize: 13, fontWeight: 700 }}>
-      ⏳ {tr(lang, 'โปรโมชันเหลือเวลาอีก', 'Promo ends in')} {left}
+      <Icon name="duration" size={15} /> {tr(lang, 'โปรโมชันเหลือเวลาอีก', 'Promo ends in')} {left}
     </div>
   );
 }

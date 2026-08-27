@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useLang, T, tr } from '@/lib/i18n';
 import { Btn } from '@/components/design/RippleButton';
+import { Icon, Stars } from '@/components/design/Icon';
 import { ReviewModal } from '@/components/workshops/ReviewModal';
 import { type JourneyItem, journeyStatus, fmtJourneyDate } from '@/lib/journey';
 import { getWorkshopDays } from '@/lib/workshop-utils';
@@ -127,9 +128,9 @@ export default function JourneyDetailPage() {
           {st.done ? (
             <span className="tag" style={{ background: 'var(--cream-deep)', color: 'var(--muted)', fontSize: 13 }}>✓ {tr(lang, 'เสร็จสิ้นกิจกรรม', 'Completed')}</span>
           ) : (
-            <span className="tag" style={{ background: '#e6f4f1', color: 'var(--teal-deep)', fontSize: 13 }}>⏳ {tr(lang, `นับถอยหลัง ${st.daysLeft} วัน`, `${st.daysLeft} days left`)}</span>
+            <span className="tag" style={{ background: '#e6f4f1', color: 'var(--teal-deep)', fontSize: 13 }}><Icon name="duration" size={13} /> {tr(lang, `นับถอยหลัง ${st.daysLeft} วัน`, `${st.daysLeft} days left`)}</span>
           )}
-          {attended && <span className="tag" style={{ background: 'var(--teal)', color: '#fff', fontSize: 13 }}>★ {tr(lang, 'เข้าร่วมแล้ว', 'Attended')}</span>}
+          {attended && <span className="tag" style={{ background: 'var(--teal)', color: '#fff', fontSize: 13 }}><Icon name="rating" size={13} filled /> {tr(lang, 'เข้าร่วมแล้ว', 'Attended')}</span>}
           <span className="mono" style={{ fontSize: 12.5, color: 'var(--muted)' }}>
             {multiDay ? `${fmtJourneyDate(days[0])} – ${fmtJourneyDate(days[days.length - 1])}` : `${fmtJourneyDate(item.date)} · ${item.time_start}–${item.time_end}`}
           </span>
@@ -162,12 +163,12 @@ export default function JourneyDetailPage() {
           </button>
           {hasReview ? (
             <span className="btn btn-paper" style={{ cursor: 'default', pointerEvents: 'none', gap: 6 }}>
-              <span style={{ color: '#f5b301', letterSpacing: 1 }}>{'★'.repeat(item.review_rating || 0)}</span>
+              <Stars value={item.review_rating || 0} size={13} showEmpty={false} />
               {tr(lang, 'รีวิวของคุณ', 'Your review')}
             </span>
           ) : attended && st.done ? (
             <Btn kind="teal" onClick={() => setReviewOpen(true)}>
-              {tr(lang, 'เขียนรีวิว', 'Write a review')} ★
+              {tr(lang, 'เขียนรีวิว', 'Write a review')} <Icon name="rating" size={15} filled />
             </Btn>
           ) : null}
         </div>
@@ -175,7 +176,7 @@ export default function JourneyDetailPage() {
         {/* Personal memory note — private, free-text, saved per booking */}
         <div className="card" style={{ marginTop: 16, padding: '16px 18px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <span aria-hidden style={{ fontSize: 18 }}>📝</span>
+            <Icon name="notes" size={18} />
             <span className="display-th" style={{ fontSize: 16 }}>{tr(lang, 'บันทึกความทรงจำ', 'My note')}</span>
             <span style={{ fontSize: 12, color: 'var(--muted)' }}>· {tr(lang, 'ส่วนตัว เห็นคนเดียว', 'private to you')}</span>
           </div>
@@ -205,7 +206,7 @@ export default function JourneyDetailPage() {
           <div className="card" style={{ marginTop: 16, padding: '16px 18px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
               <span className="mono" style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.1em' }}>{tr(lang, 'รีวิวของคุณ', 'Your review')}</span>
-              <span style={{ color: '#f5b301', letterSpacing: 2 }}>{'★'.repeat(item.review_rating || 0)}<span style={{ color: 'var(--cream-deep)' }}>{'★'.repeat(5 - (item.review_rating || 0))}</span></span>
+              <Stars value={item.review_rating || 0} size={14} />
             </div>
             {item.review_comment && <p style={{ fontSize: 13.5, color: 'var(--ink)', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>{item.review_comment}</p>}
           </div>
