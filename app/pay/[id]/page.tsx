@@ -335,9 +335,11 @@ export default function PayPage() {
           retryable?: boolean;
         };
 
-        // Kept on screen through every outcome. A panel that empties out at the
-        // moment the answer arrives reads like something broke.
+        // Kept on screen through every outcome, failures included. A panel that
+        // empties out at the moment the answer arrives reads like the booking
+        // itself vanished rather than the payment attempt.
         if (data.booking) setBooking(data.booking);
+        if (typeof data.amount === 'number') setAmount(data.amount);
 
         if (data.paid) {
           setState('paid');
@@ -358,7 +360,6 @@ export default function PayPage() {
         }
 
         setImage(data.image);
-        setAmount(data.amount || 0);
         setExpiresAt(data.expiresAt ?? null);
         setError(null);
         setState('ready');

@@ -20,6 +20,12 @@ import type { Booking } from '@/lib/types';
  * safety net /api/payments/verify gives the card lane.
  */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  // Declared out here so the catch below can still say WHAT failed to be paid
+  // for. When Beam refused the charge the page lost the booking panel too, and
+  // an error screen with no context reads like the booking itself vanished.
+  let summary: Record<string, string | null> | null = null;
+  let owed = 0;
+
   try {
     const user = await requireAuth();
     const { id } = await params;
@@ -49,7 +55,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     // Sent with every outcome, not only the payable one: the page keeps the
     // booking panel on screen while it says "paid" or "time is up", and a panel
     // that empties out at exactly that moment reads like something broke.
-    const summary = {
+    summary = {
       title: booking.w_title,
       date: booking.w_date,
       endDate: booking.w_end_date,
@@ -85,12 +91,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     // deadline, and minting a QR for it would sell a seat nobody has been
     // offered. Those users pay through /confirm, which sets the hold first.
     if (!booking.expires_at) {
-      return NextResponse.json({ error: 'ยังไม่สามารถชำระเงินได้' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'ยังไม่สามารถชำระเงินได้', booking: summary },
+        { status: 400 },
+      );
     }
 
     const amount = booking.amount || 0;
+    owed = amount;
     if (amount <= 0) {
-      return NextResponse.json({ error: 'ไม่มียอดที่ต้องชำระ' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'ไม่มียอดที่ต้องชำระ', booking: summary },
+        { status: 400 },
+      );
     }
 
     // Ask Beam directly when the page requests it. Cheap insurance: the QR is
@@ -163,11 +176,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     if (error instanceof BeamError && error.retryable) {
       console.error('QR charge: Beam unavailable', error.status);
       return NextResponse.json(
-        { error: 'ระบบชำระเงินขัดข้องชั่วคราว กรุณากดอีกครั้ง', retryable: true },
+        {
+          error: 'ระบบชำระเงินขัดข้องชั่วคราว กรุณากดอีกครั้ง',
+          retryable: true,
+          booking: summary,
+          amount: owed,
+        },
         { status: 503 },
       );
     }
     console.error('QR charge error:', error);
-    return NextResponse.json({ error: 'เกิดข้อผิดพลาด' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'เกิดข้อผิดพลาด', booking: summary, amount: owed },
+      { status: 500 },
+    );
   }
 }
