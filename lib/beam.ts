@@ -231,11 +231,13 @@ export function findChargeId(value: unknown, depth = 0): string | null {
 /**
  * Create a hosted Beam checkout for one booking.
  *
- * `expiresAt` matches the seat-hold window so the QR dies exactly when the hold
- * lapses, even if nothing on our side ever calls disablePaymentLink. Unlike
- * Stripe (which refuses anything under 30 minutes — the reason the hold was
- * stretched to 60) Beam accepts short windows, so `holdMinutes` can safely drop
- * back to 10 later.
+ * Since migration 048 this is the CARD lane only — PromptPay comes from
+ * `createQrCharge`. See the `linkSettings` comment below for why.
+ *
+ * `expiresAt` matches the seat-hold window so the link dies when the hold
+ * lapses, even if nothing on our side ever calls disablePaymentLink. Beam does
+ * honour a short window here, unlike Stripe (which refused anything under 30
+ * minutes — the reason the hold used to be 60).
  *
  * Returns the same shape as the Stripe helper — `sessionId` is Beam's payment
  * link id — so the call sites keep working unchanged.
@@ -275,8 +277,19 @@ export async function createWorkshopCheckout(params: {
       expiresAt: new Date(Date.now() + holdMinutes * 60 * 1000).toISOString(),
       redirectUrl: params.successUrl,
       ...(params.cancelUrl ? { cancelUrl: params.cancelUrl } : {}),
+      // NO PromptPay here — that is the whole point.
+      //
+      // Beam's hosted page mints a brand-new QR every time the shopper flips
+      // payment method and back, each with its own 30-minute clock and each
+      // still payable. That is how one booking collected several live QR images
+      // and the same seat got paid for twice, and no API field turns it off.
+      //
+      // PromptPay now comes from `createQrCharge` on our own page, where there
+      // is no method switcher and the image is stored and re-served. This link
+      // is the CARD lane only: with qrPromptPay off there is nothing for the
+      // hosted page to switch back and forth to.
       linkSettings: {
-        qrPromptPay: { isEnabled: true },
+        qrPromptPay: { isEnabled: false },
         mobileBanking: { isEnabled: true },
         card: { isEnabled: true },
       },
@@ -290,6 +303,100 @@ export async function createWorkshopCheckout(params: {
     throw new BeamError(`Beam create payment link failed (HTTP ${status})`, status);
   }
   return { url, sessionId: id };
+}
+
+/**
+ * Create the ONE PromptPay QR a booking is paid with.
+ *
+ * This exists because Beam's hosted checkout page cannot be made to reuse a QR:
+ * every switch of payment method mints another one, all of them payable, all on
+ * their own clock. A booking with several live QR images is a seat that can be
+ * paid for several times, and the customer who does it is out real money until
+ * a refund lands days later.
+ *
+ * Making the charge ourselves fixes it at the source — our page shows one image
+ * and has no switcher — but it does NOT fix the clock. Probed against the live
+ * API on 2026-08-23 with three charges asking for 10, 5 and 2 minutes: all three
+ * came back with the SAME expiry, exactly 30 minutes out. `expiryTime` is
+ * accepted and ignored. It is still sent, in case that ever changes, but nothing
+ * may depend on it — the seat hold is the only deadline that counts, and
+ * `expires_at` on the booking stays the authority.
+ *
+ * There is also no way to kill a pending charge: cancel, void, expire and
+ * disable all answer 404. A QR handed out at minute 0 is scannable at minute 25
+ * whatever we do, so money arriving after the hold lapses still has to be given
+ * back by the webhook + cron path.
+ *
+ * The image comes back only on creation — a later GET returns the charge without
+ * it — so callers must store `imageBase64` rather than plan to re-fetch it.
+ */
+export async function createQrCharge(params: {
+  amount: number;
+  bookingId: string;
+  /** Tagged into the reference so the other environment ignores this charge. */
+  siteUrl: string;
+}): Promise<{ chargeId: string; imageBase64: string; expiry: string | null }> {
+  const amount = toSatang(params.amount);
+  console.log(
+    `Beam QR charge booking=${params.bookingId} ฿${params.amount} → amount=${amount} satang`,
+  );
+
+  const { ok, data, status } = await beamFetch<Record<string, unknown>>('POST', '/api/v1/charges', {
+    amount,
+    currency: 'THB',
+    paymentMethod: {
+      paymentMethodType: 'QR_PROMPT_PAY',
+      // Asked for, not granted — Beam always returns 30 minutes. Kept so the
+      // request states the intent and starts working if Beam ever honours it.
+      qrPromptPay: {
+        expiryTime: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      },
+    },
+    referenceId: makeReference(params.bookingId, params.siteUrl),
+    returnUrl: params.siteUrl,
+  });
+
+  const image = (data?.encodedImage || {}) as Record<string, unknown>;
+  const chargeId = typeof data?.chargeId === 'string' ? data.chargeId : null;
+  const imageBase64 =
+    typeof image.imageBase64Encoded === 'string' ? image.imageBase64Encoded : null;
+
+  if (!ok || !chargeId || !imageBase64) {
+    throw new BeamError(`Beam create QR charge failed (HTTP ${status})`, status);
+  }
+  return {
+    chargeId,
+    imageBase64,
+    expiry: typeof image.expiry === 'string' ? image.expiry : null,
+  };
+}
+
+/**
+ * Read a charge's live state — the backstop for the QR page when the webhook is
+ * slow or never arrives.
+ *
+ * A charge created through the Charges API reports `source: "API"` with an empty
+ * `sourceId`, and echoes our `referenceId` back, which is how a payment is tied
+ * to its booking without a payment link in the picture.
+ */
+export async function fetchCharge(chargeId: string): Promise<{
+  status: string | null;
+  paid: boolean;
+  referenceId: string | null;
+  raw: Record<string, unknown> | null;
+}> {
+  const { data } = await beamFetch<Record<string, unknown>>('GET', `/api/v1/charges/${chargeId}`);
+  const status = typeof data?.status === 'string' ? data.status : null;
+  // A pending charge answers "PENDING"; the success spelling has not been seen
+  // on a live payment yet, so accept the plausible ones rather than let a paid
+  // seat read as unpaid.
+  const up = (status || '').toUpperCase();
+  return {
+    status,
+    paid: up === 'SUCCEEDED' || up === 'SUCCESS' || up === 'PAID',
+    referenceId: typeof data?.referenceId === 'string' ? data.referenceId : null,
+    raw: data,
+  };
 }
 
 /**

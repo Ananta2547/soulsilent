@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { v4 as uuid } from 'uuid';
 import { getDB, getEnv } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
-import { createWorkshopCheckout, reusableCheckoutUrl, BeamError } from '@/lib/beam';
 import { getEffectivePrice, hasWorkshopStarted } from '@/lib/workshop-utils';
 import { settleSelection, visibleAppStatus, confirmDeadlineFor, type SettleWorkshop } from '@/lib/selection';
 import { expireStaleHolds, HOLD_MINUTES } from '@/lib/holds';
@@ -336,45 +335,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ submitted: true, mode: 'free', bookingId });
     }
 
-    // Direct deposit / paid → create the Beam checkout. The modal decides
-    // whether to redirect immediately (paid) or after a notice popup (deposit).
+    // Direct deposit / paid → send them to OUR payment page, not Beam's.
+    //
+    // Beam's hosted page mints a fresh PromptPay QR every time the shopper flips
+    // payment method and back, each one payable and each on its own 30-minute
+    // clock — one booking, several live QR images, and a seat that gets paid for
+    // twice. /pay/{id} shows a single stored QR and has no switcher, so it
+    // cannot happen; the card lane is a button there.
+    //
+    // Nothing is created at Beam here. The QR is minted by /api/bookings/{id}/qr
+    // when the page actually opens, so a booking nobody follows through on costs
+    // no charge at all.
     const env = await getEnv();
     const siteUrl = env.SITE_URL || 'http://localhost:3000';
-    // If this booking already has a payable link (the user backed out of
-    // checkout and submitted again), hand back the same one. Minting another
-    // leaves two valid QR images for one seat — pay the older and the
-    // purchase-shaped webhook cannot match it to a booking.
-    const reuse = await reusableCheckoutUrl(existing?.beam_payment_link_id ?? null);
-    if (reuse) {
-      return NextResponse.json({
-        checkoutUrl: reuse,
-        bookingId,
-        mode: paymentType,
-        amount: chargeAmount,
-        holdMinutes: HOLD_MINUTES,
-        reused: true,
-      });
-    }
-
-    const { url: checkoutUrl, sessionId } = await createWorkshopCheckout({
-      workshopTitle: workshop.title,
-      amount: chargeAmount,
-      bookingId,
-      userId: user.sub,
-      // Beam has no {SESSION_ID} placeholder like Stripe, so carry the booking
-      // id instead — /api/payments/verify looks the link id up from the row.
-      successUrl: `${siteUrl}/me/bookings?paid=1&booking=${bookingId}`,
-      cancelUrl: `${siteUrl}/workshops/${workshop_id}?booking=cancelled`,
-      holdMinutes: HOLD_MINUTES,
-    });
-    // Persist the link id so the hold can be disabled later (kills the QR).
-    await db
-      .prepare('UPDATE bookings SET beam_payment_link_id = ? WHERE id = ?')
-      .bind(sessionId, bookingId)
-      .run();
 
     return NextResponse.json({
-      checkoutUrl,
+      checkoutUrl: `${siteUrl}/pay/${bookingId}`,
       bookingId,
       mode: paymentType, // 'deposit' | 'paid'
       amount: chargeAmount,
@@ -384,13 +360,6 @@ export async function POST(request: Request) {
     const err = error as Error;
     if (err.message === 'Unauthorized') {
       return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 });
-    }
-    if (error instanceof BeamError && error.retryable) {
-      console.error('Create booking: Beam unavailable', error.status);
-      return NextResponse.json(
-        { error: 'ระบบชำระเงินขัดข้องชั่วคราว กรุณากดอีกครั้ง', retryable: true },
-        { status: 503 },
-      );
     }
     console.error('Create booking error:', error);
     return NextResponse.json({ error: 'เกิดข้อผิดพลาด' }, { status: 500 });

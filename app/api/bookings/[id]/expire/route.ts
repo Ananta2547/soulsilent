@@ -6,9 +6,17 @@ import { disablePaymentLink } from '@/lib/beam';
 import type { Booking } from '@/lib/types';
 
 /**
- * Expire an unpaid booking whose 10-minute payment hold has lapsed. Cancels the
- * Stripe Checkout Session (which voids its PaymentIntent, so the PromptPay QR
- * the user may have saved stops working) and marks the booking EXPIRED.
+ * Expire an unpaid booking whose 10-minute payment hold has lapsed, closing any
+ * hosted checkout it has and marking the booking EXPIRED.
+ *
+ * NOTE — this no longer kills the PromptPay QR. Since migration 048 the QR is a
+ * Charges API charge of ours, and Beam offers no way to cancel a pending one:
+ * cancel, void, expire and disable all answer 404, and every QR lives a fixed 30
+ * minutes. So a saved QR stays scannable for another 20 minutes after the seat
+ * is released, and money that arrives then is refunded by the webhook + cron
+ * path rather than blocked here. What is closed here is the card lane's payment
+ * link (and, for holds still in flight from before the switchover, the Stripe
+ * session, which does void its PaymentIntent).
  *
  * Called by the front-end countdown when it reaches 0, and by the cron sweep.
  * Idempotent: a paid/already-cancelled booking is a no-op.

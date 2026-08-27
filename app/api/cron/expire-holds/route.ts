@@ -4,9 +4,13 @@ import { expireCheckoutSession, fetchCheckoutSession, refundPaymentIntent } from
 import { disablePaymentLink, refundCharge } from '@/lib/beam';
 
 /**
- * Sweep unpaid bookings whose 10-minute hold has lapsed and expire their Stripe
- * Checkout Sessions — voiding the PromptPay QR even for users who closed the
- * tab (so a saved QR fails when scanned) — then mark the bookings EXPIRED.
+ * Sweep unpaid bookings whose 10-minute hold has lapsed, close whatever hosted
+ * checkout they carry, and mark the bookings EXPIRED.
+ *
+ * This does NOT kill a PromptPay QR any more. Since migration 048 the QR is our
+ * own Charges API charge, and Beam has no endpoint to cancel a pending one, so
+ * it stays scannable for its fixed 30 minutes. Late money is handled by the
+ * refund retry further down instead.
  *
  * Intended to be hit every minute by an external scheduler (Cloudflare Cron
  * Trigger / cron-job.org / GitHub Actions) with the shared secret:

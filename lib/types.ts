@@ -208,6 +208,15 @@ export interface Booking {
   beam_payment_link_id: string | null;
   /** Beam charge id, set once payment lands. A refund is issued against it. */
   beam_charge_id: string | null;
+  /** The booking's own PromptPay QR, created through the Charges API and served
+   *  from our own payment page so there is exactly one payable QR per booking
+   *  (migration 048). The image is stored because Beam returns it only on
+   *  creation, never on a later GET. */
+  beam_qr_charge_id: string | null;
+  beam_qr_image: string | null;
+  /** Expiry Beam granted for the QR — always 30 minutes whatever we ask for, so
+   *  it outlives the seat hold and a late scan still has to be refunded. */
+  beam_qr_expires_at: string | null;
   amount: number;
   attended: number | null; // null=not marked, 1=attended, 0=no-show
   expires_at: string | null; // ISO datetime — null for legacy or paid rows

@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDB, getEnv } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
-import { createWorkshopCheckout } from '@/lib/beam';
 import { HOLD_MINUTES } from '@/lib/holds';
 import { getEffectivePrice } from '@/lib/workshop-utils';
 import { visibleAppStatus, confirmDeadlineFor } from '@/lib/selection';
@@ -12,7 +11,7 @@ import type { Workshop, Booking } from '@/lib/types';
 /**
  * A selected (approved) user confirms their seat. For free workshops this
  * finalizes the booking; for deposit/paid it sets the confirmation and returns
- * a Stripe checkout so the user can pay within the round deadline.
+ * our payment page so the user can pay within the round deadline.
  */
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -78,25 +77,16 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
     const env = await getEnv();
     const siteUrl = env.SITE_URL || 'http://localhost:3000';
-    // Destructure: the helper returns { url, sessionId }. This used to assign
-    // the whole object to `checkoutUrl` and hand it back as the redirect
-    // target, and it never stored the id — so a QR created down this path
-    // could not be killed when the hold lapsed.
-    const { url: checkoutUrl, sessionId } = await createWorkshopCheckout({
-      workshopTitle: workshop.title,
+    // Our own payment page, which serves this booking's single stored QR and
+    // mints it on first open. Beam's hosted page cannot be used for PromptPay:
+    // it issues a new QR on every switch of payment method and leaves them all
+    // payable, so one seat could be paid for more than once.
+    return NextResponse.json({
+      confirmed: true,
+      mode: paymentType,
+      checkoutUrl: `${siteUrl}/pay/${id}`,
       amount,
-      bookingId: id,
-      userId: user.sub,
-      successUrl: `${siteUrl}/me/bookings?paid=1&booking=${id}`,
-      cancelUrl: `${siteUrl}/me/bookings`,
-      holdMinutes: HOLD_MINUTES,
     });
-    await db
-      .prepare('UPDATE bookings SET beam_payment_link_id = ? WHERE id = ?')
-      .bind(sessionId, id)
-      .run();
-
-    return NextResponse.json({ confirmed: true, mode: paymentType, checkoutUrl, amount });
   } catch (error) {
     const err = error as Error;
     if (err.message === 'Unauthorized') {
