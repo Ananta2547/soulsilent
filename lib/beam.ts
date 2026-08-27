@@ -109,7 +109,14 @@ async function beamFetch<T>(
     // happened.
   }
   if (!res!.ok) {
-    console.error(`Beam ${method} ${path} → ${res!.status}`, text.slice(0, 500));
+    // Who actually answered matters as much as the status. A 502 whose body is
+    // plain text rather than Beam's JSON did not come from Beam's application —
+    // it came from something in front of it, and that is a completely different
+    // problem from a request Beam disliked. `server` and `cf-ray` say which.
+    const from = ['server', 'cf-ray', 'content-type', 'x-beam-request-id']
+      .map((h) => `${h}=${res!.headers.get(h) ?? '-'}`)
+      .join(' ');
+    console.error(`Beam ${method} ${path} → ${res!.status} [${from}]`, text.slice(0, 500));
   }
   return { status: res!.status, ok: res!.ok, data };
 }
