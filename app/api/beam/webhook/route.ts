@@ -132,6 +132,12 @@ export async function POST(request: Request) {
     //
     // The purchase shape has no referenceId, so its booking is found through
     // the stored link id instead.
+    //
+    // Since migration 048 PromptPay charges are created by us through the
+    // Charges API rather than by a payment link. Those report `source: "API"`
+    // with an EMPTY `sourceId`, and there is no purchase-shaped event at all —
+    // `pick` skips empty strings, so `linkId` comes out null and the booking is
+    // found by `referenceId`, which is the only route those charges need.
     const order = (data.order || {}) as Record<string, unknown>;
     const customer = (data.customer || {}) as Record<string, unknown>;
 
@@ -323,7 +329,13 @@ export async function POST(request: Request) {
           // became of their money. Without it they see only "cancelled" and
           // have no idea a refund is coming — which is how someone pays again,
           // or contacts support in a panic.
-          if (bookingId && refundable && !seen) {
+          //
+          // ONLY for a lapsed hold. A duplicate is the opposite situation: the
+          // seat is confirmed and it is the SECOND payment going back. Marking
+          // it here put "your payment arrived too late, the seat is gone" in
+          // front of people who did get their seat, because `cancel_reason`
+          // drives both the red remark and the popup on /me/bookings.
+          if (bookingId && reason === 'late_cancelled' && !seen) {
             await db
               .prepare('UPDATE bookings SET cancel_reason = ? WHERE id = ?')
               .bind(refunded ? 'late_refunded' : 'late_refund_pending', bookingId)
@@ -355,9 +367,17 @@ export async function POST(request: Request) {
         // The payload identifies the refund, not the charge it reverses, so
         // close the reconcile entry by booking rather than by charge id.
         if (bookingId) {
+          // A refund does NOT always mean this booking's own money went back.
+          // When someone pays twice, the refund is of the SECOND charge while
+          // the first still holds a confirmed seat — and closing by booking id
+          // marked that live booking "refunded", so a paid-up attendee saw
+          // "↩ คืนเงินแล้ว" on a seat they still have.
+          //
+          // Only a booking whose seat is already gone can have been refunded in
+          // the sense the UI means.
           await db
             .prepare(
-              "UPDATE bookings SET payment_status='refunded' WHERE id = ? AND payment_status = 'paid'",
+              "UPDATE bookings SET payment_status='refunded' WHERE id = ? AND payment_status = 'paid' AND status = 'cancelled'",
             )
             .bind(bookingId)
             .run();
