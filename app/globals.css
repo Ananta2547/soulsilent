@@ -2717,3 +2717,125 @@ body {
   .stats-grid { grid-template-columns: 1fr; }
   .team-grid { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   Payment page (Design Composer "Pay Page v2.dc.html")
+
+   Two columns that carry different jobs: the left says what is being paid for
+   and never changes, the right is the part that reacts — QR, countdown, and the
+   paid / expired / error outcomes. Keeping them apart means the booking stays
+   on screen while the right-hand side swaps out under it.
+
+   This page sits outside the (main) shell, so it has no site header to make
+   room for; the right column's top padding is what lines the card up with the
+   heading opposite it.
+   ============================================================ */
+.pay {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 100vh;
+}
+
+.pay-left {
+  background: var(--cream);
+  padding: 40px 56px 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 34px;
+}
+
+.pay-right {
+  padding: 132px 56px 64px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+/* Everything in the left column lines up on one measure. */
+.pay-col {
+  width: 100%;
+  max-width: 480px;
+}
+
+/* Shared frame for the non-payable outcomes, which are all one centred stack. */
+.pay-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 13px;
+  text-align: center;
+  padding-top: 40px;
+}
+
+/* ── Phone ────────────────────────────────────────────────────────────────
+   Not the desktop layout reflowed. The phone design leads with a dark card
+   carrying the two facts that must survive a glance — what is owed and how long
+   is left — stacks the rest, and pins the card-payment button to the bottom of
+   the screen so it stays reachable however far the user has scrolled.
+
+   The two trees are both rendered and one is hidden here, rather than picked in
+   JavaScript: a width read during render would either mismatch the server HTML
+   or flash the wrong layout on first paint.
+   ────────────────────────────────────────────────────────────────────────── */
+.pay-m {
+  display: none;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--cream);
+  flex-direction: column;
+}
+
+@media (max-width: 900px) {
+  .pay-desktop {
+    display: none;
+  }
+  .pay-m {
+    display: flex;
+  }
+}
+
+.pay-m-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: rgba(246, 241, 230, 0.9);
+  backdrop-filter: blur(12px) saturate(160%);
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* The generous bottom padding is what keeps the last link clear of the pinned
+   footer: the footer sticks to the viewport bottom while scrolling, so without
+   it the "later" link spends the whole scroll underneath the button. */
+.pay-m-body {
+  padding: 6px 20px 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pay-m-card {
+  background: var(--paper);
+  border-radius: 22px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The pinned footer. `env(safe-area-inset-bottom)` keeps the button clear of the
+   home indicator on a notched phone, where it would otherwise sit under it. */
+.pay-m-foot {
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px) saturate(160%);
+  padding: 14px 20px calc(22px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 -16px 40px -28px rgba(13, 30, 29, 0.4);
+}
