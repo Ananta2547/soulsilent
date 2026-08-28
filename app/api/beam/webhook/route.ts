@@ -293,16 +293,34 @@ export async function POST(request: Request) {
         }
 
         if (reason) {
-          // Beam re-delivers the same charge several times, so the refund has
-          // to fire once. The reconcile row is keyed by charge id: if it is
-          // already there, this charge has been handled, and a second refund
-          // would only collect a 400 for having nothing left to refund.
-          const seen = chargeId
-            ? await db
-                .prepare('SELECT id FROM orphan_payments WHERE id = ?')
-                .bind(chargeId)
-                .first<{ id: string }>()
-            : null;
+          // Claim this charge BEFORE touching the money.
+          //
+          // Beam re-delivers the same charge, and the deliveries can arrive
+          // CONCURRENTLY — two did, in the same second, during the late-payment
+          // test. Both read the reconcile table before either had written to
+          // it, both passed the "have we handled this?" check, and both fired a
+          // refund. Beam refused the second, so nothing went out twice, but the
+          // two handlers then wrote different values for `cancel_reason` and
+          // whichever landed last won. The booking's story was decided by a
+          // coin toss.
+          //
+          // The INSERT is the claim instead of a SELECT before it. `id` is the
+          // charge id and the primary key, so exactly one delivery can create
+          // the row; a delivery that inserted nothing is a re-delivery and has
+          // nothing left to do. Recorded whether or not the refund goes through
+          // — without a charge id we cannot refund automatically and a human
+          // must chase it.
+          const claim = await db
+            .prepare(
+              `INSERT OR IGNORE INTO orphan_payments (id, payment_intent, booking_id, amount, currency, email, reason)
+               VALUES (?, ?, ?, ?, 'thb', ?, ?)`,
+            )
+            .bind(chargeId || uuid(), linkId, bookingId, amount, email, reason)
+            .run();
+          if (claim.meta.changes !== 1) {
+            console.log(`Beam webhook: charge ${chargeId} already claimed, nothing to do`);
+            break;
+          }
 
           // Refund only money we can positively tie to one of our own bookings.
           // `unknown` means no matching row — which, on a shared Beam account,
@@ -311,7 +329,7 @@ export async function POST(request: Request) {
           // human instead.
           const refundable = reason !== 'unknown';
           let refunded = false;
-          if (chargeId && refundable && !seen) {
+          if (chargeId && refundable) {
             try {
               await refundCharge(
                 chargeId,
@@ -335,21 +353,12 @@ export async function POST(request: Request) {
           // it here put "your payment arrived too late, the seat is gone" in
           // front of people who did get their seat, because `cancel_reason`
           // drives both the red remark and the popup on /me/bookings.
-          if (bookingId && reason === 'late_cancelled' && !seen) {
+          if (bookingId && reason === 'late_cancelled') {
             await db
               .prepare('UPDATE bookings SET cancel_reason = ? WHERE id = ?')
               .bind(refunded ? 'late_refunded' : 'late_refund_pending', bookingId)
               .run();
           }
-          // Recorded whether or not the refund went through — without a charge
-          // id we cannot refund automatically and a human must chase it.
-          await db
-            .prepare(
-              `INSERT OR IGNORE INTO orphan_payments (id, payment_intent, booking_id, amount, currency, email, reason)
-               VALUES (?, ?, ?, ?, 'thb', ?, ?)`,
-            )
-            .bind(chargeId || uuid(), linkId, bookingId, amount, email, reason)
-            .run();
           break;
         }
 
