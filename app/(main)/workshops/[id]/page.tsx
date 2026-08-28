@@ -238,10 +238,156 @@ export default function WorkshopDetailPage() {
   const partDates = safeParseArray<string>(workshop.dates_json, []);
   const workshopType = workshop.workshop_type || 'one_day';
 
+  // Defined once and rendered by both headers. The desktop hero carries only
+  // the title and leaves these below it; the phone design folds them into the
+  // teal band. Two copies of the status logic would be two chances to disagree
+  // about whether a workshop is open.
+  const tagRow = (
+    <>
+      {hasWorkshopEnded(workshop) ? (
+        <span className="tag" style={{ background: 'var(--cream-deep)', color: 'var(--muted)' }}>
+          {tr(lang, 'ปิดรับ', 'Closed')}
+        </span>
+      ) : workshop.status === 'cancelled' ? (
+        <span className="tag" style={{ background: '#fde7d3', color: '#a04a14' }}>
+          {tr(lang, 'ยกเลิก', 'Cancelled')}
+        </span>
+      ) : (
+        <span className="tag tag-accent">{tr(lang, 'เปิดจอง', 'Open')}</span>
+      )}
+      <span className="tag">Workshop · Onsite</span>
+      {workshop.category && <span className="tag">{workshop.category}</span>}
+    </>
+  );
+
+  const timeLabel = `${workshop.time_start}-${workshop.time_end}`;
+  const dateLine =
+    workshopType === 'multi_day' && workshop.end_date
+      ? `${fmtFullDate(workshop.date)} - ${fmtFullDate(workshop.end_date)}`
+      : workshopType === 'multi_part' && partDates.length > 0
+        ? partDates.map(fmtFullDate).join(' \u00b7 ')
+        : fmtFullDate(workshop.date);
+
   return (
     <>
+      {/* Phone header. Shown only under 920px, where it replaces the desktop
+          hero outright - see .ws-m-head in globals.css. */}
+      <div className="ws-m-head">
+        <div className="ws-m-bar">
+          <Link
+            href="/workshops"
+            aria-label={tr(lang, 'ย้อนกลับ', 'Back')}
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--ink)',
+              fontSize: 24,
+              lineHeight: 1,
+              flexShrink: 0,
+            }}
+          >
+            ‹
+          </Link>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              className="mono"
+              style={{
+                fontSize: 9.5,
+                letterSpacing: '.18em',
+                textTransform: 'uppercase',
+                color: 'var(--teal)',
+              }}
+            >
+              workshop
+            </div>
+            <div
+              style={{
+                fontSize: 13.5,
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {workshop.title}
+            </div>
+          </div>
+        </div>
+
+        <div className="ph ph-teal-100" style={{ height: 300, position: 'relative', overflow: 'hidden' }}>
+          {workshop.image_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={workshop.image_url}
+              alt={workshop.title}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          ) : (
+            <>
+              {/* animate={false} because the draw-on stroke only runs inside a
+                  .draw-in ancestor (Reveal). This header is above the fold and
+                  never scrolls in, so an animated doodle here stays invisible. */}
+              <Cloud
+                color="var(--teal)"
+                stroke={3}
+                animate={false}
+                style={{ position: 'absolute', top: 22, right: 20, width: 78, height: 50 }}
+              />
+              <WaveLine
+                color="var(--teal-200)"
+                stroke={2.5}
+                animate={false}
+                count={2}
+                style={{
+                  position: 'absolute',
+                  bottom: 22,
+                  left: 20,
+                  width: 'calc(100% - 40px)',
+                  height: 32,
+                }}
+              />
+            </>
+          )}
+        </div>
+
+        <section className="bg-teal-section" style={{ padding: '24px 20px 26px' }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>{tagRow}</div>
+          <h1
+            className="display-th"
+            style={{ fontSize: 27, margin: 0, lineHeight: 1.2, color: '#fff', textWrap: 'pretty' }}
+          >
+            {workshop.title}
+          </h1>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
+              marginTop: 16,
+              fontSize: 13.5,
+              color: 'rgba(255,255,255,.86)',
+            }}
+          >
+            <span style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <Icon name="date" size={16} style={{ marginTop: 2 }} />
+              {dateLine} · {timeLabel}
+            </span>
+            {locationLabel && (
+              <span style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <Icon name="location" size={16} style={{ marginTop: 2 }} />
+                {locationLabel}
+              </span>
+            )}
+          </div>
+        </section>
+      </div>
+
       {/* Hero banner */}
-      <section className="bg-teal-section" style={{ padding: '40px 0' }}>
+      <section className="bg-teal-section ws-d-hero" style={{ padding: '40px 0' }}>
         <div className="container" style={{ textAlign: 'center' }}>
           <h1
             className="display-th"
@@ -253,23 +399,14 @@ export default function WorkshopDetailPage() {
       </section>
 
       {/* Content + sticky booking */}
-      <section className="section" style={{ paddingTop: 48, paddingBottom: 96 }}>
+      <section className="section ws-detail-main" style={{ paddingTop: 48, paddingBottom: 96 }}>
         <div className="container">
           <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 48 }} className="ws-detail-grid">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 48, minWidth: 0 }}>
-              {/* Tags */}
-              <Reveal>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {hasWorkshopEnded(workshop) ? (
-                    <span className="tag" style={{ background: 'var(--cream-deep)', color: 'var(--muted)' }}>{tr(lang, 'ปิดรับ', 'Closed')}</span>
-                  ) : workshop.status === 'cancelled' ? (
-                    <span className="tag" style={{ background: '#fde7d3', color: '#a04a14' }}>{tr(lang, 'ยกเลิก', 'Cancelled')}</span>
-                  ) : (
-                    <span className="tag tag-accent">{tr(lang, 'เปิดจอง', 'Open')}</span>
-                  )}
-                  <span className="tag">Workshop · Onsite</span>
-                  {workshop.category && <span className="tag">{workshop.category}</span>}
-                </div>
+              {/* Tags — the phone header prints these itself, inside the teal
+                  band, so hide them here rather than showing the row twice. */}
+              <Reveal className="ws-d-tags">
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{tagRow}</div>
               </Reveal>
 
               {workshop.description && (
@@ -733,6 +870,7 @@ export default function WorkshopDetailPage() {
               </div>
 
               <div
+                id="ws-booking-card"
                 style={{
                   position: 'sticky',
                   top: 100,
@@ -763,6 +901,53 @@ export default function WorkshopDetailPage() {
           </div>
         </div>
       </section>
+
+      {/* Pinned price bar, phones only (.ws-m-cta is display:none above 920px,
+          where the booking card is a permanently visible sidebar instead).
+
+          The button scrolls to the booking card rather than booking directly.
+          BookingCardContent has far more states than a bar can show — already
+          booked, awaiting payment, hold expired, attended, review due, sign-in
+          required — and a second copy of that logic here would drift from it.
+          One button, one source of truth for what happens next. */}
+      <div className="ws-m-cta">
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 20, fontWeight: 700, lineHeight: 1.1 }}>
+            {(workshop.payment_type || 'paid') === 'free' || getEffectivePrice(workshop).price <= 0
+              ? tr(lang, 'ฟรี', 'Free')
+              : `฿${getEffectivePrice(workshop).price.toLocaleString()}`}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+            {spotsLeft > 0
+              ? tr(lang, `เหลือ ${spotsLeft} ที่นั่ง`, `${spotsLeft} seats left`)
+              : tr(lang, 'เต็มแล้ว', 'Sold out')}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() =>
+            document
+              .getElementById('ws-booking-card')
+              ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          }
+          style={{
+            border: 0,
+            cursor: 'pointer',
+            borderRadius: 999,
+            padding: '13px 24px',
+            fontSize: 15,
+            fontWeight: 600,
+            background: 'var(--teal)',
+            color: '#fff',
+            flexShrink: 0,
+          }}
+        >
+          {hasWorkshopEnded(workshop) || workshop.status === 'cancelled'
+            ? tr(lang, 'ดูรายละเอียด', 'View details')
+            : tr(lang, 'จองที่นั่ง', 'Book a seat')}
+          <span aria-hidden style={{ marginLeft: 8 }}>→</span>
+        </button>
+      </div>
 
       <style jsx>{`
         @media (max-width: 920px) {
