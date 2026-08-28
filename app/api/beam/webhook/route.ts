@@ -387,6 +387,16 @@ export async function POST(request: Request) {
             )
             .bind(bookingId)
             .run();
+          // Tell the booking too. Beam has just confirmed the money went back,
+          // yet only the cron sweep ever moved this flag on — so the site kept
+          // saying "your refund is being processed" for up to a minute after it
+          // had landed, and forever anywhere the cron does not run.
+          await db
+            .prepare(
+              "UPDATE bookings SET cancel_reason = 'late_refunded' WHERE id = ? AND cancel_reason = 'late_refund_pending'",
+            )
+            .bind(bookingId)
+            .run();
         } else if (chargeId) {
           await db
             .prepare(

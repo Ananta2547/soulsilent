@@ -183,6 +183,17 @@ function fmtDate(d: string, lang: 'th' | 'en') {
   return fmtDateTime(d, lang);
 }
 
+/** Late-refund notices the user has already read, as "<bookingId>:<state>".
+ *
+ *  Keyed by state and not by booking alone on purpose: acknowledging "your
+ *  refund is being processed" should silence THAT message, and the later "it has
+ *  landed" is different news that deserves to be raised once on its own. */
+const LATE_ACK_KEY = 'asl.lateRefundAck';
+
+function lateAckKey(b: { id: string; cancel_reason?: string | null }): string {
+  return `${b.id}:${b.cancel_reason ?? ''}`;
+}
+
 export default function MyBookingsPage() {
   const { lang } = useLang();
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -199,7 +210,18 @@ export default function MyBookingsPage() {
   /** Set when a booking flips to paid while this page is open. */
   const [justPaid, setJustPaid] = useState<string | null>(null);
   /** Late-refund notices the user has acknowledged this visit. */
-  const [dismissedLate, setDismissedLate] = useState<string[]>([]);
+  // Acknowledgements for late refunds. Read straight out of localStorage so
+  // there is no flash of a popup the user already dismissed on a previous
+  // visit; guarded for the server render, where there is no storage.
+  const [dismissedLate, setDismissedLate] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(LATE_ACK_KEY) || '[]');
+      return Array.isArray(saved) ? (saved as string[]) : [];
+    } catch {
+      return [];
+    }
+  });
 
   const load = useCallback(() => {
     setLoadError(false);
@@ -269,15 +291,16 @@ export default function MyBookingsPage() {
   // popup because the row alone only says "cancelled", which tells someone who
   // just paid nothing about where their money went.
   //
-  // Derived rather than pushed from an effect, and dismissal is per visit: a
-  // notice about money the user is owed is worth showing again on a reload
-  // until they have acted on it.
-  const lateRefund =
-    bookings.find(
-      (b) =>
-        (b.cancel_reason === 'late_refunded' || b.cancel_reason === 'late_refund_pending') &&
-        !dismissedLate.includes(b.id),
-    ) ?? null;
+  // ALL of them at once, not one popup per booking. Picking only the first left
+  // the next one waiting behind it, so dismissing produced another popup, and
+  // another — which reads like the page is broken rather than like three
+  // separate notices.
+  const lateRefunds = bookings.filter(
+    (b) =>
+      (b.cancel_reason === 'late_refunded' || b.cancel_reason === 'late_refund_pending') &&
+      !dismissedLate.includes(lateAckKey(b)),
+  );
+  const lateRefund = lateRefunds[0] ?? null;
 
   // Anything still waiting on payment. No clock reading here — that would be an
   // impure call during render, and it isn't needed: once the hold lapses the
@@ -735,8 +758,23 @@ export default function MyBookingsPage() {
           user has just paid money for a seat they did not get, and that must
           not be something they can scroll past. */}
       {lateRefund && (() => {
-        const done = lateRefund.cancel_reason === 'late_refunded';
-        const dismiss = () => setDismissedLate((prev) => [...prev, lateRefund.id]);
+        const done = lateRefunds.every((b) => b.cancel_reason === 'late_refunded');
+        const dismiss = () => {
+          const keys = lateRefunds.map(lateAckKey);
+          setDismissedLate((prev) => [...prev, ...keys]);
+          // Remembered across visits, including for a refund still in flight.
+          // The row itself keeps saying so in red, which is the right weight for
+          // something the user has already been told — a modal across the whole
+          // screen on every single reload is not. If it later completes, the key
+          // changes and the good news is raised once.
+          try {
+            const saved = JSON.parse(window.localStorage.getItem(LATE_ACK_KEY) || '[]');
+            const merged = Array.from(new Set([...(Array.isArray(saved) ? saved : []), ...keys]));
+            window.localStorage.setItem(LATE_ACK_KEY, JSON.stringify(merged));
+          } catch {
+            // Storage blocked or full — the popup simply comes back next visit.
+          }
+        };
         return (
           <div
             onMouseDown={(e) => { if (e.target === e.currentTarget) dismiss(); }}
@@ -769,6 +807,15 @@ export default function MyBookingsPage() {
                       'The refund is being processed. If it has not arrived within 3 business days, please contact us with the date and time you paid.',
                     )}
               </div>
+              {lateRefunds.length > 1 && (
+                <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, margin: '0 0 14px' }}>
+                  {tr(
+                    lang,
+                    `รวมทั้งหมด ${lateRefunds.length} รายการที่ชำระหลังหมดเวลา และคืนเงินด้วยเงื่อนไขเดียวกัน`,
+                    `${lateRefunds.length} bookings were paid after the deadline and are being refunded on the same terms.`,
+                  )}
+                </p>
+              )}
               <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, margin: '0 0 20px' }}>
                 {tr(
                   lang,
