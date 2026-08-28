@@ -199,12 +199,13 @@ export interface Booking {
   user_id: string;
   status: 'pending' | 'confirmed' | 'cancelled';
   payment_status: 'pending' | 'paid' | 'refunded' | 'expired';
+  /** Stripe ids from before the move to Beam. Nothing writes these any more,
+   *  but they are the record of what a past booking actually paid through and
+   *  are kept for exactly that reason — a refund on one of these is issued from
+   *  the Stripe dashboard, not from here. */
   stripe_payment_id: string | null;
-  /** Stripe Checkout Session id — used to expire the session (kill the QR). */
   stripe_session_id: string | null;
-  /** Beam payment link id — disabled to kill the QR. Which of this and
-   *  stripe_session_id is set decides which gateway a booking belongs to
-   *  while both are live (migration 047). */
+  /** Beam payment link id for the card lane — disabled to close the checkout. */
   beam_payment_link_id: string | null;
   /** Beam charge id, set once payment lands. A refund is issued against it. */
   beam_charge_id: string | null;

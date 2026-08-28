@@ -2,86 +2,27 @@ import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 import { sqliteToMs } from '@/lib/datetime';
 import { requireAuth } from '@/lib/auth';
-import { fetchCheckoutSession, refundPaymentIntent } from '@/lib/stripe';
 import { fetchPaymentLink, fetchCharge } from '@/lib/beam';
 
 /**
- * POST /api/payments/verify { session_id }
+ * POST /api/payments/verify { booking_id }
  *
- * Pulls the Checkout Session from Stripe and (if paid) marks the booking /
- * enrollment as `paid`. Idempotent — safe to call multiple times.
+ * Asks the gateway where a booking's payment stands and marks it paid if it is.
+ * Idempotent — safe to call repeatedly.
  *
- * This is the backup path for when the Stripe webhook never fires
- * (typical on local dev without `stripe listen --forward-to ...`).
+ * The backup path for a webhook that never arrives. Beam carries no session-id
+ * placeholder of Stripe's kind, so the redirect brings the booking id back and
+ * the charge or link id is read off the row.
  */
 export async function POST(request: Request) {
   try {
     const user = await requireAuth();
-    const { session_id, booking_id } = (await request.json()) as {
-      session_id?: string;
-      booking_id?: string;
-    };
+    const { booking_id } = (await request.json()) as { booking_id?: string };
 
-    // Beam path. Beam has no {SESSION_ID} placeholder, so the redirect carries
-    // the booking id and the link id is read back from the row.
-    if (booking_id) {
-      return await verifyBeamBooking(booking_id, user.sub);
+    if (!booking_id) {
+      return NextResponse.json({ error: 'missing booking_id' }, { status: 400 });
     }
-
-    if (!session_id) {
-      return NextResponse.json({ error: 'missing session_id or booking_id' }, { status: 400 });
-    }
-
-    const session = await fetchCheckoutSession(session_id);
-
-    // Defence in depth: only the user who created the booking can verify it.
-    const metadata = (session.metadata || {}) as Record<string, string>;
-    if (metadata.user_id && metadata.user_id !== user.sub) {
-      return NextResponse.json({ error: 'session does not belong to you' }, { status: 403 });
-    }
-
-    if (session.payment_status !== 'paid') {
-      return NextResponse.json({
-        ok: false,
-        payment_status: session.payment_status,
-        message: 'Payment not completed yet',
-      });
-    }
-
-    const db = await getDB();
-    const paymentIntentId =
-      typeof session.payment_intent === 'string'
-        ? session.payment_intent
-        : session.payment_intent?.id ?? null;
-
-    if (metadata.type === 'workshop' && metadata.booking_id) {
-      const booking = await db
-        .prepare('SELECT status, payment_status FROM bookings WHERE id = ?')
-        .bind(metadata.booking_id)
-        .first<{ status: string; payment_status: string }>();
-
-      // Late payment: hold already expired and seat released → refund, keep cancelled.
-      if (booking && (booking.status === 'cancelled' || booking.payment_status === 'expired')) {
-        if (paymentIntentId) {
-          try {
-            await refundPaymentIntent(paymentIntentId);
-          } catch (e) {
-            console.error('Late-payment refund failed (verify)', e);
-          }
-        }
-        return NextResponse.json({ ok: false, expired: true, message: 'หมดเวลาชำระเงิน ระบบได้คืนเงินให้แล้ว' });
-      }
-
-      await db
-        .prepare(
-          "UPDATE bookings SET status = 'confirmed', payment_status = 'paid', stripe_payment_id = ? WHERE id = ?"
-        )
-        .bind(paymentIntentId, metadata.booking_id)
-        .run();
-      return NextResponse.json({ ok: true, type: 'workshop', booking_id: metadata.booking_id });
-    }
-
-    return NextResponse.json({ ok: false, error: 'unknown session type' }, { status: 400 });
+    return await verifyBeamBooking(booking_id, user.sub);
   } catch (error) {
     const err = error as Error;
     if (err.message === 'Unauthorized') {

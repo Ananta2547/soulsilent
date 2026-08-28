@@ -258,20 +258,19 @@ export default function MyBookingsPage() {
   }, []);
 
   // On return from the gateway → verify + show thank-you.
-  //   Beam   : ?paid=1&booking=<bookingId>   (Beam has no session-id placeholder)
-  //   Stripe : ?paid=1&session_id=<id>       (legacy, for holds still in flight)
+  // ?paid=1&booking=<bookingId> — Beam has no session-id placeholder of its
+  // own, so the booking id is what comes back.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const sessionId = params.get('session_id');
     const bookingId = params.get('booking');
     const paid = params.get('paid');
     (async () => {
-      if (sessionId || bookingId) {
+      if (bookingId) {
         try {
           const res = await fetch('/api/payments/verify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(bookingId ? { booking_id: bookingId } : { session_id: sessionId }),
+            body: JSON.stringify({ booking_id: bookingId }),
           });
           if (!res.ok) throw new Error(`verify HTTP ${res.status}`);
         } catch (e) {
@@ -909,7 +908,7 @@ function PayCountdown({ bookingId, expiresAt, onExpire, lang }: { bookingId: str
     return () => clearInterval(id);
   }, [targetMs]);
 
-  // On timeout: tell the server to expire the Stripe session (kills the saved
+  // On timeout: tell the server to close the checkout (kills a saved
   // QR) + mark the booking, then refresh the list. Runs once.
   useEffect(() => {
     if (!done) return;

@@ -22,9 +22,10 @@ export default {
   fetch: openNextWorker.fetch,
 
   // Cron Trigger (see wrangler.toml [triggers]). Runs every minute: hit the
-  // internal sweep that cancels the Stripe session/PaymentIntent for any hold
-  // past its 10-min window — killing a saved QR at minute 10 instead of waiting
-  // for Stripe's 30-min session auto-expiry.
+  // internal sweep that releases the seat of any hold past its 10-min window
+  // and retries the refund of money that arrived after it. The QR itself cannot
+  // be cancelled — Beam offers no endpoint for it — so a late scan is money to
+  // give back rather than something to block.
   async scheduled(_event: unknown, env: CronEnv, ctx: { waitUntil(p: Promise<unknown>): void }) {
     const base = env.SITE_URL || 'https://allsoullearn.com';
     ctx.waitUntil(

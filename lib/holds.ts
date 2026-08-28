@@ -21,7 +21,7 @@ type Db = Awaited<ReturnType<typeof import('./db').getDB>>;
  * route, which is how the modal ended up telling Thai users "10 นาที" while the
  * English string beside it said "1 hour".
  *
- * It was 60 only because Stripe refused a Checkout Session shorter than 30
+ * It was 60 only because the old gateway refused a checkout shorter than 30
  * minutes. Beam has no such floor, so this is a free product decision now.
  * Changing it also means changing the copy that names the duration
  * (BookingModal, the workshop detail perks list).

@@ -15,7 +15,7 @@ interface OrphanRow {
   created_at: string;
 }
 
-/** List recorded orphan payments (money that reached Stripe but doesn't match an
+/** List recorded orphan payments (money that reached Beam but doesn't match an
  *  owed booking — late/duplicate PromptPay QR payments). ?all=1 includes resolved. */
 export async function GET(request: Request) {
   try {
@@ -43,7 +43,12 @@ export async function GET(request: Request) {
   }
 }
 
-/** Mark an orphan payment resolved (after refunding it in the Stripe Dashboard). */
+/** Mark an orphan payment resolved.
+ *
+ *  Most rows close themselves: the refund fires from the webhook, the cron
+ *  retries it, and `refund.succeeded` marks the row done. This is for the rest —
+ *  money that could not be tied to a booking of ours, or a refund that had to be
+ *  issued by hand in the Beam dashboard. */
 export async function PATCH(request: Request) {
   try {
     await requireAdmin();

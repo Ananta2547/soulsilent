@@ -223,7 +223,7 @@ export function BookingModal({
         ? { consent: { photoVideo: consent, label: consent === 'granted' ? 'ยินยอม' : 'ไม่ยินยอม' } }
         : {}),
     };
-    // Anything that leads to a Stripe QR (paid / deposit) → show the QR warning
+    // Anything that leads to a payment QR (paid / deposit) → show the QR warning
     // popup FIRST and create the booking only after the user confirms. This means
     // Cancel creates no booking and takes no seat. Free / selection never pay, so
     // they submit straight away.
@@ -626,10 +626,10 @@ export function BookingModal({
           )}
         </div>
 
-        {/* Payment warning — shown on step 2 when submitting leads straight to the
-            Stripe PromptPay QR (paid/deposit). PromptPay QR can be re-scanned at the
-            bank, so warn before redirect: a late/repeat payment is taken by the bank
-            but rejected by us and grants no extra seat. */}
+        {/* Payment warning — shown on step 2 when submitting leads straight to
+            the PromptPay QR (paid/deposit). The QR outlives the seat hold by
+            twenty minutes and cannot be cancelled, so warn before the redirect:
+            a late payment is taken by the bank, rejected by us, and refunded. */}
         {step === 2 && workshop.payment_type !== 'free' && workshop.admission_type !== 'selection' && (
           <div style={{ padding: '0 24px', marginTop: -4 }}>
             <div style={{ background: '#fdecec', border: '1px solid #f0b4b4', borderRadius: 14, padding: '11px 15px', fontSize: 12.5, color: '#a13030', lineHeight: 1.55 }}>

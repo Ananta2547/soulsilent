@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import type { Workshop, Location, Review } from '@/lib/types';
 import { useLang, T, tr } from '@/lib/i18n';
@@ -49,8 +49,6 @@ type Instructor = {
 
 export default function WorkshopDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const { lang } = useLang();
   const [workshop, setWorkshop] = useState<Workshop | null>(null);
   const [location, setLocation] = useState<Location | null>(null);
@@ -66,7 +64,6 @@ export default function WorkshopDetailPage() {
   const [consentOpen, setConsentOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [verifyFailed, setVerifyFailed] = useState(false);
   const [booking, setBooking] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(false);
   const [loginPromptOpen, setLoginPromptOpen] = useState(false);
@@ -142,31 +139,6 @@ export default function WorkshopDetailPage() {
     if (authed) setBookingOpen(true);
     else setLoginPromptOpen(true);
   }
-
-  // When Stripe redirects back with ?session_id=..., verify the payment
-  // server-side, then strip the query param and refetch. This is the path
-  // that works without webhook delivery (local dev, or before live mode
-  // webhook is configured).
-  useEffect(() => {
-    const sessionId = searchParams.get('session_id');
-    if (!sessionId) return;
-    (async () => {
-      try {
-        const res = await fetch('/api/payments/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session_id: sessionId }),
-        });
-        if (!res.ok) throw new Error(`verify HTTP ${res.status}`);
-      } catch (e) {
-        console.error('Payment verification failed', e);
-        setVerifyFailed(true);
-      }
-      // Clean the URL so a refresh doesn't re-verify
-      router.replace(`/workshops/${id}`);
-      load();
-    })();
-  }, [searchParams, router, id, load]);
 
   async function handleBooking(application?: unknown): Promise<BookingResult> {
     setBooking(true);
@@ -283,11 +255,6 @@ export default function WorkshopDetailPage() {
       {/* Content + sticky booking */}
       <section className="section" style={{ paddingTop: 48, paddingBottom: 96 }}>
         <div className="container">
-          {verifyFailed && (
-            <div style={{ background: '#fdf1e7', border: '1px solid #e8b98a', color: '#8a4b1a', borderRadius: 12, padding: '12px 16px', fontSize: 14, marginBottom: 20 }}>
-              {tr(lang, 'ยืนยันการชำระเงินอัตโนมัติไม่สำเร็จ หากคุณชำระเงินแล้วแต่สถานะยังไม่อัปเดต กรุณารีเฟรชหน้าอีกครั้งหรือติดต่อผู้ดูแล', 'Automatic payment verification failed. If you paid but the status has not updated, please refresh or contact the admin.')}
-            </div>
-          )}
           <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 48 }} className="ws-detail-grid">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 48, minWidth: 0 }}>
               {/* Tags */}

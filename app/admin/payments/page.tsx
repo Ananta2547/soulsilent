@@ -61,8 +61,9 @@ export default function AdminPaymentsPage() {
     <div className="max-w-5xl">
       <h1 className="text-2xl font-semibold mb-1">ตรวจเงินเข้าผิดปกติ</h1>
       <p className="text-sm text-muted mb-4" style={{ color: 'var(--muted)' }}>
-        เงินที่เข้า Stripe แต่ไม่ตรงกับการจองที่ต้องจ่าย — จ่าย QR หลังหมดเวลา หรือสแกน QR ซ้ำ
-        เงินก้อนนี้ตกใน Stripe balance ต้อง<strong>คืนเงินเองที่ Stripe Dashboard</strong> แล้วกด &ldquo;จัดการแล้ว&rdquo;
+        เงินที่เข้า Beam แต่ไม่ตรงกับการจองที่ต้องจ่าย — จ่าย QR หลังหมดเวลา หรือจ่ายซ้ำ
+        ระบบ<strong>คืนเงินให้อัตโนมัติ</strong>แล้วปิดรายการเอง สิ่งที่ค้างอยู่ในนี้คือรายการที่คืนอัตโนมัติไม่สำเร็จ
+        หรือเป็นเงินที่ผูกกับการจองของเราไม่ได้ ต้องคืนเองที่ Beam Dashboard แล้วกด &ldquo;จัดการแล้ว&rdquo;
       </p>
 
       <label className="inline-flex items-center gap-2 text-sm mb-4 cursor-pointer">
@@ -101,16 +102,10 @@ export default function AdminPaymentsPage() {
                 </div>
               </div>
               <div className="ml-auto flex items-center gap-3">
-                {o.payment_intent && (
-                  <a
-                    href={`https://dashboard.stripe.com/payments/${o.payment_intent}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-sm underline"
-                  >
-                    เปิดใน Stripe ↗
-                  </a>
-                )}
+                {/* The charge id is what a refund is issued against, and what
+                    to search for in Beam. Beam has no per-charge URL to link
+                    to, so it is shown to be copied rather than clicked. */}
+                <code className="text-xs" style={{ color: 'var(--muted)' }}>{o.id}</code>
                 {o.resolved ? (
                   <button
                     className="btn btn-paper btn-sm"
@@ -135,7 +130,7 @@ export default function AdminPaymentsPage() {
       )}
 
       <p className="text-xs mt-6" style={{ color: 'var(--muted)' }}>
-        หมายเหตุ: PromptPay refund ต้องให้ผู้จ่ายกรอกเลขบัญชี — Stripe จะอีเมลไปขอ เงินคืนใน 1–2 วัน
+        หมายเหตุ: PromptPay คืนเงินไม่ทันที เงินกลับเข้าบัญชีผู้จ่ายตามรอบธนาคาร ปกติ 1–3 วันทำการ
       </p>
     </div>
   );

@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { getDB, getEnv } from '@/lib/db';
-import { expireCheckoutSession, fetchCheckoutSession, refundPaymentIntent } from '@/lib/stripe';
 import { disablePaymentLink, refundCharge } from '@/lib/beam';
 
 /**
@@ -28,34 +27,28 @@ export async function GET(request: Request) {
     // Lapsed holds still awaiting payment.
     const rows = await db
       .prepare(
-        `SELECT id, stripe_session_id, beam_payment_link_id FROM bookings
+        `SELECT id, beam_payment_link_id FROM bookings
          WHERE payment_status = 'pending'
            AND status != 'cancelled'
            AND expires_at IS NOT NULL
            AND datetime(expires_at) <= datetime('now')
          LIMIT 100`
       )
-      .all<{ id: string; stripe_session_id: string | null; beam_payment_link_id: string | null }>();
+      .all<{ id: string; beam_payment_link_id: string | null }>();
 
     let expired = 0;
     let paid = 0;
     for (const b of rows.results) {
       let becamePaid = false;
-      // Beam for rows booked since the switchover, Stripe for holds still in
-      // flight from before it.
+      // Only the card lane has a link to close. A PromptPay charge cannot be
+      // cancelled at all — Beam has no endpoint for it — so its QR simply runs
+      // out its own clock and a late scan is refunded further down.
       if (b.beam_payment_link_id) {
         try {
           const r = await disablePaymentLink(b.beam_payment_link_id);
           becamePaid = r.paid;
         } catch (e) {
           console.error('cron disablePaymentLink failed', b.id, e);
-        }
-      } else if (b.stripe_session_id) {
-        try {
-          const r = await expireCheckoutSession(b.stripe_session_id);
-          becamePaid = r.paid;
-        } catch (e) {
-          console.error('cron expireCheckoutSession failed', b.id, e);
         }
       }
       if (becamePaid) {
@@ -89,18 +82,16 @@ export async function GET(request: Request) {
       .prepare(
         // Catch both post-fix rows (payment_status='expired') AND pre-fix rows
         // left by the old lazy path (status='cancelled' + payment_status still
-        // 'pending') — those older bookings have a live PaymentIntent whose saved
-        // QR is still scannable until swept here or Stripe's 24h session expiry.
-        `SELECT id, stripe_session_id AS sid, beam_payment_link_id AS beam FROM bookings
-         WHERE (stripe_session_id IS NOT NULL OR beam_payment_link_id IS NOT NULL)
+        // 'pending'), whose link may never have been closed.
+        `SELECT id, beam_payment_link_id AS beam FROM bookings
+         WHERE beam_payment_link_id IS NOT NULL
            AND (payment_status = 'expired'
                 OR (status = 'cancelled' AND payment_status = 'pending'))
            AND datetime(created_at) >= datetime('now', '${staleWindow}')
          LIMIT 50`
       )
-      .all<{ id: string; sid: string | null; beam: string | null }>();
+      .all<{ id: string; beam: string | null }>();
     let cleaned = 0;
-    let refunded = 0;
     for (const r of stale.results) {
       try {
         if (r.beam) {
@@ -111,18 +102,6 @@ export async function GET(request: Request) {
           const res = await disablePaymentLink(r.beam);
           if (res.paid) {
             console.warn('cron: Beam link paid after expiry, refund via webhook', r.id);
-          } else {
-            cleaned++;
-          }
-        } else if (r.sid) {
-          const res = await expireCheckoutSession(r.sid);
-          if (res.paid) {
-            const s = await fetchCheckoutSession(r.sid);
-            const pi = typeof s.payment_intent === 'string' ? s.payment_intent : s.payment_intent?.id;
-            if (pi) {
-              await refundPaymentIntent(pi);
-              refunded++;
-            }
           } else {
             cleaned++;
           }
@@ -196,7 +175,6 @@ export async function GET(request: Request) {
       expired,
       paid,
       cleaned,
-      refunded,
       refundRetries: retried,
       refundRetryOk: retryOk,
     });

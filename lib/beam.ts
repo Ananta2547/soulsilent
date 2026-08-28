@@ -1,15 +1,10 @@
 /**
  * Beam Checkout — the payment gateway replacing Stripe for workshop bookings.
  *
- * The exports deliberately mirror `lib/stripe.ts` one-for-one so the call sites
- * (bookings POST, /pay, /confirm, /expire, the cron sweep and
- * /api/payments/verify) change as little as possible:
- *
- *   createWorkshopCheckout  ← stripe.checkout.sessions.create
- *   disablePaymentLink      ← expireCheckoutSession  (kills a saved QR)
- *   fetchPaymentLink        ← fetchCheckoutSession   (redirect-time verify)
- *   refundCharge            ← refundPaymentIntent
- *   verifyBeamSignature     ← stripe.webhooks.constructEventAsync
+ * The exports were shaped to match the Stripe helpers they replaced, one for
+ * one, so the call sites (bookings POST, /pay, /confirm, /expire, the cron sweep
+ * and /api/payments/verify) barely had to change during the switchover. Stripe
+ * is gone now, but the shape is a good one and stayed.
  *
  * Beam is a plain REST API, so there is no SDK and none of the Workers
  * workarounds Stripe needed (no fetch httpClient, no SubtleCryptoProvider).
@@ -243,8 +238,8 @@ export function findChargeId(value: unknown, depth = 0): string | null {
  *
  * `expiresAt` matches the seat-hold window so the link dies when the hold
  * lapses, even if nothing on our side ever calls disablePaymentLink. Beam does
- * honour a short window here, unlike Stripe (which refused anything under 30
- * minutes — the reason the hold used to be 60).
+ * honour a short window here, unlike the old gateway (which refused anything
+ * under 30 minutes — the reason the hold used to be 60).
  *
  * Returns the same shape as the Stripe helper — `sessionId` is Beam's payment
  * link id — so the call sites keep working unchanged.
@@ -429,8 +424,8 @@ export async function reusableCheckoutUrl(linkId: string | null | undefined): Pr
 
 /**
  * Close an open payment link so its QR stops working — the Beam equivalent of
- * cancelling a Stripe PaymentIntent, and far simpler: one documented endpoint
- * instead of retrieve → cancel PI → expire session.
+ * cancelling a card authorisation, and far simpler: one documented endpoint
+ * instead of a three-step dance.
  *
  * Returns `{ paid }` so a caller that loses the race (the shopper paid moments
  * before we disabled) confirms the booking instead of cancelling it.
@@ -477,8 +472,8 @@ export async function fetchPaymentLink(linkId: string): Promise<{
  * Refund a charge in full — used when money lands after the hold already
  * expired, so nobody pays for a seat they no longer hold.
  *
- * As with Stripe, a PromptPay refund is not instant and may need the payer to
- * supply bank details, so this starts a refund rather than completing one.
+ * A PromptPay refund is not instant and may need the payer to supply bank
+ * details, so this starts a refund rather than completing one.
  */
 export async function refundCharge(
   chargeId: string,

@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
-import { expireCheckoutSession } from '@/lib/stripe';
 import { disablePaymentLink } from '@/lib/beam';
 import type { Booking } from '@/lib/types';
 
@@ -15,8 +14,7 @@ import type { Booking } from '@/lib/types';
  * minutes. So a saved QR stays scannable for another 20 minutes after the seat
  * is released, and money that arrives then is refunded by the webhook + cron
  * path rather than blocked here. What is closed here is the card lane's payment
- * link (and, for holds still in flight from before the switchover, the Stripe
- * session, which does void its PaymentIntent).
+ * link.
  *
  * Called by the front-end countdown when it reaches 0, and by the cron sweep.
  * Idempotent: a paid/already-cancelled booking is a no-op.
@@ -52,17 +50,12 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       }
     }
 
-    // Kill the QR by closing the checkout. Which gateway to talk to is decided
-    // by whichever id the row carries: Beam for anything booked since the
-    // switchover, Stripe for holds still in flight from before it. If the
-    // gateway reports the user paid in the race just before this, confirm the
-    // booking instead of cancelling it.
-    const linkId = booking.beam_payment_link_id || booking.stripe_session_id;
-    if (linkId) {
+    // Close the card lane's checkout, if this booking ever opened one. If Beam
+    // reports the user paid in the race just before this, confirm the booking
+    // instead of cancelling it.
+    if (booking.beam_payment_link_id) {
       try {
-        const { paid } = booking.beam_payment_link_id
-          ? await disablePaymentLink(booking.beam_payment_link_id)
-          : await expireCheckoutSession(linkId);
+        const { paid } = await disablePaymentLink(booking.beam_payment_link_id);
         if (paid) {
           await db
             .prepare("UPDATE bookings SET status='confirmed', payment_status='paid', expires_at=NULL WHERE id = ?")
@@ -72,7 +65,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         }
       } catch (e) {
         // Session may be gone/already expired — proceed to mark the booking.
-        console.error('expireCheckoutSession failed', e);
+        console.error('disablePaymentLink failed', e);
       }
     }
 
