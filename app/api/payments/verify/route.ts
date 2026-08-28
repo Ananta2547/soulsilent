@@ -3,7 +3,7 @@ import { getDB } from '@/lib/db';
 import { sqliteToMs } from '@/lib/datetime';
 import { requireAuth } from '@/lib/auth';
 import { fetchCheckoutSession, refundPaymentIntent } from '@/lib/stripe';
-import { fetchPaymentLink } from '@/lib/beam';
+import { fetchPaymentLink, fetchCharge } from '@/lib/beam';
 
 /**
  * POST /api/payments/verify { session_id }
@@ -104,7 +104,8 @@ async function verifyBeamBooking(bookingId: string, userId: string) {
   const db = await getDB();
   const booking = await db
     .prepare(
-      'SELECT user_id, status, payment_status, expires_at, beam_payment_link_id FROM bookings WHERE id = ?',
+      `SELECT user_id, status, payment_status, expires_at, beam_payment_link_id, beam_qr_charge_id
+         FROM bookings WHERE id = ?`,
     )
     .bind(bookingId)
     .first<{
@@ -113,6 +114,7 @@ async function verifyBeamBooking(bookingId: string, userId: string) {
       payment_status: string;
       expires_at: string | null;
       beam_payment_link_id: string | null;
+      beam_qr_charge_id: string | null;
     }>();
 
   if (!booking) {
@@ -122,15 +124,40 @@ async function verifyBeamBooking(bookingId: string, userId: string) {
   if (booking.user_id !== userId) {
     return NextResponse.json({ error: 'booking does not belong to you' }, { status: 403 });
   }
-  if (!booking.beam_payment_link_id) {
-    return NextResponse.json({ ok: false, error: 'no payment link on this booking' }, { status: 400 });
+
+  // Settled already — the webhook or the QR page's own poll got here first.
+  // Saying so plainly beats going back to Beam to be told the same thing, and
+  // it is the common case now that the QR page polls every three seconds.
+  if (booking.payment_status === 'paid' || booking.status === 'confirmed') {
+    return NextResponse.json({ ok: true, type: 'workshop', booking_id: bookingId });
   }
 
-  const link = await fetchPaymentLink(booking.beam_payment_link_id);
-  if (!link.paid) {
+  // Which lane this booking is on decides who to ask. A PromptPay booking has
+  // a charge and no payment link — asking only about the link, as this did
+  // before the Charges API move, answered "no payment link on this booking" for
+  // every QR payment and put a "we could not confirm your payment" banner in
+  // front of people whose money had gone through.
+  let paid: boolean;
+  let liveStatus: string | null;
+  if (booking.beam_payment_link_id) {
+    const link = await fetchPaymentLink(booking.beam_payment_link_id);
+    paid = link.paid;
+    liveStatus = link.status;
+  } else if (booking.beam_qr_charge_id) {
+    const charge = await fetchCharge(booking.beam_qr_charge_id);
+    paid = charge.paid;
+    liveStatus = charge.status;
+  } else {
+    return NextResponse.json(
+      { ok: false, error: 'no payment on this booking' },
+      { status: 400 },
+    );
+  }
+
+  if (!paid) {
     return NextResponse.json({
       ok: false,
-      payment_status: link.status,
+      payment_status: liveStatus,
       message: 'Payment not completed yet',
     });
   }
