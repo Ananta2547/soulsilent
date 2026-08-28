@@ -2839,3 +2839,88 @@ body {
   gap: 8px;
   box-shadow: 0 -16px 40px -28px rgba(13, 30, 29, 0.4);
 }
+
+/* ============================================================
+   Workshop detail — phone layout (Design Composer
+   "Workshop Detail Mobile.dc.html")
+
+   Same sections in the same order as the desktop page, at phone scale. The one
+   place the two genuinely differ is the header: desktop leads with a teal band
+   carrying only the title, while the phone design puts a picture first and then
+   folds the tags, title, date and place into the band together. That header is
+   the only markup rendered twice; everything below it is one tree.
+
+   A back arrow and a pinned price bar also exist only here — on desktop the
+   booking card is always visible in the sidebar, so neither is needed.
+   ============================================================ */
+.ws-m-head,
+.ws-m-cta {
+  display: none;
+}
+
+.ws-m-bar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter: saturate(160%) blur(12px);
+  -webkit-backdrop-filter: saturate(160%) blur(12px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  box-shadow: 0 1px 0 rgba(13, 30, 29, 0.07);
+}
+
+@media (max-width: 920px) {
+  .ws-detail-grid {
+    grid-template-columns: 1fr;
+  }
+  /* The phone header replaces the desktop one outright, and the tags move into
+     it — leaving them below as well would print them twice. */
+  .ws-m-head {
+    display: block;
+  }
+  .ws-d-hero,
+  .ws-d-tags {
+    display: none;
+  }
+
+  /* Pinned price and CTA. The page is long and the booking card sits at the
+     bottom of it; without this the price is a scroll away at every moment. */
+  .ws-m-cta {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 60;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    background: color-mix(in srgb, var(--paper) 94%, transparent);
+    backdrop-filter: saturate(160%) blur(12px);
+    -webkit-backdrop-filter: saturate(160%) blur(12px);
+    box-shadow:
+      0 -1px 0 rgba(13, 30, 29, 0.08),
+      0 -12px 30px -20px rgba(13, 30, 29, 0.35);
+    padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Room for the pinned bar, so the last section is not stuck under it. */
+  .ws-detail-main {
+    padding-bottom: 96px;
+  }
+
+  /* Phone type scale, from the design. */
+  .ws-detail-main .container {
+    padding: 0 20px;
+  }
+  .ws-detail-main h2.display-th {
+    font-size: 24px;
+    margin: 12px 0 18px;
+  }
+  .ws-detail-main {
+    padding-top: 26px;
+  }
+}
