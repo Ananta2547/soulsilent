@@ -43,8 +43,20 @@ custom_domain = true
 #   - STRIPE_WEBHOOK_SECRET (wrangler secret put STRIPE_WEBHOOK_SECRET)
 #   - GOOGLE_CLIENT_SECRET  (wrangler secret put GOOGLE_CLIENT_SECRET)
 #   - RESEND_API_KEY        (wrangler secret put RESEND_API_KEY)
+#
+# Beam — BOTH must be set before the first deploy that serves payments, or every
+# booking fails with "Beam is not configured":
+#   - BEAM_API_KEY          (wrangler secret put BEAM_API_KEY)
+#   - BEAM_WEBHOOK_SECRET   (wrangler secret put BEAM_WEBHOOK_SECRET) — the
+#     signing key of the webhook endpoint registered for THIS site. Production
+#     and preview are separate endpoints with separate keys; a booking confirmed
+#     by the wrong key is a booking never confirmed at all.
 [vars]
 GOOGLE_CLIENT_ID = "798833181382-0sf30qcflhmpo6sepoke9i8ojab71fbp.apps.googleusercontent.com"
 SITE_URL = "https://allsoullearn.com"
+# Beam merchant identifier — not a secret (the API key and the webhook HMAC key
+# are). Production and preview share one LIVE Beam account, so events for both
+# sites arrive at both endpoints; SITE_URL above is what tells them apart.
+BEAM_MERCHANT_ID = "allsoullearn-vg1ez5"
 # Verified Resend "from" address (allsoullearn.com verified 2026-08-03).
 EMAIL_FROM = "soulsilent <noreply@allsoullearn.com>"
