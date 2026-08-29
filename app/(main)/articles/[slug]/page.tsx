@@ -7,6 +7,7 @@ import type { Article, ArticleBlock, ArticleCategory } from '@/lib/types';
 import { categoryLabel, formatArticleDate, parseBody, parseTags } from '@/lib/article-utils';
 import { useLang, T } from '@/lib/i18n';
 import { Reveal } from '@/components/design/Reveal';
+import { ShareButton } from '@/components/design/ShareButton';
 
 type ArticleWithAuthor = Article & { author_name?: string | null; author_email?: string | null };
 
@@ -150,6 +151,9 @@ export default function ArticleDetailPage() {
                 style={{ fontSize: 12, color: 'var(--muted)', letterSpacing: '.08em' }}
               >
                 {date}
+              </span>
+              <span style={{ marginLeft: 'auto' }}>
+                <ShareButton title={article.title} text={article.excerpt || undefined} />
               </span>
             </div>
           </Reveal>

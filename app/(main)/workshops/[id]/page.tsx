@@ -8,6 +8,8 @@ import { useLang, T, tr } from '@/lib/i18n';
 import { Reveal } from '@/components/design/Reveal';
 import { Btn } from '@/components/design/RippleButton';
 import { Icon, Stars } from '@/components/design/Icon';
+import { useLoadingTracker } from '@/components/design/DataLoading';
+import { ShareButton } from '@/components/design/ShareButton';
 import { Cloud, WaveLine, Star } from '@/components/design/Doodles';
 import { Countdown } from '@/components/design/Countdown';
 import { BookingModal, type BookingResult } from '@/components/workshops/BookingModal';
@@ -71,10 +73,14 @@ export default function WorkshopDetailPage() {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [openDays, setOpenDays] = useState<number[]>([0]);
 
+  // Holds the loading screen until the workshop itself is here. Refreshes
+  // after a booking reuse load() and are left untracked.
+  const track = useLoadingTracker();
+
   const load = useCallback(async () => {
     setLoadError(false);
     try {
-      const res = await fetch(`/api/workshops/${id}`);
+      const res = await track(fetch(`/api/workshops/${id}`));
       if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as {
         workshop: Workshop;
@@ -110,7 +116,7 @@ export default function WorkshopDetailPage() {
       setLoadError(true);
     }
     setLoading(false);
-  }, [id]);
+  }, [id, track]);
 
   useEffect(() => {
     load();
@@ -316,6 +322,7 @@ export default function WorkshopDetailPage() {
               {workshop.title}
             </div>
           </div>
+          <ShareButton title={workshop.title} text={workshop.short_description || undefined} compact />
         </div>
 
         <section className="bg-teal-section" style={{ padding: '24px 20px 26px' }}>
@@ -407,7 +414,12 @@ export default function WorkshopDetailPage() {
               {/* Tags — the phone header prints these itself, inside the teal
                   band, so hide them here rather than showing the row twice. */}
               <Reveal className="ws-d-tags">
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{tagRow}</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {tagRow}
+                  <span style={{ marginLeft: 'auto' }}>
+                    <ShareButton title={workshop.title} text={workshop.short_description || undefined} />
+                  </span>
+                </div>
               </Reveal>
 
               {workshop.description && (

@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { Workshop } from '@/lib/types';
-import { getWorkshopTags, getEffectivePrice, getWorkshopStatusBadge, isNewWorkshop, isWorkshopFull, compareWorkshopsForListing } from '@/lib/workshop-utils';
+import { getWorkshopTags, getEffectivePrice, getWorkshopCardStatus, isNewWorkshop, compareWorkshopsForListing } from '@/lib/workshop-utils';
 import { Icon } from '@/components/design/Icon';
+import { useLoadingTracker } from '@/components/design/DataLoading';
 
 /* ============================================================
    Workshops listing — port of Design Composer "Workshops.dc.html".
@@ -70,10 +71,14 @@ export default function WorkshopsListingPage() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [tagFilter, setTagFilter] = useState('');
 
+  // The first load raises the loading screen; the retry button below reuses
+  // load() and is left untracked by the tracker itself.
+  const track = useLoadingTracker();
+
   const load = useCallback(() => {
     setLoading(true);
     setLoadError(false);
-    fetch('/api/workshops?public=1')
+    track(fetch('/api/workshops?public=1'))
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json() as Promise<{ workshops: Workshop[] }>;
@@ -84,7 +89,7 @@ export default function WorkshopsListingPage() {
         setLoadError(true);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [track]);
 
   useEffect(() => {
     load();
@@ -208,10 +213,8 @@ function FilterPill({ active, onClick, children }: { active: boolean; onClick: (
 function Card({ w }: { w: Workshop }) {
   const eff = getEffectivePrice(w);
   const free = w.payment_type === 'free' || eff.price <= 0;
-  const badge = getWorkshopStatusBadge(w);
-  // Seats full → sink the card into a closed/"เต็ม" state (matches the detail page).
-  const full = isWorkshopFull(w);
-  const open = badge.open && !full;
+  // Badge + button wording live in one helper shared with the home card.
+  const { open, badgeLabel, ctaLabel } = getWorkshopCardStatus(w);
 
   return (
     <Link href={`/workshops/${w.id}`} className="card reveal-up" style={{ padding: 16, background: 'var(--paper)', display: 'flex', flexDirection: 'column', textDecoration: 'none', color: 'var(--ink)' }}>
@@ -254,7 +257,7 @@ function Card({ w }: { w: Workshop }) {
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
         <span className={open ? 'tag tag-accent' : 'tag'} style={open ? undefined : { background: '#e6e3da', color: 'var(--muted)' }}>
-          {full ? 'เต็ม' : badge.label}
+          {badgeLabel}
         </span>
         {w.category && <span className="tag">{w.category}</span>}
       </div>
@@ -291,14 +294,14 @@ function Card({ w }: { w: Workshop }) {
           )}
         </div>
         {open ? (
-          <span className="btn btn-teal btn-sm" aria-hidden>จอง <span className="mono">→</span></span>
+          <span className="btn btn-teal btn-sm" aria-hidden>{ctaLabel} <span className="mono">→</span></span>
         ) : (
           <span
             className="btn btn-sm"
             aria-hidden
             style={{ background: '#e6e3da', color: 'var(--muted)', cursor: 'not-allowed' }}
           >
-            {full ? 'เต็มแล้ว' : 'ปิดรับ'}
+            {ctaLabel}
           </span>
         )}
       </div>

@@ -5,7 +5,8 @@ import Link from 'next/link';
 import type { Workshop, Article, ArticleCategory } from '@/lib/types';
 import { useLang } from '@/lib/i18n';
 import { Icon } from '@/components/design/Icon';
-import { getEffectivePrice, hasWorkshopEnded, getWorkshopStatusBadge, isNewWorkshop, isWorkshopFull, compareWorkshopsForListing } from '@/lib/workshop-utils';
+import { useLoadingTracker } from '@/components/design/DataLoading';
+import { getEffectivePrice, hasWorkshopEnded, getWorkshopCardStatus, isNewWorkshop, isWorkshopFull, compareWorkshopsForListing } from '@/lib/workshop-utils';
 import { categoryLabel, formatArticleDate } from '@/lib/article-utils';
 
 /* ============================================================
@@ -335,10 +336,8 @@ function Hero({ workshops }: { workshops: Workshop[] }) {
 function EventCard({ w }: { w: Workshop }) {
   const eff = getEffectivePrice(w);
   const free = w.payment_type === 'free' || eff.price <= 0;
-  const badge = getWorkshopStatusBadge(w);
-  // Seats full → closed/"เต็ม" state, matching the /workshops card + detail page.
-  const full = isWorkshopFull(w);
-  const open = badge.open && !full;
+  // Badge + button wording live in one helper shared with the /workshops card.
+  const { open, badgeLabel, ctaLabel } = getWorkshopCardStatus(w);
   const discountPct =
     !free && eff.originalPrice && eff.originalPrice > eff.price
       ? Math.round((1 - eff.price / eff.originalPrice) * 100)
@@ -399,7 +398,7 @@ function EventCard({ w }: { w: Workshop }) {
       </div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
         <span className={open ? 'tag tag-accent' : 'tag'} style={open ? undefined : { background: '#e6e3da', color: 'var(--muted)' }}>
-          {full ? 'เต็ม' : badge.label}
+          {badgeLabel}
         </span>
         <span className="tag">{w.category || 'ONSITE'}</span>
       </div>
@@ -431,14 +430,14 @@ function EventCard({ w }: { w: Workshop }) {
           </div>
         </div>
         {open ? (
-          <span className="btn btn-teal btn-sm" aria-hidden>จอง <span className="mono">→</span></span>
+          <span className="btn btn-teal btn-sm" aria-hidden>{ctaLabel} <span className="mono">→</span></span>
         ) : (
           <span
             className="btn btn-sm"
             aria-hidden
             style={{ background: '#e6e3da', color: 'var(--muted)', cursor: 'not-allowed' }}
           >
-            {full ? 'เต็มแล้ว' : 'ปิดรับ'}
+            {ctaLabel}
           </span>
         )}
       </div>
@@ -753,33 +752,37 @@ export default function HomePage() {
   const [reviews, setReviews] = useState<PublicReview[]>([]);
   const [stats, setStats] = useState<SiteStats>({ workshops: 11, participants: 125, locations: 0 });
 
+  // Every request the home page needs is tracked, so the loading screen's bar
+  // moves as each one lands and the screen clears on the last of them.
+  const track = useLoadingTracker();
+
   useEffect(() => {
-    fetch('/api/workshops?status=active')
+    track(fetch('/api/workshops?status=active'))
       .then((r) => r.json() as Promise<{ workshops: Workshop[] }>)
       .then((d) => setWorkshops(d.workshops || []))
       .catch(() => {});
     // Hero fan shows only admin-starred workshops.
-    fetch('/api/workshops?featured=1&public=1')
+    track(fetch('/api/workshops?featured=1&public=1'))
       .then((r) => r.json() as Promise<{ workshops: Workshop[] }>)
       .then((d) => setFeaturedWorkshops(d.workshops || []))
       .catch(() => {});
-    fetch('/api/articles')
+    track(fetch('/api/articles'))
       .then((r) => r.json() as Promise<{ articles: Article[] }>)
       .then((d) => setArticles(d.articles || []))
       .catch(() => {});
-    fetch('/api/article-categories')
+    track(fetch('/api/article-categories'))
       .then((r) => r.json() as Promise<{ categories: ArticleCategory[] }>)
       .then((d) => setArticleCategories(d.categories || []))
       .catch(() => {});
-    fetch('/api/reviews?featured=1&limit=10')
+    track(fetch('/api/reviews?featured=1&limit=10'))
       .then((r) => r.json() as Promise<{ reviews: PublicReview[] }>)
       .then((d) => setReviews(d.reviews || []))
       .catch(() => {});
-    fetch('/api/stats')
+    track(fetch('/api/stats'))
       .then((r) => r.json() as Promise<Partial<SiteStats>>)
       .then((d) => setStats({ workshops: d.workshops ?? 11, participants: d.participants ?? 125, locations: d.locations ?? 0 }))
       .catch(() => {});
-  }, []);
+  }, [track]);
 
   const leadArticle = articles.find((a) => a.featured) || articles[0];
   const sideArticles = articles.filter((a) => a.id !== leadArticle?.id).slice(0, 3);

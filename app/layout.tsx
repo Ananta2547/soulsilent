@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { LangProvider } from '@/lib/i18n';
-import { RouteTransition } from '@/components/design/RouteTransition';
+import { DataLoadingProvider, DataLoadingScreen } from '@/components/design/DataLoading';
 
 export const metadata: Metadata = {
   title: 'AllSoulLearn · learn outside the room',
@@ -25,8 +25,10 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full">
-        <LangProvider>{children}</LangProvider>
-        <RouteTransition />
+        <DataLoadingProvider>
+          <LangProvider>{children}</LangProvider>
+          <DataLoadingScreen />
+        </DataLoadingProvider>
       </body>
     </html>
   );

@@ -247,24 +247,6 @@ body {
   background: #fafaf9;
 }
 
-/* Route-transition curtain — a full-screen loader shown on every navigation
-   that slides DOWN to reveal the new page. */
-.asl-curtain {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
-  background: #fafaf9;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.asl-curtain--exit {
-  animation: aslSlideDown 0.9s cubic-bezier(0.5, 0, 0.2, 1) forwards;
-}
-@keyframes aslSlideDown {
-  from { transform: translateY(0); }
-  to   { transform: translateY(100%); }
-}
 .asl-logo { width: min(560px, 72vw); height: auto; }
 .asl-loader--inline .asl-logo { width: min(360px, 64vw); }
 .asl-foot {
@@ -286,6 +268,12 @@ body {
   border-radius: 3px;
   background: #0c8577;
   animation: aslBar 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+/* Driven by how many of the page's requests have returned — it fills, it does
+   not slide, and it never animates ahead of the data. */
+.asl-bar--measured {
+  animation: none;
+  transition: width 0.25s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 .asl-label {
   font-family: 'JetBrains Mono', var(--font-mono, monospace);
@@ -320,8 +308,11 @@ body {
   50%      { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .asl-eye-blink, .asl-eye-look, .asl-bar, .asl-label, .asl-curtain--exit { animation: none !important; }
-  .asl-bar { width: 100%; }
+  .asl-eye-blink, .asl-eye-look, .asl-bar, .asl-label { animation: none !important; }
+  /* Only the indeterminate bar needs a resting width; the measured one already
+     has one, and overriding it would throw away the real number. */
+  .asl-bar:not(.asl-bar--measured) { width: 100%; }
+  .asl-bar--measured { transition: none; }
   .asl-label { opacity: 0.85; }
 }
 

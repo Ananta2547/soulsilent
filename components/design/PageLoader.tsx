@@ -11,10 +11,18 @@
 export function PageLoader({
   variant = 'inline',
   label = 'กำลังโหลด',
+  progress,
 }: {
   variant?: 'inline' | 'full';
   label?: string;
+  /** 0–1 share of the page's requests that have come back. Given a number the
+   *  bar fills to it instead of sliding; left out (route fallbacks, which have
+   *  nothing to count) it keeps the indeterminate slide. */
+  progress?: number;
 }) {
+  // A bar at literally 0% reads as broken, so the first sliver is drawn as soon
+  // as there is anything to wait for.
+  const pct = progress == null ? null : Math.round(Math.min(1, Math.max(0.06, progress)) * 100);
   return (
     <div
       className={`asl-loader ${variant === 'full' ? 'asl-loader--full' : 'asl-loader--inline'}`}
@@ -41,8 +49,17 @@ export function PageLoader({
       </svg>
 
       <div className="asl-foot">
-        <div className="asl-bar-track">
-          <div className="asl-bar" />
+        <div
+          className="asl-bar-track"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          {...(pct == null ? {} : { 'aria-valuenow': pct })}
+        >
+          <div
+            className={pct == null ? 'asl-bar' : 'asl-bar asl-bar--measured'}
+            style={pct == null ? undefined : { width: `${pct}%` }}
+          />
         </div>
         <div className="asl-label">{label}</div>
       </div>
