@@ -79,43 +79,50 @@ export default function WorkshopDetailPage() {
 
   const load = useCallback(async () => {
     setLoadError(false);
-    try {
-      const res = await track(fetch(`/api/workshops/${id}`));
-      if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}`);
-      const data = (await res.json()) as {
-        workshop: Workshop;
-        location: Location | null;
-        instructor: Instructor | null;
-        instructors?: Instructor[];
-        bookingCount: number;
-        userBooking: UserBooking | null;
-        userAttended?: boolean;
-        userCompleted?: boolean;
-        userIncompleteReason?: string | null;
-        userReview?: Review | null;
-      };
-      setWorkshop(data.workshop);
-      setLocation(data.location);
-      // `instructors` is the current shape; fall back to the single-instructor
-      // key so a cached/older API response still renders.
-      setInstructors(
-        data.instructors && data.instructors.length > 0
-          ? data.instructors
-          : data.instructor
-            ? [data.instructor]
-            : [],
-      );
-      setBookingCount(data.bookingCount || 0);
-      setUserBooking(data.userBooking);
-      setUserAttended(!!data.userAttended);
-      setUserCompleted(!!data.userCompleted);
-      setUserIncompleteReason(data.userIncompleteReason ?? null);
-      setUserReview(data.userReview || null);
-    } catch (e) {
-      console.error('Failed to load workshop', e);
-      setLoadError(true);
-    }
-    setLoading(false);
+    // The whole load is tracked, not just the response: counting it done at
+    // the response headers cleared the loading screen a beat before the page
+    // had its data, and the old spinner flashed in that gap.
+    await track(
+      (async () => {
+        try {
+          const res = await fetch(`/api/workshops/${id}`);
+          if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}`);
+          const data = (await res.json()) as {
+            workshop: Workshop;
+            location: Location | null;
+            instructor: Instructor | null;
+            instructors?: Instructor[];
+            bookingCount: number;
+            userBooking: UserBooking | null;
+            userAttended?: boolean;
+            userCompleted?: boolean;
+            userIncompleteReason?: string | null;
+            userReview?: Review | null;
+          };
+          setWorkshop(data.workshop);
+          setLocation(data.location);
+          // `instructors` is the current shape; fall back to the single-instructor
+          // key so a cached/older API response still renders.
+          setInstructors(
+            data.instructors && data.instructors.length > 0
+              ? data.instructors
+              : data.instructor
+                ? [data.instructor]
+                : [],
+          );
+          setBookingCount(data.bookingCount || 0);
+          setUserBooking(data.userBooking);
+          setUserAttended(!!data.userAttended);
+          setUserCompleted(!!data.userCompleted);
+          setUserIncompleteReason(data.userIncompleteReason ?? null);
+          setUserReview(data.userReview || null);
+        } catch (e) {
+          console.error('Failed to load workshop', e);
+          setLoadError(true);
+        }
+        setLoading(false);
+      })(),
+    );
   }, [id, track]);
 
   useEffect(() => {
@@ -186,23 +193,9 @@ export default function WorkshopDetailPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '120px 32px', textAlign: 'center' }}>
-        <div
-          style={{
-            width: 32,
-            height: 32,
-            border: '2px solid var(--teal)',
-            borderTopColor: 'transparent',
-            borderRadius: '50%',
-            margin: '0 auto',
-            animation: 'float 1s linear infinite',
-          }}
-        />
-      </div>
-    );
-  }
+  // Nothing to draw while this page's requests are open — the loading screen is
+  // over it already (components/design/DataLoading.tsx).
+  if (loading) return null;
 
   if (!workshop) {
     return (

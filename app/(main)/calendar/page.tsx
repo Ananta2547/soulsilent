@@ -7,6 +7,7 @@ import { useLang, T, tr } from '@/lib/i18n';
 import { Reveal } from '@/components/design/Reveal';
 import { getEffectivePrice, getWorkshopDays, hasWorkshopEnded } from '@/lib/workshop-utils';
 import { Icon } from '@/components/design/Icon';
+import { useLoadingTracker } from '@/components/design/DataLoading';
 
 type Booking = {
   workshop_id: string;
@@ -142,25 +143,31 @@ export default function CalendarPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selected, setSelected] = useState<Workshop | null>(null);
 
+  // The first load raises the loading screen; the retry button reuses load()
+  // and is left untracked by the tracker itself.
+  const track = useLoadingTracker();
+
   const load = useCallback(() => {
     setLoading(true);
     setLoadError(false);
-    fetch('/api/calendar')
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json() as Promise<{ workshops: Workshop[]; bookings: Booking[]; seatCounts?: Record<string, number> }>;
-      })
-      .then((d) => {
-        setWorkshops(d.workshops || []);
-        setBookings(d.bookings || []);
-        setSeatCounts(d.seatCounts || {});
-      })
-      .catch((e) => {
-        console.error('Failed to load calendar', e);
-        setLoadError(true);
-      })
-      .finally(() => setLoading(false));
-  }, []);
+    track(
+      fetch('/api/calendar')
+        .then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json() as Promise<{ workshops: Workshop[]; bookings: Booking[]; seatCounts?: Record<string, number> }>;
+        })
+        .then((d) => {
+          setWorkshops(d.workshops || []);
+          setBookings(d.bookings || []);
+          setSeatCounts(d.seatCounts || {});
+        })
+        .catch((e) => {
+          console.error('Failed to load calendar', e);
+          setLoadError(true);
+        })
+        .finally(() => setLoading(false)),
+    );
+  }, [track]);
 
   useEffect(() => {
     load();
@@ -295,21 +302,9 @@ export default function CalendarPage() {
         </Reveal>
 
         {/* Calendar grid */}
-        {loading ? (
-          <div style={{ padding: 80, textAlign: 'center' }}>
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                border: '2px solid var(--teal)',
-                borderTopColor: 'transparent',
-                borderRadius: '50%',
-                margin: '0 auto',
-                animation: 'float 1s linear infinite',
-              }}
-            />
-          </div>
-        ) : loadError ? (
+        {/* No spinner while loading: the loading screen is over the page until
+            this page's own requests land - see components/design/DataLoading. */}
+        {loading ? null : loadError ? (
           <div style={{ padding: 72, textAlign: 'center', color: 'var(--muted)' }}>
             <p style={{ marginBottom: 16 }}>โหลดปฏิทินไม่สำเร็จ</p>
             <button onClick={load} style={{ fontFamily: 'inherit', cursor: 'pointer', border: '1px solid var(--teal)', background: 'transparent', color: 'var(--teal)', borderRadius: 999, padding: '8px 22px', fontSize: 14, fontWeight: 600 }}>ลองใหม่</button>

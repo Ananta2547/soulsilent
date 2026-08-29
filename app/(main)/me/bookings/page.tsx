@@ -10,6 +10,7 @@ import { AnnounceCountdown } from '@/components/workshops/AnnounceCountdown';
 import { ApplicationConsentModal } from '@/components/workshops/ApplicationConsentModal';
 import { isWorkshopOngoing, hasWorkshopEnded, getWorkshopStart, getWorkshopDays } from '@/lib/workshop-utils';
 import { Icon } from '@/components/design/Icon';
+import { useLoadingTracker } from '@/components/design/DataLoading';
 
 type Booking = {
   id: string;
@@ -223,39 +224,45 @@ export default function MyBookingsPage() {
     }
   });
 
+  // Only the first load raises the loading screen; the poll that refreshes this
+  // page while a payment settles is left untracked by the tracker itself.
+  const track = useLoadingTracker();
+
   const load = useCallback(() => {
     setLoadError(false);
-    fetch('/api/bookings?mine=1')
-      .then((r) => {
-        if (r.status === 401) {
-          setUnauthorized(true);
-          return null;
-        }
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json() as Promise<{ bookings: Booking[] }>;
-      })
-      .then((d) => {
-        if (!d) return;
-        const next = d.bookings || [];
-        // Announce a booking that became paid while the page was open, so the
-        // user is told rather than left staring at a countdown.
-        setBookings((prev) => {
-          const wasPending = new Set(
-            prev.filter((b) => b.payment_status === 'pending' && b.status !== 'cancelled').map((b) => b.id),
-          );
-          const flipped = next.find(
-            (b) => wasPending.has(b.id) && (b.payment_status === 'paid' || b.status === 'confirmed'),
-          );
-          if (flipped) setJustPaid(flipped.id);
-          return next;
-        });
-      })
-      .catch((e) => {
-        console.error('Failed to load bookings', e);
-        setLoadError(true);
-      })
-      .finally(() => setLoading(false));
-  }, []);
+    track(
+      fetch('/api/bookings?mine=1')
+        .then((r) => {
+          if (r.status === 401) {
+            setUnauthorized(true);
+            return null;
+          }
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json() as Promise<{ bookings: Booking[] }>;
+        })
+        .then((d) => {
+          if (!d) return;
+          const next = d.bookings || [];
+          // Announce a booking that became paid while the page was open, so the
+          // user is told rather than left staring at a countdown.
+          setBookings((prev) => {
+            const wasPending = new Set(
+              prev.filter((b) => b.payment_status === 'pending' && b.status !== 'cancelled').map((b) => b.id),
+            );
+            const flipped = next.find(
+              (b) => wasPending.has(b.id) && (b.payment_status === 'paid' || b.status === 'confirmed'),
+            );
+            if (flipped) setJustPaid(flipped.id);
+            return next;
+          });
+        })
+        .catch((e) => {
+          console.error('Failed to load bookings', e);
+          setLoadError(true);
+        })
+        .finally(() => setLoading(false)),
+    );
+  }, [track]);
 
   // On return from the gateway → verify + show thank-you.
   // ?paid=1&booking=<bookingId> — Beam has no session-id placeholder of its
@@ -404,13 +411,9 @@ export default function MyBookingsPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <section className="section" style={{ padding: '80px 0', textAlign: 'center' }}>
-        <div style={{ width: 32, height: 32, border: '2px solid var(--teal)', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto', animation: 'float 1s linear infinite' }} />
-      </section>
-    );
-  }
+  // Nothing to draw while this page's requests are open — the loading screen is
+  // over it already (components/design/DataLoading.tsx).
+  if (loading) return null;
 
   if (unauthorized) {
     return (

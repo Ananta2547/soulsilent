@@ -6,6 +6,7 @@ import { useLang, T, tr } from '@/lib/i18n';
 import { Reveal } from '@/components/design/Reveal';
 import { Btn } from '@/components/design/RippleButton';
 import { Icon } from '@/components/design/Icon';
+import { useLoadingTracker } from '@/components/design/DataLoading';
 import { type JourneyItem, journeyStatus, fmtJourneyDate } from '@/lib/journey';
 
 export default function MyJourneyPage() {
@@ -14,29 +15,29 @@ export default function MyJourneyPage() {
   const [loading, setLoading] = useState(true);
   const [unauthorized, setUnauthorized] = useState(false);
 
-  useEffect(() => {
-    fetch('/api/me/journey')
-      .then((r) => {
-        if (r.status === 401) {
-          setUnauthorized(true);
-          return null;
-        }
-        return r.json() as Promise<{ items: JourneyItem[] }>;
-      })
-      .then((d) => {
-        if (d) setItems(d.items || []);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  const track = useLoadingTracker();
 
-  if (loading) {
-    return (
-      <section className="section" style={{ padding: '80px 0', textAlign: 'center' }}>
-        <div style={{ width: 32, height: 32, border: '2px solid var(--teal)', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto', animation: 'float 1s linear infinite' }} />
-      </section>
+  useEffect(() => {
+    track(
+      fetch('/api/me/journey')
+        .then((r) => {
+          if (r.status === 401) {
+            setUnauthorized(true);
+            return null;
+          }
+          return r.json() as Promise<{ items: JourneyItem[] }>;
+        })
+        .then((d) => {
+          if (d) setItems(d.items || []);
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false)),
     );
-  }
+  }, [track]);
+
+  // Nothing to draw while this page's requests are open — the loading screen is
+  // over it already (components/design/DataLoading.tsx).
+  if (loading) return null;
 
   if (unauthorized) {
     return (

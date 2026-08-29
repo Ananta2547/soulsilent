@@ -10,6 +10,7 @@ import { ReviewModal } from '@/components/workshops/ReviewModal';
 import { type JourneyItem, journeyStatus, fmtJourneyDate } from '@/lib/journey';
 import { getWorkshopDays } from '@/lib/workshop-utils';
 import type { Review } from '@/lib/types';
+import { useLoadingTracker } from '@/components/design/DataLoading';
 
 type AppProfile = {
   fullName?: string; nickname?: string; age?: number | null; gender?: string;
@@ -32,17 +33,22 @@ export default function JourneyDetailPage() {
   const [noteSaving, setNoteSaving] = useState(false);
   const [noteJustSaved, setNoteJustSaved] = useState(false);
 
+  const track = useLoadingTracker();
+
   function load() {
-    fetch('/api/me/journey')
-      .then((r) => (r.ok ? (r.json() as Promise<{ items: JourneyItem[] }>) : null))
-      .then((d) => {
-        const found = d?.items.find((x) => x.workshop_id === workshopId) || null;
-        setItem(found);
-        if (!found) setNotFound(true);
-      })
-      .catch(() => setNotFound(true))
-      .finally(() => setLoading(false));
+    track(
+      fetch('/api/me/journey')
+        .then((r) => (r.ok ? (r.json() as Promise<{ items: JourneyItem[] }>) : null))
+        .then((d) => {
+          const found = d?.items.find((x) => x.workshop_id === workshopId) || null;
+          setItem(found);
+          if (!found) setNotFound(true);
+        })
+        .catch(() => setNotFound(true))
+        .finally(() => setLoading(false)),
+    );
   }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(load, [workshopId]);
 
   // Hydrate the note editor when a (different) booking loads.
@@ -78,13 +84,9 @@ export default function JourneyDetailPage() {
     try { return JSON.parse(item.application_json) as AppSnapshot; } catch { return null; }
   }, [item?.application_json]);
 
-  if (loading) {
-    return (
-      <section className="section" style={{ padding: '80px 0', textAlign: 'center' }}>
-        <div style={{ width: 32, height: 32, border: '2px solid var(--teal)', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto', animation: 'float 1s linear infinite' }} />
-      </section>
-    );
-  }
+  // Nothing to draw while this page's requests are open — the loading screen is
+  // over it already (components/design/DataLoading.tsx).
+  if (loading) return null;
   if (notFound || !item) {
     return (
       <section className="section" style={{ padding: '80px 0', textAlign: 'center' }}>

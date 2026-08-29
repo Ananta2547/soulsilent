@@ -64,12 +64,16 @@ function fmtLocation(w: Workshop): string {
   return (w.location || '').trim();
 }
 
+/** Cards per page. 12 fills the 2/3/4-column grid evenly at every width. */
+const PER_PAGE = 12;
+
 export default function WorkshopsListingPage() {
   const [workshops, setWorkshops] = useState<Workshop[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [tagFilter, setTagFilter] = useState('');
+  const [page, setPage] = useState(1);
 
   // The first load raises the loading screen; the retry button below reuses
   // load() and is left untracked by the tracker itself.
@@ -78,17 +82,22 @@ export default function WorkshopsListingPage() {
   const load = useCallback(() => {
     setLoading(true);
     setLoadError(false);
-    track(fetch('/api/workshops?public=1'))
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json() as Promise<{ workshops: Workshop[] }>;
-      })
-      .then((d) => setWorkshops(d.workshops || []))
-      .catch((e) => {
-        console.error('Failed to load workshops', e);
-        setLoadError(true);
-      })
-      .finally(() => setLoading(false));
+    // The whole chain is tracked, not just the response: counting the request
+    // done at its headers cleared the loading screen a beat before the page had
+    // its data, and the old spinner flashed in that gap.
+    track(
+      fetch('/api/workshops?public=1')
+        .then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json() as Promise<{ workshops: Workshop[] }>;
+        })
+        .then((d) => setWorkshops(d.workshops || []))
+        .catch((e) => {
+          console.error('Failed to load workshops', e);
+          setLoadError(true);
+        })
+        .finally(() => setLoading(false)),
+    );
   }, [track]);
 
   useEffect(() => {
@@ -120,6 +129,20 @@ export default function WorkshopsListingPage() {
     [workshops, categoryFilter, tagFilter],
   );
 
+  // Clamped rather than reset, so a filter that narrows the list while the
+  // reader is on page 4 lands them on the last page that still has cards
+  // instead of an empty one.
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  const current = Math.min(page, pageCount);
+  const shown = filtered.slice((current - 1) * PER_PAGE, current * PER_PAGE);
+
+  function goToPage(n: number) {
+    setPage(n);
+    // Paging is reading, not scrolling — put the reader back at the first card
+    // rather than wherever the previous page's last card left them.
+    document.getElementById('wk-grid-top')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   return (
     <>
       {/* ---- Header ---- */}
@@ -144,9 +167,9 @@ export default function WorkshopsListingPage() {
       <section className="bg-cream" style={{ padding: '28px 0 32px' }}>
         <div className="container" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <FilterPill active={categoryFilter === 'all'} onClick={() => setCategoryFilter('all')}>ทั้งหมด</FilterPill>
+            <FilterPill active={categoryFilter === 'all'} onClick={() => { setCategoryFilter('all'); setPage(1); }}>ทั้งหมด</FilterPill>
             {categories.map((c) => (
-              <FilterPill key={c} active={categoryFilter === c} onClick={() => setCategoryFilter(c)}>{c}</FilterPill>
+              <FilterPill key={c} active={categoryFilter === c} onClick={() => { setCategoryFilter(c); setPage(1); }}>{c}</FilterPill>
             ))}
           </div>
           {tags.length > 0 && (
@@ -157,7 +180,7 @@ export default function WorkshopsListingPage() {
                 return (
                   <button
                     key={t}
-                    onClick={() => setTagFilter(on ? '' : t)}
+                    onClick={() => { setTagFilter(on ? '' : t); setPage(1); }}
                     className="tag"
                     style={{ cursor: 'pointer', border: 0, fontFamily: 'inherit', background: on ? 'var(--teal)' : 'var(--teal-50)', color: on ? '#fff' : 'var(--teal-deep)' }}
                   >
@@ -166,7 +189,7 @@ export default function WorkshopsListingPage() {
                 );
               })}
               {tagFilter && (
-                <button onClick={() => setTagFilter('')} style={{ background: 'transparent', border: 0, color: 'var(--muted)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>ล้างแท็ก</button>
+                <button onClick={() => { setTagFilter(''); setPage(1); }} style={{ background: 'transparent', border: 0, color: 'var(--muted)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>ล้างแท็ก</button>
               )}
             </div>
           )}
@@ -175,12 +198,10 @@ export default function WorkshopsListingPage() {
 
       {/* ---- Grid ---- */}
       <section className="section" style={{ paddingTop: 40 }}>
-        <div className="container">
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: '80px 0' }}>
-              <div style={{ width: 32, height: 32, border: '2px solid var(--teal)', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto', animation: 'float 1s linear infinite' }} />
-            </div>
-          ) : loadError ? (
+        <div className="container" id="wk-grid-top">
+          {/* No spinner while loading: the loading screen is over the page until
+              this page's own requests land - see components/design/DataLoading. */}
+          {loading ? null : loadError ? (
             <div style={{ textAlign: 'center', padding: '56px 0', color: 'var(--muted)' }}>
               <p style={{ marginBottom: 16 }}>โหลดกิจกรรมไม่สำเร็จ</p>
               <button onClick={load} style={{ fontFamily: 'inherit', cursor: 'pointer', border: '1px solid var(--teal)', background: 'transparent', color: 'var(--teal)', borderRadius: 999, padding: '8px 22px', fontSize: 14, fontWeight: 600 }}>ลองใหม่</button>
@@ -188,13 +209,108 @@ export default function WorkshopsListingPage() {
           ) : filtered.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '56px 0', color: 'var(--muted)' }}>ไม่พบกิจกรรมที่ตรงกับตัวกรอง</div>
           ) : (
-            <div className="wk-grid">
-              {filtered.map((w) => <Card key={w.id} w={w} />)}
-            </div>
+            <>
+              <div className="wk-grid">
+                {shown.map((w) => <Card key={w.id} w={w} />)}
+              </div>
+              <Pagination current={current} pageCount={pageCount} total={filtered.length} onGo={goToPage} />
+            </>
           )}
         </div>
       </section>
     </>
+  );
+}
+
+/**
+ * Page controls. Long runs collapse to first · … · neighbours · … · last, so
+ * the row never wraps into a second line of numbers on a phone.
+ */
+function Pagination({
+  current,
+  pageCount,
+  total,
+  onGo,
+}: {
+  current: number;
+  pageCount: number;
+  total: number;
+  onGo: (n: number) => void;
+}) {
+  if (pageCount <= 1) return null;
+
+  const pages: (number | 'gap')[] = [];
+  for (let n = 1; n <= pageCount; n++) {
+    const near = Math.abs(n - current) <= 1;
+    const edge = n === 1 || n === pageCount;
+    if (near || edge) pages.push(n);
+    else if (pages[pages.length - 1] !== 'gap') pages.push('gap');
+  }
+
+  return (
+    <nav
+      aria-label="หน้ากิจกรรม"
+      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginTop: 48 }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
+        <PageBtn disabled={current === 1} onClick={() => onGo(current - 1)}>‹ ก่อนหน้า</PageBtn>
+        {pages.map((n, i) =>
+          n === 'gap' ? (
+            <span key={`gap${i}`} aria-hidden style={{ color: 'var(--muted)', padding: '0 4px' }}>
+              …
+            </span>
+          ) : (
+            <PageBtn key={n} active={n === current} onClick={() => onGo(n)} label={`หน้า ${n}`}>
+              {n}
+            </PageBtn>
+          ),
+        )}
+        <PageBtn disabled={current === pageCount} onClick={() => onGo(current + 1)}>ถัดไป ›</PageBtn>
+      </div>
+      <div className="mono" style={{ fontSize: 11, letterSpacing: '.1em', color: 'var(--muted)' }}>
+        หน้า {current} / {pageCount} · {total} กิจกรรม
+      </div>
+    </nav>
+  );
+}
+
+function PageBtn({
+  children,
+  onClick,
+  active = false,
+  disabled = false,
+  label,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  active?: boolean;
+  disabled?: boolean;
+  label?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      aria-current={active ? 'page' : undefined}
+      style={{
+        minWidth: 40,
+        height: 40,
+        padding: '0 14px',
+        borderRadius: 999,
+        border: 0,
+        fontFamily: 'inherit',
+        fontSize: 14,
+        fontWeight: 600,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        background: active ? 'var(--teal)' : 'var(--cream)',
+        color: active ? '#fff' : disabled ? 'var(--muted)' : 'var(--ink)',
+        opacity: disabled ? 0.55 : 1,
+      }}
+    >
+      {children}
+    </button>
   );
 }
 

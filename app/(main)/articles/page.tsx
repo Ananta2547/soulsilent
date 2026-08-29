@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { Article, ArticleCategory } from '@/lib/types';
 import { DEFAULT_CATEGORIES, categoryLabel, formatArticleDate, parseTags } from '@/lib/article-utils';
 import { useLang } from '@/lib/i18n';
+import { useLoadingTracker } from '@/components/design/DataLoading';
 
 /* ============================================================
    Articles / Journal — port of Design Composer "Articles.dc.html".
@@ -23,18 +24,22 @@ export default function ArticlesPage() {
   const [active, setActive] = useState('all');
   const [query, setQuery] = useState('');
 
+  const track = useLoadingTracker();
+
   useEffect(() => {
-    Promise.all([
-      fetch('/api/articles').then((r) => r.json() as Promise<{ articles: Article[] }>),
-      fetch('/api/article-categories').then((r) => r.json() as Promise<{ categories: ArticleCategory[] }>),
-    ])
-      .then(([a, c]) => {
-        setArticles(a.articles || []);
-        setCategories(c.categories || []);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+    track(
+      Promise.all([
+        fetch('/api/articles').then((r) => r.json() as Promise<{ articles: Article[] }>),
+        fetch('/api/article-categories').then((r) => r.json() as Promise<{ categories: ArticleCategory[] }>),
+      ])
+        .then(([a, c]) => {
+          setArticles(a.articles || []);
+          setCategories(c.categories || []);
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false)),
+    );
+  }, [track]);
 
   const filterPills = categories.length > 0 ? [{ key: 'all', th: 'ทั้งหมด', en: 'All' }, ...categories] : DEFAULT_CATEGORIES;
 
@@ -111,7 +116,7 @@ export default function ArticlesPage() {
         <div className="container">
           {loading ? (
             <div style={{ textAlign: 'center', padding: '80px 0' }}>
-              <div style={{ width: 32, height: 32, border: '2px solid var(--teal)', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto', animation: 'float 1s linear infinite' }} />
+              {/* No spinner: the loading screen is over the page until this page's own requests land — see components/design/DataLoading.tsx. */}
             </div>
           ) : !lead ? (
             <div style={{ textAlign: 'center', padding: '56px 0', color: 'var(--muted)' }}>ไม่พบบทความที่ตรงกับตัวกรอง</div>

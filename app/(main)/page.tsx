@@ -757,31 +757,43 @@ export default function HomePage() {
   const track = useLoadingTracker();
 
   useEffect(() => {
-    track(fetch('/api/workshops?status=active'))
-      .then((r) => r.json() as Promise<{ workshops: Workshop[] }>)
-      .then((d) => setWorkshops(d.workshops || []))
-      .catch(() => {});
+    track(
+      fetch('/api/workshops?status=active')
+        .then((r) => r.json() as Promise<{ workshops: Workshop[] }>)
+        .then((d) => setWorkshops(d.workshops || []))
+        .catch(() => {}),
+    );
     // Hero fan shows only admin-starred workshops.
-    track(fetch('/api/workshops?featured=1&public=1'))
-      .then((r) => r.json() as Promise<{ workshops: Workshop[] }>)
-      .then((d) => setFeaturedWorkshops(d.workshops || []))
-      .catch(() => {});
-    track(fetch('/api/articles'))
-      .then((r) => r.json() as Promise<{ articles: Article[] }>)
-      .then((d) => setArticles(d.articles || []))
-      .catch(() => {});
-    track(fetch('/api/article-categories'))
-      .then((r) => r.json() as Promise<{ categories: ArticleCategory[] }>)
-      .then((d) => setArticleCategories(d.categories || []))
-      .catch(() => {});
-    track(fetch('/api/reviews?featured=1&limit=10'))
-      .then((r) => r.json() as Promise<{ reviews: PublicReview[] }>)
-      .then((d) => setReviews(d.reviews || []))
-      .catch(() => {});
-    track(fetch('/api/stats'))
-      .then((r) => r.json() as Promise<Partial<SiteStats>>)
-      .then((d) => setStats({ workshops: d.workshops ?? 11, participants: d.participants ?? 125, locations: d.locations ?? 0 }))
-      .catch(() => {});
+    track(
+      fetch('/api/workshops?featured=1&public=1')
+        .then((r) => r.json() as Promise<{ workshops: Workshop[] }>)
+        .then((d) => setFeaturedWorkshops(d.workshops || []))
+        .catch(() => {}),
+    );
+    track(
+      fetch('/api/articles')
+        .then((r) => r.json() as Promise<{ articles: Article[] }>)
+        .then((d) => setArticles(d.articles || []))
+        .catch(() => {}),
+    );
+    track(
+      fetch('/api/article-categories')
+        .then((r) => r.json() as Promise<{ categories: ArticleCategory[] }>)
+        .then((d) => setArticleCategories(d.categories || []))
+        .catch(() => {}),
+    );
+    track(
+      fetch('/api/reviews?featured=1&limit=10')
+        .then((r) => r.json() as Promise<{ reviews: PublicReview[] }>)
+        .then((d) => setReviews(d.reviews || []))
+        .catch(() => {}),
+    );
+    track(
+      fetch('/api/stats')
+        .then((r) => r.json() as Promise<Partial<SiteStats>>)
+        .then((d) => setStats({ workshops: d.workshops ?? 11, participants: d.participants ?? 125, locations: d.locations ?? 0 }))
+        .catch(() => {}),
+    );
   }, [track]);
 
   const leadArticle = articles.find((a) => a.featured) || articles[0];
