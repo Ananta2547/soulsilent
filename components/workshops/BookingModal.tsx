@@ -93,6 +93,10 @@ export function BookingModal({
   const [result, setResult] = useState<BookingResult | null>(null);
 
   const requireConsent = !!workshop.require_consent;
+  // Nobody travels to an online workshop, so the travel question (and the plate
+  // that follows a private vehicle) is dropped from the form entirely rather
+  // than asked and ignored.
+  const isOnline = !!workshop.is_online;
 
   const questions = useMemo<ApplicationQuestion[]>(() => {
     try {
@@ -182,13 +186,15 @@ export function BookingModal({
         return;
       }
     }
-    if (!travel) {
-      setErr(tr(lang, 'กรุณาเลือกวิธีการเดินทาง', 'Please choose how you will travel here.'));
-      return;
-    }
-    if (travelNeedsPlate && !plate.trim()) {
-      setErr(tr(lang, 'กรุณากรอกทะเบียนรถ', 'Please enter your vehicle plate number.'));
-      return;
+    if (!isOnline) {
+      if (!travel) {
+        setErr(tr(lang, 'กรุณาเลือกวิธีการเดินทาง', 'Please choose how you will travel here.'));
+        return;
+      }
+      if (travelNeedsPlate && !plate.trim()) {
+        setErr(tr(lang, 'กรุณากรอกทะเบียนรถ', 'Please enter your vehicle plate number.'));
+        return;
+      }
     }
     if (requireConsent && !consent) {
       setErr(tr(lang, 'กรุณาเลือกความยินยอมการบันทึกเสียง ภาพและวิดีโอ', 'Please choose your audio/photo/video consent.'));
@@ -212,13 +218,20 @@ export function BookingModal({
         dietary: vault.dietary || '',
       },
       answers: questions.map((q) => ({ id: q.id, label: q.label, value: answers[q.id] ?? '' })),
-      travel: {
-        method: travel,
-        // Store the Thai label too so admin screens read correctly without
-        // having to map the code back.
-        label: travelOption?.th || '',
-        plate: travelNeedsPlate ? plate.trim() : '',
-      },
+      // Left out for online workshops — the question was never asked, and an
+      // empty travel object would read on admin screens as one the applicant
+      // skipped. formatTravel() prints "—" when the key is absent.
+      ...(isOnline
+        ? {}
+        : {
+            travel: {
+              method: travel,
+              // Store the Thai label too so admin screens read correctly without
+              // having to map the code back.
+              label: travelOption?.th || '',
+              plate: travelNeedsPlate ? plate.trim() : '',
+            },
+          }),
       ...(requireConsent
         ? { consent: { photoVideo: consent, label: consent === 'granted' ? 'ยินยอม' : 'ไม่ยินยอม' } }
         : {}),
@@ -470,46 +483,48 @@ export function BookingModal({
               {err && (
                 <div style={{ marginBottom: 14, padding: 12, background: '#fde7d3', color: '#a04a14', borderRadius: 12, fontSize: 13 }}>{err}</div>
               )}
-              {/* Travel — asked on every workshop. A private vehicle also needs
+              {/* Travel — onsite workshops only. A private vehicle also needs
                   its plate so staff can sort out parking on the day. */}
-              <div style={{ marginBottom: questions.length > 0 ? 20 : 0 }}>
-                <label style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', marginBottom: 6 }}>
-                  <T th="คุณจะเดินทางมายังไง?" en="How will you travel here?" />
-                  <span style={{ color: '#d35d52' }}> *</span>
-                </label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {TRAVEL_OPTIONS.map((o) => (
-                    <label key={o.value} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--ink)', cursor: 'pointer' }}>
-                      <input
-                        type="radio"
-                        name="travel-method"
-                        checked={travel === o.value}
-                        onChange={() => {
-                          setTravel(o.value);
-                          // Switching to public transport drops any plate typed
-                          // earlier so it can't be submitted by accident.
-                          if (!o.needsPlate) setPlate('');
-                        }}
-                      />
-                      {pick(o, lang)}
-                    </label>
-                  ))}
-                </div>
-                {travelNeedsPlate && (
-                  <div style={{ marginTop: 12 }}>
-                    <label style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', marginBottom: 6 }}>
-                      <T th="ทะเบียนรถ" en="Vehicle plate number" />
-                      <span style={{ color: '#d35d52' }}> *</span>
-                    </label>
-                    <input
-                      className="field"
-                      value={plate}
-                      onChange={(e) => setPlate(e.target.value)}
-                      placeholder={tr(lang, 'เช่น กข 1234 กรุงเทพมหานคร', 'e.g. 1กข 1234 Bangkok')}
-                    />
+              {!isOnline && (
+                <div style={{ marginBottom: questions.length > 0 ? 20 : 0 }}>
+                  <label style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', marginBottom: 6 }}>
+                    <T th="คุณจะเดินทางมายังไง?" en="How will you travel here?" />
+                    <span style={{ color: '#d35d52' }}> *</span>
+                  </label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {TRAVEL_OPTIONS.map((o) => (
+                      <label key={o.value} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--ink)', cursor: 'pointer' }}>
+                        <input
+                          type="radio"
+                          name="travel-method"
+                          checked={travel === o.value}
+                          onChange={() => {
+                            setTravel(o.value);
+                            // Switching to public transport drops any plate typed
+                            // earlier so it can't be submitted by accident.
+                            if (!o.needsPlate) setPlate('');
+                          }}
+                        />
+                        {pick(o, lang)}
+                      </label>
+                    ))}
                   </div>
-                )}
-              </div>
+                  {travelNeedsPlate && (
+                    <div style={{ marginTop: 12 }}>
+                      <label style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', marginBottom: 6 }}>
+                        <T th="ทะเบียนรถ" en="Vehicle plate number" />
+                        <span style={{ color: '#d35d52' }}> *</span>
+                      </label>
+                      <input
+                        className="field"
+                        value={plate}
+                        onChange={(e) => setPlate(e.target.value)}
+                        placeholder={tr(lang, 'เช่น กข 1234 กรุงเทพมหานคร', 'e.g. 1กข 1234 Bangkok')}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
 
               {questions.length === 0 ? null : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
