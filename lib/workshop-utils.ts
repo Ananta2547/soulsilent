@@ -365,6 +365,22 @@ export function getWorkshopStatusBadge(w: Workshop, now: Date = new Date()): { l
   return { label: open ? 'เปิดจอง' : 'ปิดรับ', open };
 }
 
+/** What a listing card shows. Registration closes when the event starts (and
+ *  for selection, when results are announced) - see getWorkshopStatusBadge -
+ *  and passing that deadline beats a full house: once booking is closed the
+ *  card reads "ปิดรับ" whether or not the seats ran out, because "เต็ม" invites
+ *  the reader to watch for a cancellation that can no longer be taken.
+ *  Both public cards (home + listing) render from this so they cannot drift. */
+export function getWorkshopCardStatus(
+  w: Workshop,
+  now: Date = new Date(),
+): { open: boolean; badgeLabel: string; ctaLabel: string } {
+  const badge = getWorkshopStatusBadge(w, now);
+  if (!badge.open) return { open: false, badgeLabel: badge.label, ctaLabel: 'ปิดรับ' };
+  if (isWorkshopFull(w)) return { open: false, badgeLabel: 'เต็ม', ctaLabel: 'เต็มแล้ว' };
+  return { open: true, badgeLabel: badge.label, ctaLabel: 'จอง' };
+}
+
 /** created_at (stored UTC "YYYY-MM-DD HH:MM:SS") as epoch ms, 0 if unparseable. */
 function createdAtMs(w: { created_at?: string | null }): number {
   if (!w.created_at) return 0;

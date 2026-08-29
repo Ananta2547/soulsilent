@@ -8,6 +8,7 @@ import { Btn } from '@/components/design/RippleButton';
 import { getEffectivePrice, safeParseArray } from '@/lib/workshop-utils';
 import type { WorkshopMaster, Workshop } from '@/lib/types';
 import { Icon } from '@/components/design/Icon';
+import { useLoadingTracker } from '@/components/design/DataLoading';
 
 type Session = Workshop & { booked: number };
 
@@ -18,26 +19,26 @@ export default function WorkshopInfoPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetch(`/api/workshop-masters/${id}`)
-      .then((r) => (r.ok ? (r.json() as Promise<{ master: WorkshopMaster; sessions: Session[] }>) : null))
-      .then((d) => {
-        if (d) {
-          setMaster(d.master);
-          setSessions(d.sessions || []);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [id]);
+  const track = useLoadingTracker();
 
-  if (loading) {
-    return (
-      <section className="section" style={{ padding: '100px 0', textAlign: 'center' }}>
-        <div style={{ width: 32, height: 32, border: '2px solid var(--teal)', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto', animation: 'float 1s linear infinite' }} />
-      </section>
+  useEffect(() => {
+    track(
+      fetch(`/api/workshop-masters/${id}`)
+        .then((r) => (r.ok ? (r.json() as Promise<{ master: WorkshopMaster; sessions: Session[] }>) : null))
+        .then((d) => {
+          if (d) {
+            setMaster(d.master);
+            setSessions(d.sessions || []);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false)),
     );
-  }
+  }, [id, track]);
+
+  // Nothing to draw while this page's requests are open — the loading screen is
+  // over it already (components/design/DataLoading.tsx).
+  if (loading) return null;
 
   if (!master) {
     return (

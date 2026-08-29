@@ -5,7 +5,8 @@ import Link from 'next/link';
 import type { Workshop, Article, ArticleCategory } from '@/lib/types';
 import { useLang } from '@/lib/i18n';
 import { Icon } from '@/components/design/Icon';
-import { getEffectivePrice, hasWorkshopEnded, getWorkshopStatusBadge, isNewWorkshop, isWorkshopFull, compareWorkshopsForListing } from '@/lib/workshop-utils';
+import { useLoadingTracker } from '@/components/design/DataLoading';
+import { getEffectivePrice, hasWorkshopEnded, getWorkshopCardStatus, isNewWorkshop, isWorkshopFull, compareWorkshopsForListing } from '@/lib/workshop-utils';
 import { categoryLabel, formatArticleDate } from '@/lib/article-utils';
 
 /* ============================================================
@@ -150,6 +151,12 @@ function FanCard({ slot, index, ticket, onEnter }: { slot: (typeof FAN_SLOTS)[nu
   // A live workshop occupies this slot once real data loads (samples have id:null).
   // Live slots drop the colourful design gradient entirely (replace, not overlay).
   const isLive = !!ticket.id;
+  // A real poster already carries its own title, date and price, set by whoever
+  // drew it. Printing ours on top of that scrims the artwork and says
+  // everything twice, so a card with a poster shows the poster and nothing
+  // else. Only the placeholder cards - which have no artwork to show - keep the
+  // typeset ticket face below.
+  const posterOnly = !!ticket.image;
   return (
     <div
       className="fan-card"
@@ -168,19 +175,21 @@ function FanCard({ slot, index, ticket, onEnter }: { slot: (typeof FAN_SLOTS)[nu
         // eslint-disable-next-line @next/next/no-img-element
         <img src={ticket.image} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
       )}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: ticket.image
-            ? 'linear-gradient(to top, rgba(13,30,29,.9) 0%, rgba(13,30,29,.4) 40%, rgba(13,30,29,.04) 62%, rgba(13,30,29,.38) 100%)'
-            : 'radial-gradient(120% 60% at 30% 0%,rgba(255,255,255,.28),transparent 55%)',
-          pointerEvents: 'none',
-        }}
-      />
+      {!posterOnly && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'radial-gradient(120% 60% at 30% 0%,rgba(255,255,255,.28),transparent 55%)',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
       {ticket.id && (
         <Link href={`/workshops/${ticket.id}`} aria-label={ticket.title} style={{ position: 'absolute', inset: 0, zIndex: 6 }} />
       )}
+      {posterOnly ? null : (
+        <>
       {ticket.discountPct ? (
         <span style={{ position: 'absolute', top: 10, right: 10, zIndex: 7, background: 'var(--accent)', color: 'var(--ink)', fontFamily: 'Archivo Black', fontSize: 12, borderRadius: 8, padding: '3px 8px', boxShadow: '0 4px 10px rgba(0,0,0,.25)' }}>
           ลด {ticket.discountPct}%
@@ -216,6 +225,8 @@ function FanCard({ slot, index, ticket, onEnter }: { slot: (typeof FAN_SLOTS)[nu
           </div>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 }
@@ -325,10 +336,8 @@ function Hero({ workshops }: { workshops: Workshop[] }) {
 function EventCard({ w }: { w: Workshop }) {
   const eff = getEffectivePrice(w);
   const free = w.payment_type === 'free' || eff.price <= 0;
-  const badge = getWorkshopStatusBadge(w);
-  // Seats full → closed/"เต็ม" state, matching the /workshops card + detail page.
-  const full = isWorkshopFull(w);
-  const open = badge.open && !full;
+  // Badge + button wording live in one helper shared with the /workshops card.
+  const { open, badgeLabel, ctaLabel } = getWorkshopCardStatus(w);
   const discountPct =
     !free && eff.originalPrice && eff.originalPrice > eff.price
       ? Math.round((1 - eff.price / eff.originalPrice) * 100)
@@ -389,7 +398,7 @@ function EventCard({ w }: { w: Workshop }) {
       </div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
         <span className={open ? 'tag tag-accent' : 'tag'} style={open ? undefined : { background: '#e6e3da', color: 'var(--muted)' }}>
-          {full ? 'เต็ม' : badge.label}
+          {badgeLabel}
         </span>
         <span className="tag">{w.category || 'ONSITE'}</span>
       </div>
@@ -421,14 +430,14 @@ function EventCard({ w }: { w: Workshop }) {
           </div>
         </div>
         {open ? (
-          <span className="btn btn-teal btn-sm" aria-hidden>จอง <span className="mono">→</span></span>
+          <span className="btn btn-teal btn-sm" aria-hidden>{ctaLabel} <span className="mono">→</span></span>
         ) : (
           <span
             className="btn btn-sm"
             aria-hidden
             style={{ background: '#e6e3da', color: 'var(--muted)', cursor: 'not-allowed' }}
           >
-            {full ? 'เต็มแล้ว' : 'ปิดรับ'}
+            {ctaLabel}
           </span>
         )}
       </div>
@@ -743,33 +752,49 @@ export default function HomePage() {
   const [reviews, setReviews] = useState<PublicReview[]>([]);
   const [stats, setStats] = useState<SiteStats>({ workshops: 11, participants: 125, locations: 0 });
 
+  // Every request the home page needs is tracked, so the loading screen's bar
+  // moves as each one lands and the screen clears on the last of them.
+  const track = useLoadingTracker();
+
   useEffect(() => {
-    fetch('/api/workshops?status=active')
-      .then((r) => r.json() as Promise<{ workshops: Workshop[] }>)
-      .then((d) => setWorkshops(d.workshops || []))
-      .catch(() => {});
+    track(
+      fetch('/api/workshops?status=active')
+        .then((r) => r.json() as Promise<{ workshops: Workshop[] }>)
+        .then((d) => setWorkshops(d.workshops || []))
+        .catch(() => {}),
+    );
     // Hero fan shows only admin-starred workshops.
-    fetch('/api/workshops?featured=1&public=1')
-      .then((r) => r.json() as Promise<{ workshops: Workshop[] }>)
-      .then((d) => setFeaturedWorkshops(d.workshops || []))
-      .catch(() => {});
-    fetch('/api/articles')
-      .then((r) => r.json() as Promise<{ articles: Article[] }>)
-      .then((d) => setArticles(d.articles || []))
-      .catch(() => {});
-    fetch('/api/article-categories')
-      .then((r) => r.json() as Promise<{ categories: ArticleCategory[] }>)
-      .then((d) => setArticleCategories(d.categories || []))
-      .catch(() => {});
-    fetch('/api/reviews?featured=1&limit=10')
-      .then((r) => r.json() as Promise<{ reviews: PublicReview[] }>)
-      .then((d) => setReviews(d.reviews || []))
-      .catch(() => {});
-    fetch('/api/stats')
-      .then((r) => r.json() as Promise<Partial<SiteStats>>)
-      .then((d) => setStats({ workshops: d.workshops ?? 11, participants: d.participants ?? 125, locations: d.locations ?? 0 }))
-      .catch(() => {});
-  }, []);
+    track(
+      fetch('/api/workshops?featured=1&public=1')
+        .then((r) => r.json() as Promise<{ workshops: Workshop[] }>)
+        .then((d) => setFeaturedWorkshops(d.workshops || []))
+        .catch(() => {}),
+    );
+    track(
+      fetch('/api/articles')
+        .then((r) => r.json() as Promise<{ articles: Article[] }>)
+        .then((d) => setArticles(d.articles || []))
+        .catch(() => {}),
+    );
+    track(
+      fetch('/api/article-categories')
+        .then((r) => r.json() as Promise<{ categories: ArticleCategory[] }>)
+        .then((d) => setArticleCategories(d.categories || []))
+        .catch(() => {}),
+    );
+    track(
+      fetch('/api/reviews?featured=1&limit=10')
+        .then((r) => r.json() as Promise<{ reviews: PublicReview[] }>)
+        .then((d) => setReviews(d.reviews || []))
+        .catch(() => {}),
+    );
+    track(
+      fetch('/api/stats')
+        .then((r) => r.json() as Promise<Partial<SiteStats>>)
+        .then((d) => setStats({ workshops: d.workshops ?? 11, participants: d.participants ?? 125, locations: d.locations ?? 0 }))
+        .catch(() => {}),
+    );
+  }, [track]);
 
   const leadArticle = articles.find((a) => a.featured) || articles[0];
   const sideArticles = articles.filter((a) => a.id !== leadArticle?.id).slice(0, 3);

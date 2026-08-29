@@ -73,7 +73,9 @@ export default function TeacherWorkshopDetail() {
   const { id } = useParams<{ id: string }>();
   const { lang } = useLang();
   const [data, setData] = useState<Data | null>(null);
-  const [openApp, setOpenApp] = useState<string | null>(null);
+  // Several applications can stay open at once: comparing two answers means
+  // reading them side by side, and one-at-a-time made that impossible.
+  const [openApps, setOpenApps] = useState<Set<string>>(new Set());
   const [pending, setPending] = useState<Set<string>>(new Set());
   const [nickEdit, setNickEdit] = useState<string | null>(null);
   const [nickDraft, setNickDraft] = useState('');
@@ -220,7 +222,7 @@ export default function TeacherWorkshopDetail() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {bookings.map((b, idx) => {
               const map = parseMap(b.attendance_json);
-              const expanded = openApp === b.id;
+              const expanded = openApps.has(b.id);
               return (
                 <div key={b.id} className="card card-static" style={{ padding: 0, border: '1.5px solid var(--cream-deep)', overflow: 'hidden' }}>
                   {/* Name header band — clearer separation per applicant */}
@@ -230,7 +232,7 @@ export default function TeacherWorkshopDetail() {
                     </span>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontWeight: 700, color: 'var(--ink)', fontSize: 15, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        {b.user_name || '—'}
+                        {applicantName(b.application_json, b.user_name)}
                         {b.teacher_nickname && (
                           <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--teal-deep)', background: 'var(--teal-50)', borderRadius: 999, padding: '2px 10px' }}>
                             “{b.teacher_nickname}”
@@ -279,7 +281,19 @@ export default function TeacherWorkshopDetail() {
                         </button>
                       )}
                     </div>
-                    <button type="button" onClick={() => setOpenApp(expanded ? null : b.id)} className="btn btn-paper btn-sm" style={{ alignSelf: 'flex-start' }}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setOpenApps((prev) => {
+                          const next = new Set(prev);
+                          if (!next.delete(b.id)) next.add(b.id);
+                          return next;
+                        })
+                      }
+                      aria-expanded={expanded}
+                      className="btn btn-paper btn-sm"
+                      style={{ alignSelf: 'flex-start' }}
+                    >
                       {expanded ? tr(lang, 'ซ่อนใบสมัคร', 'Hide form') : tr(lang, 'ดูใบสมัคร', 'View form')}
                     </button>
                   </div>
@@ -341,8 +355,27 @@ function Stat({ label, value, tone, big }: { label: string; value: string; tone?
   );
 }
 
+/**
+ * The name to head a participant with: the one they typed on the application
+ * ("ชื่อจริง นามสกุล"), not the Google display name the account happens to
+ * carry — that is often an initial, a handle, or a school username, none of
+ * which help a facilitator calling the room to order.
+ */
+function applicantName(json: string | null, fallback: string | null): string {
+  try {
+    const p = (JSON.parse(json || 'null') as { profile?: AppProfile } | null)?.profile;
+    const full = (p?.fullName || '').trim() || [p?.firstName, p?.lastName].filter(Boolean).join(' ').trim();
+    if (full) return full;
+  } catch {
+    // Unparseable application — fall through to the account name.
+  }
+  return fallback || '—';
+}
+
 type AppProfile = {
   fullName?: string;
+  firstName?: string;
+  lastName?: string;
   age?: number | null;
   gender?: string;
   phone?: string;

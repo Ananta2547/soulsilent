@@ -7,6 +7,8 @@ import type { Article, ArticleBlock, ArticleCategory } from '@/lib/types';
 import { categoryLabel, formatArticleDate, parseBody, parseTags } from '@/lib/article-utils';
 import { useLang, T } from '@/lib/i18n';
 import { Reveal } from '@/components/design/Reveal';
+import { ShareButton } from '@/components/design/ShareButton';
+import { useLoadingTracker } from '@/components/design/DataLoading';
 
 type ArticleWithAuthor = Article & { author_name?: string | null; author_email?: string | null };
 
@@ -22,30 +24,34 @@ export default function ArticleDetailPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
+  const track = useLoadingTracker();
+
   useEffect(() => {
-    Promise.all([
-      fetch(`/api/articles/${slug}`).then((r) => {
-        if (r.status === 404) return null;
-        return r.json() as Promise<{ article: ArticleWithAuthor }>;
-      }),
-      fetch('/api/articles').then((r) => r.json() as Promise<{ articles: Article[] }>),
-      fetch('/api/article-categories').then(
-        (r) => r.json() as Promise<{ categories: ArticleCategory[] }>
-      ),
-    ])
-      .then(([detail, list, cats]) => {
-        if (!detail || !detail.article) {
-          setNotFound(true);
-        } else {
-          setArticle(detail.article);
-        }
-        setAllArticles(list.articles || []);
-        setCategories(cats.categories || []);
-      })
-      .catch(() => setNotFound(true))
-      .finally(() => setLoading(false));
+    track(
+      Promise.all([
+        fetch(`/api/articles/${slug}`).then((r) => {
+          if (r.status === 404) return null;
+          return r.json() as Promise<{ article: ArticleWithAuthor }>;
+        }),
+        fetch('/api/articles').then((r) => r.json() as Promise<{ articles: Article[] }>),
+        fetch('/api/article-categories').then(
+          (r) => r.json() as Promise<{ categories: ArticleCategory[] }>
+        ),
+      ])
+        .then(([detail, list, cats]) => {
+          if (!detail || !detail.article) {
+            setNotFound(true);
+          } else {
+            setArticle(detail.article);
+          }
+          setAllArticles(list.articles || []);
+          setCategories(cats.categories || []);
+        })
+        .catch(() => setNotFound(true))
+        .finally(() => setLoading(false)),
+    );
     window.scrollTo(0, 0);
-  }, [slug]);
+  }, [slug, track]);
 
   // Prev/next chronologically (newest = first in list)
   const { prev, next } = useMemo(() => {
@@ -73,23 +79,9 @@ export default function ArticleDetailPage() {
       .map((x) => x.a);
   }, [article, allArticles]);
 
-  if (loading) {
-    return (
-      <div style={{ padding: '120px 0', textAlign: 'center' }}>
-        <div
-          style={{
-            width: 32,
-            height: 32,
-            border: '2px solid var(--teal)',
-            borderTopColor: 'transparent',
-            borderRadius: '50%',
-            margin: '0 auto',
-            animation: 'float 1s linear infinite',
-          }}
-        />
-      </div>
-    );
-  }
+  // Nothing to draw while the page's requests are open — the loading screen is
+  // over it already (components/design/DataLoading.tsx).
+  if (loading) return null;
 
   if (notFound || !article) {
     return (
@@ -150,6 +142,9 @@ export default function ArticleDetailPage() {
                 style={{ fontSize: 12, color: 'var(--muted)', letterSpacing: '.08em' }}
               >
                 {date}
+              </span>
+              <span style={{ marginLeft: 'auto' }}>
+                <ShareButton title={article.title} text={article.excerpt || undefined} />
               </span>
             </div>
           </Reveal>
