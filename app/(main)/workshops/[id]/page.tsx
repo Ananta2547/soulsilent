@@ -318,42 +318,6 @@ export default function WorkshopDetailPage() {
           </div>
         </div>
 
-        <div className="ph ph-teal-100" style={{ height: 300, position: 'relative', overflow: 'hidden' }}>
-          {workshop.image_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={workshop.image_url}
-              alt={workshop.title}
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            />
-          ) : (
-            <>
-              {/* animate={false} because the draw-on stroke only runs inside a
-                  .draw-in ancestor (Reveal). This header is above the fold and
-                  never scrolls in, so an animated doodle here stays invisible. */}
-              <Cloud
-                color="var(--teal)"
-                stroke={3}
-                animate={false}
-                style={{ position: 'absolute', top: 22, right: 20, width: 78, height: 50 }}
-              />
-              <WaveLine
-                color="var(--teal-200)"
-                stroke={2.5}
-                animate={false}
-                count={2}
-                style={{
-                  position: 'absolute',
-                  bottom: 22,
-                  left: 20,
-                  width: 'calc(100% - 40px)',
-                  height: 32,
-                }}
-              />
-            </>
-          )}
-        </div>
-
         <section className="bg-teal-section" style={{ padding: '24px 20px 26px' }}>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>{tagRow}</div>
           <h1
@@ -384,6 +348,43 @@ export default function WorkshopDetailPage() {
             )}
           </div>
         </section>
+
+        <div className="ph ph-teal-100" style={{ aspectRatio: '297 / 420', position: 'relative', overflow: 'hidden' }}>
+          {workshop.image_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={workshop.image_url}
+              alt={workshop.title}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          ) : (
+            <>
+              {/* animate={false} because the draw-on stroke only runs inside a
+                  .draw-in ancestor (Reveal). This header is above the fold and
+                  never scrolls in, so an animated doodle here stays invisible. */}
+              <Cloud
+                color="var(--teal)"
+                stroke={3}
+                animate={false}
+                style={{ position: 'absolute', top: 28, right: 24, width: 96, height: 62 }}
+              />
+              <WaveLine
+                color="var(--teal-200)"
+                stroke={2.5}
+                animate={false}
+                count={2}
+                style={{
+                  position: 'absolute',
+                  bottom: 28,
+                  left: 24,
+                  width: 'calc(100% - 48px)',
+                  height: 38,
+                }}
+              />
+            </>
+          )}
+        </div>
+
       </div>
 
       {/* Hero banner */}
@@ -402,7 +403,7 @@ export default function WorkshopDetailPage() {
       <section className="section ws-detail-main" style={{ paddingTop: 48, paddingBottom: 96 }}>
         <div className="container">
           <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 48 }} className="ws-detail-grid">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 48, minWidth: 0 }}>
+            <div className="ws-detail-left">
               {/* Tags — the phone header prints these itself, inside the teal
                   band, so hide them here rather than showing the row twice. */}
               <Reveal className="ws-d-tags">
@@ -692,34 +693,10 @@ export default function WorkshopDetailPage() {
                   >
                     <T th="คนที่จะอยู่กับคุณทั้งวัน" en="Who'll be with you all day" />
                   </h2>
-                  <div style={{ display: 'grid', gap: 16 }}>
+                  <div className="ws-fac-list">
                   {instructors.map((ins) => (
-                  <div
-                    key={ins.id}
-                    style={{
-                      display: 'flex',
-                      gap: 24,
-                      alignItems: 'flex-start',
-                      padding: 24,
-                      borderRadius: 22,
-                      background: 'var(--paper)',
-                      boxShadow: 'inset 0 0 0 1px var(--cream-deep)',
-                      flexWrap: 'wrap',
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 96,
-                        height: 96,
-                        borderRadius: 18,
-                        background: 'var(--teal-50)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                        overflow: 'hidden',
-                      }}
-                    >
+                  <div key={ins.id} className="ws-fac-card">
+                    <div className="ws-fac-avatar">
                       {ins.avatar_url ? (
                         <img
                           src={ins.avatar_url}
@@ -727,14 +704,7 @@ export default function WorkshopDetailPage() {
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         />
                       ) : (
-                        <span
-                          style={{
-                            fontFamily: 'Mitr, sans-serif',
-                            fontSize: 44,
-                            fontWeight: 500,
-                            color: 'var(--teal-deep)',
-                          }}
-                        >
+                        <span style={{ fontFamily: 'Mitr, sans-serif', fontWeight: 500, color: 'var(--teal-deep)' }}>
                           {ins.name[0]?.toUpperCase() || '?'}
                         </span>
                       )}
@@ -756,13 +726,9 @@ export default function WorkshopDetailPage() {
                             ? tr(lang, 'ผู้ก่อตั้ง & LEAD FACILITATOR', 'founder & lead facilitator')
                             : tr(lang, 'ผู้ดูแลกิจกรรม', 'host')}
                       </div>
-                      <h3
-                        className="display-th"
-                        style={{ fontSize: 22, margin: '0 0 10px', lineHeight: 1.25 }}
-                      >
-                        {ins.name}
-                      </h3>
+                      <h3 className="display-th">{ins.name}</h3>
                       <p
+                        className="ws-fac-bio"
                         style={{
                           fontSize: 14.5,
                           color: 'var(--muted)',
@@ -799,6 +765,11 @@ export default function WorkshopDetailPage() {
                   </div>
                   ))}
                   </div>
+                  {instructors.length > 1 && (
+                    <div className="mono ws-fac-hint">
+                      {tr(lang, 'เลื่อนเพื่อดูผู้สอนคนถัดไป →', 'Swipe for the next facilitator →')}
+                    </div>
+                  )}
                 </Reveal>
               )}
 
@@ -842,8 +813,10 @@ export default function WorkshopDetailPage() {
 
             {/* Poster (static) + sticky booking card */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {/* The phone header prints its own full-bleed poster, so this one
+                  is desktop-only - see .ws-d-poster. */}
               <div
-                className="ph ph-teal-100"
+                className="ph ph-teal-100 ws-d-poster"
                 style={{ aspectRatio: '297 / 420', borderRadius: 22, overflow: 'hidden', position: 'relative' }}
               >
                 {workshop.image_url ? (
@@ -871,14 +844,7 @@ export default function WorkshopDetailPage() {
 
               <div
                 id="ws-booking-card"
-                style={{
-                  position: 'sticky',
-                  top: 100,
-                  background: 'var(--paper)',
-                  borderRadius: 24,
-                  padding: 32,
-                  boxShadow: '0 12px 40px -16px rgba(13,30,29,.15)',
-                }}
+                className="ws-book-card"
               >
                 <BookingCardContent
                   workshop={workshop}
@@ -1677,16 +1643,7 @@ function FindUs({
   return (
     <>
       {/* Map */}
-      <div
-        style={{
-          position: 'relative',
-          borderRadius: 18,
-          overflow: 'hidden',
-          background: 'var(--cream)',
-          boxShadow: 'inset 0 0 0 1px var(--cream-deep)',
-          aspectRatio: '16 / 10',
-        }}
-      >
+      <div className="ws-map">
         <iframe
           src={embedSrc}
           title="Google Maps"
@@ -1711,18 +1668,7 @@ function FindUs({
       </div>
 
       {/* Address card */}
-      <div
-        style={{
-          marginTop: 20,
-          padding: 22,
-          background: 'var(--cream)',
-          borderRadius: 18,
-          display: 'flex',
-          gap: 18,
-          alignItems: 'flex-start',
-          flexWrap: 'wrap',
-        }}
-      >
+      <div className="ws-addr">
         {/* Cover image (first gallery image) */}
         {coverImage && (
           <div
@@ -1754,7 +1700,7 @@ function FindUs({
             {tr(lang, 'ที่อยู่', 'Address')}
           </div>
           <div style={{ fontSize: 15, lineHeight: 1.55, marginBottom: 16 }}>{locationLabel}</div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div className="ws-addr-actions">
             {location && (
               <Link href={`/locations/${location.id}`} className="btn btn-teal btn-sm">
                 {tr(lang, 'ดูรายละเอียดสถานที่', 'View location details')} <span className="mono">→</span>
@@ -1770,11 +1716,13 @@ function FindUs({
                 ? `✓ ${tr(lang, 'คัดลอกแล้ว', 'Copied')}`
                 : tr(lang, 'คัดลอกที่อยู่', 'Copy address')}
             </button>
+            {/* Phones already get this link as the button floating on the map,
+                and the design drops it from the card there. */}
             <a
               href={openUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="btn btn-ghost btn-sm"
+              className="btn btn-ghost btn-sm ws-addr-ghost"
             >
               {tr(lang, 'เปิด Google Maps', 'Open Google Maps')} <span className="mono">↗</span>
             </a>
