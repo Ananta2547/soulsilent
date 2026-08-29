@@ -150,6 +150,12 @@ function FanCard({ slot, index, ticket, onEnter }: { slot: (typeof FAN_SLOTS)[nu
   // A live workshop occupies this slot once real data loads (samples have id:null).
   // Live slots drop the colourful design gradient entirely (replace, not overlay).
   const isLive = !!ticket.id;
+  // A real poster already carries its own title, date and price, set by whoever
+  // drew it. Printing ours on top of that scrims the artwork and says
+  // everything twice, so a card with a poster shows the poster and nothing
+  // else. Only the placeholder cards - which have no artwork to show - keep the
+  // typeset ticket face below.
+  const posterOnly = !!ticket.image;
   return (
     <div
       className="fan-card"
@@ -168,19 +174,21 @@ function FanCard({ slot, index, ticket, onEnter }: { slot: (typeof FAN_SLOTS)[nu
         // eslint-disable-next-line @next/next/no-img-element
         <img src={ticket.image} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
       )}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: ticket.image
-            ? 'linear-gradient(to top, rgba(13,30,29,.9) 0%, rgba(13,30,29,.4) 40%, rgba(13,30,29,.04) 62%, rgba(13,30,29,.38) 100%)'
-            : 'radial-gradient(120% 60% at 30% 0%,rgba(255,255,255,.28),transparent 55%)',
-          pointerEvents: 'none',
-        }}
-      />
+      {!posterOnly && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'radial-gradient(120% 60% at 30% 0%,rgba(255,255,255,.28),transparent 55%)',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
       {ticket.id && (
         <Link href={`/workshops/${ticket.id}`} aria-label={ticket.title} style={{ position: 'absolute', inset: 0, zIndex: 6 }} />
       )}
+      {posterOnly ? null : (
+        <>
       {ticket.discountPct ? (
         <span style={{ position: 'absolute', top: 10, right: 10, zIndex: 7, background: 'var(--accent)', color: 'var(--ink)', fontFamily: 'Archivo Black', fontSize: 12, borderRadius: 8, padding: '3px 8px', boxShadow: '0 4px 10px rgba(0,0,0,.25)' }}>
           ลด {ticket.discountPct}%
@@ -216,6 +224,8 @@ function FanCard({ slot, index, ticket, onEnter }: { slot: (typeof FAN_SLOTS)[nu
           </div>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 }
