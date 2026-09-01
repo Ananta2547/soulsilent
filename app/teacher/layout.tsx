@@ -44,10 +44,12 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
   }
 
   return (
-    <div className="flex min-h-screen">
+    // Column on phones — the rail collapses to a top bar there and only slides
+    // over the page when asked for; a row from 1024px, where it is a fixed rail.
+    <div className="flex flex-col lg:flex-row min-h-screen bg-surface">
       <TeacherSidebar />
-      <div className="flex-1 bg-surface min-w-0">
-        <div className="p-6 lg:p-8">{children}</div>
+      <div className="flex-1 min-w-0">
+        <div className="p-4 sm:p-6 lg:p-8">{children}</div>
       </div>
     </div>
   );
