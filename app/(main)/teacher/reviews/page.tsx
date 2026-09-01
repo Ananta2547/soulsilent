@@ -1,0 +1,275 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import { useLang, T, tr } from '@/lib/i18n';
+import { Stars } from '@/components/design/Icon';
+import { useLoadingTracker } from '@/components/design/DataLoading';
+
+type ReviewRow = {
+  id: string;
+  rating: number;
+  comment: string | null;
+  featured: number;
+  created_at: string;
+  user_name: string | null;
+  workshop_id: string;
+  workshop_title: string | null;
+};
+
+export default function TeacherReviewsPage() {
+  const { lang } = useLang();
+  const [rows, setRows] = useState<ReviewRow[] | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [sort, setSort] = useState<'newest' | 'oldest'>('newest');
+  /** '' = every workshop. Otherwise only reviews of that one. */
+  const [wsFilter, setWsFilter] = useState('');
+  const track = useLoadingTracker();
+
+  useEffect(() => {
+    track(
+      fetch('/api/teacher/reviews')
+        .then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json() as Promise<{ reviews: ReviewRow[] }>;
+        })
+        .then((d) => setRows(d.reviews || []))
+        .catch((e) => {
+          console.error('Failed to load teacher reviews', e);
+          setLoadError(true);
+        }),
+    );
+  }, [track]);
+
+  const all = useMemo(() => rows || [], [rows]);
+
+  // Stars are 1-5, so a mean is meaningful; guard the empty list.
+  const avg = all.length ? all.reduce((a, r) => a + r.rating, 0) / all.length : 0;
+
+  /** Only workshops that actually have a review — an option matching nothing is
+   *  worse than no option at all. */
+  const workshops = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const r of all) if (!seen.has(r.workshop_id)) seen.set(r.workshop_id, r.workshop_title || '—');
+    return [...seen].sort((a, b) => a[1].localeCompare(b[1], 'th'));
+  }, [all]);
+
+  const visible = useMemo(() => {
+    const filtered = wsFilter ? all.filter((r) => r.workshop_id === wsFilter) : all;
+    // Sorted on parsed time rather than the API's order, which stops meaning
+    // anything once a filter has been applied.
+    return [...filtered].sort((a, b) => {
+      const d = toMs(a.created_at) - toMs(b.created_at);
+      return sort === 'newest' ? -d : d;
+    });
+  }, [all, wsFilter, sort]);
+
+  if (loadError) {
+    return (
+      <p style={{ color: 'var(--muted)', fontSize: 14 }}>
+        <T th="โหลดรีวิวไม่สำเร็จ" en="Could not load reviews" />
+      </p>
+    );
+  }
+  if (rows === null) return null;
+
+  return (
+    <div>
+      <span className="eyebrow">
+        <T th="คำติชม" en="feedback" />
+      </span>
+      <h1 className="display-th" style={{ fontSize: 'clamp(26px,3.4vw,36px)', margin: '12px 0 6px' }}>
+        <T th="รีวิวที่คุณได้รับ" en="Your reviews" />
+      </h1>
+      <p style={{ fontSize: 14.5, color: 'var(--muted)', margin: '0 0 26px' }}>
+        <T th="สิ่งที่ผู้เข้าร่วมเขียนถึงเวิร์กชอปของคุณ" en="What participants wrote about your workshops." />
+      </p>
+
+      {/* Headline numbers */}
+      <section
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: 14,
+          marginBottom: 22,
+        }}
+      >
+        <div className="card card-static" style={{ padding: 18 }}>
+          <div className="mono" style={LABEL}>
+            {tr(lang, 'ดาวเฉลี่ย', 'Average rating')}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+            <span style={BIG}>{all.length ? avg.toFixed(1) : '—'}</span>
+            {all.length > 0 && <Stars value={Math.round(avg)} size={14} />}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
+            <T th="จาก 5 ดาว" en="out of 5" />
+          </div>
+        </div>
+
+        <div className="card card-static" style={{ padding: 18 }}>
+          <div className="mono" style={LABEL}>
+            {tr(lang, 'รีวิวทั้งหมด', 'Total reviews')}
+          </div>
+          <div style={BIG}>{all.length.toLocaleString()}</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
+            {tr(
+              lang,
+              `มีข้อความ ${all.filter((r) => (r.comment || '').trim()).length} รีวิว`,
+              `${all.filter((r) => (r.comment || '').trim()).length} with a comment`,
+            )}
+          </div>
+        </div>
+      </section>
+
+      {all.length === 0 ? (
+        <div className="card card-static" style={{ textAlign: 'center', padding: '48px 24px' }}>
+          <p style={{ color: 'var(--muted)', margin: 0 }}>
+            <T th="ยังไม่มีรีวิว" en="No reviews yet" />
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Sort + filter, one row above the list */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+            <div style={{ display: 'inline-flex', background: 'var(--cream)', borderRadius: 999, padding: 3 }}>
+              {(
+                [
+                  ['newest', tr(lang, 'ล่าสุด', 'Newest')],
+                  ['oldest', tr(lang, 'เก่าสุด', 'Oldest')],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSort(key)}
+                  aria-pressed={sort === key}
+                  style={{
+                    border: 0,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    borderRadius: 999,
+                    padding: '6px 14px',
+                    background: sort === key ? 'var(--paper)' : 'transparent',
+                    color: sort === key ? 'var(--ink)' : 'var(--muted)',
+                    boxShadow: sort === key ? '0 1px 4px rgba(13,30,29,.12)' : 'none',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <select
+              value={wsFilter}
+              onChange={(e) => setWsFilter(e.target.value)}
+              aria-label={tr(lang, 'แยกรายการตามเวิร์กชอป', 'Filter by workshop')}
+              className="field"
+              style={{ width: 'auto', maxWidth: 280, padding: '8px 14px', fontSize: 13 }}
+            >
+              <option value="">{tr(lang, 'แยกรายการ — ทุกเวิร์กชอป', 'All workshops')}</option>
+              {workshops.map(([id, title]) => (
+                <option key={id} value={id}>
+                  {title}
+                </option>
+              ))}
+            </select>
+
+            <span style={{ fontSize: 12, color: 'var(--muted)', marginLeft: 'auto' }}>
+              {tr(lang, `แสดง ${visible.length} รีวิว`, `showing ${visible.length}`)}
+            </span>
+          </div>
+
+          {visible.length === 0 ? (
+            <div className="card card-static" style={{ textAlign: 'center', padding: '40px 24px' }}>
+              <p style={{ color: 'var(--muted)', margin: 0 }}>
+                <T th="ไม่มีรีวิวของเวิร์กชอปนี้" en="No reviews for this workshop" />
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {visible.map((r) => (
+                <article
+                  key={r.id}
+                  className="card card-static"
+                  style={{ padding: 16, display: 'flex', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}
+                >
+                  <div style={{ flex: 1, minWidth: 220 }}>
+                    {/* Who wrote it and which workshop it is about lead the card:
+                        those two together are what identifies a review. */}
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 700, color: 'var(--ink)', fontSize: 14.5 }}>
+                        {r.user_name || '—'}
+                      </span>
+                      <span style={{ color: 'var(--muted)', fontSize: 12 }}>·</span>
+                      <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--teal-deep)' }}>
+                        {r.workshop_title || '—'}
+                      </span>
+                      <Stars value={r.rating} size={13} />
+                    </div>
+                    {r.comment && (
+                      <p
+                        style={{
+                          fontSize: 14,
+                          lineHeight: 1.65,
+                          color: 'var(--ink)',
+                          margin: '8px 0 0',
+                          whiteSpace: 'pre-line',
+                        }}
+                      >
+                        {r.comment}
+                      </p>
+                    )}
+                  </div>
+
+                  <time
+                    dateTime={r.created_at}
+                    className="mono"
+                    style={{ fontSize: 11.5, color: 'var(--muted)', whiteSpace: 'nowrap', marginLeft: 'auto' }}
+                  >
+                    {fmtReviewedAt(r.created_at)}
+                  </time>
+                </article>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+const LABEL: React.CSSProperties = {
+  fontSize: 10.5,
+  letterSpacing: '.12em',
+  textTransform: 'uppercase',
+  color: 'var(--muted)',
+  marginBottom: 8,
+};
+
+const BIG: React.CSSProperties = {
+  fontFamily: 'var(--font-display-th)',
+  fontWeight: 600,
+  fontSize: 27,
+  lineHeight: 1.05,
+  color: 'var(--ink)',
+  letterSpacing: '-.02em',
+};
+
+/** SQLite writes UTC as "YYYY-MM-DD HH:MM:SS" — no T, no Z — which Safari reads
+ *  as NaN and Chrome reads as local time. Normalise before parsing. */
+function toMs(v: string): number {
+  const t = new Date(v.includes('T') ? v : v.replace(' ', 'T') + 'Z').getTime();
+  return Number.isNaN(t) ? 0 : t;
+}
+
+/** "12 ส.ค. 2569 · 14:30" — the date and the time of day, both stated. */
+function fmtReviewedAt(v: string): string {
+  const ms = toMs(v);
+  if (!ms) return '—';
+  const d = new Date(ms);
+  const date = d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+  const time = d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+  return `${date} · ${time}`;
+}
