@@ -1,7 +1,5 @@
 'use client';
 
-import { PageLoader } from '@/components/design/PageLoader';
-
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useLang, T, tr } from '@/lib/i18n';
@@ -47,9 +45,7 @@ export default function TeacherWorkshopsPage() {
       </p>
 
       {rows === null ? (
-        <div className="flex items-center justify-center h-40">
-          <PageLoader />
-        </div>
+        <CardGridSkeleton />
       ) : rows.length === 0 ? (
         <div className="card card-static" style={{ textAlign: 'center', padding: '48px 24px' }}>
           <p style={{ color: 'var(--muted)', margin: 0 }}>
@@ -64,10 +60,13 @@ export default function TeacherWorkshopsPage() {
             const dateLabel = new Date(days[0] + 'T00:00:00').toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
             return (
               <Link key={w.id} href={`/teacher/workshops/${w.id}`} className="card card-static" style={{ padding: 0, overflow: 'hidden', textDecoration: 'none', display: 'block' }}>
-                <div style={{ height: 150, background: 'var(--cream-deep)', position: 'relative' }}>
+                {/* The poster is the thing a teacher recognises their own
+                    workshop by, so it is shown whole: a 3:4 frame with the
+                    image contained inside it, never cropped to a strip. */}
+                <div style={{ aspectRatio: '3 / 4', background: 'var(--cream)', position: 'relative' }}>
                   {w.image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={w.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={w.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                   ) : null}
                   <span style={{ position: 'absolute', top: 10, right: 10, fontSize: 11, fontWeight: 600, color: st.tone, background: st.bg, borderRadius: 999, padding: '4px 10px' }}>
                     {tr(lang, st.th, st.en)}
@@ -88,6 +87,28 @@ export default function TeacherWorkshopsPage() {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+/** The grid's own shape while it loads — same columns, same card proportions,
+ *  so nothing jumps when the workshops arrive. */
+function CardGridSkeleton() {
+  return (
+    <div
+      aria-hidden
+      style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 18 }}
+    >
+      {Array.from({ length: 6 }, (_, i) => (
+        <div key={i} className="card card-static" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="skel" style={{ aspectRatio: '3 / 4', borderRadius: 0 }} />
+          <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div className="skel" style={{ height: 17, width: '72%' }} />
+            <div className="skel" style={{ height: 12, width: '52%' }} />
+            <div className="skel" style={{ height: 12, width: '40%' }} />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useLang, T, tr } from '@/lib/i18n';
-import { useLoadingTracker } from '@/components/design/DataLoading';
 
 type Totals = { workshops: number; participants: number; gross: number; net: number };
 type MonthTotal = { month: string; total: number; count: number };
@@ -30,22 +29,22 @@ export default function TeacherOverviewPage() {
   const [data, setData] = useState<Overview | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [page, setPage] = useState(1);
-  const track = useLoadingTracker();
 
+  // Not handed to the loading tracker: the dashboard's frame — rail, headings —
+  // is already on screen, and a full-screen loader over it would hide a page
+  // the reader can already navigate. The skeleton below stands in instead.
   useEffect(() => {
-    track(
-      fetch('/api/teacher/overview')
-        .then((r) => {
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          return r.json() as Promise<Overview>;
-        })
-        .then(setData)
-        .catch((e) => {
-          console.error('Failed to load teacher overview', e);
-          setLoadError(true);
-        }),
-    );
-  }, [track]);
+    fetch('/api/teacher/overview')
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json() as Promise<Overview>;
+      })
+      .then(setData)
+      .catch((e) => {
+        console.error('Failed to load teacher overview', e);
+        setLoadError(true);
+      });
+  }, []);
 
   // A cancelled booking is the opposite of what this table is read for, so it
   // is dropped here.
@@ -61,7 +60,7 @@ export default function TeacherOverviewPage() {
       </p>
     );
   }
-  if (!data) return null;
+  if (!data) return <OverviewSkeleton />;
 
   const ages = ageBand(data.ages, lang);
 
@@ -210,6 +209,56 @@ export default function TeacherOverviewPage() {
 }
 
 /* ---------------- pieces ---------------- */
+
+/** The page's own shape while its numbers load — four stat cards, a chart and a
+ *  table, at the sizes the real ones occupy, so nothing jumps on arrival. */
+function OverviewSkeleton() {
+  return (
+    <div aria-hidden>
+      <div className="skel" style={{ height: 12, width: 140, marginBottom: 16 }} />
+      <div className="skel" style={{ height: 34, width: 260, marginBottom: 10 }} />
+      <div className="skel" style={{ height: 14, width: 340, marginBottom: 26 }} />
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
+          gap: 14,
+          marginBottom: 26,
+        }}
+      >
+        {Array.from({ length: 4 }, (_, i) => (
+          <div key={i} className="card card-static" style={{ padding: 18 }}>
+            <div className="skel" style={{ height: 11, width: '60%', marginBottom: 12 }} />
+            <div className="skel" style={{ height: 27, width: '45%', marginBottom: 10 }} />
+            <div className="skel" style={{ height: 11, width: '70%' }} />
+          </div>
+        ))}
+      </div>
+
+      <div className="card card-static" style={{ padding: 18 }}>
+        <div className="skel" style={{ height: 17, width: 160, marginBottom: 8 }} />
+        <div className="skel" style={{ height: 12, width: 240, marginBottom: 20 }} />
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 150 }}>
+          {[38, 62, 30, 84, 46, 70, 26, 58, 92, 44, 66, 34].map((h, i) => (
+            <div key={i} className="skel" style={{ flex: 1, height: `${h}%`, borderRadius: '4px 4px 0 0' }} />
+          ))}
+        </div>
+      </div>
+
+      <div className="card card-static" style={{ padding: 18, marginTop: 26 }}>
+        <div className="skel" style={{ height: 17, width: 130, marginBottom: 18 }} />
+        {Array.from({ length: 5 }, (_, i) => (
+          <div key={i} style={{ display: 'flex', gap: 14, marginBottom: 14 }}>
+            <div className="skel" style={{ height: 13, flex: 2 }} />
+            <div className="skel" style={{ height: 13, flex: 1 }} />
+            <div className="skel" style={{ height: 13, width: 70 }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function StatCard({ label, value, note }: { label: string; value: string; note: string }) {
   return (

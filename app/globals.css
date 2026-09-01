@@ -317,6 +317,42 @@ body {
 }
 
 
+/* ============================================================
+   Skeleton placeholders — the shape of the content, drawn while it loads.
+
+   Used on the dashboard pages, where the page frame (rail, headings) is
+   already on screen and only the data is missing: covering that with a
+   full-screen loader would hide a page the reader can already navigate.
+   ============================================================ */
+.skel {
+  position: relative;
+  overflow: hidden;
+  background: var(--cream-deep);
+  border-radius: 8px;
+}
+
+.skel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: skelSweep 1.4s cubic-bezier(0.2, 0.7, 0.2, 1) infinite;
+}
+
+@keyframes skelSweep {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* A sweep that never arrives is worse than a still block. */
+  .skel::after {
+    animation: none;
+  }
+}
+
 .btn-teal {
   background: var(--teal);
   color: #fff;

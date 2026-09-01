@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLang, T, tr } from '@/lib/i18n';
 import { Stars } from '@/components/design/Icon';
-import { useLoadingTracker } from '@/components/design/DataLoading';
 
 type ReviewRow = {
   id: string;
@@ -23,22 +22,22 @@ export default function TeacherReviewsPage() {
   const [sort, setSort] = useState<'newest' | 'oldest'>('newest');
   /** '' = every workshop. Otherwise only reviews of that one. */
   const [wsFilter, setWsFilter] = useState('');
-  const track = useLoadingTracker();
 
+  // Not handed to the loading tracker — see the overview page: the dashboard
+  // frame is already drawn, so this page shows its own skeleton instead of
+  // being covered by the site-wide loading screen.
   useEffect(() => {
-    track(
-      fetch('/api/teacher/reviews')
-        .then((r) => {
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          return r.json() as Promise<{ reviews: ReviewRow[] }>;
-        })
-        .then((d) => setRows(d.reviews || []))
-        .catch((e) => {
-          console.error('Failed to load teacher reviews', e);
-          setLoadError(true);
-        }),
-    );
-  }, [track]);
+    fetch('/api/teacher/reviews')
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json() as Promise<{ reviews: ReviewRow[] }>;
+      })
+      .then((d) => setRows(d.reviews || []))
+      .catch((e) => {
+        console.error('Failed to load teacher reviews', e);
+        setLoadError(true);
+      });
+  }, []);
 
   const all = useMemo(() => rows || [], [rows]);
 
@@ -70,7 +69,7 @@ export default function TeacherReviewsPage() {
       </p>
     );
   }
-  if (rows === null) return null;
+  if (rows === null) return <ReviewsSkeleton />;
 
   return (
     <div>
@@ -236,6 +235,48 @@ export default function TeacherReviewsPage() {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+/** Two stat cards over a list of review cards, at the real sizes. */
+function ReviewsSkeleton() {
+  return (
+    <div aria-hidden>
+      <div className="skel" style={{ height: 12, width: 100, marginBottom: 16 }} />
+      <div className="skel" style={{ height: 34, width: 240, marginBottom: 10 }} />
+      <div className="skel" style={{ height: 14, width: 320, marginBottom: 26 }} />
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: 14,
+          marginBottom: 22,
+        }}
+      >
+        {Array.from({ length: 2 }, (_, i) => (
+          <div key={i} className="card card-static" style={{ padding: 18 }}>
+            <div className="skel" style={{ height: 11, width: '55%', marginBottom: 12 }} />
+            <div className="skel" style={{ height: 27, width: '40%', marginBottom: 10 }} />
+            <div className="skel" style={{ height: 11, width: '65%' }} />
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {Array.from({ length: 4 }, (_, i) => (
+          <div key={i} className="card card-static" style={{ padding: 16 }}>
+            <div style={{ display: 'flex', gap: 12, marginBottom: 10 }}>
+              <div className="skel" style={{ height: 14, width: 120 }} />
+              <div className="skel" style={{ height: 14, width: 160 }} />
+              <div className="skel" style={{ height: 14, width: 70, marginLeft: 'auto' }} />
+            </div>
+            <div className="skel" style={{ height: 12, width: '90%', marginBottom: 6 }} />
+            <div className="skel" style={{ height: 12, width: '64%' }} />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
