@@ -3,6 +3,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLang, T, tr } from '@/lib/i18n';
 import { Stars } from '@/components/design/Icon';
+import { Pager } from '@/components/teacher/Pager';
+
+/** Five cards plus the stats and the filter row fit one screen. */
+const PER_PAGE = 5;
 
 type ReviewRow = {
   id: string;
@@ -22,6 +26,7 @@ export default function TeacherReviewsPage() {
   const [sort, setSort] = useState<'newest' | 'oldest'>('newest');
   /** '' = every workshop. Otherwise only reviews of that one. */
   const [wsFilter, setWsFilter] = useState('');
+  const [page, setPage] = useState(1);
 
   // Not handed to the loading tracker — see the overview page: the dashboard
   // frame is already drawn, so this page shows its own skeleton instead of
@@ -62,6 +67,11 @@ export default function TeacherReviewsPage() {
     });
   }, [all, wsFilter, sort]);
 
+  // Paged rather than allowed to run on: the dashboard is one screen tall.
+  const pageCount = Math.max(1, Math.ceil(visible.length / PER_PAGE));
+  const current = Math.min(page, pageCount);
+  const shown = visible.slice((current - 1) * PER_PAGE, current * PER_PAGE);
+
   if (loadError) {
     return (
       <p style={{ color: 'var(--muted)', fontSize: 14 }}>
@@ -92,31 +102,23 @@ export default function TeacherReviewsPage() {
           marginBottom: 22,
         }}
       >
-        <div className="card card-static" style={{ padding: 18 }}>
+        {/* The number is the point of each box: label above, figure below, both
+            centred, and nothing else competing with them. */}
+        <div className="card card-static" style={{ padding: '18px 14px', textAlign: 'center' }}>
           <div className="mono" style={LABEL}>
             {tr(lang, 'ดาวเฉลี่ย', 'Average rating')}
           </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 10 }}>
             <span style={BIG}>{all.length ? avg.toFixed(1) : '—'}</span>
-            {all.length > 0 && <Stars value={Math.round(avg)} size={14} />}
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
-            <T th="จาก 5 ดาว" en="out of 5" />
+            {all.length > 0 && <Stars value={Math.round(avg)} size={15} />}
           </div>
         </div>
 
-        <div className="card card-static" style={{ padding: 18 }}>
+        <div className="card card-static" style={{ padding: '18px 14px', textAlign: 'center' }}>
           <div className="mono" style={LABEL}>
             {tr(lang, 'รีวิวทั้งหมด', 'Total reviews')}
           </div>
           <div style={BIG}>{all.length.toLocaleString()}</div>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
-            {tr(
-              lang,
-              `มีข้อความ ${all.filter((r) => (r.comment || '').trim()).length} รีวิว`,
-              `${all.filter((r) => (r.comment || '').trim()).length} with a comment`,
-            )}
-          </div>
         </div>
       </section>
 
@@ -140,7 +142,7 @@ export default function TeacherReviewsPage() {
                 <button
                   key={key}
                   type="button"
-                  onClick={() => setSort(key)}
+                  onClick={() => { setSort(key); setPage(1); }}
                   aria-pressed={sort === key}
                   style={{
                     border: 0,
@@ -162,7 +164,7 @@ export default function TeacherReviewsPage() {
 
             <select
               value={wsFilter}
-              onChange={(e) => setWsFilter(e.target.value)}
+              onChange={(e) => { setWsFilter(e.target.value); setPage(1); }}
               aria-label={tr(lang, 'แยกรายการตามเวิร์กชอป', 'Filter by workshop')}
               className="field"
               style={{ width: 'auto', maxWidth: 280, padding: '8px 14px', fontSize: 13 }}
@@ -188,7 +190,7 @@ export default function TeacherReviewsPage() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {visible.map((r) => (
+              {shown.map((r) => (
                 <article
                   key={r.id}
                   className="card card-static"
@@ -231,6 +233,7 @@ export default function TeacherReviewsPage() {
                   </time>
                 </article>
               ))}
+              <Pager page={current} pageCount={pageCount} onChange={setPage} label="หน้ารีวิว" />
             </div>
           )}
         </>

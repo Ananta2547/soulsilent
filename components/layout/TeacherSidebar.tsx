@@ -22,7 +22,23 @@ import { Logo } from './Logo';
  */
 type NavItem = { href: string; label: string; icon: React.ReactNode };
 
+// Workshops lead: they are what a teacher opens the dashboard to work on. The
+// money and the feedback are things they check *about* those workshops.
 const NAV: NavItem[] = [
+  {
+    href: '/teacher/workshops',
+    label: 'Workshop ของฉัน',
+    icon: (
+      <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.5}
+          d="M4 7.5h16M4 7.5v11a1.5 1.5 0 001.5 1.5h13a1.5 1.5 0 001.5-1.5v-11M9 7.5V6a2 2 0 012-2h2a2 2 0 012 2v1.5"
+        />
+      </svg>
+    ),
+  },
   {
     href: '/teacher',
     label: 'ภาพรวม / รายได้',
@@ -42,20 +58,6 @@ const NAV: NavItem[] = [
           strokeLinejoin="round"
           strokeWidth={1.5}
           d="M11.5 4.3l2.1 4.3 4.7.7-3.4 3.3.8 4.7-4.2-2.2-4.2 2.2.8-4.7L4.7 9.3l4.7-.7 2.1-4.3z"
-        />
-      </svg>
-    ),
-  },
-  {
-    href: '/teacher/workshops',
-    label: 'Workshop ของฉัน',
-    icon: (
-      <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={1.5}
-          d="M4 7.5h16M4 7.5v11a1.5 1.5 0 001.5 1.5h13a1.5 1.5 0 001.5-1.5v-11M9 7.5V6a2 2 0 012-2h2a2 2 0 012 2v1.5"
         />
       </svg>
     ),

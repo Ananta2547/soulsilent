@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useLang, T, tr } from '@/lib/i18n';
+import { Pager } from '@/components/teacher/Pager';
 
 type Totals = { workshops: number; participants: number; gross: number; net: number };
 type MonthTotal = { month: string; total: number; count: number };
@@ -14,15 +15,30 @@ type BookingRow = {
   payment_status: string;
   created_at: string;
 };
+/** One collected payment: when it landed and how much. */
+type PaidPoint = { at: string; amount: number };
 type Overview = {
   totals: Totals;
   monthly: MonthTotal[];
+  paidPoints: PaidPoint[];
   ages: number[];
   bookings: BookingRow[];
 };
 
 const baht = (n: number) => '฿' + Math.round(n).toLocaleString();
-const BOOKINGS_PER_PAGE = 8;
+/** Small enough that the table and the chart above it stay inside one screen. */
+const BOOKINGS_PER_PAGE = 6;
+
+/** The chart's range filter. `days` is how far back the bars reach; `bucket` is
+ *  how wide one bar is, so a year reads as months and a day as hours. */
+const RANGES = [
+  { key: '1d', th: '1 วัน', en: '1D', days: 1, bucket: 'hour' as const },
+  { key: '7d', th: '7 วัน', en: '7D', days: 7, bucket: 'day' as const },
+  { key: '1m', th: '1 เดือน', en: '1M', days: 30, bucket: 'day' as const },
+  { key: '3m', th: '3 เดือน', en: '3M', days: 90, bucket: 'week' as const },
+  { key: '6m', th: '6 เดือน', en: '6M', days: 182, bucket: 'week' as const },
+  { key: '1y', th: '1 ปี', en: '1Y', days: 365, bucket: 'month' as const },
+];
 
 export default function TeacherOverviewPage() {
   const { lang } = useLang();
@@ -62,7 +78,7 @@ export default function TeacherOverviewPage() {
   }
   if (!data) return <OverviewSkeleton />;
 
-  const ages = ageBand(data.ages, lang);
+  const ages = averageAge(data.ages, lang);
 
   return (
     <div>
@@ -79,33 +95,25 @@ export default function TeacherOverviewPage() {
         />
       </p>
 
+      {/* Four figures, centred as a block: on a wide screen a stretched row of
+          four leaves each number floating alone in its own acre. */}
       <section
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
           gap: 14,
-          marginBottom: 26,
+          marginBottom: 22,
+          maxWidth: 880,
+          marginInline: 'auto',
         }}
       >
-        <StatCard
-          label={tr(lang, 'เวิร์กชอป', 'Workshops')}
-          value={String(data.totals.workshops)}
-          note={tr(lang, 'ที่คุณดูแล', 'you lead')}
-        />
-        <StatCard
-          label={tr(lang, 'ผู้เข้าร่วม', 'Participants')}
-          value={String(data.totals.participants)}
-          note={tr(lang, 'ชำระแล้ว', 'paid')}
-        />
-        <StatCard
-          label={tr(lang, 'รายได้สุทธิ', 'Net revenue')}
-          value={baht(data.totals.net)}
-          note={tr(lang, `ก่อนหัก ${baht(data.totals.gross)}`, `${baht(data.totals.gross)} before deductions`)}
-        />
-        <StatCard label={tr(lang, 'อายุเฉลี่ยผู้เข้าร่วม', 'Average age')} value={ages.label} note={ages.note} />
+        <StatCard label={tr(lang, 'เวิร์กชอป', 'Workshops')} value={String(data.totals.workshops)} />
+        <StatCard label={tr(lang, 'ผู้เข้าร่วม', 'Participants')} value={String(data.totals.participants)} />
+        <StatCard label={tr(lang, 'รายได้สุทธิ', 'Net revenue')} value={baht(data.totals.net)} />
+        <StatCard label={tr(lang, 'อายุเฉลี่ยผู้เข้าร่วม', 'Average age')} value={ages} />
       </section>
 
-      <RevenueChart months={data.monthly} lang={lang} />
+      <RevenueChart points={data.paidPoints || []} lang={lang} />
 
       {/* Recent bookings */}
       <section className="card card-static" style={{ padding: 0, overflow: 'hidden', marginTop: 26 }}>
@@ -184,21 +192,8 @@ export default function TeacherOverviewPage() {
               </table>
             </div>
             {pageCount > 1 && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  padding: '12px 18px',
-                  borderTop: '1px solid var(--cream-deep)',
-                }}
-              >
-                <PageBtn disabled={current === 1} onClick={() => setPage(current - 1)}>‹</PageBtn>
-                <span className="mono" style={{ fontSize: 11.5, color: 'var(--muted)' }}>
-                  {current} / {pageCount}
-                </span>
-                <PageBtn disabled={current === pageCount} onClick={() => setPage(current + 1)}>›</PageBtn>
+              <div style={{ padding: '6px 18px 12px', borderTop: '1px solid var(--cream-deep)' }}>
+                <Pager page={current} pageCount={pageCount} onChange={setPage} label="หน้าการจอง" />
               </div>
             )}
           </>
@@ -260,9 +255,11 @@ function OverviewSkeleton() {
   );
 }
 
-function StatCard({ label, value, note }: { label: string; value: string; note: string }) {
+/** A label and the number under it, both centred. No third line: the caption
+ *  under every figure turned the row into four paragraphs. */
+function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="card card-static" style={{ padding: 18 }}>
+    <div className="card card-static" style={{ padding: '18px 14px', textAlign: 'center' }}>
       <div
         className="mono"
         style={{
@@ -270,7 +267,7 @@ function StatCard({ label, value, note }: { label: string; value: string; note: 
           letterSpacing: '.12em',
           textTransform: 'uppercase',
           color: 'var(--muted)',
-          marginBottom: 8,
+          marginBottom: 10,
         }}
       >
         {label}
@@ -279,7 +276,7 @@ function StatCard({ label, value, note }: { label: string; value: string; note: 
         style={{
           fontFamily: 'var(--font-display-th)',
           fontWeight: 600,
-          fontSize: 27,
+          fontSize: 30,
           lineHeight: 1.05,
           color: 'var(--ink)',
           letterSpacing: '-.02em',
@@ -287,128 +284,236 @@ function StatCard({ label, value, note }: { label: string; value: string; note: 
       >
         {value}
       </div>
-      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>{note}</div>
     </div>
   );
 }
 
 /**
- * Collected revenue by month. One series, so there is no legend and no palette
- * to validate — the heading says what the bars are. Bars because months are
- * discrete buckets, oldest to newest so the latest sits where the eye lands.
- * The exact numbers are in the hover readout and in each bar's accessible name.
+ * Collected revenue over a chosen window. One series, so there is no legend and
+ * no palette to validate — the heading says what the bars are. Bars because
+ * each one is a discrete slice of time, oldest to newest so the latest sits
+ * where the eye lands. Exact figures come from the hover readout and from each
+ * bar's accessible name.
+ *
+ * The window is chosen in the corner (1 วัน … 1 ปี) and sets the slice as well
+ * as the span: a day is read in hours, a year in months. Empty slices are still
+ * drawn — a gap has to look like "nothing came in", not a missing period.
  */
-function RevenueChart({ months, lang }: { months: MonthTotal[]; lang: 'th' | 'en' }) {
+function RevenueChart({ points, lang }: { points: PaidPoint[]; lang: 'th' | 'en' }) {
   const [hover, setHover] = useState<number | null>(null);
-  // The API hands back newest-first; a time axis reads the other way.
-  const data = [...months].reverse();
-  const peak = Math.max(1, ...data.map((m) => m.total));
+  const [rangeKey, setRangeKey] = useState('1y');
+  const range = RANGES.find((r) => r.key === rangeKey) || RANGES[RANGES.length - 1];
+
+  const data = useMemo(() => buildSeries(points, range, lang), [points, range, lang]);
+  const peak = Math.max(1, ...data.map((d) => d.total));
+  const windowTotal = data.reduce((a, d) => a + d.total, 0);
 
   return (
     <section className="card card-static" style={{ padding: 0, overflow: 'hidden' }}>
       <div
         style={{
-          padding: '16px 18px',
+          padding: '14px 18px',
           borderBottom: '1px solid var(--cream-deep)',
           display: 'flex',
-          alignItems: 'baseline',
+          alignItems: 'center',
           justifyContent: 'space-between',
           gap: 12,
           flexWrap: 'wrap',
         }}
       >
-        <div>
+        <div style={{ minWidth: 0 }}>
           <h2 className="display-th" style={{ fontSize: 17, margin: 0 }}>
-            <T th="รายได้รายเดือน" en="Revenue by month" />
+            <T th="รายได้" en="Revenue" />
           </h2>
-          <p style={{ fontSize: 12, color: 'var(--muted)', margin: '4px 0 0' }}>
-            <T th="เฉพาะการจองที่ชำระแล้ว · 12 เดือนล่าสุด" en="Paid bookings only · last 12 months" />
+          <p style={{ fontSize: 12, color: 'var(--muted)', margin: '3px 0 0' }}>
+            {hover != null
+              ? `${data[hover].label} · ${baht(data[hover].total)} · ${data[hover].count} ${tr(lang, 'รายการ', 'bookings')}`
+              : tr(lang, `รวม ${baht(windowTotal)} ในช่วงนี้`, `${baht(windowTotal)} in this window`)}
           </p>
         </div>
-        <span style={{ fontSize: 12.5, color: 'var(--muted)', minHeight: 18 }}>
-          {hover != null
-            ? `${thaiMonth(data[hover].month, lang)} · ${baht(data[hover].total)} · ${data[hover].count} ${tr(lang, 'รายการ', 'bookings')}`
-            : ''}
-        </span>
+
+        {/* Range filter, in the corner of the chart's own box. */}
+        <div
+          role="group"
+          aria-label={tr(lang, 'ช่วงเวลาของกราฟ', 'Chart time range')}
+          style={{ display: 'inline-flex', background: 'var(--cream)', borderRadius: 999, padding: 3, gap: 2 }}
+        >
+          {RANGES.map((r) => (
+            <button
+              key={r.key}
+              type="button"
+              onClick={() => {
+                setRangeKey(r.key);
+                setHover(null);
+              }}
+              aria-pressed={r.key === rangeKey}
+              style={{
+                border: 0,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                fontSize: 12,
+                fontWeight: 600,
+                borderRadius: 999,
+                padding: '5px 10px',
+                whiteSpace: 'nowrap',
+                background: r.key === rangeKey ? 'var(--paper)' : 'transparent',
+                color: r.key === rangeKey ? 'var(--ink)' : 'var(--muted)',
+                boxShadow: r.key === rangeKey ? '0 1px 4px rgba(13,30,29,.12)' : 'none',
+              }}
+            >
+              {tr(lang, r.th, r.en)}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {data.length === 0 ? (
-        <p style={{ padding: '40px 18px', textAlign: 'center', color: 'var(--muted)', fontSize: 14, margin: 0 }}>
-          <T th="ยังไม่มีรายได้" en="No revenue yet" />
-        </p>
-      ) : (
-        <div style={{ padding: 18 }}>
-          <div
-            className="mono"
-            style={{
-              fontSize: 10.5,
-              letterSpacing: '.12em',
-              textTransform: 'uppercase',
-              color: 'var(--muted)',
-              marginBottom: 10,
-            }}
-          >
-            {tr(lang, `สูงสุด ${baht(peak)}`, `peak ${baht(peak)}`)}
-          </div>
+      <div style={{ padding: '14px 18px 16px' }}>
+        <div
+          className="mono"
+          style={{
+            fontSize: 10.5,
+            letterSpacing: '.12em',
+            textTransform: 'uppercase',
+            color: 'var(--muted)',
+            marginBottom: 8,
+          }}
+        >
+          {tr(lang, `สูงสุด ${baht(peak)}`, `peak ${baht(peak)}`)}
+        </div>
 
-          <div
-            style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 150 }}
-            onMouseLeave={() => setHover(null)}
-          >
-            {data.map((m, i) => (
-              <button
-                key={m.month}
-                type="button"
-                onMouseEnter={() => setHover(i)}
-                onFocus={() => setHover(i)}
-                onBlur={() => setHover(null)}
-                aria-label={`${thaiMonth(m.month, lang)} ${baht(m.total)} · ${m.count} ${tr(lang, 'รายการ', 'bookings')}`}
-                style={{
-                  flex: 1,
-                  height: '100%',
-                  display: 'flex',
-                  alignItems: 'flex-end',
-                  background: 'none',
-                  border: 0,
-                  padding: 0,
-                  cursor: 'pointer',
-                }}
-              >
-                <span
-                  style={{
-                    width: '100%',
-                    // A month with nothing collected still gets a hairline, so a
-                    // gap reads as "no money came in", not as a missing month.
-                    height: `${Math.max(2, (m.total / peak) * 100)}%`,
-                    borderRadius: '4px 4px 0 0',
-                    background: hover === i ? 'var(--teal-deep)' : 'var(--teal)',
-                    transition: 'background .18s cubic-bezier(.2,.7,.2,1)',
-                  }}
-                />
-              </button>
-            ))}
-          </div>
-
-          <div style={{ display: 'flex', gap: 2, marginTop: 8 }}>
-            {data.map((m, i) => (
+        <div
+          style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 132 }}
+          onMouseLeave={() => setHover(null)}
+        >
+          {data.map((d, i) => (
+            <button
+              key={d.key}
+              type="button"
+              onMouseEnter={() => setHover(i)}
+              onFocus={() => setHover(i)}
+              onBlur={() => setHover(null)}
+              title={`${d.label} · ${baht(d.total)}`}
+              aria-label={`${d.label} ${baht(d.total)} · ${d.count} ${tr(lang, 'รายการ', 'bookings')}`}
+              style={{
+                flex: 1,
+                height: '100%',
+                display: 'flex',
+                alignItems: 'flex-end',
+                background: 'none',
+                border: 0,
+                padding: 0,
+                cursor: 'pointer',
+              }}
+            >
               <span
-                key={m.month}
+                style={{
+                  width: '100%',
+                  // An empty slice still gets a hairline, so a gap reads as "no
+                  // money came in" and not as a slice that went missing.
+                  height: `${Math.max(2, (d.total / peak) * 100)}%`,
+                  borderRadius: '4px 4px 0 0',
+                  background: hover === i ? 'var(--teal-deep)' : 'var(--teal)',
+                  transition: 'background .18s cubic-bezier(.2,.7,.2,1)',
+                }}
+              />
+            </button>
+          ))}
+        </div>
+
+        {/* A handful of ticks only: one label per bar collides at any width. */}
+        <div style={{ display: 'flex', gap: 2, marginTop: 6 }}>
+          {data.map((d, i) => {
+            const step = Math.max(1, Math.ceil(data.length / 6));
+            const show = i % step === 0 || i === data.length - 1;
+            return (
+              <span
+                key={d.key}
                 className="mono"
                 style={{
                   flex: 1,
                   textAlign: 'center',
-                  fontSize: 10,
+                  fontSize: 9.5,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
                   color: hover === i ? 'var(--ink)' : 'var(--muted)',
                 }}
               >
-                {m.month.slice(5)}
+                {show || hover === i ? d.short : ''}
               </span>
-            ))}
-          </div>
+            );
+          })}
         </div>
-      )}
+      </div>
     </section>
   );
+}
+
+type Bar = { key: string; label: string; short: string; total: number; count: number };
+
+/** Buckets the collected payments into the fixed slices the chosen range asks
+ *  for, oldest first, including the slices nothing landed in. */
+function buildSeries(points: PaidPoint[], range: (typeof RANGES)[number], lang: 'th' | 'en'): Bar[] {
+  const now = new Date();
+  const bars: Bar[] = [];
+  const locale = lang === 'th' ? 'th-TH' : 'en-GB';
+
+  const starts: Date[] = [];
+  if (range.bucket === 'hour') {
+    const top = new Date(now);
+    top.setMinutes(0, 0, 0);
+    for (let i = 23; i >= 0; i--) starts.push(new Date(top.getTime() - i * 3600000));
+  } else if (range.bucket === 'day') {
+    const top = new Date(now);
+    top.setHours(0, 0, 0, 0);
+    for (let i = range.days - 1; i >= 0; i--) starts.push(new Date(top.getTime() - i * 86400000));
+  } else if (range.bucket === 'week') {
+    const top = new Date(now);
+    top.setHours(0, 0, 0, 0);
+    const weeks = Math.round(range.days / 7);
+    for (let i = weeks - 1; i >= 0; i--) starts.push(new Date(top.getTime() - i * 7 * 86400000));
+  } else {
+    for (let i = 11; i >= 0; i--) starts.push(new Date(now.getFullYear(), now.getMonth() - i, 1));
+  }
+
+  const width =
+    range.bucket === 'hour'
+      ? 3600000
+      : range.bucket === 'day'
+        ? 86400000
+        : range.bucket === 'week'
+          ? 7 * 86400000
+          : 0;
+
+  for (let i = 0; i < starts.length; i++) {
+    const from = starts[i].getTime();
+    const to = width ? from + width : starts[i + 1] ? starts[i + 1].getTime() : Infinity;
+    const inBucket = points.filter((p) => {
+      const t = toMs(p.at);
+      return t >= from && t < to;
+    });
+    const d = starts[i];
+    const label =
+      range.bucket === 'hour'
+        ? d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
+        : range.bucket === 'month'
+          ? d.toLocaleDateString(locale, { month: 'short', year: '2-digit' })
+          : d.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
+    const short =
+      range.bucket === 'hour'
+        ? d.toLocaleTimeString(locale, { hour: '2-digit' })
+        : range.bucket === 'month'
+          ? d.toLocaleDateString(locale, { month: 'short' })
+          : d.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
+    bars.push({
+      key: String(from),
+      label,
+      short,
+      total: inBucket.reduce((a, p) => a + (p.amount || 0), 0),
+      count: inBucket.length,
+    });
+  }
+
+  return bars;
 }
 
 function Th({ children, align = 'left' }: { children: React.ReactNode; align?: 'left' | 'right' }) {
@@ -423,56 +528,16 @@ function Td({ children, align = 'left' }: { children: React.ReactNode; align?: '
   return <td style={{ textAlign: align, padding: '11px 16px', color: 'var(--muted)' }}>{children}</td>;
 }
 
-function PageBtn({
-  children,
-  onClick,
-  disabled,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  disabled: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      style={{
-        width: 32,
-        height: 32,
-        borderRadius: 999,
-        border: 0,
-        background: 'var(--cream)',
-        color: disabled ? 'var(--muted)' : 'var(--ink)',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.55 : 1,
-        fontFamily: 'inherit',
-        fontSize: 15,
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
 /* ---------------- helpers ---------------- */
 
 /**
- * The average age as the five-year band it falls in ("26-30 ปี") rather than a
- * false-precision 27.4 — the ages themselves were only ever whole years.
+ * The average age as one whole number of years ("21 ปี"). The ages it averages
+ * were only ever whole years, so a decimal claims a precision that is not there.
  */
-function ageBand(ages: number[], lang: 'th' | 'en'): { label: string; note: string } {
-  if (ages.length === 0) return { label: '—', note: tr(lang, 'ยังไม่มีข้อมูลอายุ', 'no age data yet') };
+function averageAge(ages: number[], lang: 'th' | 'en'): string {
+  if (ages.length === 0) return '—';
   const mean = ages.reduce((a, n) => a + n, 0) / ages.length;
-  const lo = Math.floor((mean - 1) / 5) * 5 + 1; // 27.4 → 26
-  return {
-    label: tr(lang, `${lo}-${lo + 4} ปี`, `${lo}-${lo + 4} yrs`),
-    note: tr(
-      lang,
-      `จาก ${ages.length} คน · เฉลี่ย ${mean.toFixed(1)} ปี`,
-      `${ages.length} people · mean ${mean.toFixed(1)}`,
-    ),
-  };
+  return tr(lang, `${Math.round(mean)} ปี`, `${Math.round(mean)} yrs`);
 }
 
 function bookingStatus(b: BookingRow, lang: 'th' | 'en'): { label: string; bg: string; fg: string } {
@@ -494,14 +559,4 @@ function fmtDayTime(v: string): string {
   if (!ms) return '—';
   const d = new Date(ms);
   return `${d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} · ${d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}`;
-}
-
-/** "2026-08" → "ส.ค. 69" */
-function thaiMonth(ym: string, lang: 'th' | 'en'): string {
-  const [y, m] = ym.split('-').map(Number);
-  if (!y || !m) return ym;
-  return new Date(y, m - 1, 1).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-GB', {
-    month: 'short',
-    year: '2-digit',
-  });
 }

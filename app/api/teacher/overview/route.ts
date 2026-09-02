@@ -89,6 +89,21 @@ export async function GET() {
     .bind(u.sub, u.sub)
     .all<{ month: string; total: number; count: number }>();
 
+  // Every collected payment of the last year, as (when, how much). The chart's
+  // range filter buckets these itself — a monthly roll-up cannot answer "the
+  // last 7 days", and these rows are few enough to send whole.
+  const paidRes = await db
+    .prepare(
+      `SELECT b.created_at AS at, b.amount AS amount
+         FROM bookings b
+         JOIN workshops w ON w.id = b.workshop_id
+        WHERE ${OWNED} AND ${COLLECTED}
+          AND b.created_at >= datetime('now', '-1 year')
+        ORDER BY b.created_at ASC`,
+    )
+    .bind(u.sub, u.sub)
+    .all<{ at: string; amount: number }>();
+
   // Every booking on this teacher's workshops, newest first. Cancelled rows are
   // included: the page decides what to hide, and the activity a teacher reads
   // as history must not quietly lose entries.
@@ -127,6 +142,7 @@ export async function GET() {
   return NextResponse.json({
     totals: { workshops: workshops.length, participants, gross, net },
     monthly: monthlyRes.results || [],
+    paidPoints: paidRes.results || [],
     // The band is worked out on the page; the raw ages travel so it can also
     // say how many people the average rests on.
     ages: [...agesByPerson.values()],
