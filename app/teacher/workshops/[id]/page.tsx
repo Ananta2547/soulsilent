@@ -10,6 +10,7 @@ import type { Workshop } from '@/lib/types';
 import { getWorkshopDays, hasWorkshopEnded } from '@/lib/workshop-utils';
 import { PdpaBadge } from '@/components/workshops/PdpaBadge';
 import { FacilitatorNote } from '@/components/admin/FacilitatorNote';
+import { applicantName } from '@/lib/applicant';
 
 type Row = {
   id: string;
@@ -353,23 +354,6 @@ function Stat({ label, value, tone, big }: { label: string; value: string; tone?
       <div style={{ fontSize: big ? 22 : 18, fontWeight: 700, color: tone || 'var(--ink)', marginTop: 2 }}>{value}</div>
     </div>
   );
-}
-
-/**
- * The name to head a participant with: the one they typed on the application
- * ("ชื่อจริง นามสกุล"), not the Google display name the account happens to
- * carry — that is often an initial, a handle, or a school username, none of
- * which help a facilitator calling the room to order.
- */
-function applicantName(json: string | null, fallback: string | null): string {
-  try {
-    const p = (JSON.parse(json || 'null') as { profile?: AppProfile } | null)?.profile;
-    const full = (p?.fullName || '').trim() || [p?.firstName, p?.lastName].filter(Boolean).join(' ').trim();
-    if (full) return full;
-  } catch {
-    // Unparseable application — fall through to the account name.
-  }
-  return fallback || '—';
 }
 
 type AppProfile = {

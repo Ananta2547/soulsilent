@@ -12,6 +12,7 @@ import { PdpaBadge } from '@/components/workshops/PdpaBadge';
 import { RefundSlipModal } from '@/components/admin/RefundSlipModal';
 import { FacilitatorNote } from '@/components/admin/FacilitatorNote';
 import { Icon } from '@/components/design/Icon';
+import { applicantName } from '@/lib/applicant';
 
 type BookingRow = {
   id: string;
@@ -322,7 +323,9 @@ export default function AttendancePage() {
                       <tr className="border-t border-gray-lighter">
                         <td className="py-3 px-5 text-dark font-medium">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span>{b.user_name || '—'}</span>
+                            {/* The name on the application, not the account's
+                                display name — see lib/applicant.ts. */}
+                            <span>{applicantName(b.application_json, b.user_name)}</span>
                             <PdpaBadge applicationJson={b.application_json} />
                           </div>
                         </td>
