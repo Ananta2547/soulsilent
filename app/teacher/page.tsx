@@ -26,8 +26,12 @@ type Overview = {
 };
 
 const baht = (n: number) => '฿' + Math.round(n).toLocaleString();
-/** Small enough that the table and the chart above it stay inside one screen. */
-const BOOKINGS_PER_PAGE = 6;
+
+/** Rows per page. Chosen so the heading, the four figures, the chart and this
+ *  table together clear a 900px window without the page scrolling. A shorter
+ *  window than that does scroll — clipping the bottom of the page would be
+ *  worse than a scrollbar. */
+const BOOKINGS_PER_PAGE = 5;
 
 /** The chart's range filter. `days` is how far back the bars reach; `bucket` is
  *  how wide one bar is, so a year reads as months and a day as hours. */
@@ -65,9 +69,12 @@ export default function TeacherOverviewPage() {
   // A cancelled booking is the opposite of what this table is read for, so it
   // is dropped here.
   const live = useMemo(() => (data?.bookings || []).filter((b) => b.status !== 'cancelled'), [data]);
-  const pageCount = Math.max(1, Math.ceil(live.length / BOOKINGS_PER_PAGE));
+
+  const perPage = BOOKINGS_PER_PAGE;
+
+  const pageCount = Math.max(1, Math.ceil(live.length / perPage));
   const current = Math.min(page, pageCount);
-  const shown = live.slice((current - 1) * BOOKINGS_PER_PAGE, current * BOOKINGS_PER_PAGE);
+  const shown = live.slice((current - 1) * perPage, current * perPage);
 
   if (loadError) {
     return (
@@ -85,10 +92,10 @@ export default function TeacherOverviewPage() {
       <span className="eyebrow">
         <T th="ภาพรวม · รายได้" en="overview · revenue" />
       </span>
-      <h1 className="display-th" style={{ fontSize: 'clamp(26px,3.4vw,36px)', margin: '12px 0 6px' }}>
+      <h1 className="display-th" style={{ fontSize: 'clamp(24px,3vw,32px)', margin: '8px 0 4px' }}>
         <T th="ภาพรวมของคุณ" en="Your overview" />
       </h1>
-      <p style={{ fontSize: 14.5, color: 'var(--muted)', margin: '0 0 26px' }}>
+      <p style={{ fontSize: 14, color: 'var(--muted)', margin: '0 0 18px' }}>
         <T
           th="ตัวเลขทั้งหมดนับเฉพาะเวิร์กชอปที่คุณเป็นผู้นำกิจกรรม"
           en="Every figure here counts only the workshops you lead."
@@ -102,7 +109,7 @@ export default function TeacherOverviewPage() {
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
           gap: 14,
-          marginBottom: 22,
+          marginBottom: 14,
           maxWidth: 880,
           marginInline: 'auto',
         }}
@@ -116,7 +123,7 @@ export default function TeacherOverviewPage() {
       <RevenueChart points={data.paidPoints || []} lang={lang} />
 
       {/* Recent bookings */}
-      <section className="card card-static" style={{ padding: 0, overflow: 'hidden', marginTop: 26 }}>
+      <section className="card card-static" style={{ padding: 0, overflow: 'hidden', marginTop: 14 }}>
         <div
           style={{
             padding: '16px 18px',
@@ -259,7 +266,7 @@ function OverviewSkeleton() {
  *  under every figure turned the row into four paragraphs. */
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="card card-static" style={{ padding: '18px 14px', textAlign: 'center' }}>
+    <div className="card card-static" style={{ padding: '14px 14px', textAlign: 'center' }}>
       <div
         className="mono"
         style={{
@@ -382,7 +389,7 @@ function RevenueChart({ points, lang }: { points: PaidPoint[]; lang: 'th' | 'en'
         </div>
 
         <div
-          style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 132 }}
+          style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 92 }}
           onMouseLeave={() => setHover(null)}
         >
           {data.map((d, i) => (

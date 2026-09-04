@@ -5,8 +5,9 @@ import { useLang, T, tr } from '@/lib/i18n';
 import { Stars } from '@/components/design/Icon';
 import { Pager } from '@/components/teacher/Pager';
 
-/** Five cards plus the stats and the filter row fit one screen. */
-const PER_PAGE = 5;
+/** Cards per page — the stats, the filter row and four cards clear a 900px
+ *  window without the page scrolling. */
+const PER_PAGE = 4;
 
 type ReviewRow = {
   id: string;
@@ -67,10 +68,11 @@ export default function TeacherReviewsPage() {
     });
   }, [all, wsFilter, sort]);
 
-  // Paged rather than allowed to run on: the dashboard is one screen tall.
-  const pageCount = Math.max(1, Math.ceil(visible.length / PER_PAGE));
+  const perPage = PER_PAGE;
+
+  const pageCount = Math.max(1, Math.ceil(visible.length / perPage));
   const current = Math.min(page, pageCount);
-  const shown = visible.slice((current - 1) * PER_PAGE, current * PER_PAGE);
+  const shown = visible.slice((current - 1) * perPage, current * perPage);
 
   if (loadError) {
     return (
@@ -86,10 +88,10 @@ export default function TeacherReviewsPage() {
       <span className="eyebrow">
         <T th="คำติชม" en="feedback" />
       </span>
-      <h1 className="display-th" style={{ fontSize: 'clamp(26px,3.4vw,36px)', margin: '12px 0 6px' }}>
+      <h1 className="display-th" style={{ fontSize: 'clamp(24px,3vw,32px)', margin: '8px 0 4px' }}>
         <T th="รีวิวที่คุณได้รับ" en="Your reviews" />
       </h1>
-      <p style={{ fontSize: 14.5, color: 'var(--muted)', margin: '0 0 26px' }}>
+      <p style={{ fontSize: 14, color: 'var(--muted)', margin: '0 0 18px' }}>
         <T th="สิ่งที่ผู้เข้าร่วมเขียนถึงเวิร์กชอปของคุณ" en="What participants wrote about your workshops." />
       </p>
 

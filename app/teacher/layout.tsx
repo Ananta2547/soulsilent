@@ -55,7 +55,10 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
     // phone screen, and trapping it in 100vh would hide the bottom of it.
     <div className="flex flex-col lg:flex-row min-h-screen lg:h-screen lg:overflow-hidden bg-surface">
       <TeacherSidebar />
-      <div className="flex-1 min-w-0 lg:h-screen lg:overflow-y-auto">
+      {/* min-h-0 is load-bearing: without it a flex child refuses to shrink
+          below its content, so instead of scrolling it overflows and the
+          shell's overflow-hidden cuts the bottom of the page off. */}
+      <div className="flex-1 min-w-0 lg:h-screen lg:min-h-0 lg:overflow-y-auto">
         <div className="p-4 sm:p-6 lg:p-8">{children}</div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useLang, T, tr } from '@/lib/i18n';
 import { Icon } from '@/components/design/Icon';
@@ -10,9 +10,12 @@ import { getWorkshopDays, hasWorkshopEnded } from '@/lib/workshop-utils';
 
 type Row = Workshop & { booked: number };
 
-/** Two rows of the widest grid. Past that the page would outgrow the screen,
- *  which is the one thing this dashboard does not do. */
-const PER_PAGE = 8;
+/** Mirrors the grid's CSS: columns are at least this wide, this far apart. */
+const MIN_COL = 260;
+const GAP = 18;
+/** One row of cards per page. An A3 poster is tall, so a second row of them
+ *  cannot share a screen with anything else. */
+const ROWS_PER_PAGE = 1;
 
 const STATUS = (w: Row) => {
   if (w.status === 'cancelled') return { th: 'ยกเลิก', en: 'Cancelled', tone: '#9a4a3f', bg: '#f4dad4' };
@@ -24,6 +27,11 @@ export default function TeacherWorkshopsPage() {
   const { lang } = useLang();
   const [rows, setRows] = useState<Row[] | null>(null);
   const [page, setPage] = useState(1);
+  const gridRef = useRef<HTMLDivElement>(null);
+  // How many cards a page holds is how many the grid puts in a row: the poster
+  // is A3, so one row of them already fills the height a screen has to spare.
+  const [cols, setCols] = useState(4);
+  const perPage = Math.max(1, cols * ROWS_PER_PAGE);
 
   useEffect(() => {
     (async () => {
@@ -38,19 +46,33 @@ export default function TeacherWorkshopsPage() {
     })();
   }, []);
 
-  const pageCount = Math.max(1, Math.ceil((rows?.length || 0) / PER_PAGE));
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
+    const measure = () => {
+      const w = el.clientWidth;
+      if (w) setCols(Math.max(1, Math.floor((w + GAP) / (MIN_COL + GAP))));
+    };
+    // ResizeObserver fires once on observe, so the first measurement happens in
+    // its callback rather than synchronously inside this effect.
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [rows]);
+
+  const pageCount = Math.max(1, Math.ceil((rows?.length || 0) / perPage));
   const current = Math.min(page, pageCount);
-  const shown = (rows || []).slice((current - 1) * PER_PAGE, current * PER_PAGE);
+  const shown = (rows || []).slice((current - 1) * perPage, current * perPage);
 
   return (
     <div>
       <span className="eyebrow">
         <T th="workshop ของฉัน" en="my workshops" />
       </span>
-      <h1 className="display-th" style={{ fontSize: 'clamp(26px,3.4vw,36px)', margin: '12px 0 6px' }}>
+      <h1 className="display-th" style={{ fontSize: 'clamp(24px,3vw,32px)', margin: '8px 0 4px' }}>
         <T th="เวิร์กชอปของฉัน" en="My Workshops" />
       </h1>
-      <p style={{ fontSize: 14.5, color: 'var(--muted)', margin: '0 0 28px' }}>
+      <p style={{ fontSize: 14, color: 'var(--muted)', margin: '0 0 18px' }}>
         <T th="เวิร์กชอปที่คุณเป็นผู้นำกิจกรรม — ดูผู้สมัคร เช็คชื่อ และยอดโอน" en="Workshops you lead — applicants, check-in and payouts." />
       </p>
 
@@ -64,7 +86,7 @@ export default function TeacherWorkshopsPage() {
         </div>
       ) : (
         <>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 18 }}>
+        <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 18 }}>
           {shown.map((w) => {
             const days = getWorkshopDays(w);
             const st = STATUS(w);
@@ -136,11 +158,11 @@ function CardGridSkeleton() {
   return (
     <div
       aria-hidden
-      style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 18 }}
+      style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 18 }}
     >
       {Array.from({ length: 6 }, (_, i) => (
         <div key={i} className="card card-static" style={{ padding: 0, overflow: 'hidden' }}>
-          <div className="skel" style={{ aspectRatio: '3 / 4', borderRadius: 0 }} />
+          <div className="skel" style={{ aspectRatio: '297 / 420', borderRadius: 0 }} />
           <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div className="skel" style={{ height: 17, width: '72%' }} />
             <div className="skel" style={{ height: 12, width: '52%' }} />
