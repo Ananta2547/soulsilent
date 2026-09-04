@@ -102,16 +102,16 @@ export default function TeacherOverviewPage() {
         />
       </p>
 
-      {/* Four figures, centred as a block: on a wide screen a stretched row of
-          four leaves each number floating alone in its own acre. */}
+      {/* Four figures across the full width, squaring up with the chart and the
+          table below them: capping the row left a band of empty page down each
+          side while everything under it ran edge to edge. Each figure stays
+          centred inside its own card. */}
       <section
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
           gap: 14,
           marginBottom: 14,
-          maxWidth: 880,
-          marginInline: 'auto',
         }}
       >
         <StatCard label={tr(lang, 'เวิร์กชอป', 'Workshops')} value={String(data.totals.workshops)} />
