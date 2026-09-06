@@ -6,7 +6,6 @@ import Link from 'next/link';
 import type { Workshop } from '@/lib/types';
 import { fmtDateTime } from '@/lib/datetime';
 import { formatTravel, type TravelInfo } from '@/lib/travel';
-import { TransferHistory } from '@/components/workshops/TransferHistory';
 
 type AppAnswer = { id: string; label: string; value: string | string[] };
 type AppProfile = {
@@ -238,9 +237,6 @@ export default function ApplicantsPage() {
           );
         })}
       </div>
-
-      {/* Seats that changed hands — who gave one away, who took it up. */}
-      <TransferHistory workshopId={id} />
     </div>
   );
 }
