@@ -173,3 +173,53 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: 'เกิดข้อผิดพลาด' }, { status: 500 });
   }
 }
+
+/**
+ * DELETE /api/bookings/{id} — take a participant off a workshop for good.
+ *
+ * Admin only, and only for a seat that took no money. Revenue, payouts and the
+ * reconcile screens are all read off the booking row itself — there is no
+ * separate payments table — so deleting a row that was paid for would erase the
+ * money with it. Those are cancelled instead (PUT status), which frees the seat
+ * and keeps the books intact.
+ */
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const user = await requireAuth();
+    if (user.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    const { id } = await params;
+    const db = await getDB();
+
+    const booking = await db
+      .prepare('SELECT id, amount, payment_status FROM bookings WHERE id = ?')
+      .bind(id)
+      .first<{ id: string; amount: number | null; payment_status: string }>();
+    if (!booking) return NextResponse.json({ error: 'ไม่พบการจองนี้' }, { status: 404 });
+
+    if (booking.payment_status === 'paid' && (booking.amount || 0) > 0) {
+      return NextResponse.json(
+        {
+          error: 'ที่นั่งนี้มีการชำระเงินแล้ว ลบถาวรไม่ได้ — ให้ยกเลิกที่นั่งแทน เพื่อเก็บประวัติการเงินไว้',
+          paid: true,
+        },
+        { status: 400 },
+      );
+    }
+
+    // A handover link points at this booking; leaving it behind would hand the
+    // receiver a claim on a seat that no longer exists.
+    await db.prepare('DELETE FROM ticket_transfers WHERE booking_id = ?').bind(id).run();
+    await db.prepare('DELETE FROM bookings WHERE id = ?').bind(id).run();
+
+    return NextResponse.json({ deleted: true });
+  } catch (error) {
+    const err = error as Error;
+    if (err.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    console.error('Delete booking error:', error);
+    return NextResponse.json({ error: 'เกิดข้อผิดพลาด' }, { status: 500 });
+  }
+}

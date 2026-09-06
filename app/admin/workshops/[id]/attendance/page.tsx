@@ -80,6 +80,8 @@ export default function AttendancePage() {
   const [slipFor, setSlipFor] = useState<BookingRow | null>(null);
   const [activeDay, setActiveDay] = useState(0);
   const [showAdd, setShowAdd] = useState(false);
+  // The row admin asked to take off the workshop, held while they confirm.
+  const [removeFor, setRemoveFor] = useState<BookingRow | null>(null);
 
   const isDeposit = workshop?.payment_type === 'deposit';
   const days = workshop ? getWorkshopDays(workshop) : [];
@@ -161,6 +163,42 @@ export default function AttendancePage() {
       setPendingIds((s) => {
         const next = new Set(s);
         next.delete(bookingId);
+        return next;
+      });
+    }
+  }
+
+  /** Take a participant off the workshop.
+   *
+   *  A seat that took money is cancelled rather than deleted: revenue, payouts
+   *  and the reconcile screens are read straight off the booking row, so
+   *  deleting one would take the money out of the books with it. A ฿0 seat —
+   *  a manual add, a free confirm — has nothing to keep, and goes for good. */
+  async function removeParticipant(b: BookingRow) {
+    const paidForMoney = b.payment_status === 'paid' && b.amount > 0;
+    setPendingIds((s) => new Set(s).add(b.id));
+    try {
+      if (paidForMoney) {
+        const res = await fetch(`/api/bookings/${b.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'cancelled' }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        setBookings((rows) => rows.map((r) => (r.id === b.id ? { ...r, status: 'cancelled' } : r)));
+      } else {
+        const res = await fetch(`/api/bookings/${b.id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        setBookings((rows) => rows.filter((r) => r.id !== b.id));
+      }
+      setRemoveFor(null);
+    } catch (e) {
+      console.error('Failed to remove participant', e);
+      alert('เอาผู้เข้าร่วมออกไม่สำเร็จ กรุณาลองใหม่');
+    } finally {
+      setPendingIds((s) => {
+        const next = new Set(s);
+        next.delete(b.id);
         return next;
       });
     }
@@ -311,6 +349,7 @@ export default function AttendancePage() {
                   {showSlipCol && (
                     <th className="text-center py-3 px-5 text-gray font-medium">{slipNoun}</th>
                   )}
+                  <th className="text-right py-3 px-5 text-gray font-medium">จัดการ</th>
                 </tr>
               </thead>
               <tbody>
@@ -326,6 +365,11 @@ export default function AttendancePage() {
                                 display name — see lib/applicant.ts. */}
                             <span>{applicantName(b.application_json, b.user_name)}</span>
                             <PdpaBadge applicationJson={b.application_json} />
+                            {b.status === 'cancelled' && (
+                              <span className="text-[11px] font-medium text-red-600 bg-red-50 rounded-full px-2 py-0.5">
+                                ยกเลิกแล้ว
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="py-3 px-5 text-gray text-xs">{b.user_email || '—'}</td>
@@ -427,10 +471,24 @@ export default function AttendancePage() {
                             })()}
                           </td>
                         )}
+                        <td className="py-3 px-5 text-right">
+                          {b.status === 'cancelled' ? (
+                            <span className="text-xs text-gray">—</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setRemoveFor(b)}
+                              disabled={busy}
+                              className="text-xs font-medium text-red-600 hover:underline disabled:opacity-50"
+                            >
+                              เอาออก
+                            </button>
+                          )}
+                        </td>
                       </tr>
                       {open && (
                         <tr className="bg-surface/50">
-                          <td colSpan={showSlipCol ? 6 : 5} className="px-5 py-4 border-t border-gray-lighter">
+                          <td colSpan={showSlipCol ? 7 : 6} className="px-5 py-4 border-t border-gray-lighter">
                             <ApplicationDetail json={b.application_json} />
                             <FacilitatorNote
                               // Remount per booking so the textarea always
@@ -475,6 +533,15 @@ export default function AttendancePage() {
         />
       )}
 
+      {removeFor && (
+        <RemoveParticipantModal
+          booking={removeFor}
+          busy={pendingIds.has(removeFor.id)}
+          onClose={() => setRemoveFor(null)}
+          onConfirm={() => removeParticipant(removeFor)}
+        />
+      )}
+
       {showAdd && (
         <AddParticipantModal
           workshopId={id}
@@ -493,6 +560,68 @@ export default function AttendancePage() {
 type UserHit = { id: string; name: string | null; email: string | null };
 
 /** Search the user directory and add one as a manual participant. */
+/**
+ * Confirm taking a participant off the workshop. What the button does depends
+ * on the seat: one that took money is cancelled (the money stays in the books),
+ * a ฿0 one is deleted outright — so the dialog says which before it happens.
+ */
+function RemoveParticipantModal({
+  booking,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  booking: BookingRow;
+  busy: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const paidForMoney = booking.payment_status === 'paid' && booking.amount > 0;
+  const name = applicantName(booking.application_json, booking.user_name);
+  return (
+    <div onClick={onClose} className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl w-full max-w-md overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-lighter">
+          <h2 className="font-heading text-lg text-dark">
+            {paidForMoney ? 'ยกเลิกที่นั่งนี้?' : 'เอาผู้เข้าร่วมออก?'}
+          </h2>
+        </div>
+        <div className="p-6 space-y-3 text-sm text-dark">
+          <p>
+            <span className="font-medium">{name}</span>
+            {booking.user_email ? <span className="text-gray"> · {booking.user_email}</span> : null}
+          </p>
+          {paidForMoney ? (
+            <p className="text-gray leading-relaxed">
+              ที่นั่งนี้ชำระเงินมาแล้ว ฿{booking.amount.toLocaleString()} ระบบจะ<strong className="text-dark">ยกเลิกที่นั่ง</strong>
+              เพื่อคืนที่ว่างให้คนอื่น แต่ยังเก็บรายการเงินไว้ในรายงาน — แถวนี้จะยังอยู่ในรายชื่อพร้อมป้าย “ยกเลิกแล้ว”
+              เผื่อต้องแนบสลิปคืนเงินภายหลัง
+            </p>
+          ) : (
+            <p className="text-gray leading-relaxed">
+              ที่นั่งนี้ไม่มียอดชำระ ระบบจะ<strong className="text-dark">ลบออกถาวร</strong> พร้อมลิงก์โอนสิทธิ์ที่ผูกกับที่นั่งนี้ (ถ้ามี)
+              — กู้คืนไม่ได้
+            </p>
+          )}
+        </div>
+        <div className="px-6 py-4 border-t border-gray-lighter flex justify-end gap-2">
+          <button type="button" onClick={onClose} disabled={busy} className="btn btn-paper btn-sm">
+            ยกเลิก
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={busy}
+            className="btn btn-sm bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+          >
+            {busy ? 'กำลังดำเนินการ…' : paidForMoney ? 'ยกเลิกที่นั่ง' : 'ลบออกถาวร'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AddParticipantModal({
   workshopId,
   existingEmails,
