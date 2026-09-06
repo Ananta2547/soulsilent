@@ -1541,8 +1541,7 @@ function GiftSquare({ onClick, disabled, lang }: { onClick: () => void; disabled
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontSize: 22,
-        lineHeight: 1,
+        color: 'var(--teal-deep)',
         borderRadius: 16,
         border: '1.5px solid var(--teal)',
         background: 'var(--teal-50)',
@@ -1550,7 +1549,7 @@ function GiftSquare({ onClick, disabled, lang }: { onClick: () => void; disabled
         opacity: disabled ? 0.5 : 1,
       }}
     >
-      <span aria-hidden>🎁</span>
+      <Icon name="gift" size={24} align="0" />
     </button>
   );
 }
