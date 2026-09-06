@@ -161,7 +161,7 @@ export default function TeacherWorkshopDetail() {
 
   return (
     <div>
-      <Link href="/teacher" className="mono" style={{ fontSize: 12, color: 'var(--muted)', textDecoration: 'none' }}>
+      <Link href="/teacher/workshops" className="mono" style={{ fontSize: 12, color: 'var(--muted)', textDecoration: 'none' }}>
         ← {tr(lang, 'กลับไปเวิร์กชอปของฉัน', 'Back to my workshops')}
       </Link>
       <h1 className="display-th" style={{ fontSize: 'clamp(24px,3.5vw,36px)', margin: '12px 0 4px' }}>
