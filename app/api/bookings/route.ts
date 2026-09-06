@@ -265,20 +265,23 @@ export async function POST(request: Request) {
       const giftPrice = getEffectivePrice(workshop).price;
       const giftAmount =
         paymentType === 'free' ? 0 : paymentType === 'deposit' ? workshop.deposit_amount || 0 : giftPrice;
-      // Nothing to charge → the seat is secured on the spot, exactly as a free
-      // direct booking is, and the link is ready to send immediately.
-      const giftFree = paymentType === 'free' || giftAmount <= 0;
+      // Nothing to pay, nothing to give: the receiver can take the seat
+      // themselves in the same two taps, and a "gift" that costs the buyer
+      // nothing only takes a seat out of circulation while it waits to be
+      // claimed.
+      if (paymentType === 'free' || giftAmount <= 0) {
+        return NextResponse.json(
+          { error: 'กิจกรรมนี้เข้าร่วมฟรี จองเองได้เลย ไม่ต้องส่งเป็นของขวัญ' },
+          { status: 400 },
+        );
+      }
       const bookingId = uuid();
       await db
         .prepare(
           `INSERT INTO bookings (id, workshop_id, user_id, status, payment_status, amount, app_status, application_json, expires_at)
-           VALUES (?, ?, ?, ?, ?, ?, 'approved', NULL, ${giftFree ? 'NULL' : "datetime('now', ?)"})`,
+           VALUES (?, ?, ?, 'pending', 'pending', ?, 'approved', NULL, datetime('now', ?))`,
         )
-        .bind(
-          ...(giftFree
-            ? [bookingId, workshop_id, user.sub, 'confirmed', 'paid', giftAmount]
-            : [bookingId, workshop_id, user.sub, 'pending', 'pending', giftAmount, `+${HOLD_MINUTES} minutes`]),
-        )
+        .bind(bookingId, workshop_id, user.sub, giftAmount, `+${HOLD_MINUTES} minutes`)
         .run();
 
       const buyer = await db
@@ -301,10 +304,11 @@ export async function POST(request: Request) {
       return NextResponse.json({
         bookingId,
         gift: true,
-        mode: giftFree ? 'free' : paymentType,
+        mode: paymentType,
         amount: giftAmount,
         claimUrl: claimUrl(giftSite, token),
-        ...(giftFree ? { submitted: true } : { checkoutUrl: `${giftSite}/pay/${bookingId}`, holdMinutes: HOLD_MINUTES }),
+        checkoutUrl: `${giftSite}/pay/${bookingId}`,
+        holdMinutes: HOLD_MINUTES,
       });
     }
 

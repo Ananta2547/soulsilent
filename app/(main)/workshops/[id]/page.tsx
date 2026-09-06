@@ -1375,9 +1375,11 @@ function BookingCardContent({
               {tr(lang, 'ดูใบสมัคร', 'View application')}
             </button>
           )}
-          {/* Passing the seat on. Only before the day: once the workshop is
-              under way nobody could take it up, and the API refuses too. */}
-          {!started && (
+          {/* Passing the seat on. Not for a free seat — there is nothing to
+              pass on that the receiver could not book themselves — and only
+              before the day: once the workshop is under way nobody could take
+              it up, and the API refuses too. */}
+          {!started && !isFree && (
             <button
               type="button"
               onClick={onTransfer}
@@ -1437,7 +1439,7 @@ function BookingCardContent({
             </button>
             {/* An unpaid booking is not a seat yet, so buying one as a gift is
                 still open to them. */}
-            {!isSelection && <GiftSquare onClick={onGift} disabled={booking} lang={lang} />}
+            {!isSelection && !isFree && <GiftSquare onClick={onGift} disabled={booking} lang={lang} />}
           </div>
           <Link href="/me/bookings" style={{ display: 'block', textAlign: 'center', fontSize: 12.5, color: 'var(--muted)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
             {tr(lang, 'จัดการการจอง', 'Manage booking')}
@@ -1484,9 +1486,10 @@ function BookingCardContent({
                   : tr(lang, 'จองที่นั่งเลย', 'Book a seat')}{' '}
             <span className="mono">→</span>
           </button>
-          {/* Buying it for someone else. Selection workshops are decided on the
-              applicant, so a seat there cannot be bought for a third party. */}
-          {!isSelection && <GiftSquare onClick={onGift} disabled={booking || soldOut} lang={lang} />}
+          {/* Buying it for someone else. Not on a free workshop — the friend
+              can book that themselves — and not on a selection one, where the
+              place is decided on the applicant. */}
+          {!isSelection && !isFree && <GiftSquare onClick={onGift} disabled={booking || soldOut} lang={lang} />}
         </div>
       )}
 

@@ -21,7 +21,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
     const booking = await db
       .prepare(
-        `SELECT id, user_id, workshop_id, status, payment_status, application_json
+        `SELECT id, user_id, workshop_id, status, payment_status, amount, application_json
            FROM bookings WHERE id = ?`,
       )
       .bind(id)
@@ -31,6 +31,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
         workshop_id: string;
         status: string;
         payment_status: string;
+        amount: number | null;
         application_json: string | null;
       }>();
 
@@ -49,6 +50,16 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       .bind(booking.workshop_id)
       .first<Workshop>();
     if (!workshop) return NextResponse.json({ error: 'ไม่พบกิจกรรม' }, { status: 404 });
+    // A free seat is not worth handing over: whoever wants it can book it
+    // directly, and passing it through a link only adds a step that can be
+    // lost. `amount` is what was actually charged, so a 100%-off promo counts
+    // as free here too.
+    if ((workshop.payment_type || 'paid') === 'free' || (booking.amount || 0) <= 0) {
+      return NextResponse.json(
+        { error: 'กิจกรรมนี้เข้าร่วมฟรี ให้เพื่อนจองเองได้เลย ไม่ต้องโอนสิทธิ์' },
+        { status: 400 },
+      );
+    }
     // Once the event is under way the receiver could never take the seat up,
     // so the link is refused rather than minted and left dead.
     if (hasWorkshopStarted(workshop)) {
