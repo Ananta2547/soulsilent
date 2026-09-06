@@ -205,17 +205,82 @@ function HoldNote({
   );
 }
 
+/** The gift link, shown the moment the payment lands — the seat is secured,
+ *  so the link now works, and the buyer can send it on. */
+function GiftLinkPanel({ url }: { url: string }) {
+  const { lang } = useLang();
+  const [copied, setCopied] = useState(false);
+  return (
+    <div style={{ width: '100%', maxWidth: 420, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <span style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.65, textAlign: 'center' }}>
+        <T
+          th="ชำระเงินเรียบร้อย — ส่งลิงก์นี้ให้ผู้รับ เพื่อกดรับสิทธิ์และกรอกใบสมัครของตัวเอง"
+          en="Payment received — send this link to the recipient so they can claim the seat and fill in their own application."
+        />
+      </span>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          border: '1px solid var(--cream-deep)',
+          background: 'var(--cream)',
+          borderRadius: 12,
+          padding: '10px 12px',
+        }}
+      >
+        <input
+          readOnly
+          value={url}
+          onFocus={(e) => e.currentTarget.select()}
+          style={{ flex: 1, minWidth: 0, border: 0, background: 'transparent', fontSize: 12.5, color: 'var(--ink)', fontFamily: 'JetBrains Mono, monospace' }}
+        />
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(url);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
+            } catch {
+              // Blocked in some in-app browsers — the field is selectable.
+              setCopied(false);
+            }
+          }}
+          className="btn btn-teal"
+          style={{ flexShrink: 0, padding: '9px 16px', fontSize: 13 }}
+        >
+          {copied ? tr(lang, 'คัดลอกแล้ว', 'Copied') : tr(lang, 'คัดลอก', 'Copy')}
+        </button>
+      </div>
+      <span style={{ fontSize: 12, color: '#8a5a00', background: '#fcefcf', border: '1px solid #f0dfae', borderRadius: 12, padding: '10px 13px', lineHeight: 1.6 }}>
+        <T
+          th="ลิงก์นี้ใช้ได้ครั้งเดียว — ใครก็ตามที่เปิดและกดรับสิทธิ์จะได้ที่นั่งนี้ไป เปิดดูอีกครั้งได้จากหน้ากิจกรรม"
+          en="This link works once — whoever opens it and claims takes the seat. You can find it again on the workshop page."
+        />
+      </span>
+      <Link href="/me/bookings" className="btn btn-paper" style={{ justifyContent: 'center' }}>
+        {tr(lang, 'ไปที่การจองของฉัน', 'Go to my bookings')}
+      </Link>
+    </div>
+  );
+}
+
 /** loading / paid / expired / error — identical wording on both layouts. */
 function StateBody({
   state,
   error,
   retryable,
   onRetry,
+  giftUrl,
 }: {
   state: PayState;
   error: string | null;
   retryable: boolean;
   onRetry: () => void;
+  /** Set when the seat just paid for was bought for somebody else: the link
+   *  that hands it to them, which only exists once the money is in. */
+  giftUrl?: string | null;
 }) {
   if (state === 'loading') {
     return (
@@ -235,12 +300,18 @@ function StateBody({
         <span className="display-en" style={{ fontSize: 46, color: 'var(--teal)' }}>
           PAID
         </span>
-        <span style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.65 }}>
-          <T
-            th="ได้รับการชำระเงินแล้ว กำลังพาไปหน้าการจอง…"
-            en="Payment received — taking you to your bookings…"
-          />
-        </span>
+        {giftUrl ? (
+          // A gift: the buyer is not the one attending, so the thing they came
+          // for is the link, and this is the first moment it is worth anything.
+          <GiftLinkPanel url={giftUrl} />
+        ) : (
+          <span style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.65 }}>
+            <T
+              th="ได้รับการชำระเงินแล้ว กำลังพาไปหน้าการจอง…"
+              en="Payment received — taking you to your bookings…"
+            />
+          </span>
+        )}
       </>
     );
   }
@@ -310,6 +381,8 @@ export default function PayPage() {
   const [booking, setBooking] = useState<BookingSummary | null>(null);
   const [state, setState] = useState<PayState>('loading');
   const [error, setError] = useState<string | null>(null);
+  // Set only for a gift, once it is paid for: the link to hand to the receiver.
+  const [giftUrl, setGiftUrl] = useState<string | null>(null);
   const [retryable, setRetryable] = useState(false);
   const [cardLoading, setCardLoading] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -343,6 +416,16 @@ export default function PayPage() {
 
         if (data.paid) {
           setState('paid');
+          // A gift stays here instead: the link is the whole point of the
+          // purchase and this is the first moment it works, so it is put in
+          // front of the buyer rather than left behind a redirect.
+          const gift = await fetch(`/api/bookings/${id}/transfer`)
+            .then((r) => r.json() as Promise<{ url?: string | null; kind?: string }>)
+            .catch(() => ({ url: null }));
+          if (gift.url && gift.kind === 'gift') {
+            setGiftUrl(gift.url);
+            return;
+          }
           // Straight to the bookings page, which already knows how to say "your
           // seat is confirmed — no need to scan again".
           router.replace(`/me/bookings?paid=1&booking=${id}`);
@@ -698,6 +781,7 @@ export default function PayPage() {
                 error={error}
                 retryable={retryable}
                 onRetry={() => void load(false)}
+                giftUrl={giftUrl}
               />
             </div>
           )}
@@ -854,6 +938,7 @@ export default function PayPage() {
               error={error}
               retryable={retryable}
               onRetry={() => void load(false)}
+              giftUrl={giftUrl}
             />
           </div>
         )}

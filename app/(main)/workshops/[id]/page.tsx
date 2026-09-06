@@ -78,7 +78,6 @@ export default function WorkshopDetailPage() {
     url: string;
     kind: 'gift' | 'transfer';
     recipient?: string | null;
-    payUrl?: string | null;
   } | null>(null);
   const [transferBusy, setTransferBusy] = useState(false);
   // null = still checking; true/false = known login state.
@@ -225,20 +224,11 @@ export default function WorkshopDetailPage() {
         setBooking(false);
         return data.error || tr(lang, 'เกิดข้อผิดพลาด', 'Something went wrong');
       }
-      // The link exists from the moment the gift is created, so hand it over
-      // now rather than after payment: the buyer is about to leave for the QR,
-      // and this is where they are thinking about the person they are buying
-      // for. It only becomes claimable once the money lands, which the dialog
-      // says, and paying is its primary button.
+      // Straight to the QR. The link is minted here but stays out of sight
+      // until the money lands — a link handed over before payment is one that
+      // can be sent to a friend who then finds a seat nobody paid for.
       if (data.checkoutUrl) {
-        setBooking(false);
-        setGiftOpen(false);
-        setTransferLink({
-          url: data.claimUrl || '',
-          kind: 'gift',
-          recipient: recipient.name,
-          payUrl: data.checkoutUrl,
-        });
+        window.location.href = data.checkoutUrl;
         return null;
       }
       // Free workshop → the seat is already secured, so hand over the link now.
@@ -1030,13 +1020,7 @@ export default function WorkshopDetailPage() {
           url={transferLink.url}
           kind={transferLink.kind}
           recipient={transferLink.recipient}
-          payUrl={transferLink.payUrl}
-          onClose={() => {
-            setTransferLink(null);
-            // A gift left unpaid still holds a seat for ten minutes; re-read so
-            // the card shows that hold rather than an untouched booking button.
-            load();
-          }}
+          onClose={() => setTransferLink(null)}
         />
       )}
 

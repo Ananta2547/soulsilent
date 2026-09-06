@@ -106,3 +106,51 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: 'เกิดข้อผิดพลาด' }, { status: 500 });
   }
 }
+
+/**
+ * GET /api/bookings/{id}/transfer — the live handover link for this seat, if
+ * one has been minted and nobody has claimed it yet.
+ *
+ * Read-only: unlike POST it never mints, so the pay page can ask "is this a
+ * gift?" without creating a link for an ordinary booking.
+ */
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const user = await requireAuth();
+    const { id } = await params;
+    const db = await getDB();
+
+    const booking = await db
+      .prepare('SELECT id, user_id FROM bookings WHERE id = ?')
+      .bind(id)
+      .first<{ id: string; user_id: string }>();
+    if (!booking || (booking.user_id !== user.sub && user.role !== 'admin')) {
+      return NextResponse.json({ error: 'ไม่พบการจองนี้' }, { status: 404 });
+    }
+
+    const live = await db
+      .prepare(
+        `SELECT * FROM ticket_transfers
+          WHERE booking_id = ? AND status = 'pending'
+          ORDER BY created_at DESC LIMIT 1`,
+      )
+      .bind(id)
+      .first<TicketTransfer>();
+    if (!live) return NextResponse.json({ url: null });
+
+    const env = await getEnv();
+    const site = env.SITE_URL || 'http://localhost:3000';
+    return NextResponse.json({
+      url: claimUrl(site, live.token),
+      kind: live.kind,
+      recipient: live.to_name,
+    });
+  } catch (error) {
+    const err = error as Error;
+    if (err.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 });
+    }
+    console.error('Read transfer error:', error);
+    return NextResponse.json({ error: 'เกิดข้อผิดพลาด' }, { status: 500 });
+  }
+}
