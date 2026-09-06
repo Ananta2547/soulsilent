@@ -13,9 +13,15 @@ type Row = Workshop & { booked: number };
 /** Mirrors the grid's CSS: columns are at least this wide, this far apart. */
 const MIN_COL = 260;
 const GAP = 18;
-/** One row of cards per page. An A3 poster is tall, so a second row of them
- *  cannot share a screen with anything else. */
-const ROWS_PER_PAGE = 1;
+/** Below this the grid drops its minimum column width and forces two columns:
+ *  a single A3 poster per row on a phone is a card taller than the screen, so
+ *  the page becomes one long scroll of one card at a time. */
+const NARROW = 640;
+/** One row of cards per page on desktop, where the shell is exactly one screen
+ *  tall and an A3 poster already fills that height. Phones scroll normally and
+ *  the cards are half as wide there, so they hold a 2x2 page. */
+const ROWS_DESKTOP = 1;
+const ROWS_NARROW = 2;
 
 const STATUS = (w: Row) => {
   if (w.status === 'cancelled') return { th: 'ยกเลิก', en: 'Cancelled', tone: '#9a4a3f', bg: '#f4dad4' };
@@ -31,7 +37,8 @@ export default function TeacherWorkshopsPage() {
   // How many cards a page holds is how many the grid puts in a row: the poster
   // is A3, so one row of them already fills the height a screen has to spare.
   const [cols, setCols] = useState(4);
-  const perPage = Math.max(1, cols * ROWS_PER_PAGE);
+  const [narrow, setNarrow] = useState(false);
+  const perPage = Math.max(1, cols * (narrow ? ROWS_NARROW : ROWS_DESKTOP));
 
   useEffect(() => {
     (async () => {
@@ -51,7 +58,10 @@ export default function TeacherWorkshopsPage() {
     if (!el) return;
     const measure = () => {
       const w = el.clientWidth;
-      if (w) setCols(Math.max(1, Math.floor((w + GAP) / (MIN_COL + GAP))));
+      if (!w) return;
+      const isNarrow = w < NARROW;
+      setNarrow(isNarrow);
+      setCols(isNarrow ? 2 : Math.max(1, Math.floor((w + GAP) / (MIN_COL + GAP))));
     };
     // ResizeObserver fires once on observe, so the first measurement happens in
     // its callback rather than synchronously inside this effect.
@@ -86,7 +96,7 @@ export default function TeacherWorkshopsPage() {
         </div>
       ) : (
         <>
-        <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 18 }}>
+        <div ref={gridRef} className="tch-wgrid">
           {shown.map((w) => {
             const days = getWorkshopDays(w);
             const st = STATUS(w);
@@ -102,12 +112,13 @@ export default function TeacherWorkshopsPage() {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={w.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                   ) : null}
-                  <span style={{ position: 'absolute', top: 10, right: 10, fontSize: 11, fontWeight: 600, color: st.tone, background: st.bg, borderRadius: 999, padding: '4px 10px' }}>
+                  <span className="tch-wbadge" style={{ position: 'absolute', top: 10, right: 10, fontSize: 11, fontWeight: 600, color: st.tone, background: st.bg, borderRadius: 999, padding: '4px 10px' }}>
                     {tr(lang, st.th, st.en)}
                   </span>
                   {/* Whether the platform's share has reached the organizer —
                       the question a teacher has about a finished workshop. */}
                   <span
+                    className="tch-wbadge"
                     style={{
                       position: 'absolute',
                       top: 10,
@@ -123,11 +134,11 @@ export default function TeacherWorkshopsPage() {
                     {w.payout_status === 'paid' ? tr(lang, 'โอนแล้ว', 'Paid out') : tr(lang, 'รอโอน', 'Awaiting payout')}
                   </span>
                 </div>
-                <div style={{ padding: 16 }}>
-                  <h3 className="display-th" style={{ fontSize: 17, margin: '0 0 8px', lineHeight: 1.3, color: 'var(--ink)' }}>
+                <div className="tch-wcard-body" style={{ padding: 16 }}>
+                  <h3 className="display-th tch-wcard-title" style={{ fontSize: 17, margin: '0 0 8px', lineHeight: 1.3, color: 'var(--ink)' }}>
                     {w.title}
                   </h3>
-                  <div style={{ fontSize: 13, color: 'var(--muted)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div className="tch-wmeta" style={{ fontSize: 13, color: 'var(--muted)', display: 'flex', flexDirection: 'column', gap: 4 }}>
                     {/* Date and seats share a line — two short facts, one row. */}
                     <span style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                       <span>
@@ -158,12 +169,12 @@ function CardGridSkeleton() {
   return (
     <div
       aria-hidden
-      style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 18 }}
+      className="tch-wgrid"
     >
       {Array.from({ length: 6 }, (_, i) => (
         <div key={i} className="card card-static" style={{ padding: 0, overflow: 'hidden' }}>
           <div className="skel" style={{ aspectRatio: '297 / 420', borderRadius: 0 }} />
-          <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="tch-wcard-body" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div className="skel" style={{ height: 17, width: '72%' }} />
             <div className="skel" style={{ height: 12, width: '52%' }} />
             <div className="skel" style={{ height: 12, width: '40%' }} />

@@ -3132,3 +3132,35 @@ body {
     padding: 22px;
   }
 }
+
+/* ---- Teacher · my workshops grid ------------------------------------- */
+/* Desktop keeps a fluid grid of at-least-260px columns. A phone gets two
+   fixed columns instead: at one column an A3 poster is a card taller than the
+   screen, so the list reads as one endless scroll of single cards. Done in CSS
+   rather than JS so the first paint is already right. */
+.tch-wgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 18px;
+}
+@media (max-width: 639px) {
+  .tch-wgrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  /* Half-width cards: the text has to come down with them. */
+  .tch-wcard-body {
+    padding: 12px;
+  }
+  .tch-wcard-title {
+    font-size: 15px;
+  }
+  .tch-wmeta {
+    font-size: 12px;
+  }
+  /* Two badges side by side on a 170px poster would collide. */
+  .tch-wbadge {
+    font-size: 10px;
+    padding: 3px 7px;
+  }
+}
