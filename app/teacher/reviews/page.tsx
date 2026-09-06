@@ -110,7 +110,10 @@ export default function TeacherReviewsPage() {
           <div className="mono" style={LABEL}>
             {tr(lang, 'ดาวเฉลี่ย', 'Average rating')}
           </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 10 }}>
+          {/* Stars under the figure, not beside it: side by side they push the
+              number off centre and the card stops lining up with the one next
+              to it. */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
             <span style={BIG}>{all.length ? avg.toFixed(1) : '—'}</span>
             {all.length > 0 && <Stars value={Math.round(avg)} size={15} />}
           </div>
