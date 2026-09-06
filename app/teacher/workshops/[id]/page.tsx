@@ -11,6 +11,7 @@ import { getWorkshopDays, hasWorkshopEnded } from '@/lib/workshop-utils';
 import { PdpaBadge } from '@/components/workshops/PdpaBadge';
 import { FacilitatorNote } from '@/components/admin/FacilitatorNote';
 import { applicantName } from '@/lib/applicant';
+import { TransferHistory } from '@/components/workshops/TransferHistory';
 
 type Row = {
   id: string;
@@ -343,6 +344,9 @@ export default function TeacherWorkshopDetail() {
           </div>
         )}
       </section>
+
+      {/* Seats that changed hands — who gave one away, who took it up. */}
+      <TransferHistory workshopId={id} />
     </div>
   );
 }

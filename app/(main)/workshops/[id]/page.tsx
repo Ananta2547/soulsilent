@@ -30,6 +30,8 @@ import {
   getWorkshopDays,
 } from '@/lib/workshop-utils';
 import { visibleAppStatus } from '@/lib/selection-status';
+import { GiftModal } from '@/components/workshops/GiftModal';
+import { TransferLinkModal } from '@/components/workshops/TransferLinkModal';
 import { platformStyle, platformLabel } from '@/lib/online-platform';
 
 type UserBooking = {
@@ -69,6 +71,11 @@ export default function WorkshopDetailPage() {
   const [booking, setBooking] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(false);
   const [loginPromptOpen, setLoginPromptOpen] = useState(false);
+  const [giftOpen, setGiftOpen] = useState(false);
+  // The handover link, once minted — the same modal serves a gift the buyer is
+  // about to send and a seat its holder is passing on.
+  const [transferLink, setTransferLink] = useState<{ url: string; kind: 'gift' | 'transfer'; recipient?: string | null } | null>(null);
+  const [transferBusy, setTransferBusy] = useState(false);
   // null = still checking; true/false = known login state.
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [openDays, setOpenDays] = useState<number[]>([0]);
@@ -191,6 +198,60 @@ export default function WorkshopDetailPage() {
       alert(tr(lang, 'เกิดข้อผิดพลาด', 'Something went wrong'));
       setBooking(false);
     }
+  }
+
+  // Gift: same sign-in gate as booking — the buyer needs an account, because the
+  // seat is held under theirs until the receiver claims it.
+  function handleGiftClick() {
+    if (authed) setGiftOpen(true);
+    else setLoginPromptOpen(true);
+  }
+
+  async function submitGift(recipient: { name: string; phone: string }): Promise<string | null> {
+    setBooking(true);
+    try {
+      const res = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workshop_id: id, gift: recipient }),
+      });
+      const data = (await res.json()) as { checkoutUrl?: string; claimUrl?: string; error?: string };
+      if (!res.ok) {
+        setBooking(false);
+        return data.error || tr(lang, 'เกิดข้อผิดพลาด', 'Something went wrong');
+      }
+      // Paid gifts go to the QR first; the link waits on the booking and is
+      // reachable from this card once the payment lands.
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+        return null;
+      }
+      // Free workshop → the seat is already secured, so hand over the link now.
+      setBooking(false);
+      setGiftOpen(false);
+      if (data.claimUrl) setTransferLink({ url: data.claimUrl, kind: 'gift', recipient: recipient.name });
+      load();
+      return null;
+    } catch {
+      setBooking(false);
+      return tr(lang, 'เกิดข้อผิดพลาด', 'Something went wrong');
+    }
+  }
+
+  // Hand this seat to somebody else. The endpoint is idempotent, so pressing it
+  // again returns the link that already exists rather than a second one.
+  async function openTransferLink() {
+    if (!userBooking || transferBusy) return;
+    setTransferBusy(true);
+    try {
+      const res = await fetch(`/api/bookings/${userBooking.id}/transfer`, { method: 'POST' });
+      const data = (await res.json()) as { url?: string; kind?: 'gift' | 'transfer'; error?: string };
+      if (data.url) setTransferLink({ url: data.url, kind: data.kind || 'transfer' });
+      else alert(data.error || tr(lang, 'เกิดข้อผิดพลาด', 'Something went wrong'));
+    } catch {
+      alert(tr(lang, 'เกิดข้อผิดพลาด', 'Something went wrong'));
+    }
+    setTransferBusy(false);
   }
 
   // Nothing to draw while this page's requests are open — the loading screen is
@@ -862,6 +923,9 @@ export default function WorkshopDetailPage() {
                   userReview={userReview}
                   booking={booking}
                   onBook={handleBookClick}
+                  onGift={handleGiftClick}
+                  onTransfer={openTransferLink}
+                  transferBusy={transferBusy}
                   onResume={resumePayment}
                   onReview={() => setReviewOpen(true)}
                   onViewApplication={() => setConsentOpen(true)}
@@ -937,6 +1001,24 @@ export default function WorkshopDetailPage() {
         />
       )}
 
+      {giftOpen && (
+        <GiftModal
+          workshopTitle={workshop.title}
+          submitting={booking}
+          onClose={() => setGiftOpen(false)}
+          onSubmit={submitGift}
+        />
+      )}
+
+      {transferLink && (
+        <TransferLinkModal
+          url={transferLink.url}
+          kind={transferLink.kind}
+          recipient={transferLink.recipient}
+          onClose={() => setTransferLink(null)}
+        />
+      )}
+
       {loginPromptOpen && (
         <LoginPromptModal
           redirectTo={`/workshops/${id}`}
@@ -992,6 +1074,9 @@ function BookingCardContent({
   userReview,
   booking,
   onBook,
+  onGift,
+  onTransfer,
+  transferBusy,
   onResume,
   onReview,
   onViewApplication,
@@ -1007,6 +1092,9 @@ function BookingCardContent({
   userReview: Review | null;
   booking: boolean;
   onBook: () => void;
+  onGift: () => void;
+  onTransfer: () => void;
+  transferBusy: boolean;
   onResume: () => void;
   onReview: () => void;
   onViewApplication: () => void;
@@ -1287,6 +1375,36 @@ function BookingCardContent({
               {tr(lang, 'ดูใบสมัคร', 'View application')}
             </button>
           )}
+          {/* Passing the seat on. Only before the day: once the workshop is
+              under way nobody could take it up, and the API refuses too. */}
+          {!started && (
+            <button
+              type="button"
+              onClick={onTransfer}
+              disabled={transferBusy}
+              style={{
+                width: '100%',
+                marginTop: 10,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                background: 'transparent',
+                border: '1.5px solid var(--teal)',
+                color: 'var(--teal-deep)',
+                borderRadius: 999,
+                padding: '13px 20px',
+                fontSize: 14.5,
+                fontWeight: 600,
+                cursor: transferBusy ? 'wait' : 'pointer',
+              }}
+            >
+              {transferBusy
+                ? tr(lang, 'กำลังสร้างลิงก์…', 'Creating link…')
+                : tr(lang, 'โอนย้ายสิทธิ์ให้เพื่อน', 'Transfer to a friend')}
+              <span aria-hidden className="mono">↗</span>
+            </button>
+          )}
         </>
       ) : isRejected ? (
         <button
@@ -1300,23 +1418,27 @@ function BookingCardContent({
       ) : owesPayment ? (
         <>
           {hasLiveHold && <HoldCountdown expiresAt={userBooking!.expires_at!} lang={lang} />}
-          <button
-            type="button"
-            onClick={onResume}
-            disabled={booking}
-            className="btn btn-teal"
-            style={{
-              width: '100%',
-              justifyContent: 'center',
-              fontSize: 15,
-              padding: '15px 22px',
-              marginTop: hasLiveHold ? 12 : 0,
-              marginBottom: 10,
-            }}
-          >
-            {booking ? tr(lang, 'กำลังโหลด...', 'Loading...') : tr(lang, 'ดำเนินการต่อ', 'Continue')}{' '}
-            <span className="mono">→</span>
-          </button>
+          <div style={{ display: 'flex', gap: 10, marginTop: hasLiveHold ? 12 : 0, marginBottom: 10 }}>
+            <button
+              type="button"
+              onClick={onResume}
+              disabled={booking}
+              className="btn btn-teal"
+              style={{
+                flex: 1,
+                minWidth: 0,
+                justifyContent: 'center',
+                fontSize: 15,
+                padding: '15px 22px',
+              }}
+            >
+              {booking ? tr(lang, 'กำลังโหลด...', 'Loading...') : tr(lang, 'ดำเนินการต่อ', 'Continue')}{' '}
+              <span className="mono">→</span>
+            </button>
+            {/* An unpaid booking is not a seat yet, so buying one as a gift is
+                still open to them. */}
+            {!isSelection && <GiftSquare onClick={onGift} disabled={booking} lang={lang} />}
+          </div>
           <Link href="/me/bookings" style={{ display: 'block', textAlign: 'center', fontSize: 12.5, color: 'var(--muted)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
             {tr(lang, 'จัดการการจอง', 'Manage booking')}
           </Link>
@@ -1339,18 +1461,18 @@ function BookingCardContent({
           {tr(lang, 'ปิดรับสมัคร — กิจกรรมเริ่มแล้ว', 'Registration closed — event started')}
         </button>
       ) : (
-        <>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
           <button
             type="button"
             onClick={onBook}
             disabled={booking || soldOut}
             className="btn btn-teal"
             style={{
-              width: '100%',
+              flex: 1,
+              minWidth: 0,
               justifyContent: 'center',
               fontSize: 15,
               padding: '15px 22px',
-              marginBottom: 10,
             }}
           >
             {booking
@@ -1362,7 +1484,10 @@ function BookingCardContent({
                   : tr(lang, 'จองที่นั่งเลย', 'Book a seat')}{' '}
             <span className="mono">→</span>
           </button>
-        </>
+          {/* Buying it for someone else. Selection workshops are decided on the
+              applicant, so a seat there cannot be bought for a third party. */}
+          {!isSelection && <GiftSquare onClick={onGift} disabled={booking || soldOut} lang={lang} />}
+        </div>
       )}
 
       {/* Join link — online workshops only, and only once the seat is secured.
@@ -1396,6 +1521,37 @@ function BookingCardContent({
         ))}
       </ul>
     </>
+  );
+}
+
+/** Square gift button that sits beside the primary CTA. Square on purpose: it
+ *  is an alternative to the main action, not a second one competing with it. */
+function GiftSquare({ onClick, disabled, lang }: { onClick: () => void; disabled?: boolean; lang: 'th' | 'en' }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={tr(lang, 'ซื้อเป็นของขวัญให้คนอื่น', 'Buy this as a gift')}
+      aria-label={tr(lang, 'ซื้อเป็นของขวัญให้คนอื่น', 'Buy this as a gift')}
+      style={{
+        width: 52,
+        height: 52,
+        flexShrink: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 22,
+        lineHeight: 1,
+        borderRadius: 16,
+        border: '1.5px solid var(--teal)',
+        background: 'var(--teal-50)',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      <span aria-hidden>🎁</span>
+    </button>
   );
 }
 

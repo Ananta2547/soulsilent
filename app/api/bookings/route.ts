@@ -5,6 +5,7 @@ import { requireAuth } from '@/lib/auth';
 import { getEffectivePrice, hasWorkshopStarted } from '@/lib/workshop-utils';
 import { settleSelection, visibleAppStatus, confirmDeadlineFor, type SettleWorkshop } from '@/lib/selection';
 import { expireStaleHolds, HOLD_MINUTES } from '@/lib/holds';
+import { claimUrl, newTransferToken, partyFromBooking } from '@/lib/transfers';
 import type { Workshop } from '@/lib/types';
 
 
@@ -148,9 +149,12 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await requireAuth();
-    const { workshop_id, application } = (await request.json()) as {
+    const { workshop_id, application, gift } = (await request.json()) as {
       workshop_id: string;
       application?: unknown;
+      /** Buying the seat for someone else — who it is meant for. The buyer
+       *  fills no application; the receiver does, when they claim the link. */
+      gift?: { name?: string; phone?: string };
     };
     const applicationJson = application != null ? JSON.stringify(application) : null;
     const db = await getDB();
@@ -176,7 +180,9 @@ export async function POST(request: Request) {
     // Age restriction (defense-in-depth — the BookingModal also blocks this).
     // DOB now lives in the autofill vault (vault_json.dob); fall back to the
     // legacy users.date_of_birth column.
-    if (workshop.min_age != null || workshop.max_age != null) {
+    // A gift is age-checked against the RECEIVER when they claim it, not
+    // against the buyer, who is not the one attending.
+    if (!gift && (workshop.min_age != null || workshop.max_age != null)) {
       const u = await db
         .prepare('SELECT vault_json, date_of_birth FROM users WHERE id = ?')
         .bind(user.sub)
@@ -234,6 +240,72 @@ export async function POST(request: Request) {
       if ((countResult?.count || 0) >= workshop.max_participants) {
         return NextResponse.json({ error: 'ที่นั่งเต็มแล้ว' }, { status: 400 });
       }
+    }
+
+    // ---- Gift: the buyer pays, someone else attends -------------------
+    //
+    // Deliberately outside the "one live booking per user" logic below: the
+    // buyer is not the participant, so a gift neither recycles nor blocks a
+    // seat they hold themselves. The row starts owned by the buyer (they are
+    // the one who pays for it) and changes hands when the receiver claims the
+    // link.
+    if (gift) {
+      const toName = (gift.name || '').trim();
+      const toPhone = (gift.phone || '').trim();
+      if (!toName || !toPhone) {
+        return NextResponse.json({ error: 'กรุณากรอกชื่อและเบอร์โทรศัพท์ผู้รับ' }, { status: 400 });
+      }
+      if (isSelection) {
+        return NextResponse.json(
+          { error: 'กิจกรรมนี้รับสมัครแบบคัดเลือก ยังไม่รองรับการส่งเป็นของขวัญ' },
+          { status: 400 },
+        );
+      }
+
+      const giftPrice = getEffectivePrice(workshop).price;
+      const giftAmount =
+        paymentType === 'free' ? 0 : paymentType === 'deposit' ? workshop.deposit_amount || 0 : giftPrice;
+      // Nothing to charge → the seat is secured on the spot, exactly as a free
+      // direct booking is, and the link is ready to send immediately.
+      const giftFree = paymentType === 'free' || giftAmount <= 0;
+      const bookingId = uuid();
+      await db
+        .prepare(
+          `INSERT INTO bookings (id, workshop_id, user_id, status, payment_status, amount, app_status, application_json, expires_at)
+           VALUES (?, ?, ?, ?, ?, ?, 'approved', NULL, ${giftFree ? 'NULL' : "datetime('now', ?)"})`,
+        )
+        .bind(
+          ...(giftFree
+            ? [bookingId, workshop_id, user.sub, 'confirmed', 'paid', giftAmount]
+            : [bookingId, workshop_id, user.sub, 'pending', 'pending', giftAmount, `+${HOLD_MINUTES} minutes`]),
+        )
+        .run();
+
+      const buyer = await db
+        .prepare('SELECT name, phone, vault_json FROM users WHERE id = ?')
+        .bind(user.sub)
+        .first<{ name: string | null; phone: string | null; vault_json: string | null }>();
+      const from = partyFromBooking(null, buyer || {});
+      const token = newTransferToken();
+      await db
+        .prepare(
+          `INSERT INTO ticket_transfers
+             (id, booking_id, workshop_id, kind, token, status, from_user_id, from_name, from_phone, to_name, to_phone)
+           VALUES (?, ?, ?, 'gift', ?, 'pending', ?, ?, ?, ?, ?)`,
+        )
+        .bind(uuid(), bookingId, workshop_id, token, user.sub, from.name, from.phone, toName, toPhone)
+        .run();
+
+      const giftEnv = await getEnv();
+      const giftSite = giftEnv.SITE_URL || 'http://localhost:3000';
+      return NextResponse.json({
+        bookingId,
+        gift: true,
+        mode: giftFree ? 'free' : paymentType,
+        amount: giftAmount,
+        claimUrl: claimUrl(giftSite, token),
+        ...(giftFree ? { submitted: true } : { checkoutUrl: `${giftSite}/pay/${bookingId}`, holdMinutes: HOLD_MINUTES }),
+      });
     }
 
     // Look up this user's existing booking for this workshop. We treat rows as:

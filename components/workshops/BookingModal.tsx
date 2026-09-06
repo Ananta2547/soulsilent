@@ -73,12 +73,17 @@ export function BookingModal({
   workshop,
   submitting,
   onSubmit,
+  /** 'claim' = taking over a seat somebody already paid for. Same form, but
+   *  nothing is owed, so the payment warning and the pay wording drop out. */
+  mode = 'book',
 }: {
   onClose: () => void;
   workshop: Workshop;
   submitting: boolean;
   onSubmit: (application: unknown) => Promise<BookingResult>;
+  mode?: 'book' | 'claim';
 }) {
+  const claiming = mode === 'claim';
   const { lang } = useLang();
   const [step, setStep] = useState<1 | 2>(1);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -240,7 +245,7 @@ export function BookingModal({
     // popup FIRST and create the booking only after the user confirms. This means
     // Cancel creates no booking and takes no seat. Free / selection never pay, so
     // they submit straight away.
-    const willPay = workshop.payment_type !== 'free' && workshop.admission_type !== 'selection';
+    const willPay = !claiming && workshop.payment_type !== 'free' && workshop.admission_type !== 'selection';
     if (willPay) {
       setPendingApp(application);
       return;
@@ -323,7 +328,11 @@ export function BookingModal({
             ✓
           </div>
           <h2 className="display-th" style={{ fontSize: 22, margin: '0 0 10px' }}>
-            <T th="ส่งใบสมัครสำเร็จ" en="Application Submitted Successfully" />
+            {claiming ? (
+              <T th="รับสิทธิ์สำเร็จ — ที่นั่งเป็นของคุณแล้ว" en="Claimed — the seat is yours" />
+            ) : (
+              <T th="ส่งใบสมัครสำเร็จ" en="Application Submitted Successfully" />
+            )}
           </h2>
           {result.mode === 'selection' && (
             <p style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.6, margin: '0 0 22px' }}>
@@ -645,7 +654,7 @@ export function BookingModal({
             the PromptPay QR (paid/deposit). The QR outlives the seat hold by
             twenty minutes and cannot be cancelled, so warn before the redirect:
             a late payment is taken by the bank, rejected by us, and refunded. */}
-        {step === 2 && workshop.payment_type !== 'free' && workshop.admission_type !== 'selection' && (
+        {step === 2 && !claiming && workshop.payment_type !== 'free' && workshop.admission_type !== 'selection' && (
           <div style={{ padding: '0 24px', marginTop: -4 }}>
             <div style={{ background: '#fdecec', border: '1px solid #f0b4b4', borderRadius: 14, padding: '11px 15px', fontSize: 12.5, color: '#a13030', lineHeight: 1.55 }}>
               <strong><T th="⚠️ ขั้นตอนถัดไปคือ QR ชำระเงิน (หมดอายุ 10 นาที)" en="⚠️ Next is the payment QR (expires in 10 minutes)" /></strong>
@@ -682,9 +691,11 @@ export function BookingModal({
               <Btn kind="teal" onClick={submit} disabled={submitting} style={{ marginLeft: 'auto', justifyContent: 'center' }}>
                 {submitting
                   ? tr(lang, 'กำลังดำเนินการ…', 'Processing…')
-                  : workshop.admission_type === 'selection' || workshop.payment_type === 'free'
-                    ? tr(lang, 'ส่งใบสมัคร', 'Submit Application')
-                    : tr(lang, 'ส่งใบสมัคร & ชำระเงิน', 'Submit & Pay')}
+                  : claiming
+                    ? tr(lang, 'ยืนยันรับสิทธิ์', 'Confirm and claim')
+                    : workshop.admission_type === 'selection' || workshop.payment_type === 'free'
+                      ? tr(lang, 'ส่งใบสมัคร', 'Submit Application')
+                      : tr(lang, 'ส่งใบสมัคร & ชำระเงิน', 'Submit & Pay')}
               </Btn>
             </>
           )}
