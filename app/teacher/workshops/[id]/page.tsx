@@ -313,10 +313,10 @@ export default function TeacherWorkshopDetail() {
                               {tr(lang, `วันที่ ${di + 1}`, `Day ${di + 1}`)}
                             </span>
                             <button type="button" disabled={ended || busy} onClick={() => setDay(b.id, di, present ? null : 1)} style={chipStyle(present, 'green', ended)}>
-                              ✓ {tr(lang, 'มา', 'In')}
+                              {tr(lang, 'มา', 'In')}
                             </button>
                             <button type="button" disabled={ended || busy} onClick={() => setDay(b.id, di, absent ? null : 0)} style={chipStyle(absent, 'red', ended)}>
-                              ✕ {tr(lang, 'ไม่มา', 'Out')}
+                              {tr(lang, 'ไม่มา', 'Out')}
                             </button>
                           </div>
                         );
