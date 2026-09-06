@@ -10,12 +10,17 @@ export function TransferLinkModal({
   url,
   kind,
   recipient,
+  payUrl,
   onClose,
 }: {
   url: string;
   kind: 'gift' | 'transfer';
   /** Who the buyer said the gift was for. Absent for a plain transfer. */
   recipient?: string | null;
+  /** Where the seat still has to be paid for. Present right after a gift is
+   *  created: the link exists from that moment, but only works once the money
+   *  lands, so it is handed over together with the way to pay. */
+  payUrl?: string | null;
   onClose: () => void;
 }) {
   const { lang } = useLang();
@@ -34,6 +39,7 @@ export function TransferLinkModal({
   }
 
   const isGift = kind === 'gift';
+  const unpaid = !!payUrl;
 
   return (
     <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -56,7 +62,13 @@ export function TransferLinkModal({
             : tr(lang, 'ส่งลิงก์นี้ให้เพื่อน', 'Send this link to your friend')}
         </h3>
         <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.6, margin: '0 0 18px' }}>
-          {recipient
+          {unpaid
+            ? tr(
+                lang,
+                `เก็บลิงก์นี้ไว้ส่งให้${recipient ? ` ${recipient}` : 'เพื่อน'} — ลิงก์จะใช้รับสิทธิ์ได้เมื่อชำระเงินเสร็จแล้ว`,
+                `Keep this link to send${recipient ? ` to ${recipient}` : ''} — it can be claimed once the payment goes through.`,
+              )
+            : recipient
             ? tr(
                 lang,
                 `สำหรับ ${recipient} — ผู้รับต้องเข้าสู่ระบบและกรอกใบสมัครของตัวเองก่อน สิทธิ์จึงจะย้าย`,
@@ -98,6 +110,19 @@ export function TransferLinkModal({
             en="This link works once — whoever opens it and claims takes the seat. Send it only to the person you mean to."
           />
         </div>
+
+        {/* The seat is on a 10-minute hold at this point, so paying is the next
+            step and the one this dialog must not get in the way of. */}
+        {payUrl && (
+          <button
+            type="button"
+            onClick={() => { window.location.href = payUrl; }}
+            className="btn btn-teal"
+            style={{ width: '100%', justifyContent: 'center', marginTop: 16, padding: '14px 22px', fontSize: 15 }}
+          >
+            {tr(lang, 'ไปชำระเงิน', 'Continue to payment')} <span className="mono">→</span>
+          </button>
+        )}
       </div>
     </div>
   );

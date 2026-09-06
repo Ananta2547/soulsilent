@@ -74,7 +74,12 @@ export default function WorkshopDetailPage() {
   const [giftOpen, setGiftOpen] = useState(false);
   // The handover link, once minted — the same modal serves a gift the buyer is
   // about to send and a seat its holder is passing on.
-  const [transferLink, setTransferLink] = useState<{ url: string; kind: 'gift' | 'transfer'; recipient?: string | null } | null>(null);
+  const [transferLink, setTransferLink] = useState<{
+    url: string;
+    kind: 'gift' | 'transfer';
+    recipient?: string | null;
+    payUrl?: string | null;
+  } | null>(null);
   const [transferBusy, setTransferBusy] = useState(false);
   // null = still checking; true/false = known login state.
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -220,10 +225,20 @@ export default function WorkshopDetailPage() {
         setBooking(false);
         return data.error || tr(lang, 'เกิดข้อผิดพลาด', 'Something went wrong');
       }
-      // Paid gifts go to the QR first; the link waits on the booking and is
-      // reachable from this card once the payment lands.
+      // The link exists from the moment the gift is created, so hand it over
+      // now rather than after payment: the buyer is about to leave for the QR,
+      // and this is where they are thinking about the person they are buying
+      // for. It only becomes claimable once the money lands, which the dialog
+      // says, and paying is its primary button.
       if (data.checkoutUrl) {
-        window.location.href = data.checkoutUrl;
+        setBooking(false);
+        setGiftOpen(false);
+        setTransferLink({
+          url: data.claimUrl || '',
+          kind: 'gift',
+          recipient: recipient.name,
+          payUrl: data.checkoutUrl,
+        });
         return null;
       }
       // Free workshop → the seat is already secured, so hand over the link now.
@@ -1015,7 +1030,13 @@ export default function WorkshopDetailPage() {
           url={transferLink.url}
           kind={transferLink.kind}
           recipient={transferLink.recipient}
-          onClose={() => setTransferLink(null)}
+          payUrl={transferLink.payUrl}
+          onClose={() => {
+            setTransferLink(null);
+            // A gift left unpaid still holds a seat for ten minutes; re-read so
+            // the card shows that hold rather than an untouched booking button.
+            load();
+          }}
         />
       )}
 
