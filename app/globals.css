@@ -3327,3 +3327,38 @@ body {
   0%, 100% { transform: translateY(0); opacity: 0.9; }
   50% { transform: translateY(5px); opacity: 0.35; }
 }
+
+/* ---- Reviews: swipe affordance on phones ----
+   The arrows are gone below 560px and one card fills the row, so nothing
+   said there were more. The card now stops short of the right edge (the
+   next one peeks in) and dots + a counter sit underneath. */
+.dc-rev-dots { display: none; }
+
+@media (max-width: 560px) {
+  .dc-rev-cell { flex-basis: 84%; }
+  .dc-rev-track { padding-right: 18px; }
+  .dc-rev-dots {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin-top: 2px;
+  }
+  .dc-rev-dot-row { display: flex; align-items: center; gap: 7px; }
+  .dc-rev-dot {
+    width: 7px;
+    height: 7px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.38);
+    cursor: pointer;
+    transition: width 0.25s ease, background 0.25s ease;
+  }
+  .dc-rev-dot.on { width: 20px; border-radius: 999px; background: var(--accent); }
+  .dc-rev-hint {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.72);
+  }
+}

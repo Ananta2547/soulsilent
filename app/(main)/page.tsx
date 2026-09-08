@@ -620,6 +620,9 @@ function ReviewsSection({ reviews }: { reviews: PublicReview[] }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
+  /* Phones get no arrows — one card fills the row — so the dots below the
+     track carry the whole "there is more, swipe" message. */
+  const [active, setActive] = useState(0);
 
   const cards =
     reviews.length > 0
@@ -632,6 +635,9 @@ function ReviewsSection({ reviews }: { reviews: PublicReview[] }) {
     const update = () => {
       setCanPrev(el.scrollLeft > 8);
       setCanNext(el.scrollLeft < el.scrollWidth - el.clientWidth - 8);
+      const cell = el.firstElementChild as HTMLElement | null;
+      const step = cell ? cell.offsetWidth + 22 : el.clientWidth;
+      setActive(step > 0 ? Math.round(el.scrollLeft / step) : 0);
     };
     update();
     el.addEventListener('scroll', update, { passive: true });
@@ -704,6 +710,37 @@ function ReviewsSection({ reviews }: { reviews: PublicReview[] }) {
           </div>
           <button type="button" className="dc-rev-arrow mono" aria-label="รีวิวถัดไป" onClick={() => slide(1)} disabled={!canNext}>→</button>
         </div>
+
+        {/* Phone-only: how many reviews there are, where you are in them, and
+            a nudge to keep swiping. Hidden once the arrows come back. */}
+        {cards.length > 1 && (
+          <div className="dc-rev-dots">
+            <div className="dc-rev-dot-row">
+              {cards.map((c, i) => (
+                <button
+                  key={c.key}
+                  type="button"
+                  aria-label={`รีวิวที่ ${i + 1}`}
+                  aria-current={i === active}
+                  className={i === active ? 'dc-rev-dot on' : 'dc-rev-dot'}
+                  onClick={() => {
+                    const el = trackRef.current;
+                    if (!el) return;
+                    const cell = el.firstElementChild as HTMLElement | null;
+                    const step = cell ? cell.offsetWidth + 22 : el.clientWidth;
+                    el.scrollTo({ left: i * step, behavior: 'smooth' });
+                  }}
+                />
+              ))}
+            </div>
+            <div className="dc-rev-hint mono">
+              {active + 1} / {cards.length}
+              {active < cards.length - 1 && (
+                <> · เลื่อนดูรีวิวอื่น <span aria-hidden>→</span></>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );
