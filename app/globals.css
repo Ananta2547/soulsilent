@@ -3256,6 +3256,9 @@ body {
   .dc-event-card .tag { font-size: 10px; padding: 3px 8px; }
   .dc-event-card .dc-ev-title { font-size: 14.5px !important; margin-bottom: 6px !important; }
   .dc-event-card .dc-ev-meta { font-size: 11.5px !important; margin-bottom: 8px !important; }
+  /* Two-up cards have room for one line of context; the date is the one
+     that decides whether to tap. Time and place live on the detail page. */
+  .dc-event-card .dc-ev-sub { display: none !important; }
   .dc-event-card .dc-ev-foot { display: block !important; padding-top: 8px !important; }
   .dc-event-card .dc-ev-price { font-size: 16px !important; }
   .dc-event-card .dc-ev-cta {

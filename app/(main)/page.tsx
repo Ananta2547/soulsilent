@@ -416,12 +416,12 @@ function EventCard({ w }: { w: Workshop }) {
           <Icon name="date" size={14} />
           <span>{cardDateLabel(w)}</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div className="dc-ev-sub" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <Icon name="time" size={14} />
           <span>{w.time_start} – {w.time_end}</span>
         </div>
         {fmtLocation(w) && (
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+          <div className="dc-ev-sub" style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
             <Icon name="location" size={14} style={{ marginTop: 1 }} />
             <span className="u-clamp-2">{fmtLocation(w)}</span>
           </div>
