@@ -1,13 +1,43 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+/* ============================================================
+   My Journey — port of Design Composer
+   "AllSoulLearn Journey + Diary.dc.html" (journey view only; the
+   diary half of that file is deliberately not brought over).
+
+   Every attended workshop is a stop on one dashed path: alternating
+   sides of a centre line on desktop, a single left-hand rail on a
+   phone. The path ends at the start of the story, and begins with an
+   invitation to add the next stop.
+   ============================================================ */
+
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useLang, T, tr } from '@/lib/i18n';
-import { Reveal } from '@/components/design/Reveal';
 import { Btn } from '@/components/design/RippleButton';
 import { Icon } from '@/components/design/Icon';
 import { useLoadingTracker } from '@/components/design/DataLoading';
-import { type JourneyItem, journeyStatus, fmtJourneyDate } from '@/lib/journey';
+import { getWorkshopDays } from '@/lib/workshop-utils';
+import { type JourneyItem, fmtJourneyDate } from '@/lib/journey';
+
+/** Whole hours spent in one workshop — per-day length × number of days. */
+function itemHours(it: JourneyItem): number {
+  const toMin = (t: string | null) => {
+    const [h, m] = (t || '').split(':').map(Number);
+    return Number.isFinite(h) ? h * 60 + (Number.isFinite(m) ? m : 0) : null;
+  };
+  const start = toMin(it.time_start);
+  const end = toMin(it.time_end);
+  if (start == null || end == null || end <= start) return 0;
+  const days = getWorkshopDays({
+    workshop_type: it.workshop_type as 'one_day',
+    date: it.date,
+    end_date: it.end_date,
+    dates_json: it.dates_json,
+    time_end: it.time_end,
+  }).length;
+  return ((end - start) / 60) * Math.max(1, days);
+}
 
 export default function MyJourneyPage() {
   const { lang } = useLang();
@@ -35,6 +65,14 @@ export default function MyJourneyPage() {
     );
   }, [track]);
 
+  const stats = useMemo(() => {
+    const hours = items.reduce((sum, it) => sum + itemHours(it), 0);
+    const notes = items.filter((it) => (it.journey_note || '').trim()).length;
+    // The path is drawn newest-first, so the oldest stop is where it started.
+    const firstYear = items.length ? (items[items.length - 1].date || '').slice(0, 4) : '';
+    return { hours: Math.round(hours), notes, firstYear };
+  }, [items]);
+
   // Nothing to draw while this page's requests are open — the loading screen is
   // over it already (components/design/DataLoading.tsx).
   if (loading) return null;
@@ -53,20 +91,25 @@ export default function MyJourneyPage() {
   }
 
   return (
-    <section className="section" style={{ paddingTop: 48, paddingBottom: 64 }}>
+    <section className="section jn-page" style={{ paddingTop: 44, paddingBottom: 72 }}>
       <div className="container">
-        <Reveal>
-          <span className="eyebrow">
-            <T th="เส้นทางของฉัน" en="my journey" />
-          </span>
-          <h1 className="display-th" style={{ fontSize: 'clamp(34px, 5vw, 60px)', margin: '18px 0 8px' }}>
-            My Journey
-          </h1>
-          <p style={{ color: 'var(--muted)', fontSize: 15, marginBottom: 28 }}>
-            {tr(lang, 'รวมทุก workshop ที่คุณเคยสมัครและเข้าร่วม', 'Every workshop you have applied to and attended')}
-            {items.length > 0 && ` · ${items.length}`}
-          </p>
-        </Reveal>
+        <div className="jn-head">
+          <div style={{ maxWidth: 520 }}>
+            <h1 className="jn-title">MY JOURNEY</h1>
+            <p style={{ fontSize: 15, lineHeight: 1.6, color: 'var(--muted)', margin: 0 }}>
+              {tr(
+                lang,
+                'ทุก workshop ที่คุณเดินผ่านมา เรียงเป็นเส้นทางเดียว — แตะที่การ์ดเพื่อเปิดความทรงจำของวันนั้น',
+                'Every workshop you have walked through, laid out as one path — tap a card to open that day.',
+              )}
+            </p>
+          </div>
+          <div className="jn-stats">
+            <Stat n={String(items.length).padStart(2, '0')} label="WORKSHOPS" teal />
+            <Stat n={String(stats.hours)} label={tr(lang, 'ชั่วโมงเรียนรู้', 'hours')} />
+            <Stat n={String(stats.notes)} label={tr(lang, 'บันทึกความทรงจำ', 'memory notes')} />
+          </div>
+        </div>
 
         {items.length === 0 ? (
           <div style={{ padding: 48, borderRadius: 22, background: 'var(--cream)', textAlign: 'center', color: 'var(--muted)' }}>
@@ -78,63 +121,81 @@ export default function MyJourneyPage() {
             </Btn>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 18 }}>
-            {items.map((it) => {
-              const st = journeyStatus(it);
-              return (
-                <Link
-                  key={it.booking_id}
-                  href={`/me/journey/${it.workshop_id}`}
-                  className="card"
-                  style={{ padding: 0, overflow: 'hidden', textDecoration: 'none', color: 'var(--ink)', display: 'flex', flexDirection: 'column' }}
-                >
-                  <div style={{ aspectRatio: '297 / 210', background: 'var(--cream-deep)', overflow: 'hidden' }}>
+          <div className="jn-path">
+            {/* The invitation sits at the head of the path — the next stop is
+                the one that hasn't happened yet. */}
+            <div className="jn-node jn-node-next">
+              <div className="jn-dot jn-dot-open" aria-hidden />
+              <div className="jn-next">
+                <span className="eyebrow" style={{ color: 'var(--muted)' }}>
+                  <T th="ต่อไป" en="next" />
+                </span>
+                <div style={{ fontFamily: 'Mitr, sans-serif', fontWeight: 500, fontSize: 20, lineHeight: 1.35, margin: '12px 0 18px' }}>
+                  <T
+                    th={<>เส้นทางยังไม่จบ<br />หา workshop ถัดไปกันไหม</>}
+                    en={<>The path isn&apos;t over<br />shall we find the next one?</>}
+                  />
+                </div>
+                <Link href="/workshops" className="btn btn-teal">
+                  {tr(lang, 'ดูกิจกรรมทั้งหมด', 'Browse workshops')} <span className="mono">→</span>
+                </Link>
+                <span className="jn-script">it can be fun! ✺</span>
+              </div>
+            </div>
+
+            {items.map((it) => (
+              <div className="jn-node" key={it.booking_id}>
+                <div className="jn-dot" aria-hidden />
+                <Link href={`/me/journey/${it.workshop_id}`} className="card jn-card">
+                  <div className="jn-poster">
                     {it.image_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={it.image_url} alt={it.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <img src={it.image_url} alt={it.title} />
                     ) : (
-                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 13 }}>
+                      <span className="mono" style={{ fontSize: 10, letterSpacing: '.1em', color: 'var(--muted)' }}>
                         {tr(lang, 'ไม่มีรูป', 'No image')}
-                      </div>
+                      </span>
                     )}
                   </div>
-                  <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
-                    <h3 className="display-th" style={{ fontSize: 17, margin: 0, lineHeight: 1.3 }}>{it.title}</h3>
-                    <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      {st.done ? (
-                        <span className="tag" style={{ background: 'var(--cream-deep)', color: 'var(--muted)' }}>
-                          ✓ {tr(lang, 'เสร็จสิ้นกิจกรรม', 'Completed')}
-                        </span>
-                      ) : (
-                        <span className="tag" style={{ background: '#e6f4f1', color: 'var(--teal-deep)' }}>
-                          <Icon name="duration" size={13} /> {tr(lang, `นับถอยหลัง ${st.daysLeft} วัน`, `${st.daysLeft} days left`)}
-                        </span>
-                      )}
-                      {it.attended === 1 && (
-                        <span className="tag" style={{ background: 'var(--teal)', color: '#fff' }}><Icon name="rating" size={12} filled /> {tr(lang, 'เข้าร่วมแล้ว', 'Attended')}</span>
-                      )}
+                  <div className="jn-card-body">
+                    <div className="jn-card-title">{it.title}</div>
+                    <div className="jn-card-foot">
+                      <span className="mono jn-card-date">
+                        <Icon name="date" size={13} /> {fmtJourneyDate(it.date)}
+                      </span>
+                      <span className="jn-card-note">
+                        <Icon name="notes" size={13} />
+                        {(it.journey_note || '').trim()
+                          ? tr(lang, 'อ่านบันทึก', 'Read note')
+                          : tr(lang, 'จดบันทึกความทรงจำ', 'Add a memory')}
+                      </span>
                     </div>
-                    <div className="mono" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '.06em' }}>
-                      {fmtJourneyDate(it.date)}
-                    </div>
-                    {it.journey_note ? (
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 12, color: 'var(--ink)', background: 'var(--cream)', borderRadius: 10, padding: '8px 10px', lineHeight: 1.5 }}>
-                        <Icon name="notes" size={14} />
-                        <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.journey_note}</span>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--teal)' }}>
-                        <Icon name="notes" size={14} />
-                        {tr(lang, 'จดบันทึกความทรงจำ', 'Add a memory note')}
-                      </div>
-                    )}
                   </div>
                 </Link>
-              );
-            })}
+              </div>
+            ))}
+
+            <div className="jn-start">
+              <span className="jn-start-dot" aria-hidden />
+              <span className="eyebrow" style={{ color: 'var(--muted)' }}>
+                {tr(lang, 'จุดเริ่มต้น', 'the beginning')}
+                {stats.firstYear ? ` · ${stats.firstYear}` : ''}
+              </span>
+            </div>
           </div>
         )}
       </div>
     </section>
+  );
+}
+
+function Stat({ n, label, teal = false }: { n: string; label: string; teal?: boolean }) {
+  return (
+    <div>
+      <div className="jn-stat-n" style={teal ? { color: 'var(--teal)' } : undefined}>{n}</div>
+      <div style={{ marginTop: 8 }}>
+        <span className="eyebrow" style={{ color: 'var(--muted)' }}>{label}</span>
+      </div>
+    </div>
   );
 }

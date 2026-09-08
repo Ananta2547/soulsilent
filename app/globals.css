@@ -3379,3 +3379,138 @@ body {
     color: rgba(255, 255, 255, 0.72);
   }
 }
+
+/* ============================================================
+   My Journey — Design Composer "Journey + Diary" (journey half)
+   One dashed path with the stops hung off it: alternating sides of a
+   centre line on desktop, a single left-hand rail on a phone.
+   ============================================================ */
+.jn-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 40px;
+  flex-wrap: wrap;
+  margin-bottom: 46px;
+}
+.jn-title {
+  font-family: 'Archivo Black', sans-serif;
+  font-size: clamp(38px, 6vw, 64px);
+  line-height: 0.92;
+  letter-spacing: -0.03em;
+  margin: 0 0 12px;
+  color: var(--ink);
+}
+.jn-stats { display: flex; gap: 56px; padding-top: 6px; }
+.jn-stat-n { font-family: 'Archivo Black', sans-serif; font-size: 46px; line-height: 1; color: var(--ink); }
+
+.jn-path { position: relative; }
+/* Mobile-first: one rail down the left, every stop hanging off it (the
+   design's own phone layout). The alternating two-sided path is layered on
+   above 860px, so the two never fight over the same properties. */
+.jn-path::before {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 10px;
+  bottom: 44px;
+  border-left: 3px dashed var(--teal-200);
+}
+.jn-node { position: relative; padding-left: 36px; margin-bottom: 30px; }
+.jn-dot {
+  position: absolute;
+  left: 7px;
+  top: 22px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--teal);
+  transform: translateX(-50%);
+  box-shadow: 0 0 0 6px rgba(13, 138, 126, 0.12);
+}
+.jn-dot-open { background: var(--accent); box-shadow: 0 0 0 6px rgba(240, 180, 41, 0.16); }
+
+.jn-next { background: var(--cream); border-radius: 22px; padding: 26px 28px; box-sizing: border-box; }
+.jn-script {
+  display: block;
+  font-family: 'Caveat', cursive;
+  font-size: 24px;
+  color: var(--teal);
+  margin-top: 16px;
+  transform: rotate(-3deg);
+}
+
+.jn-card { display: block; padding: 0; overflow: hidden; text-decoration: none; color: var(--ink); box-sizing: border-box; }
+.jn-poster {
+  aspect-ratio: 297 / 420;
+  background: var(--cream-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.jn-poster img { width: 100%; height: 100%; object-fit: cover; }
+.jn-card-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 9px; }
+.jn-card-title {
+  font-family: Mitr, sans-serif;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.jn-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.jn-card-date { display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; letter-spacing: 0.1em; color: var(--muted); }
+.jn-card-note { display: inline-flex; align-items: center; gap: 6px; color: var(--teal); font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+
+.jn-start { display: flex; align-items: center; gap: 10px; }
+.jn-start-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--teal-200);
+  box-shadow: 0 0 0 6px rgba(13, 138, 126, 0.12);
+  flex-shrink: 0;
+  margin-left: -1px;
+}
+
+@media (min-width: 861px) {
+  /* Desktop: the stops alternate around a centre line. */
+  .jn-path::before { left: 50%; bottom: 54px; transform: translateX(-50%); }
+  .jn-node { display: grid; grid-template-columns: 1fr 1fr; padding-left: 0; margin-bottom: 54px; }
+  .jn-node > .jn-card, .jn-node > .jn-next { grid-column: 1; justify-self: end; margin-right: 54px; width: 320px; }
+  .jn-node:nth-of-type(even) > .jn-card,
+  .jn-node:nth-of-type(even) > .jn-next { grid-column: 2; justify-self: start; margin-right: 0; margin-left: 54px; }
+  .jn-dot { left: 50%; top: 26px; }
+  .jn-start { flex-direction: column; align-items: center; gap: 8px; }
+  .jn-start-dot { margin-left: 0; }
+}
+
+@media (max-width: 860px) {
+  .jn-head { gap: 26px; margin-bottom: 32px; }
+  .jn-stats { gap: 34px; }
+  .jn-stat-n { font-size: 36px; }
+}
+
+@media (max-width: 560px) {
+  .jn-stats { gap: 22px; }
+  .jn-stat-n { font-size: 30px; }
+  .jn-next { padding: 20px 20px 22px; border-radius: 18px; }
+  .jn-card-title { font-size: 15px; }
+  .jn-card-note { font-size: 12px; }
+}
+
+/* ============================================================
+   Workshops listing — phone pass
+   Same two-up compact card as the home page, so the two grids read
+   as one family; the header and filter rows shrink to match.
+   ============================================================ */
+@media (max-width: 560px) {
+  .wk-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 12px; }
+  .wk-head-title { font-size: clamp(28px, 8.5vw, 36px) !important; }
+  .wk-head-lede { font-size: 14px !important; margin-top: 18px !important; }
+  .wk-filters { gap: 10px !important; }
+  .wk-filters .filter-pill { padding: 8px 14px !important; font-size: 12.5px !important; }
+  .wk-filters .tag { font-size: 11px; padding: 4px 9px; }
+}

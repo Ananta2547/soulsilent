@@ -148,7 +148,7 @@ export default function WorkshopsListingPage() {
       {/* ---- Header ---- */}
       <section className="container" style={{ paddingTop: 56, paddingBottom: 40 }}>
         <div className="mono" style={{ color: 'var(--muted)', letterSpacing: '.14em', fontSize: 11, textTransform: 'uppercase', marginBottom: 14 }}>— กิจกรรมทั้งหมด</div>
-        <h1 className="display-th reveal-up" style={{ fontSize: 'clamp(34px,5.4vw,58px)', margin: 0, color: 'var(--ink)', lineHeight: 1.05 }}>
+        <h1 className="display-th reveal-up wk-head-title" style={{ fontSize: 'clamp(34px,5.4vw,58px)', margin: 0, color: 'var(--ink)', lineHeight: 1.05 }}>
           เลือก
           <span style={{ position: 'relative', display: 'inline-block', color: 'var(--teal)' }}>
             กิจกรรม
@@ -158,14 +158,14 @@ export default function WorkshopsListingPage() {
           </span>
           ที่ใช่กับคุณ
         </h1>
-        <p style={{ margin: '22px 0 0', fontSize: 16, lineHeight: 1.6, color: 'var(--muted)', maxWidth: 640 }}>
+        <p className="wk-head-lede" style={{ margin: '22px 0 0', fontSize: 16, lineHeight: 1.6, color: 'var(--muted)', maxWidth: 640 }}>
           ทั้ง Workshop, Event, Seminar และอื่น ๆ อีกมากมาย — เลือกแบบที่เหมาะกับเวลาและจังหวะของคุณ
         </p>
       </section>
 
       {/* ---- Filter bar ---- */}
       <section className="bg-cream" style={{ padding: '28px 0 32px' }}>
-        <div className="container" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="container wk-filters" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <FilterPill active={categoryFilter === 'all'} onClick={() => { setCategoryFilter('all'); setPage(1); }}>ทั้งหมด</FilterPill>
             {categories.map((c) => (
@@ -333,8 +333,8 @@ function Card({ w }: { w: Workshop }) {
   const { open, badgeLabel, ctaLabel } = getWorkshopCardStatus(w);
 
   return (
-    <Link href={`/workshops/${w.id}`} className="card reveal-up" style={{ padding: 16, background: 'var(--paper)', display: 'flex', flexDirection: 'column', textDecoration: 'none', color: 'var(--ink)' }}>
-      <div className="ph ph-teal card-media" style={{ aspectRatio: '3/4', borderRadius: 14, marginBottom: 14, position: 'relative', overflow: 'hidden' }}>
+    <Link href={`/workshops/${w.id}`} className="card reveal-up dc-event-card" style={{ padding: 16, background: 'var(--paper)', display: 'flex', flexDirection: 'column', textDecoration: 'none', color: 'var(--ink)' }}>
+      <div className="ph ph-teal card-media dc-ev-media" style={{ aspectRatio: '3/4', borderRadius: 14, marginBottom: 14, position: 'relative', overflow: 'hidden' }}>
         {w.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={w.image_url} alt={w.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -377,43 +377,43 @@ function Card({ w }: { w: Workshop }) {
         </span>
         {w.category && <span className="tag">{w.category}</span>}
       </div>
-      <h3 className="display-th u-clamp-2" style={{ fontSize: 17, margin: '0 0 8px', lineHeight: 1.25, minHeight: '2.5em' }}>{w.title}</h3>
-      <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <h3 className="display-th u-clamp-2 dc-ev-title" style={{ fontSize: 17, margin: '0 0 8px', lineHeight: 1.25, minHeight: '2.5em' }}>{w.title}</h3>
+      <div className="dc-ev-meta" style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: 3 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <Icon name="date" size={14} />
           <span>{cardDateLabel(w)}</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div className="dc-ev-sub" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <Icon name="time" size={14} />
           <span>{w.time_start} – {w.time_end}</span>
         </div>
         {fmtLocation(w) && (
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+          <div className="dc-ev-sub" style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
             <Icon name="location" size={14} style={{ marginTop: 1 }} />
             <span className="u-clamp-2">{fmtLocation(w)}</span>
           </div>
         )}
       </div>
 
-      <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12 }}>
+      <div className="dc-ev-foot" style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12 }}>
         <div>
           <div className="mono" style={{ fontSize: 9.5, color: 'var(--muted)', letterSpacing: '.1em', textTransform: 'uppercase' }}>ค่าเข้าร่วม</div>
           {free ? (
-            <div style={{ fontFamily: 'var(--font-display-th)', fontWeight: 600, fontSize: 19, color: 'var(--teal)' }}>ฟรี</div>
+            <div className="dc-ev-price" style={{ fontFamily: 'var(--font-display-th)', fontWeight: 600, fontSize: 19, color: 'var(--teal)' }}>ฟรี</div>
           ) : eff.isPromo ? (
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-              <span style={{ fontFamily: 'var(--font-display-th)', fontWeight: 600, fontSize: 19, color: 'var(--teal)' }}>฿{eff.price.toLocaleString()}</span>
+              <span className="dc-ev-price" style={{ fontFamily: 'var(--font-display-th)', fontWeight: 600, fontSize: 19, color: 'var(--teal)' }}>฿{eff.price.toLocaleString()}</span>
               <span style={{ fontSize: 12, color: 'var(--muted)', textDecoration: 'line-through' }}>฿{eff.originalPrice.toLocaleString()}</span>
             </div>
           ) : (
-            <div style={{ fontFamily: 'var(--font-display-th)', fontWeight: 600, fontSize: 19 }}>฿{eff.price.toLocaleString()}</div>
+            <div className="dc-ev-price" style={{ fontFamily: 'var(--font-display-th)', fontWeight: 600, fontSize: 19 }}>฿{eff.price.toLocaleString()}</div>
           )}
         </div>
         {open ? (
-          <span className="btn btn-teal btn-sm" aria-hidden>{ctaLabel} <span className="mono">→</span></span>
+          <span className="btn btn-teal btn-sm dc-ev-cta" aria-hidden>{ctaLabel} <span className="mono">→</span></span>
         ) : (
           <span
-            className="btn btn-sm"
+            className="btn btn-sm dc-ev-cta"
             aria-hidden
             style={{ background: '#e6e3da', color: 'var(--muted)', cursor: 'not-allowed' }}
           >
