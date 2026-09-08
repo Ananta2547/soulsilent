@@ -3229,37 +3229,22 @@ body {
 .drawer-link .mono { font-size: 15px; color: var(--teal); opacity: 0.55; }
 .drawer-link:active { color: var(--teal); }
 
-/* ---- Hero fan → swipe row ---- */
+/* ---- Hero fan ---- */
+/* The fan stays a fan on phones — it is the page's signature. It is just
+   scaled to the viewport, bleeding a little past both edges (the section
+   clips it) so the outer tickets stay legible instead of shrinking to fit
+   whole. margin-bottom claws back the space the untransformed 380px box
+   still reserves. */
 @media (max-width: 640px) {
-  .home-dc .giant-en { font-size: clamp(42px, 14vw, 76px); margin: 0 0 12px; }
-  .fan-wrap {
-    position: static;
-    height: auto;
-    max-width: none;
-    display: flex;
-    gap: 12px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    margin: 0 -18px;
-    padding: 8px 18px 22px;
-    transform: none !important;
-  }
-  .fan-wrap::-webkit-scrollbar { display: none; }
-  .fan-card {
-    position: static !important;
-    flex: 0 0 172px;
-    width: 172px !important;
-    height: 236px !important;
-    border-radius: 16px;
-    transform: none !important;
-    filter: none !important;
-    scroll-snap-align: center;
-    box-shadow: 0 16px 30px -16px rgba(13, 30, 29, 0.45) !important;
-  }
-  .home-dc .hero-lede { margin-top: 6px !important; font-size: 15px; }
+  .home-dc .giant-en { font-size: clamp(42px, 14vw, 76px); margin: 0 0 -22px; }
+  .fan-wrap { transform: scale(0.58); transform-origin: top center; margin-bottom: -150px; }
+  .home-dc .hero-lede { margin-top: 46px !important; font-size: 15px; }
+}
+@media (max-width: 480px) {
+  /* 894px of fan into a ~390px screen: 0.46 leaves the outer cards just
+     kissing the edges, the way the design crops them. */
+  .fan-wrap { transform: scale(0.46); margin-bottom: -196px; }
+  .home-dc .hero-lede { margin-top: 40px !important; }
 }
 
 /* ---- Upcoming events ---- */
