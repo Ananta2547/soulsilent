@@ -149,7 +149,7 @@ export function AdminSidebar() {
   return (
     <aside className="w-64 bg-dark min-h-screen flex flex-col">
       <div className="p-6 border-b border-white/10">
-        <Logo size="sm" />
+        <Logo size="sm" markOnly />
         <p className="text-xs text-gray mt-1 font-mono tracking-wider">ADMIN</p>
       </div>
 

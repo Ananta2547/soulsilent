@@ -9,6 +9,8 @@ type MonthTotal = { month: string; total: number; count: number };
 type BookingRow = {
   id: string;
   user_name: string | null;
+  /** The name written on the application — who is actually coming. */
+  applicant_name: string | null;
   workshop_title: string | null;
   amount: number;
   status: string;
@@ -139,7 +141,7 @@ export default function TeacherOverviewPage() {
             <T th="การจองล่าสุด" en="Recent bookings" />
           </h2>
           <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-            {tr(lang, `ไม่รวมที่ยกเลิก · ${live.length} รายการ`, `cancelled excluded · ${live.length} rows`)}
+            {tr(lang, `${live.length} รายการ`, `${live.length} rows`)}
           </span>
         </div>
 
@@ -149,52 +151,44 @@ export default function TeacherOverviewPage() {
           </p>
         ) : (
           <>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
+            {/* Fixed layout: a long workshop title clips to one line with an
+                ellipsis rather than widening the table into a sideways scroll,
+                which on a phone hides the columns to its right. */}
+            <div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5, tableLayout: 'fixed' }}>
+                <colgroup>
+                  <col style={{ width: '34%' }} />
+                  <col style={{ width: '26%' }} />
+                  <col style={{ width: '16%' }} />
+                  <col style={{ width: '24%' }} />
+                </colgroup>
                 <thead>
                   <tr style={{ background: 'var(--cream)' }}>
                     <Th>{tr(lang, 'เวิร์กชอป', 'Workshop')}</Th>
-                    <Th>{tr(lang, 'ผู้จอง', 'Booked by')}</Th>
-                    <Th align="right">{tr(lang, 'จำนวน', 'Amount')}</Th>
-                    <Th>{tr(lang, 'สถานะ', 'Status')}</Th>
-                    <Th align="right">{tr(lang, 'วันที่', 'Date')}</Th>
+                    <Th>{tr(lang, 'ชื่อผู้เข้าร่วม', 'Participant')}</Th>
+                    <Th align="right">{tr(lang, 'ราคา', 'Amount')}</Th>
+                    <Th align="right">{tr(lang, 'วันเวลาจอง', 'Booked at')}</Th>
                   </tr>
                 </thead>
                 <tbody>
-                  {shown.map((b) => {
-                    const st = bookingStatus(b, lang);
-                    return (
-                      <tr key={b.id} style={{ borderTop: '1px solid var(--cream-deep)' }}>
-                        <Td>
-                          <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{b.workshop_title || '—'}</span>
-                        </Td>
-                        <Td>{b.user_name || '—'}</Td>
-                        <Td align="right">
-                          <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{baht(b.amount || 0)}</span>
-                        </Td>
-                        <Td>
-                          <span
-                            style={{
-                              fontSize: 11.5,
-                              fontWeight: 600,
-                              borderRadius: 999,
-                              padding: '3px 10px',
-                              background: st.bg,
-                              color: st.fg,
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {st.label}
-                          </span>
-                        </Td>
-                        <Td align="right">
-                          <span className="mono" style={{ fontSize: 11.5, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-                            {fmtDayTime(b.created_at)}
-                          </span>
-                        </Td>
-                      </tr>
-                    );
-                  })}
+                  {shown.map((b) => (
+                    <tr key={b.id} style={{ borderTop: '1px solid var(--cream-deep)' }}>
+                      <Td title={b.workshop_title || undefined}>
+                        <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{b.workshop_title || '—'}</span>
+                      </Td>
+                      <Td title={b.applicant_name || b.user_name || undefined}>
+                        {b.applicant_name || b.user_name || '—'}
+                      </Td>
+                      <Td align="right">
+                        <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{baht(b.amount || 0)}</span>
+                      </Td>
+                      <Td align="right">
+                        <span className="mono" style={{ fontSize: 11.5, color: 'var(--muted)' }}>
+                          {fmtDayTime(b.created_at)}
+                        </span>
+                      </Td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -388,10 +382,38 @@ function RevenueChart({ points, lang }: { points: PaidPoint[]; lang: 'th' | 'en'
           {tr(lang, `สูงสุด ${baht(peak)}`, `peak ${baht(peak)}`)}
         </div>
 
+        {/* The tooltip lives over the bars rather than in a `title`, which a
+            phone never shows: there is no hover on a touch screen, so tapping a
+            bar has to be what opens it. */}
         <div
-          style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 92 }}
+          style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: 2, height: 92 }}
           onMouseLeave={() => setHover(null)}
         >
+          {hover != null && data[hover] && (
+            <div
+              role="status"
+              style={{
+                position: 'absolute',
+                bottom: 'calc(100% + 8px)',
+                left: `${((hover + 0.5) / data.length) * 100}%`,
+                transform: `translateX(${hover < data.length / 2 ? '-20%' : '-80%'})`,
+                background: 'var(--paper)',
+                border: '1px solid var(--cream-deep)',
+                boxShadow: '0 8px 20px -10px rgba(13,30,29,.45)',
+                borderRadius: 10,
+                padding: '7px 11px',
+                whiteSpace: 'nowrap',
+                pointerEvents: 'none',
+                zIndex: 2,
+              }}
+            >
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>{data[hover].label}</div>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)' }}>
+                {data[hover].total.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
+                {tr(lang, 'บาท', 'THB')}
+              </div>
+            </div>
+          )}
           {data.map((d, i) => (
             <button
               key={d.key}
@@ -399,7 +421,7 @@ function RevenueChart({ points, lang }: { points: PaidPoint[]; lang: 'th' | 'en'
               onMouseEnter={() => setHover(i)}
               onFocus={() => setHover(i)}
               onBlur={() => setHover(null)}
-              title={`${d.label} · ${baht(d.total)}`}
+              onClick={() => setHover((cur) => (cur === i ? null : i))}
               aria-label={`${d.label} ${baht(d.total)} · ${d.count} ${tr(lang, 'รายการ', 'bookings')}`}
               style={{
                 flex: 1,
@@ -525,14 +547,49 @@ function buildSeries(points: PaidPoint[], range: (typeof RANGES)[number], lang: 
 
 function Th({ children, align = 'left' }: { children: React.ReactNode; align?: 'left' | 'right' }) {
   return (
-    <th style={{ textAlign: align, padding: '10px 16px', fontSize: 12, fontWeight: 500, color: 'var(--muted)' }}>
+    <th
+      style={{
+        textAlign: align,
+        padding: '10px 16px',
+        fontSize: 12,
+        fontWeight: 500,
+        color: 'var(--muted)',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+      }}
+    >
       {children}
     </th>
   );
 }
 
-function Td({ children, align = 'left' }: { children: React.ReactNode; align?: 'left' | 'right' }) {
-  return <td style={{ textAlign: align, padding: '11px 16px', color: 'var(--muted)' }}>{children}</td>;
+/** One line, clipped with an ellipsis. `title` carries the full text for anyone
+ *  who needs it — the row height stays put however long a workshop is named. */
+function Td({
+  children,
+  align = 'left',
+  title,
+}: {
+  children: React.ReactNode;
+  align?: 'left' | 'right';
+  title?: string;
+}) {
+  return (
+    <td
+      title={title}
+      style={{
+        textAlign: align,
+        padding: '11px 16px',
+        color: 'var(--muted)',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+      }}
+    >
+      {children}
+    </td>
+  );
 }
 
 /* ---------------- helpers ---------------- */
@@ -545,13 +602,6 @@ function averageAge(ages: number[], lang: 'th' | 'en'): string {
   if (ages.length === 0) return '—';
   const mean = ages.reduce((a, n) => a + n, 0) / ages.length;
   return tr(lang, `${Math.round(mean)} ปี`, `${Math.round(mean)} yrs`);
-}
-
-function bookingStatus(b: BookingRow, lang: 'th' | 'en'): { label: string; bg: string; fg: string } {
-  if (b.payment_status === 'paid' || b.status === 'confirmed') {
-    return { label: tr(lang, 'ชำระแล้ว', 'Paid'), bg: 'var(--teal-50)', fg: 'var(--teal-deep)' };
-  }
-  return { label: tr(lang, 'รอชำระ', 'Pending'), bg: '#fcefcf', fg: '#a06a14' };
 }
 
 /** SQLite writes UTC as "YYYY-MM-DD HH:MM:SS" — no T, no Z — which Safari reads

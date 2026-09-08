@@ -92,7 +92,7 @@ export function TeacherSidebar() {
             <path strokeLinecap="round" strokeWidth={1.5} d="M4 7h16M4 12h16M4 17h16" />
           </svg>
         </button>
-        <Logo size="sm" />
+        <Logo size="sm" markOnly />
         <span className="ml-auto text-[11px] text-gray font-mono tracking-wider">TEACHER</span>
       </header>
 
@@ -114,7 +114,7 @@ export function TeacherSidebar() {
       >
         <div className="p-6 border-b border-white/10 flex items-start gap-3">
           <div className="min-w-0">
-            <Logo size="sm" />
+            <Logo size="sm" markOnly />
             <p className="text-xs text-gray mt-1 font-mono tracking-wider">TEACHER</p>
           </div>
           <button

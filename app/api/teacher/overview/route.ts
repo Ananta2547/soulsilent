@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { computePayout } from '@/lib/workshop-utils';
+import { applicantName } from '@/lib/applicant';
 
 // GET /api/teacher/overview — the numbers behind the teacher dashboard's
 // overview: totals, revenue by month, participant ages and recent bookings,
@@ -148,6 +149,12 @@ export async function GET() {
     ages: [...agesByPerson.values()],
     // Nothing else needs the application snapshot, and it holds phone numbers
     // and medical notes — it stays on the server.
-    bookings: bookings.map(({ application_json: _drop, ...rest }) => rest),
+    // The application's own name, not the account's display name — the same
+    // rule the check-in screens use. Worked out here so the snapshot itself,
+    // which carries far more than a name, never leaves the server.
+    bookings: bookings.map(({ application_json, ...rest }) => ({
+      ...rest,
+      applicant_name: applicantName(application_json, rest.user_name),
+    })),
   });
 }

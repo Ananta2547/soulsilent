@@ -3152,8 +3152,13 @@ body {
   .tch-wcard-body {
     padding: 12px;
   }
+  /* One line, then an ellipsis: at half width a three-word title pushed the
+     date and seats off the bottom of a card and the row stopped lining up. */
   .tch-wcard-title {
     font-size: 15px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .tch-wmeta {
     font-size: 12px;

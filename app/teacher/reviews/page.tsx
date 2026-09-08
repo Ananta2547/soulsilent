@@ -99,7 +99,9 @@ export default function TeacherReviewsPage() {
       <section
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          // Two numbers, always one row: at 200px minimum they wrapped on a
+          // phone and the pair read as two unrelated cards.
+          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
           gap: 14,
           marginBottom: 22,
         }}
@@ -258,7 +260,9 @@ function ReviewsSkeleton() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          // Two numbers, always one row: at 200px minimum they wrapped on a
+          // phone and the pair read as two unrelated cards.
+          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
           gap: 14,
           marginBottom: 22,
         }}

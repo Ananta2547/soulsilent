@@ -195,8 +195,18 @@ export default function TeacherWorkshopDetail() {
         {w.payout_slip_url && (
           <div>
             <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>{tr(lang, 'สลิปโอนเงิน', 'Transfer slip')}</div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={w.payout_slip_url} alt="slip" style={{ maxWidth: 240, borderRadius: 12, border: '1px solid var(--cream-deep)' }} />
+            {/* The slip opens on demand. Printed into the card it took a
+                phone screen's worth of height above the participant list,
+                for something read once when the money arrives. */}
+            <a
+              href={w.payout_slip_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-paper"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13.5, padding: '9px 16px' }}
+            >
+              {tr(lang, 'ดูสลิป', 'View slip')} <span aria-hidden className="mono">↗</span>
+            </a>
           </div>
         )}
       </section>
@@ -386,7 +396,7 @@ function ApplicationDetail({ json, lang }: { json: string | null; lang: 'th' | '
   const fmt = (v: unknown) => (Array.isArray(v) ? v.join(', ') : String(v ?? '')) || '—';
 
   return (
-    <div style={{ marginTop: 12, paddingTop: 14, borderTop: '1px dashed var(--cream-deep)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px,1fr))', gap: '10px 16px' }}>
+    <div style={{ marginTop: 12, paddingTop: 14, borderTop: '1px dashed var(--cream-deep)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: '10px 14px' }}>
       <Field label={tr(lang, 'ชื่อ-นามสกุล', 'Full name')} value={p.fullName || '—'} />
       <Field label={tr(lang, 'อายุ', 'Age')} value={p.age != null ? `${p.age}` : '—'} />
       <Field label={tr(lang, 'เพศ', 'Gender')} value={p.gender || '—'} />
