@@ -327,6 +327,14 @@ function Hero({ workshops }: { workshops: Workshop[] }) {
           สำรวจกิจกรรมทั้งหมด&nbsp;&nbsp;<span className="mono">→</span>
         </Link>
       </div>
+
+      {/* Anchors the bottom of the full-height phone hero and says there is
+          more below the fold. Hidden on wider screens, where the next
+          section is already visible. */}
+      <div className="hero-scroll-cue" aria-hidden>
+        <span className="mono">เลื่อนดูกิจกรรม</span>
+        <span className="hero-scroll-line" />
+      </div>
     </section>
   );
 }

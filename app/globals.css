@@ -3279,3 +3279,48 @@ body {
 @media (max-width: 480px) {
   .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 20px 12px; }
 }
+
+/* ---- Hero fills the phone screen ----
+   One screen, one statement: eyebrow, headline, fan, lede and the CTA
+   are sized to land inside the first viewport, so the next section
+   starts below the fold instead of half-showing under the button.
+   The inline padding on the section is what the !important overrides. */
+.hero-scroll-cue { display: none; }
+
+@media (max-width: 640px) {
+  .home-dc #top {
+    min-height: calc(100dvh - 58px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding-top: 18px !important;
+    padding-bottom: 64px !important;
+  }
+  .hero-scroll-cue {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 22px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    opacity: 0.75;
+    pointer-events: none;
+  }
+  .hero-scroll-line {
+    width: 1px;
+    height: 26px;
+    background: linear-gradient(var(--teal), transparent);
+    animation: hero-cue 1.9s ease-in-out infinite;
+  }
+}
+
+@keyframes hero-cue {
+  0%, 100% { transform: translateY(0); opacity: 0.9; }
+  50% { transform: translateY(5px); opacity: 0.35; }
+}
