@@ -997,6 +997,7 @@ body {
 
 /* mobile dropdown → bottom sheet */
 .prof-pop-backdrop { display: none; }
+.prof-grab { display: none; }
 @media (max-width: 560px) {
   .prof-pop {
     position: fixed !important; top: auto !important; bottom: 0 !important; right: 0 !important; left: 0 !important;
@@ -1008,6 +1009,22 @@ body {
   .prof-pop-backdrop {
     display: block; position: fixed; inset: 0; z-index: 79;
     background: rgba(13, 30, 29, .4); animation: fadeIn .2s ease;
+  }
+  /* Drag-to-dismiss: the handle says the sheet can be pulled down, and
+     overscroll-behavior stops the pull from scrolling the page behind it. */
+  .prof-pop { overscroll-behavior: contain; touch-action: pan-y; }
+  .prof-grab {
+    display: block;
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 42px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .55);
+    z-index: 2;
+    pointer-events: none;
   }
 }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

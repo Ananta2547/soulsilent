@@ -79,14 +79,57 @@ export function ProfileDropdown({
   const display = user.nickname || user.name;
   const age = calcAge(user.date_of_birth);
 
+  /* Drag-to-dismiss for the mobile sheet. A drag only starts when the sheet is
+     scrolled to the top, so flicking through a long menu never drags it shut.
+     Upward pull is damped — the sheet is already at the bottom of the screen. */
+  const dragFrom = useRef<number | null>(null);
+  const dragStartedAt = useRef(0);
+  const [dragY, setDragY] = useState(0);
+
+  function onTouchStart(e: React.TouchEvent) {
+    if (!isMobile) return;
+    if (ref.current && ref.current.scrollTop > 0) return;
+    dragFrom.current = e.touches[0].clientY;
+    dragStartedAt.current = Date.now();
+  }
+
+  function onTouchMove(e: React.TouchEvent) {
+    if (dragFrom.current == null) return;
+    const dy = e.touches[0].clientY - dragFrom.current;
+    setDragY(dy > 0 ? dy : dy / 5);
+  }
+
+  function onTouchEnd() {
+    if (dragFrom.current == null) return;
+    const dt = Date.now() - dragStartedAt.current;
+    dragFrom.current = null;
+    // Far enough, or a short flick — either reads as "close this".
+    if (dragY > 110 || (dragY > 44 && dt < 280)) {
+      onClose();
+      return;
+    }
+    setDragY(0);
+  }
+
+  const dragging = dragFrom.current != null;
+
   const tree = (
     <>
       {/* Dim backdrop — only shown on mobile where the menu is a bottom sheet. */}
-      <div className="prof-pop-backdrop" aria-hidden onClick={onClose} />
+      <div
+        className="prof-pop-backdrop"
+        aria-hidden
+        onClick={onClose}
+        style={dragY > 0 ? { opacity: Math.max(0.25, 1 - dragY / 320), animation: 'none' } : undefined}
+      />
     <div
       ref={ref}
       className="prof-pop"
       role="menu"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onTouchCancel={onTouchEnd}
       style={{
         position: 'absolute',
         top: 'calc(100% + 12px)',
@@ -98,9 +141,16 @@ export function ProfileDropdown({
         overflow: 'hidden',
         boxShadow: '0 24px 60px -18px rgba(13,30,29,.42), 0 0 0 1px rgba(13,30,29,.05)',
         transformOrigin: 'top right',
-        animation: 'popIn .22s cubic-bezier(.2,.8,.2,1)',
+        animation: dragY !== 0 ? 'none' : 'popIn .22s cubic-bezier(.2,.8,.2,1)',
+        ...(dragY !== 0
+          ? { transform: `translateY(${Math.max(dragY, -24)}px)` }
+          : null),
+        transition: dragging ? 'none' : 'transform .26s cubic-bezier(.2,.8,.2,1)',
       }}
     >
+      {/* Grab handle — mobile only; also the obvious place to start the drag. */}
+      <span className="prof-grab" aria-hidden />
+
       {/* header: cover + avatar */}
       <div style={{ position: 'relative' }}>
         <div
