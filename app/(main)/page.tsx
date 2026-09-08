@@ -343,8 +343,8 @@ function EventCard({ w }: { w: Workshop }) {
       ? Math.round((1 - eff.price / eff.originalPrice) * 100)
       : 0;
   return (
-    <Link href={`/workshops/${w.id}`} className="card reveal-up" style={{ padding: 16, display: 'flex', flexDirection: 'column', textDecoration: 'none', color: 'var(--ink)' }}>
-      <div className="ph ph-teal card-media" style={{ aspectRatio: '3/4', borderRadius: 14, marginBottom: 14, position: 'relative', overflow: 'hidden' }}>
+    <Link href={`/workshops/${w.id}`} className="card reveal-up dc-event-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', textDecoration: 'none', color: 'var(--ink)' }}>
+      <div className="ph ph-teal card-media dc-ev-media" style={{ aspectRatio: '3/4', borderRadius: 14, marginBottom: 14, position: 'relative', overflow: 'hidden' }}>
         {w.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={w.image_url} alt={w.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -402,8 +402,8 @@ function EventCard({ w }: { w: Workshop }) {
         </span>
         <span className="tag">{w.category || 'ONSITE'}</span>
       </div>
-      <h3 className="display-th u-clamp-2" style={{ fontSize: 17, margin: '0 0 8px', lineHeight: 1.25, minHeight: '2.5em' }}>{w.title}</h3>
-      <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <h3 className="display-th u-clamp-2 dc-ev-title" style={{ fontSize: 17, margin: '0 0 8px', lineHeight: 1.25, minHeight: '2.5em' }}>{w.title}</h3>
+      <div className="dc-ev-meta" style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: 3 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <Icon name="date" size={14} />
           <span>{cardDateLabel(w)}</span>
@@ -419,21 +419,21 @@ function EventCard({ w }: { w: Workshop }) {
           </div>
         )}
       </div>
-      <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12 }}>
+      <div className="dc-ev-foot" style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12 }}>
         <div>
           <div className="mono" style={{ fontSize: 9.5, color: 'var(--muted)', letterSpacing: '.1em', textTransform: 'uppercase' }}>เริ่มต้น</div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
-            <div style={{ fontFamily: 'var(--font-display-th)', fontWeight: 600, fontSize: 19, color: 'var(--teal)' }}>{free ? 'ฟรี' : `฿${eff.price.toLocaleString()}`}</div>
+            <div className="dc-ev-price" style={{ fontFamily: 'var(--font-display-th)', fontWeight: 600, fontSize: 19, color: 'var(--teal)' }}>{free ? 'ฟรี' : `฿${eff.price.toLocaleString()}`}</div>
             {discountPct > 0 && eff.originalPrice && (
               <div style={{ fontSize: 13, color: 'var(--muted)', textDecoration: 'line-through' }}>฿{eff.originalPrice.toLocaleString()}</div>
             )}
           </div>
         </div>
         {open ? (
-          <span className="btn btn-teal btn-sm" aria-hidden>{ctaLabel} <span className="mono">→</span></span>
+          <span className="btn btn-teal btn-sm dc-ev-cta" aria-hidden>{ctaLabel} <span className="mono">→</span></span>
         ) : (
           <span
-            className="btn btn-sm"
+            className="btn btn-sm dc-ev-cta"
             aria-hidden
             style={{ background: '#e6e3da', color: 'var(--muted)', cursor: 'not-allowed' }}
           >
@@ -485,6 +485,7 @@ function UpcomingEvents({ workshops }: { workshops: Workshop[] }) {
                   <button
                     key={c}
                     onClick={() => setFilter(c)}
+                    className="dc-filter-pill"
                     style={{ fontFamily: 'inherit', cursor: 'pointer', border: 0, borderRadius: 999, padding: '10px 20px', fontSize: 13.5, fontWeight: 600, background: active ? 'var(--ink)' : 'var(--paper)', color: active ? '#fff' : 'var(--ink)' }}
                   >
                     {c}
@@ -536,9 +537,9 @@ function ArticlesSection({ lead, side, categories }: { lead?: Article; side: Art
               พื้นที่ของความทรงจำ<br /><span style={{ color: 'var(--teal)' }}>บทความ</span> ข่าวสาร
             </h2>
           </div>
-          <div style={{ maxWidth: 480, textAlign: 'right', alignSelf: 'flex-end' }}>
+          <div className="dc-art-intro" style={{ maxWidth: 480, textAlign: 'right', alignSelf: 'flex-end' }}>
             <p style={{ margin: '0 0 12px', fontSize: 14.5, lineHeight: 1.6, color: 'var(--muted)' }}>
-              <span style={{ whiteSpace: 'nowrap' }}>บันทึกจากเรื่องราว มุมมอง และประสบการณ์จากทีม Soul Silent</span><br />เปิดมาอ่านเล่นตอนว่างในวันหยุด หรือก่อนเข้านอน
+              <span className="dc-nowrap-lg">บันทึกจากเรื่องราว มุมมอง และประสบการณ์จากทีม Soul Silent</span><br />เปิดมาอ่านเล่นตอนว่างในวันหยุด หรือก่อนเข้านอน
             </p>
             <Link href="/articles" style={{ fontWeight: 700, fontSize: 14 }}>archive ทั้งหมด <span className="mono">→</span></Link>
           </div>

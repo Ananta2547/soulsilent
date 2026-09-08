@@ -3169,3 +3169,128 @@ body {
     padding: 3px 7px;
   }
 }
+
+/* ============================================================
+   Mobile pass — header + home page
+   Phones get their own composition rather than a shrunken desktop
+   one: the header keeps a single row of round tap targets, the hero
+   fan becomes a swipeable row of readable tickets, and the card
+   grids go two-up so a thumb can scan them.
+   Several rules carry !important because the components they style
+   set the same properties inline (the hero fan animates through
+   inline transforms, and the home cards are inline-styled ports of
+   the design file).
+   ============================================================ */
+
+/* ---- Header ---- */
+.nav-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--cream);
+  color: var(--ink);
+  border: 0;
+  padding: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+.nav-icon-btn:hover { background: var(--teal); color: #fff; }
+.nav-icon-btn:active { transform: scale(0.94); }
+
+@media (max-width: 560px) {
+  .nav-bar { gap: 6px; padding: 10px 14px; }
+  .nav-icon-btn { width: 38px; height: 38px; }
+  .nav-logo svg { height: 21px !important; }
+}
+
+/* ---- Drawer ---- */
+.drawer { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
+.drawer-links { display: flex; flex-direction: column; margin-top: 12px; }
+.drawer-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 15px 2px;
+  font-family: Mitr, sans-serif;
+  font-weight: 500;
+  font-size: 22px;
+  line-height: 1.3;
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(13, 30, 29, 0.08);
+}
+.drawer-link:last-child { border-bottom: 0; }
+.drawer-link .mono { font-size: 15px; color: var(--teal); opacity: 0.55; }
+.drawer-link:active { color: var(--teal); }
+
+/* ---- Hero fan → swipe row ---- */
+@media (max-width: 640px) {
+  .home-dc .giant-en { font-size: clamp(42px, 14vw, 76px); margin: 0 0 12px; }
+  .fan-wrap {
+    position: static;
+    height: auto;
+    max-width: none;
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    margin: 0 -18px;
+    padding: 8px 18px 22px;
+    transform: none !important;
+  }
+  .fan-wrap::-webkit-scrollbar { display: none; }
+  .fan-card {
+    position: static !important;
+    flex: 0 0 172px;
+    width: 172px !important;
+    height: 236px !important;
+    border-radius: 16px;
+    transform: none !important;
+    filter: none !important;
+    scroll-snap-align: center;
+    box-shadow: 0 16px 30px -16px rgba(13, 30, 29, 0.45) !important;
+  }
+  .home-dc .hero-lede { margin-top: 6px !important; font-size: 15px; }
+}
+
+/* ---- Upcoming events ---- */
+@media (max-width: 560px) {
+  .dc-filter-pill { padding: 8px 14px !important; font-size: 12.5px !important; }
+  .dc-events-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 12px; }
+  .dc-event-card { padding: 10px !important; border-radius: 16px; }
+  .dc-event-card .dc-ev-media { margin-bottom: 10px !important; border-radius: 12px; }
+  .dc-event-card .tag { font-size: 10px; padding: 3px 8px; }
+  .dc-event-card .dc-ev-title { font-size: 14.5px !important; margin-bottom: 6px !important; }
+  .dc-event-card .dc-ev-meta { font-size: 11.5px !important; margin-bottom: 8px !important; }
+  .dc-event-card .dc-ev-foot { display: block !important; padding-top: 8px !important; }
+  .dc-event-card .dc-ev-price { font-size: 16px !important; }
+  .dc-event-card .dc-ev-cta {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    margin-top: 8px;
+    padding: 8px 12px;
+    font-size: 12.5px;
+  }
+}
+
+/* ---- Articles intro ---- */
+.dc-nowrap-lg { white-space: nowrap; }
+@media (max-width: 900px) {
+  .dc-nowrap-lg { white-space: normal; }
+  .dc-art-intro { text-align: left !important; }
+}
+
+/* ---- Stats ---- */
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 20px 12px; }
+}

@@ -47,6 +47,7 @@ export function SiteHeader() {
         <div className="nav-bar">
           <Link
             href="/"
+            className="nav-logo"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -74,26 +75,7 @@ export function SiteHeader() {
             href="/calendar"
             aria-label={tr(lang, 'ปฏิทิน', 'Calendar')}
             title={tr(lang, 'ปฏิทิน Workshop', 'Workshop Calendar')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 44,
-              height: 44,
-              borderRadius: '50%',
-              background: 'var(--cream)',
-              color: 'var(--ink)',
-              textDecoration: 'none',
-              transition: 'background .18s ease, color .18s ease, transform .18s ease',
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.background = 'var(--teal)';
-              e.currentTarget.style.color = '#fff';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.background = 'var(--cream)';
-              e.currentTarget.style.color = 'var(--ink)';
-            }}
+            className="nav-icon-btn"
           >
             <CalendarDaysIcon color="currentColor" size={18} />
           </Link>
@@ -168,15 +150,14 @@ export function SiteHeader() {
           )}
 
           <button
-            className="show-sm"
+            className="show-sm nav-icon-btn"
             onClick={() => setDrawerOpen(true)}
-            style={{ background: 'transparent', border: 0, padding: 8, cursor: 'pointer' }}
             aria-label="Menu"
           >
-            <svg width="22" height="22" viewBox="0 0 22 22">
+            <svg width="20" height="20" viewBox="0 0 22 22">
               <path
                 d="M3 6 H 19 M3 11 H 19 M3 16 H 19"
-                stroke="var(--ink)"
+                stroke="currentColor"
                 strokeWidth="2"
                 strokeLinecap="round"
               />
@@ -190,36 +171,31 @@ export function SiteHeader() {
           <AllSoulLearnLogo height={24} />
           <button
             onClick={() => setDrawerOpen(false)}
-            style={{
-              background: 'transparent',
-              border: 0,
-              padding: 8,
-              cursor: 'pointer',
-              fontSize: 18,
-            }}
+            className="nav-icon-btn"
+            style={{ fontSize: 18 }}
             aria-label="Close"
           >
             ✕
           </button>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 18 }}>
+        <div className="drawer-links">
           {links.map((l) => (
             <Link
               key={l.href}
               href={l.href}
               onClick={() => setDrawerOpen(false)}
-              style={{
-                padding: '16px 4px',
-                fontSize: 24,
-                fontFamily: 'Mitr',
-                fontWeight: 500,
-                textDecoration: 'none',
-                color: 'var(--ink)',
-              }}
+              className="drawer-link"
             >
               {tr(lang, l.th, l.en)}
+              <span aria-hidden className="mono">→</span>
             </Link>
           ))}
+          {/* The calendar is a round icon in the bar; spelled out here so the
+              drawer carries every destination the header does. */}
+          <Link href="/calendar" onClick={() => setDrawerOpen(false)} className="drawer-link">
+            {tr(lang, 'ปฏิทินกิจกรรม', 'Calendar')}
+            <span aria-hidden className="mono">→</span>
+          </Link>
         </div>
         <div style={{ marginTop: 'auto', display: 'flex', gap: 10 }}>
           {!user ? (
