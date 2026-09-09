@@ -3634,11 +3634,32 @@ body {
    <button> brings with it. */
 .jn-card { width: 100%; text-align: left; border: 1px solid rgba(13, 30, 29, 0.07); font: inherit; cursor: pointer; background: var(--paper); }
 
+.jn-modal-grab { display: none; }
+
 @media (max-width: 860px) {
   .jn-stats { padding: 14px 16px; }
-  .jn-modal { grid-template-columns: 1fr; max-height: 92vh; border-radius: 22px; }
+  .jn-modal { grid-template-columns: 1fr; max-height: 92vh; border-radius: 22px; overscroll-behavior: contain; touch-action: pan-y; }
+  /* Says the sheet can be pulled down, and gives the thumb somewhere to start. */
+  .jn-modal-grab {
+    display: block;
+    position: absolute;
+    top: 9px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 42px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--cream-deep);
+    z-index: 3;
+    pointer-events: none;
+  }
+  .jn-modal-close { top: 20px; }
+  .jn-modal-poster { padding-top: 28px; }
   .jn-modal-poster { padding: 22px 20px 18px; }
-  .jn-modal-poster-frame { max-width: 240px; margin: 0 auto; }
+  /* An explicit width, not just a max: auto cross-axis margins on a flex item
+     switch off the stretch that was sizing this, which collapsed the frame to
+     its content. */
+  .jn-modal-poster-frame { width: 240px; max-width: 100%; margin: 0 auto; }
   .jn-modal-body { padding: 22px 20px 26px; }
   .jn-modal-title { font-size: 23px; }
   .jn-modal-backdrop { padding: 0; align-items: flex-end; }
@@ -3646,7 +3667,25 @@ body {
 }
 
 @media (max-width: 560px) {
-  .jn-stat-row { gap: 8px; }
-  .jn-stat-n { font-size: 30px; }
-  .jn-stats { padding: 12px 14px; }
+  /* Three columns of equal width, hairline-divided, each centred under its own
+     figure. The eyebrow's leading dash is dropped here — at this width it ate
+     the room the label needed and pushed every caption onto three lines. */
+  .jn-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    padding: 14px 4px;
+    border-radius: 16px;
+  }
+  .jn-stats > div { text-align: center; padding: 0 6px; min-width: 0; }
+  .jn-stats > div + div { border-left: 1px solid var(--cream-deep); }
+  .jn-stat-row { justify-content: center; gap: 6px; }
+  .jn-stat-n { font-size: 26px; }
+  .jn-stats .eyebrow {
+    font-size: 9px;
+    letter-spacing: 0.05em;
+    gap: 0;
+    line-height: 1.35;
+    display: block;
+  }
+  .jn-stats .eyebrow::before { display: none; }
 }

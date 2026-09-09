@@ -6,7 +6,7 @@
  * reader back exactly where they were. The full page still exists at
  * /me/journey/<workshop> for a deep link. */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useLang, tr } from '@/lib/i18n';
 import { Icon, Stars } from '@/components/design/Icon';
@@ -32,6 +32,39 @@ export function JourneyModal({
   const [saving, setSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
+
+  /* On a phone this is a bottom sheet, so it closes the way sheets do — pulled
+     down. The drag only starts when the sheet is scrolled to the top, so
+     reading a long stop still scrolls normally. Mirrors the profile sheet. */
+  const sheet = useRef<HTMLDivElement>(null);
+  const dragFrom = useRef<number | null>(null);
+  const dragStartedAt = useRef(0);
+  const [dragY, setDragY] = useState(0);
+
+  function onTouchStart(e: React.TouchEvent) {
+    if (sheet.current && sheet.current.scrollTop > 0) return;
+    dragFrom.current = e.touches[0].clientY;
+    dragStartedAt.current = Date.now();
+  }
+
+  function onTouchMove(e: React.TouchEvent) {
+    if (dragFrom.current == null) return;
+    const dy = e.touches[0].clientY - dragFrom.current;
+    setDragY(dy > 0 ? dy : dy / 5);
+  }
+
+  function onTouchEnd() {
+    if (dragFrom.current == null) return;
+    const dt = Date.now() - dragStartedAt.current;
+    dragFrom.current = null;
+    if (dragY > 110 || (dragY > 44 && dt < 280)) {
+      onClose();
+      return;
+    }
+    setDragY(0);
+  }
+
+  const dragging = dragFrom.current != null;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -83,7 +116,22 @@ export function JourneyModal({
           if (e.target === e.currentTarget) onClose();
         }}
       >
-        <div className="jn-modal" role="dialog" aria-modal="true" aria-label={item.title}>
+        <div
+          ref={sheet}
+          className="jn-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label={item.title}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+          onTouchCancel={onTouchEnd}
+          style={{
+            ...(dragY !== 0 ? { transform: `translateY(${Math.max(dragY, -24)}px)`, animation: 'none' } : null),
+            transition: dragging ? 'none' : 'transform .26s cubic-bezier(.2,.8,.2,1)',
+          }}
+        >
+          <span className="jn-modal-grab" aria-hidden />
           <button type="button" className="jn-modal-close" onClick={onClose} aria-label={tr(lang, 'ปิด', 'Close')}>
             ✕
           </button>
