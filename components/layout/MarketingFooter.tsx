@@ -21,12 +21,14 @@ function SocialIcon({ label }: { label: string }) {
   }
 }
 
-const SOCIALS: { label: string; href: string }[] = [
-  { label: 'Facebook', href: 'https://www.facebook.com/profile.php?id=100088101092600' },
-  { label: 'Instagram', href: 'https://www.instagram.com/soulsilent.official/' },
-  { label: 'YouTube', href: 'https://www.youtube.com/@SoulSilentOfficial' },
-  { label: 'TikTok', href: 'https://www.tiktok.com/@soulsilent.tk?is_from_webapp=1&sender_device=pc' },
-  { label: 'X', href: 'https://x.com/soulsilent_x' },
+/** An entry with no href is shown but not clickable — the account exists in the
+ *  set, its link just hasn't been given yet (Instagram). */
+const SOCIALS: { label: string; href?: string }[] = [
+  { label: 'Facebook', href: 'https://www.facebook.com/allsoullearn' },
+  { label: 'Instagram' },
+  { label: 'YouTube', href: 'https://www.youtube.com/@allsoullearn' },
+  { label: 'TikTok', href: 'https://www.tiktok.com/@allsoullearn' },
+  { label: 'X', href: 'https://x.com/allsoullearn' },
 ];
 
 const FOOTER_NAV = [
@@ -43,11 +45,18 @@ export function MarketingFooter() {
       <div style={{ background: 'var(--teal-deep)', padding: '52px 0', textAlign: 'center' }}>
         <div className="mono" style={{ color: '#fff', letterSpacing: '.16em', fontSize: 14, textTransform: 'uppercase', fontWeight: 700, marginBottom: 22 }}>ติดตามเรา</div>
         <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
-          {SOCIALS.map((s) => (
-            <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer" aria-label={s.label} style={{ width: 42, height: 42, borderRadius: '50%', background: 'rgba(255,255,255,.14)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
-              <SocialIcon label={s.label} />
-            </a>
-          ))}
+          {SOCIALS.map((s) => {
+            const dot = { width: 42, height: 42, borderRadius: '50%', background: 'rgba(255,255,255,.14)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff' } as const;
+            return s.href ? (
+              <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer" aria-label={s.label} style={dot}>
+                <SocialIcon label={s.label} />
+              </a>
+            ) : (
+              <span key={s.label} aria-label={s.label} style={{ ...dot, opacity: 0.45 }}>
+                <SocialIcon label={s.label} />
+              </span>
+            );
+          })}
         </div>
       </div>
 

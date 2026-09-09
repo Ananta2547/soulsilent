@@ -3218,6 +3218,13 @@ body {
 }
 .nav-icon-btn:hover { background: var(--teal); color: #fff; }
 .nav-icon-btn:active { transform: scale(0.94); }
+/* The hamburger is one of these buttons and also carries .show-sm. This class
+   sets `display`, and it is declared after .show-sm, so without this pair the
+   menu button reappears on desktop beside the full nav. */
+.nav-icon-btn.show-sm { display: none; }
+@media (max-width: 760px) {
+  .nav-icon-btn.show-sm { display: inline-flex; }
+}
 
 @media (max-width: 560px) {
   .nav-bar { gap: 6px; padding: 10px 14px; }
@@ -3431,15 +3438,6 @@ body {
 .jn-dot-open { background: var(--accent); box-shadow: 0 0 0 6px rgba(240, 180, 41, 0.16); }
 
 .jn-next { background: var(--cream); border-radius: 22px; padding: 26px 28px; box-sizing: border-box; }
-.jn-script {
-  display: block;
-  font-family: 'Caveat', cursive;
-  font-size: 24px;
-  color: var(--teal);
-  margin-top: 16px;
-  transform: rotate(-3deg);
-}
-
 .jn-card { display: block; padding: 0; overflow: hidden; text-decoration: none; color: var(--ink); box-sizing: border-box; }
 .jn-poster {
   aspect-ratio: 297 / 420;
@@ -3513,4 +3511,142 @@ body {
   .wk-filters { gap: 10px !important; }
   .wk-filters .filter-pill { padding: 8px 14px !important; font-size: 12.5px !important; }
   .wk-filters .tag { font-size: 11px; padding: 4px 9px; }
+}
+
+/* ---- My Journey: header figures + the stop popup ---- */
+.jn-stats {
+  border: 1px solid var(--cream-deep);
+  border-radius: 18px;
+  padding: 16px 26px;
+  background: var(--paper);
+}
+.jn-stat-row { display: flex; align-items: center; gap: 12px; }
+.jn-stat-n { font-family: 'Archivo Black', sans-serif; font-size: 46px; line-height: 1; }
+
+.jn-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(13, 30, 29, 0.5);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  animation: fadeIn 0.18s ease;
+}
+.jn-modal {
+  position: relative;
+  display: grid;
+  grid-template-columns: 400px 1fr;
+  width: min(1040px, 100%);
+  max-height: 88vh;
+  overflow: auto;
+  background: var(--paper);
+  border-radius: 26px;
+  box-shadow: 0 40px 90px -30px rgba(13, 30, 29, 0.55);
+  animation: popIn 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.jn-modal-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--cream);
+  color: var(--ink);
+  font-size: 15px;
+  cursor: pointer;
+  z-index: 2;
+}
+.jn-modal-close:hover { background: var(--cream-deep); }
+
+.jn-modal-poster { background: var(--cream); padding: 28px 26px; display: flex; flex-direction: column; }
+.jn-modal-poster-frame {
+  border-radius: 14px;
+  overflow: hidden;
+  aspect-ratio: 297 / 420;
+  background: var(--cream-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 24px 48px -26px rgba(13, 30, 29, 0.5);
+}
+.jn-modal-poster-frame img { width: 100%; height: 100%; object-fit: cover; }
+.jn-modal-size {
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  text-align: center;
+  margin-top: 12px;
+}
+.jn-modal-full { margin-top: 14px; justify-content: center; width: 100%; box-sizing: border-box; }
+
+.jn-modal-body { padding: 30px 34px 34px; min-width: 0; }
+.jn-modal-title {
+  font-family: Mitr, sans-serif;
+  font-weight: 500;
+  font-size: 30px;
+  line-height: 1.2;
+  margin: 12px 0 16px;
+}
+.jn-modal-drive {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--teal-50);
+  border-radius: 18px;
+  padding: 16px 20px;
+  margin-top: 22px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.jn-modal-drive-mark {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--teal);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.jn-modal-note { margin-top: 22px; background: var(--cream); border-radius: 22px; padding: 22px 24px; }
+.jn-modal-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 14px;
+  background: var(--paper);
+  border: 1px solid var(--cream-deep);
+  border-radius: 14px;
+  padding: 14px 16px;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+/* The card is a button now (it opens the popup), so it needs the resets a
+   <button> brings with it. */
+.jn-card { width: 100%; text-align: left; border: 1px solid rgba(13, 30, 29, 0.07); font: inherit; cursor: pointer; background: var(--paper); }
+
+@media (max-width: 860px) {
+  .jn-stats { padding: 14px 16px; }
+  .jn-modal { grid-template-columns: 1fr; max-height: 92vh; border-radius: 22px; }
+  .jn-modal-poster { padding: 22px 20px 18px; }
+  .jn-modal-poster-frame { max-width: 240px; margin: 0 auto; }
+  .jn-modal-body { padding: 22px 20px 26px; }
+  .jn-modal-title { font-size: 23px; }
+  .jn-modal-backdrop { padding: 0; align-items: flex-end; }
+  .jn-modal { border-radius: 22px 22px 0 0; }
+}
+
+@media (max-width: 560px) {
+  .jn-stat-row { gap: 8px; }
+  .jn-stat-n { font-size: 30px; }
+  .jn-stats { padding: 12px 14px; }
 }

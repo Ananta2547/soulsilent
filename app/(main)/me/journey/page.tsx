@@ -17,6 +17,7 @@ import { useLang, T, tr } from '@/lib/i18n';
 import { Btn } from '@/components/design/RippleButton';
 import { Icon } from '@/components/design/Icon';
 import { useLoadingTracker } from '@/components/design/DataLoading';
+import { JourneyModal } from '@/components/journey/JourneyModal';
 import { getWorkshopDays } from '@/lib/workshop-utils';
 import { type JourneyItem, fmtJourneyDate } from '@/lib/journey';
 
@@ -44,6 +45,8 @@ export default function MyJourneyPage() {
   const [items, setItems] = useState<JourneyItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [unauthorized, setUnauthorized] = useState(false);
+  /** booking_id of the stop opened in the popup, or null. */
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const track = useLoadingTracker();
 
@@ -73,6 +76,11 @@ export default function MyJourneyPage() {
     return { hours: Math.round(hours), notes, firstYear };
   }, [items]);
 
+  /* The stop shown in the popup. Items arrive newest-first, so the stop number
+     the design prints ("จุดที่ 03") counts up from the oldest. */
+  const openIdx = items.findIndex((x) => x.booking_id === openId);
+  const openStop = openIdx >= 0 ? { item: items[openIdx], index: items.length - openIdx } : null;
+
   // Nothing to draw while this page's requests are open — the loading screen is
   // over it already (components/design/DataLoading.tsx).
   if (loading) return null;
@@ -99,15 +107,15 @@ export default function MyJourneyPage() {
             <p style={{ fontSize: 15, lineHeight: 1.6, color: 'var(--muted)', margin: 0 }}>
               {tr(
                 lang,
-                'ทุก workshop ที่คุณเดินผ่านมา เรียงเป็นเส้นทางเดียว — แตะที่การ์ดเพื่อเปิดความทรงจำของวันนั้น',
-                'Every workshop you have walked through, laid out as one path — tap a card to open that day.',
+                'เก็บบันทึกทุกความทรงจำ จากทุกประสบการณ์',
+                'Every memory kept, from every experience.',
               )}
             </p>
           </div>
           <div className="jn-stats">
-            <Stat n={String(items.length).padStart(2, '0')} label="WORKSHOPS" teal />
-            <Stat n={String(stats.hours)} label={tr(lang, 'ชั่วโมงเรียนรู้', 'hours')} />
-            <Stat n={String(stats.notes)} label={tr(lang, 'บันทึกความทรงจำ', 'memory notes')} />
+            <Stat n={String(items.length).padStart(2, '0')} icon="date" label="WORKSHOPS" teal />
+            <Stat n={String(stats.hours)} icon="time" label={tr(lang, 'ชั่วโมงเรียนรู้', 'hours')} />
+            <Stat n={String(stats.notes)} icon="notes" label={tr(lang, 'บันทึกความทรงจำ', 'memory notes')} />
           </div>
         </div>
 
@@ -127,10 +135,7 @@ export default function MyJourneyPage() {
             <div className="jn-node jn-node-next">
               <div className="jn-dot jn-dot-open" aria-hidden />
               <div className="jn-next">
-                <span className="eyebrow" style={{ color: 'var(--muted)' }}>
-                  <T th="ต่อไป" en="next" />
-                </span>
-                <div style={{ fontFamily: 'Mitr, sans-serif', fontWeight: 500, fontSize: 20, lineHeight: 1.35, margin: '12px 0 18px' }}>
+                <div style={{ fontFamily: 'Mitr, sans-serif', fontWeight: 500, fontSize: 20, lineHeight: 1.35, margin: '0 0 18px' }}>
                   <T
                     th={<>เส้นทางยังไม่จบ<br />หา workshop ถัดไปกันไหม</>}
                     en={<>The path isn&apos;t over<br />shall we find the next one?</>}
@@ -139,14 +144,18 @@ export default function MyJourneyPage() {
                 <Link href="/workshops" className="btn btn-teal">
                   {tr(lang, 'ดูกิจกรรมทั้งหมด', 'Browse workshops')} <span className="mono">→</span>
                 </Link>
-                <span className="jn-script">it can be fun! ✺</span>
               </div>
             </div>
 
             {items.map((it) => (
               <div className="jn-node" key={it.booking_id}>
                 <div className="jn-dot" aria-hidden />
-                <Link href={`/me/journey/${it.workshop_id}`} className="card jn-card">
+                <button
+                  type="button"
+                  onClick={() => setOpenId(it.booking_id)}
+                  className="card jn-card"
+                  aria-haspopup="dialog"
+                >
                   <div className="jn-poster">
                     {it.image_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -171,7 +180,7 @@ export default function MyJourneyPage() {
                       </span>
                     </div>
                   </div>
-                </Link>
+                </button>
               </div>
             ))}
 
@@ -185,14 +194,39 @@ export default function MyJourneyPage() {
           </div>
         )}
       </div>
+
+      {openStop && (
+        <JourneyModal
+          item={openStop.item}
+          index={openStop.index}
+          onClose={() => setOpenId(null)}
+          onChange={(next) =>
+            setItems((prev) => prev.map((x) => (x.booking_id === next.booking_id ? next : x)))
+          }
+        />
+      )}
     </section>
   );
 }
 
-function Stat({ n, label, teal = false }: { n: string; label: string; teal?: boolean }) {
+/** One figure in the header strip: the number, its icon, and what it counts. */
+function Stat({
+  n,
+  label,
+  icon,
+  teal = false,
+}: {
+  n: string;
+  label: string;
+  icon: 'date' | 'time' | 'notes';
+  teal?: boolean;
+}) {
   return (
     <div>
-      <div className="jn-stat-n" style={teal ? { color: 'var(--teal)' } : undefined}>{n}</div>
+      <div className="jn-stat-row">
+        <span className="jn-stat-n" style={teal ? { color: 'var(--teal)' } : undefined}>{n}</span>
+        <Icon name={icon} size={26} style={{ color: teal ? 'var(--teal)' : 'var(--ink)' }} />
+      </div>
       <div style={{ marginTop: 8 }}>
         <span className="eyebrow" style={{ color: 'var(--muted)' }}>{label}</span>
       </div>

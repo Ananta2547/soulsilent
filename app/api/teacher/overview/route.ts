@@ -90,12 +90,14 @@ export async function GET() {
     .bind(u.sub, u.sub)
     .all<{ month: string; total: number; count: number }>();
 
-  // Every collected payment of the last year, as (when, how much). The chart's
-  // range filter buckets these itself — a monthly roll-up cannot answer "the
-  // last 7 days", and these rows are few enough to send whole.
+  // Every collected payment of the last year, as (when, how much, which
+  // workshop, whose). The chart's range filter buckets these itself — a monthly
+  // roll-up cannot answer "the last 7 days" — and the four figures above the
+  // chart are worked out from the same rows, so they follow the same window.
   const paidRes = await db
     .prepare(
-      `SELECT b.created_at AS at, b.amount AS amount
+      `SELECT b.created_at AS at, b.amount AS amount, b.workshop_id AS workshop_id,
+              COALESCE(b.user_id, b.id) AS person, b.application_json AS application_json
          FROM bookings b
          JOIN workshops w ON w.id = b.workshop_id
         WHERE ${OWNED} AND ${COLLECTED}
@@ -103,7 +105,26 @@ export async function GET() {
         ORDER BY b.created_at ASC`,
     )
     .bind(u.sub, u.sub)
-    .all<{ at: string; amount: number }>();
+    .all<{ at: string; amount: number; workshop_id: string; person: string; application_json: string | null }>();
+
+  /** The applicant's age, or null. The snapshot itself never leaves the server. */
+  const ageOf = (json: string | null): number | null => {
+    if (!json) return null;
+    try {
+      const age = (JSON.parse(json) as { profile?: { age?: number | null } }).profile?.age;
+      return typeof age === 'number' && age > 0 && age <= 120 ? age : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const paidPoints = (paidRes.results || []).map((p) => ({
+    at: p.at,
+    amount: p.amount,
+    workshop_id: p.workshop_id,
+    person: p.person,
+    age: ageOf(p.application_json),
+  }));
 
   // Every booking on this teacher's workshops, newest first. Cancelled rows are
   // included: the page decides what to hide, and the activity a teacher reads
@@ -143,7 +164,14 @@ export async function GET() {
   return NextResponse.json({
     totals: { workshops: workshops.length, participants, gross, net },
     monthly: monthlyRes.results || [],
-    paidPoints: paidRes.results || [],
+    paidPoints,
+    // Payout terms per workshop, so the page can work out net revenue for any
+    // slice of time the reader picks — a single net figure could not be sliced.
+    payouts: workshops.map((w) => ({
+      id: w.id,
+      type: w.payout_deduction_type,
+      value: w.payout_deduction_value,
+    })),
     // The band is worked out on the page; the raw ages travel so it can also
     // say how many people the average rests on.
     ages: [...agesByPerson.values()],

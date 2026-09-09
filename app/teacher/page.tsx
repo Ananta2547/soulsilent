@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useLang, T, tr } from '@/lib/i18n';
+import { computePayout } from '@/lib/workshop-utils';
+import { sqliteToMs } from '@/lib/datetime';
 import { Pager } from '@/components/teacher/Pager';
 
 type Totals = { workshops: number; participants: number; gross: number; net: number };
@@ -17,12 +19,22 @@ type BookingRow = {
   payment_status: string;
   created_at: string;
 };
-/** One collected payment: when it landed and how much. */
-type PaidPoint = { at: string; amount: number };
+/** One collected payment: when it landed, how much, on which workshop, from
+ *  whom, and how old they said they were. */
+type PaidPoint = {
+  at: string;
+  amount: number;
+  workshop_id: string;
+  person: string;
+  age: number | null;
+};
+/** What each workshop deducts before the teacher is paid. */
+type Payout = { id: string; type: 'none' | 'fixed' | 'percent'; value: number };
 type Overview = {
   totals: Totals;
   monthly: MonthTotal[];
   paidPoints: PaidPoint[];
+  payouts: Payout[];
   ages: number[];
   bookings: BookingRow[];
 };
@@ -51,6 +63,10 @@ export default function TeacherOverviewPage() {
   const [data, setData] = useState<Overview | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [page, setPage] = useState(1);
+  // The window lives up here, not inside the chart: the four figures above it
+  // answer for the same slice of time, so one filter drives both.
+  const [rangeKey, setRangeKey] = useState('1y');
+  const range = RANGES.find((r) => r.key === rangeKey) || RANGES[RANGES.length - 1];
 
   // Not handed to the loading tracker: the dashboard's frame — rail, headings —
   // is already on screen, and a full-screen loader over it would hide a page
@@ -67,6 +83,32 @@ export default function TeacherOverviewPage() {
         setLoadError(true);
       });
   }, []);
+
+  // The four figures, worked out over the chosen window from the same collected
+  // payments the chart draws — so "6 workshops" always means "6 in this window".
+  const scoped = useMemo(() => {
+    const points = data?.paidPoints || [];
+    const cutoff = Date.now() - range.days * 86400000;
+    const inWindow = points.filter((p) => (sqliteToMs(p.at) || 0) >= cutoff);
+    const grossByWorkshop = new Map<string, number>();
+    const ageByPerson = new Map<string, number>();
+    for (const p of inWindow) {
+      grossByWorkshop.set(p.workshop_id, (grossByWorkshop.get(p.workshop_id) || 0) + (p.amount || 0));
+      if (p.age != null) ageByPerson.set(p.person, p.age);
+    }
+    const terms = new Map((data?.payouts || []).map((w) => [w.id, w]));
+    let net = 0;
+    for (const [wid, g] of grossByWorkshop) {
+      const t = terms.get(wid);
+      net += computePayout(g, t?.type || 'none', t?.value || 0).net;
+    }
+    return {
+      workshops: grossByWorkshop.size,
+      participants: inWindow.length,
+      net,
+      ages: [...ageByPerson.values()],
+    };
+  }, [data, range.days]);
 
   // A cancelled booking is the opposite of what this table is read for, so it
   // is dropped here.
@@ -87,7 +129,8 @@ export default function TeacherOverviewPage() {
   }
   if (!data) return <OverviewSkeleton />;
 
-  const ages = averageAge(data.ages, lang);
+  const ages = averageAge(scoped.ages, lang);
+  const windowLabel = tr(lang, `ใน ${range.th}ล่าสุด`, `last ${range.en}`);
 
   return (
     <div>
@@ -116,13 +159,18 @@ export default function TeacherOverviewPage() {
           marginBottom: 14,
         }}
       >
-        <StatCard label={tr(lang, 'เวิร์กชอป', 'Workshops')} value={String(data.totals.workshops)} />
-        <StatCard label={tr(lang, 'ผู้เข้าร่วม', 'Participants')} value={String(data.totals.participants)} />
-        <StatCard label={tr(lang, 'รายได้สุทธิ', 'Net revenue')} value={baht(data.totals.net)} />
-        <StatCard label={tr(lang, 'อายุเฉลี่ยผู้เข้าร่วม', 'Average age')} value={ages} />
+        <StatCard label={tr(lang, 'เวิร์กชอป', 'Workshops')} value={String(scoped.workshops)} note={windowLabel} />
+        <StatCard label={tr(lang, 'ผู้เข้าร่วม', 'Participants')} value={String(scoped.participants)} note={windowLabel} />
+        <StatCard label={tr(lang, 'รายได้สุทธิ', 'Net revenue')} value={baht(scoped.net)} note={windowLabel} />
+        <StatCard label={tr(lang, 'อายุเฉลี่ยผู้เข้าร่วม', 'Average age')} value={ages} note={windowLabel} />
       </section>
 
-      <RevenueChart points={data.paidPoints || []} lang={lang} />
+      <RevenueChart
+        points={data.paidPoints || []}
+        lang={lang}
+        rangeKey={rangeKey}
+        onRange={setRangeKey}
+      />
 
       {/* Recent bookings */}
       <section className="card card-static" style={{ padding: 0, overflow: 'hidden', marginTop: 14 }}>
@@ -258,7 +306,7 @@ function OverviewSkeleton() {
 
 /** A label and the number under it, both centred. No third line: the caption
  *  under every figure turned the row into four paragraphs. */
-function StatCard({ label, value }: { label: string; value: string }) {
+function StatCard({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
     <div className="card card-static" style={{ padding: '14px 14px', textAlign: 'center' }}>
       <div
@@ -285,6 +333,11 @@ function StatCard({ label, value }: { label: string; value: string }) {
       >
         {value}
       </div>
+      {note && (
+        <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 6, letterSpacing: '.06em' }}>
+          {note}
+        </div>
+      )}
     </div>
   );
 }
@@ -300,9 +353,18 @@ function StatCard({ label, value }: { label: string; value: string }) {
  * as the span: a day is read in hours, a year in months. Empty slices are still
  * drawn — a gap has to look like "nothing came in", not a missing period.
  */
-function RevenueChart({ points, lang }: { points: PaidPoint[]; lang: 'th' | 'en' }) {
+function RevenueChart({
+  points,
+  lang,
+  rangeKey,
+  onRange,
+}: {
+  points: PaidPoint[];
+  lang: 'th' | 'en';
+  rangeKey: string;
+  onRange: (key: string) => void;
+}) {
   const [hover, setHover] = useState<number | null>(null);
-  const [rangeKey, setRangeKey] = useState('1y');
   const range = RANGES.find((r) => r.key === rangeKey) || RANGES[RANGES.length - 1];
 
   const data = useMemo(() => buildSeries(points, range, lang), [points, range, lang]);
@@ -344,7 +406,7 @@ function RevenueChart({ points, lang }: { points: PaidPoint[]; lang: 'th' | 'en'
               key={r.key}
               type="button"
               onClick={() => {
-                setRangeKey(r.key);
+                onRange(r.key);
                 setHover(null);
               }}
               aria-pressed={r.key === rangeKey}
