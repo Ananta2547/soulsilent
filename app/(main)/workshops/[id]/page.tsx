@@ -51,6 +51,11 @@ type Instructor = {
   portfolio_id: string | null;
 };
 
+/** The gift flow is built and live in the API, but the button that starts it is
+ *  held back from the public page until the flow is signed off. Flip to true to
+ *  bring it back — nothing else has to change. */
+const GIFT_BUTTON_ENABLED = false;
+
 export default function WorkshopDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { lang } = useLang();
@@ -1444,7 +1449,7 @@ function BookingCardContent({
             </button>
             {/* An unpaid booking is not a seat yet, so buying one as a gift is
                 still open to them. */}
-            {!isSelection && !isFree && <GiftSquare onClick={onGift} disabled={booking} lang={lang} />}
+            {GIFT_BUTTON_ENABLED && !isSelection && !isFree && <GiftSquare onClick={onGift} disabled={booking} lang={lang} />}
           </div>
           <Link href="/me/bookings" style={{ display: 'block', textAlign: 'center', fontSize: 12.5, color: 'var(--muted)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
             {tr(lang, 'จัดการการจอง', 'Manage booking')}
@@ -1494,7 +1499,7 @@ function BookingCardContent({
           {/* Buying it for someone else. Not on a free workshop — the friend
               can book that themselves — and not on a selection one, where the
               place is decided on the applicant. */}
-          {!isSelection && !isFree && <GiftSquare onClick={onGift} disabled={booking || soldOut} lang={lang} />}
+          {GIFT_BUTTON_ENABLED && !isSelection && !isFree && <GiftSquare onClick={onGift} disabled={booking || soldOut} lang={lang} />}
         </div>
       )}
 
