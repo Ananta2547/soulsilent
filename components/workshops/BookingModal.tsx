@@ -165,6 +165,19 @@ export function BookingModal({
   const travelOption = TRAVEL_OPTIONS.find((o) => o.value === travel);
   const travelNeedsPlate = !!travelOption?.needsPlate;
 
+  // An online workshop with no custom questions and no consent clause has
+  // nothing left to ask, so step 2 would be an empty page. Drop it: step 1
+  // submits directly and the header stops promising a second step.
+  const hasStep2 = !isOnline || questions.length > 0 || requireConsent;
+
+  const submitLabel = submitting
+    ? tr(lang, 'กำลังดำเนินการ…', 'Processing…')
+    : claiming
+      ? tr(lang, 'ยืนยันรับสิทธิ์', 'Confirm and claim')
+      : workshop.admission_type === 'selection' || workshop.payment_type === 'free'
+        ? tr(lang, 'ส่งใบสมัคร', 'Submit Application')
+        : tr(lang, 'ส่งใบสมัคร & ชำระเงิน', 'Submit & Pay');
+
   function goNext() {
     if (incomplete) {
       setErr(tr(lang, 'ข้อมูลผู้สมัครไม่ครบ — กรุณาไปกรอกให้ครบที่หน้า "ข้อมูลกรอกอัตโนมัติ" ก่อน', 'Your applicant info is incomplete — please complete it on the Autofill page first.'));
@@ -437,7 +450,7 @@ export function BookingModal({
         <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--cream-deep)', display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="mono" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '.1em', textTransform: 'uppercase' }}>
-              {tr(lang, `ขั้นตอน ${step}/2`, `Step ${step}/2`)}
+              {hasStep2 ? tr(lang, `ขั้นตอน ${step}/2`, `Step ${step}/2`) : tr(lang, 'ขั้นตอนเดียว', 'One step')}
             </div>
             <h2 className="display-th" style={{ fontSize: 20, margin: '2px 0 0' }}>
               {step === 1 ? <T th="ตรวจสอบข้อมูลผู้สมัคร" en="Review your details" /> : <T th="คำถามเพิ่มเติม" en="A few questions" />}
@@ -459,6 +472,11 @@ export function BookingModal({
                 <div style={{ marginBottom: 14, padding: 12, background: '#fde7d3', color: '#a04a14', borderRadius: 12, fontSize: 13, lineHeight: 1.55 }}>
                   {tr(lang, 'ข้อมูลผู้สมัครยังไม่ครบ (ช่องที่ขึ้น "—") — กรุณาไปกรอกให้ครบที่หน้า "ข้อมูลกรอกอัตโนมัติ" ก่อน จึงจะดำเนินการต่อได้', 'Your applicant info is incomplete (fields showing "—"). Please complete them on the "Autofill" page before continuing.')}
                 </div>
+              )}
+              {/* Submit errors surface here too, because a form with no step 2
+                  is sent straight from this screen. */}
+              {err && (
+                <div style={{ marginBottom: 14, padding: 12, background: '#fde7d3', color: '#a04a14', borderRadius: 12, fontSize: 13 }}>{err}</div>
               )}
               <ReadGroup lang={lang} title={tr(lang, 'ชื่อ & อายุ', 'Name & age')}>
                 <Row label={tr(lang, 'คำนำหน้า', 'Title')} value={prefixLabel || '—'} />
@@ -650,11 +668,11 @@ export function BookingModal({
           )}
         </div>
 
-        {/* Payment warning — shown on step 2 when submitting leads straight to
+        {/* Payment warning — shown on the last step when submitting leads straight to
             the PromptPay QR (paid/deposit). The QR outlives the seat hold by
             twenty minutes and cannot be cancelled, so warn before the redirect:
             a late payment is taken by the bank, rejected by us, and refunded. */}
-        {step === 2 && !claiming && workshop.payment_type !== 'free' && workshop.admission_type !== 'selection' && (
+        {(step === 2 || !hasStep2) && !claiming && workshop.payment_type !== 'free' && workshop.admission_type !== 'selection' && (
           <div style={{ padding: '0 24px', marginTop: -4 }}>
             <div style={{ background: '#fdecec', border: '1px solid #f0b4b4', borderRadius: 14, padding: '11px 15px', fontSize: 12.5, color: '#a13030', lineHeight: 1.55 }}>
               <strong><T th="⚠️ ขั้นตอนถัดไปคือ QR ชำระเงิน (หมดอายุ 10 นาที)" en="⚠️ Next is the payment QR (expires in 10 minutes)" /></strong>
@@ -676,11 +694,17 @@ export function BookingModal({
               </Link>
               <Btn
                 kind="teal"
-                onClick={goNext}
-                disabled={incomplete}
+                onClick={hasStep2 ? goNext : submit}
+                disabled={incomplete || (!hasStep2 && submitting)}
                 style={{ marginLeft: 'auto', justifyContent: 'center', opacity: incomplete ? 0.5 : 1, cursor: incomplete ? 'not-allowed' : 'pointer' }}
               >
-                {tr(lang, 'ถัดไป', 'Next')} <span className="mono">→</span>
+                {hasStep2 ? (
+                  <>
+                    {tr(lang, 'ถัดไป', 'Next')} <span className="mono">→</span>
+                  </>
+                ) : (
+                  submitLabel
+                )}
               </Btn>
             </>
           ) : (
@@ -689,13 +713,7 @@ export function BookingModal({
                 ← {tr(lang, 'ย้อนกลับ', 'Back')}
               </button>
               <Btn kind="teal" onClick={submit} disabled={submitting} style={{ marginLeft: 'auto', justifyContent: 'center' }}>
-                {submitting
-                  ? tr(lang, 'กำลังดำเนินการ…', 'Processing…')
-                  : claiming
-                    ? tr(lang, 'ยืนยันรับสิทธิ์', 'Confirm and claim')
-                    : workshop.admission_type === 'selection' || workshop.payment_type === 'free'
-                      ? tr(lang, 'ส่งใบสมัคร', 'Submit Application')
-                      : tr(lang, 'ส่งใบสมัคร & ชำระเงิน', 'Submit & Pay')}
+                {submitLabel}
               </Btn>
             </>
           )}
