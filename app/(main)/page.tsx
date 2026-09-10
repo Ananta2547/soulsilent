@@ -408,7 +408,9 @@ function EventCard({ w }: { w: Workshop }) {
         <span className={open ? 'tag tag-accent' : 'tag'} style={open ? undefined : { background: '#e6e3da', color: 'var(--muted)' }}>
           {badgeLabel}
         </span>
-        <span className="tag">{w.category || 'ONSITE'}</span>
+        {/* Where it happens, straight from the admin's online switch — the
+            category only fills in for onsite workshops that have one. */}
+        <span className="tag">{w.is_online ? 'ONLINE' : w.category || 'ONSITE'}</span>
       </div>
       <h3 className="display-th u-clamp-2 dc-ev-title" style={{ fontSize: 17, margin: '0 0 8px', lineHeight: 1.25, minHeight: '2.5em' }}>{w.title}</h3>
       <div className="dc-ev-meta" style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: 3 }}>

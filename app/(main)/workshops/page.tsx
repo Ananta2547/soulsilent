@@ -375,6 +375,7 @@ function Card({ w }: { w: Workshop }) {
         <span className={open ? 'tag tag-accent' : 'tag'} style={open ? undefined : { background: '#e6e3da', color: 'var(--muted)' }}>
           {badgeLabel}
         </span>
+        <span className="tag">{w.is_online ? 'ONLINE' : 'ONSITE'}</span>
         {w.category && <span className="tag">{w.category}</span>}
       </div>
       <h3 className="display-th u-clamp-2 dc-ev-title" style={{ fontSize: 17, margin: '0 0 8px', lineHeight: 1.25, minHeight: '2.5em' }}>{w.title}</h3>

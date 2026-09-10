@@ -325,7 +325,7 @@ export default function WorkshopDetailPage() {
       ) : (
         <span className="tag tag-accent">{tr(lang, 'เปิดจอง', 'Open')}</span>
       )}
-      <span className="tag">Workshop · Onsite</span>
+      <span className="tag">Workshop · {workshop.is_online ? 'Online' : 'Onsite'}</span>
       {workshop.category && <span className="tag">{workshop.category}</span>}
     </>
   );
