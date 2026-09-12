@@ -3683,27 +3683,51 @@ body {
   .jn-stats .eyebrow::before { display: none; }
 }
 
-/* Teacher workshop page — the payout slip card. The image is shown whole:
-   capped at a comfortable height on desktop, full card width on phones. */
+/* Teacher workshop page — the payout slip lightbox. Opened from a tile in
+   the finance grid; the image is never printed into the page itself. */
+.tc-slip-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(13, 30, 29, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  overflow-y: auto;
+}
+.tc-slip-box {
+  width: 100%;
+  max-width: 560px;
+  max-height: calc(100dvh - 48px);
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border-radius: 20px;
+  padding: 18px 20px 20px;
+  box-shadow: 0 30px 80px -24px rgba(13, 30, 29, 0.5);
+}
 .tc-slip-frame {
+  flex: 1;
+  min-height: 0;
   display: flex;
   justify-content: center;
   background: var(--cream);
   border-radius: 14px;
   padding: 12px;
-  overflow: hidden;
+  overflow: auto;
 }
 .tc-slip-frame img {
   display: block;
   max-width: 100%;
-  max-height: 520px;
+  max-height: calc(100dvh - 160px);
   width: auto;
   height: auto;
   object-fit: contain;
   border-radius: 8px;
-  box-shadow: 0 10px 30px -18px rgba(13, 30, 29, 0.45);
 }
 @media (max-width: 560px) {
+  .tc-slip-backdrop { padding: 12px; align-items: flex-end; }
+  .tc-slip-box { padding: 14px 14px 16px; border-radius: 18px; max-height: calc(100dvh - 24px); }
   .tc-slip-frame { padding: 8px; }
-  .tc-slip-frame img { max-height: none; width: 100%; }
 }

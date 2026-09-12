@@ -79,7 +79,18 @@ export default function TeacherWorkshopDetail() {
   const [openApps, setOpenApps] = useState<Set<string>>(new Set());
   const [pending, setPending] = useState<Set<string>>(new Set());
   const [nickEdit, setNickEdit] = useState<string | null>(null);
+  /** The payout slip opens in a lightbox on demand — never printed into the page. */
+  const [slipOpen, setSlipOpen] = useState(false);
   const [nickDraft, setNickDraft] = useState('');
+
+  useEffect(() => {
+    if (!slipOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSlipOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [slipOpen]);
 
   useEffect(() => {
     (async () => {
@@ -223,6 +234,21 @@ export default function TeacherWorkshopDetail() {
           <Stat label={tr(lang, 'รายรับรวม', 'Gross')} value={baht(finance.gross)} />
           <Stat label={tr(lang, 'หักค่าใช้จ่าย', 'Deduction')} value={'− ' + baht(finance.deduction)} tone="#c2410c" />
           <Stat label={tr(lang, 'ยอดโอนสุทธิ', 'Net payout')} value={baht(finance.net)} tone="var(--teal-deep)" big />
+          {w.payout_slip_url && (
+            <div style={{ background: 'var(--cream)', borderRadius: 14, padding: '12px 14px', display: 'flex', flexDirection: 'column' }}>
+              <div className="mono" style={{ fontSize: 10.5, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                {tr(lang, 'สลิปโอนเงิน', 'Transfer slip')}
+              </div>
+              <button
+                type="button"
+                onClick={() => setSlipOpen(true)}
+                className="btn btn-ink"
+                style={{ marginTop: 6, alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13.5, padding: '8px 14px' }}
+              >
+                {tr(lang, 'ดูสลิป', 'View slip')} <span aria-hidden className="mono">↗</span>
+              </button>
+            </div>
+          )}
         </div>
         {w.payout_remark && (
           <div style={{ fontSize: 13.5, color: 'var(--ink)', background: 'var(--cream)', borderRadius: 12, padding: '12px 14px' }}>
@@ -232,35 +258,46 @@ export default function TeacherWorkshopDetail() {
         )}
       </section>
 
-      {/* The slip gets a card of its own, shown in full, so the money arriving
-          is something a teacher can see rather than a link to click. */}
-      {w.payout_slip_url && (
-        <section className="card card-static" style={{ marginBottom: 26 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
-            <h2 className="display-th" style={{ fontSize: 20, margin: 0 }}>
-              <T th="สลิปโอนเงิน" en="Transfer slip" />
-            </h2>
-            <a
-              href={w.payout_slip_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-paper"
-              style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, padding: '8px 14px' }}
-            >
-              {tr(lang, 'เปิดเต็มจอ', 'Open full size')} <span aria-hidden className="mono">↗</span>
-            </a>
+      {/* Slip lightbox — the image only ever appears after the button above. */}
+      {slipOpen && w.payout_slip_url && (
+        <div
+          className="tc-slip-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label={tr(lang, 'สลิปโอนเงิน', 'Transfer slip')}
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setSlipOpen(false);
+          }}
+        >
+          <div className="tc-slip-box">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <h2 className="display-th" style={{ fontSize: 18, margin: 0 }}>
+                <T th="สลิปโอนเงิน" en="Transfer slip" />
+              </h2>
+              <a
+                href={w.payout_slip_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-paper"
+                style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, padding: '7px 12px' }}
+              >
+                {tr(lang, 'เปิดเต็มจอ', 'Full size')} <span aria-hidden className="mono">↗</span>
+              </a>
+              <button
+                type="button"
+                onClick={() => setSlipOpen(false)}
+                aria-label={tr(lang, 'ปิด', 'Close')}
+                style={{ background: 'none', border: 0, fontSize: 22, lineHeight: 1, color: 'var(--muted)', cursor: 'pointer' }}
+              >
+                ×
+              </button>
+            </div>
+            <div className="tc-slip-frame">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={w.payout_slip_url} alt={tr(lang, 'สลิปโอนเงิน', 'Transfer slip')} />
+            </div>
           </div>
-          <a
-            href={w.payout_slip_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="tc-slip-frame"
-            aria-label={tr(lang, 'เปิดสลิปเต็มจอ', 'Open the slip full size')}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={w.payout_slip_url} alt={tr(lang, 'สลิปโอนเงิน', 'Transfer slip')} />
-          </a>
-        </section>
+        </div>
       )}
 
       {/* PART 2 — Participants */}
