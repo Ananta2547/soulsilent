@@ -13,8 +13,9 @@ export type ProfileMenuItem = {
 };
 
 /** Filter the menu by the current user's role (items with no `roles` show to all). */
-export function menuForRole(role?: string | null): ProfileMenuItem[] {
-  return PROFILE_MENU.filter((m) => !m.roles || (!!role && m.roles.includes(role as 'user' | 'teacher' | 'admin')));
+export function menuForRole(role?: string | null, roles?: string[] | null): ProfileMenuItem[] {
+  const held = roles && roles.length ? roles : role ? [role] : [];
+  return PROFILE_MENU.filter((m) => !m.roles || m.roles.some((r) => held.includes(r)));
 }
 
 const iconCls = 'w-[18px] h-[18px] flex-shrink-0';

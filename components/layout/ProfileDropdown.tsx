@@ -1,5 +1,7 @@
 'use client';
 
+import { hasAnyRole } from '@/lib/roles';
+
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
@@ -11,6 +13,8 @@ export interface ProfileUser {
   name: string;
   email: string;
   role: string;
+  /** Every role held (primary + extras); older callers may omit it. */
+  roles?: string[];
   avatar_url: string | null;
   cover_image_url?: string | null;
   nickname?: string | null;
@@ -228,7 +232,7 @@ export function ProfileDropdown({
 
       {/* menu list */}
       <div style={{ padding: '8px 10px 6px' }}>
-        {menuForRole(user.role).map((m) => (
+        {menuForRole(user.role, user.roles).map((m) => (
           <Link
             key={m.key}
             href={m.href}
@@ -262,7 +266,7 @@ export function ProfileDropdown({
         ))}
 
         {/* Teacher / organizer dashboard */}
-        {(user.role === 'teacher' || user.role === 'admin') && (
+        {hasAnyRole(user.roles || [user.role], ['teacher']) && (
           <Link
             href="/teacher"
             role="menuitem"

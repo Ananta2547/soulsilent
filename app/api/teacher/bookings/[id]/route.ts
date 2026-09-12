@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUserWithRoles } from '@/lib/auth';
+import { hasAnyRole } from '@/lib/roles';
 import { hasWorkshopEnded, canAccessTeacherDashboard } from '@/lib/workshop-utils';
 import type { Workshop } from '@/lib/types';
 
@@ -8,9 +9,9 @@ import type { Workshop } from '@/lib/types';
 // Body: { dayIndex: number, value: 1 | 0 | null } (present / absent / unmarked).
 // Locked once the event ends.
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const u = await getCurrentUser();
+  const u = await getCurrentUserWithRoles();
   if (!u) return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 });
-  if (u.role !== 'teacher' && u.role !== 'admin') {
+  if (!hasAnyRole(u.roles, ['teacher'])) {
     return NextResponse.json({ error: 'เฉพาะผู้สอน' }, { status: 403 });
   }
   const { id } = await params;
@@ -50,7 +51,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (!row) return NextResponse.json({ error: 'ไม่พบการจอง' }, { status: 404 });
   // Owner, or a co-facilitator the admin ticked (migration 046) — otherwise a
   // co-facilitator could open the roster but not check anyone in.
-  if (u.role !== 'admin' && !canAccessTeacherDashboard(row, u.sub)) {
+  if (!u.roles.includes('admin') && !canAccessTeacherDashboard(row, u.sub)) {
     return NextResponse.json({ error: 'ไม่มีสิทธิ์' }, { status: 403 });
   }
   if (hasWorkshopEnded(row)) {

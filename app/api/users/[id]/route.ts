@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { EXTRA_ROLES } from '@/lib/roles';
 import { getDB } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
 import { isOwnerEmail } from '@/lib/constants';
@@ -7,8 +8,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   try {
     await requireAdmin();
     const { id } = await params;
-    const { role, name, account_status, is_team } = (await request.json()) as {
+    const { role, roles, name, account_status, is_team } = (await request.json()) as {
       role?: string;
+      /** Extra roles on top of `role` (migration 052) — only EXTRA_ROLES are kept. */
+      roles?: string[];
       name?: string;
       account_status?: 'active' | 'suspended';
       is_team?: boolean | number;
@@ -39,6 +42,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const values: (string | number | null)[] = [];
 
     if (role) { fields.push('role = ?'); values.push(role); }
+    if (Array.isArray(roles)) {
+      const allowed = new Set<string>(EXTRA_ROLES.map((r) => r.value));
+      const extras = [...new Set(roles.filter((r) => allowed.has(r)))];
+      fields.push('roles_json = ?');
+      values.push(extras.length ? JSON.stringify(extras) : null);
+    }
     if (name) { fields.push('name = ?'); values.push(name); }
     // Feature (or remove) this user on the public About "team" section.
     if (is_team !== undefined) {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { hasAnyRole } from '@/lib/roles';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Logo } from './Logo';
@@ -77,6 +78,15 @@ const NAV: NavItem[] = [
 export function TeacherSidebar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  // "จัดรอบสอน" is for the ผู้จัดรอบ role (session_host); admin sees it too.
+  const [roles, setRoles] = useState<string[]>([]);
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then((r) => r.json() as Promise<{ user?: { role?: string; roles?: string[] } | null }>)
+      .then((d) => setRoles(d.user?.roles || (d.user?.role ? [d.user.role] : [])))
+      .catch(() => {});
+  }, []);
+  const nav = NAV.filter((item) => item.href !== '/teacher/sessions' || hasAnyRole(roles, ['session_host']));
 
   useEffect(() => {
     if (!open) return;
@@ -140,7 +150,7 @@ export function TeacherSidebar() {
         </div>
 
         <nav className="flex-1 p-4 space-y-1">
-          {NAV.map((item) => {
+          {nav.map((item) => {
             // Each section owns its subtree, so the workshop detail page keeps
             // "Workshop ของฉัน" lit.
             const active = pathname.startsWith(item.href);

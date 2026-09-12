@@ -14,7 +14,7 @@ export async function GET(request: Request) {
       .filter(Boolean);
 
     const baseQuery =
-      'SELECT id, email, name, nickname, role, avatar_url, account_status, deleted_at, is_team, created_at, updated_at FROM users';
+      'SELECT id, email, name, nickname, role, roles_json, avatar_url, account_status, deleted_at, is_team, created_at, updated_at FROM users';
 
     // `q` = typeahead search by name or email (used by the attendance
     // "add participant" picker). Case-insensitive substring, capped at 20.
@@ -22,18 +22,20 @@ export async function GET(request: Request) {
     let stmt;
     if (q) {
       const like = `%${q}%`;
+      // A role held as an extra (roles_json) counts the same as the primary.
+      const roleWhere = `(role IN (${roles.map(() => '?').join(',')}) OR EXISTS (SELECT 1 FROM json_each(COALESCE(roles_json, '[]')) WHERE json_each.value IN (${roles.map(() => '?').join(',')})))`;
       stmt = roles.length
         ? db
-            .prepare(
-              `${baseQuery} WHERE role IN (${roles.map(() => '?').join(',')}) AND (name LIKE ? OR email LIKE ?) ORDER BY name LIMIT 20`,
-            )
-            .bind(...roles, like, like)
+            .prepare(`${baseQuery} WHERE ${roleWhere} AND (name LIKE ? OR email LIKE ?) ORDER BY name LIMIT 20`)
+            .bind(...roles, ...roles, like, like)
         : db.prepare(`${baseQuery} WHERE name LIKE ? OR email LIKE ? ORDER BY name LIMIT 20`).bind(like, like);
     } else {
       stmt = roles.length
         ? db
-            .prepare(`${baseQuery} WHERE role IN (${roles.map(() => '?').join(',')}) ORDER BY name`)
-            .bind(...roles)
+            .prepare(
+              `${baseQuery} WHERE (role IN (${roles.map(() => '?').join(',')}) OR EXISTS (SELECT 1 FROM json_each(COALESCE(roles_json, '[]')) WHERE json_each.value IN (${roles.map(() => '?').join(',')}))) ORDER BY name`
+            )
+            .bind(...roles, ...roles)
         : db.prepare(`${baseQuery} ORDER BY created_at DESC`);
     }
 

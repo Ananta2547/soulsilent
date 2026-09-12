@@ -4,6 +4,8 @@ export interface User {
   password_hash: string | null;
   name: string;
   role: 'admin' | 'user' | 'teacher';
+  /** Extra roles on top of `role` — JSON string[] (migration 052). */
+  roles_json?: string | null;
   google_id: string | null;
   avatar_url: string | null;
   avatar_meta: string | null;
@@ -414,4 +416,10 @@ export interface JWTPayload {
   role: 'admin' | 'user' | 'teacher';
   iat: number;
   exp: number;
+}
+
+/** A signed-in user with every role they hold (primary + extras), read from
+ *  the users row at request time so an admin's change applies at once. */
+export interface CurrentUser extends JWTPayload {
+  roles: string[];
 }

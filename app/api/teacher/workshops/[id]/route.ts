@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUserWithRoles } from '@/lib/auth';
+import { hasAnyRole } from '@/lib/roles';
 import { computePayout, canAccessTeacherDashboard } from '@/lib/workshop-utils';
 import { settleSelection } from '@/lib/selection';
 import type { Workshop } from '@/lib/types';
@@ -8,9 +9,9 @@ import type { Workshop } from '@/lib/types';
 // GET /api/teacher/workshops/[id] — workshop (owned), paid bookings with their
 // application + per-day attendance, and the payout finance summary.
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const u = await getCurrentUser();
+  const u = await getCurrentUserWithRoles();
   if (!u) return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 });
-  if (u.role !== 'teacher' && u.role !== 'admin') {
+  if (!hasAnyRole(u.roles, ['teacher'])) {
     return NextResponse.json({ error: 'เฉพาะผู้สอน' }, { status: 403 });
   }
   const { id } = await params;
@@ -19,7 +20,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const workshop = await db.prepare('SELECT * FROM workshops WHERE id = ?').bind(id).first<Workshop>();
   if (!workshop) return NextResponse.json({ error: 'ไม่พบเวิร์กชอป' }, { status: 404 });
   // Owner, or a co-facilitator the admin ticked (migration 046).
-  if (u.role !== 'admin' && !canAccessTeacherDashboard(workshop, u.sub)) {
+  if (!u.roles.includes('admin') && !canAccessTeacherDashboard(workshop, u.sub)) {
     return NextResponse.json({ error: 'ไม่มีสิทธิ์เข้าถึง' }, { status: 403 });
   }
 

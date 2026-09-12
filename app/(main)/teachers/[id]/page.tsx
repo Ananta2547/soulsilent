@@ -146,9 +146,9 @@ export default function TeacherProfilePage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {onDay.map((r) => {
                     const full = r.private_taken > 0 || r.booked >= r.max_participants;
-                    // A round under a master goes to the activity page carrying
-                    // the day; a standalone workshop goes to its own page.
-                    const href = r.master_id ? `/workshop-info/${r.master_id}?date=${r.date}` : `/workshops/${r.id}?date=${r.date}`;
+                    // Straight to the workshop page; the day rides along so the
+                    // round's booking popup opens on it.
+                    const href = `/workshops/${r.id}?date=${r.date}`;
                     return (
                       <Link key={r.id} href={href} className="card tp-round">
                         {r.image_url ? (

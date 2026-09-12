@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUserWithRoles } from '@/lib/auth';
+import { hasAnyRole } from '@/lib/roles';
 import { computePayout } from '@/lib/workshop-utils';
 import { applicantName } from '@/lib/applicant';
 
@@ -36,9 +37,9 @@ type BookingRow = {
 };
 
 export async function GET() {
-  const u = await getCurrentUser();
+  const u = await getCurrentUserWithRoles();
   if (!u) return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 });
-  if (u.role !== 'teacher' && u.role !== 'admin') {
+  if (!hasAnyRole(u.roles, ['teacher'])) {
     return NextResponse.json({ error: 'เฉพาะผู้สอน' }, { status: 403 });
   }
 

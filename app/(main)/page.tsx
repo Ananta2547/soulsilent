@@ -351,7 +351,7 @@ function EventCard({ w }: { w: Workshop }) {
       ? Math.round((1 - eff.price / eff.originalPrice) * 100)
       : 0;
   return (
-    <Link href={w.master_id ? `/workshop-info/${w.master_id}?date=${w.date}` : `/workshops/${w.id}`} className="card reveal-up dc-event-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', textDecoration: 'none', color: 'var(--ink)' }}>
+    <Link href={`/workshops/${w.id}`} className="card reveal-up dc-event-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', textDecoration: 'none', color: 'var(--ink)' }}>
       <div className="ph ph-teal card-media dc-ev-media" style={{ aspectRatio: '3/4', borderRadius: 14, marginBottom: 14, position: 'relative', overflow: 'hidden' }}>
         {w.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -457,8 +457,9 @@ function EventCard({ w }: { w: Workshop }) {
 
 function UpcomingEvents({ workshops }: { workshops: Workshop[] }) {
   const upcoming = useMemo(
-    // New (≤7d) → Open → Closed, each by soonest event date.
-    () => workshops.filter((w) => !hasWorkshopEnded(w)).sort((a, b) => compareWorkshopsForListing(a, b)),
+    // New (≤7d) → Open → Closed, each by soonest event date. Rounds a teacher
+    // opened under a master have their own section below.
+    () => workshops.filter((w) => !hasWorkshopEnded(w) && !w.master_id).sort((a, b) => compareWorkshopsForListing(a, b)),
     [workshops],
   );
   const categories = useMemo(
@@ -524,6 +525,69 @@ function UpcomingEvents({ workshops }: { workshops: Workshop[] }) {
   );
 }
 
+/* ---------------- Rounds (teacher-opened, repeating) ---------------- */
+
+function RoundsSection({ workshops }: { workshops: Workshop[] }) {
+  // One card per activity: its nearest open round carries the card, the
+  // badge says how many more days it runs on.
+  const groups = useMemo(() => {
+    const open = workshops
+      .filter((w) => !!w.master_id && !hasWorkshopEnded(w))
+      .sort((a, b) => (a.date + a.time_start).localeCompare(b.date + b.time_start));
+    const byMaster = new Map<string, { first: Workshop; count: number; days: Set<string> }>();
+    open.forEach((w) => {
+      const g = byMaster.get(w.master_id as string);
+      if (g) {
+        g.count += 1;
+        g.days.add(w.date);
+      } else byMaster.set(w.master_id as string, { first: w, count: 1, days: new Set([w.date]) });
+    });
+    return [...byMaster.values()].slice(0, 8);
+  }, [workshops]);
+
+  if (groups.length === 0) return null;
+
+  return (
+    <section className="section" style={{ background: 'var(--paper)' }}>
+      <div className="container">
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 40 }}>
+          <div className="reveal-up">
+            <div className="mono" style={{ color: 'var(--muted)', letterSpacing: '.14em', fontSize: 11, textTransform: 'uppercase', marginBottom: 10 }}>— 02 · รอบสอน</div>
+            <h2 className="display-th" style={{ fontSize: 'clamp(30px,4.4vw,46px)', margin: 0, color: 'var(--ink)' }}>
+              เลือกวันที่สะดวก<br />
+              แล้ว<span style={{ position: 'relative', display: 'inline-block' }}>
+                มาเจอกัน
+                <svg viewBox="0 0 300 18" preserveAspectRatio="none" style={{ position: 'absolute', left: 0, right: 0, bottom: -10, width: '100%', height: 16 }} aria-hidden="true">
+                  <path d="M2 11 Q 40 2 78 10 T 152 9 T 226 10 T 298 8" fill="none" stroke="var(--teal)" strokeWidth="5" strokeLinecap="round" />
+                </svg>
+              </span>
+            </h2>
+            <p style={{ margin: '20px 0 0', fontSize: 15, lineHeight: 1.6, color: 'var(--muted)', maxWidth: 440 }}>
+              กิจกรรมที่ผู้สอนเปิดเป็นรอบ ทุกวันหรือทุกสัปดาห์ — จิ้มวันในปฏิทินแล้วจองได้เลย
+            </p>
+          </div>
+        </div>
+
+        <div className="dc-events-grid">
+          {groups.map((g) => (
+            <div key={g.first.master_id as string} style={{ position: 'relative' }}>
+              <EventCard w={g.first} />
+              {g.days.size > 1 && (
+                <span
+                  className="tag"
+                  style={{ position: 'absolute', top: 12, right: 12, background: 'var(--ink)', color: '#fff', fontSize: 11, pointerEvents: 'none' }}
+                >
+                  {g.days.size} วัน · {g.count} รอบ
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /* ---------------- Articles ---------------- */
 
 function ArticlesSection({ lead, side, categories }: { lead?: Article; side: Article[]; categories: ArticleCategory[] }) {
@@ -542,7 +606,7 @@ function ArticlesSection({ lead, side, categories }: { lead?: Article; side: Art
       <div className="container">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, justifyContent: 'space-between', marginBottom: 40 }}>
           <div className="reveal-up">
-            <div className="mono" style={{ color: 'var(--muted)', letterSpacing: '.14em', fontSize: 11, textTransform: 'uppercase', marginBottom: 10 }}>— 02 · อ่าน</div>
+            <div className="mono" style={{ color: 'var(--muted)', letterSpacing: '.14em', fontSize: 11, textTransform: 'uppercase', marginBottom: 10 }}>— 03 · อ่าน</div>
             <h2 className="display-th" style={{ fontSize: 'clamp(30px,4.4vw,46px)', margin: 0, color: 'var(--ink)' }}>
               พื้นที่ของความทรงจำ<br /><span style={{ color: 'var(--teal)' }}>บทความ</span> ข่าวสาร
             </h2>
@@ -670,7 +734,7 @@ function ReviewsSection({ reviews }: { reviews: PublicReview[] }) {
     <section className="section bg-teal-section" style={{ textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
       <span className="mono" style={{ position: 'absolute', right: '8%', top: 64, color: 'var(--accent)', fontSize: 22 }}>+</span>
       <div className="container">
-        <div className="mono" style={{ letterSpacing: '.14em', fontSize: 11, textTransform: 'uppercase', color: '#fff', marginBottom: 14 }}>03 — พื้นที่รีวิว</div>
+        <div className="mono" style={{ letterSpacing: '.14em', fontSize: 11, textTransform: 'uppercase', color: '#fff', marginBottom: 14 }}>04 — พื้นที่รีวิว</div>
         <h2 className="display-en" style={{ fontSize: 'clamp(48px,9vw,110px)', margin: 0, color: '#fff', lineHeight: 0.9 }}>
           <span style={{ color: '#fff' }}>&ldquo;</span>ECHOES<span style={{ color: '#fff' }}>&rdquo;</span>
         </h2>
@@ -762,7 +826,7 @@ function StatsSection({ stats }: { stats: SiteStats }) {
     <section className="section">
       <div className="container">
         <div className="reveal-up" style={{ maxWidth: 760, marginBottom: 40 }}>
-          <div className="mono" style={{ color: 'var(--muted)', letterSpacing: '.14em', fontSize: 11, textTransform: 'uppercase', marginBottom: 12 }}>— 04 · สถิติ</div>
+          <div className="mono" style={{ color: 'var(--muted)', letterSpacing: '.14em', fontSize: 11, textTransform: 'uppercase', marginBottom: 12 }}>— 05 · สถิติ</div>
           <h2 className="display-th" style={{ fontSize: 'clamp(30px,4.4vw,52px)', margin: 0, lineHeight: 1.15, color: 'var(--ink)' }}>
             ตัวเลขที่ทำให้เรา{' '}
             <span style={{ position: 'relative', display: 'inline-block', color: 'var(--teal)' }}>
@@ -851,6 +915,7 @@ export default function HomePage() {
     <div className="home-dc">
       <Hero workshops={featuredWorkshops} />
       <UpcomingEvents workshops={workshops} />
+      <RoundsSection workshops={workshops} />
       <ArticlesSection lead={leadArticle} side={sideArticles} categories={articleCategories} />
       <ReviewsSection reviews={reviews} />
       <StatsSection stats={stats} />

@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUserWithRoles } from '@/lib/auth';
+import { hasAnyRole } from '@/lib/roles';
 
 /** DELETE /api/teacher/sessions/[id] — cancel a round the teacher opened, as
  *  long as nobody holds a seat in it. With bookings it is the admin's call. */
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const u = await getCurrentUser();
+  const u = await getCurrentUserWithRoles();
   if (!u) return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 });
-  if (u.role !== 'teacher' && u.role !== 'admin') {
-    return NextResponse.json({ error: 'เฉพาะผู้สอน' }, { status: 403 });
+  if (!hasAnyRole(u.roles, ['session_host'])) {
+    return NextResponse.json({ error: 'เฉพาะผู้จัดรอบ (session_host)' }, { status: 403 });
   }
   const { id } = await params;
   const db = await getDB();
@@ -22,7 +23,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     .bind(id)
     .first<{ id: string; master_id: string | null; organizer: string | null; live: number }>();
   if (!w || !w.master_id) return NextResponse.json({ error: 'ไม่พบรอบนี้' }, { status: 404 });
-  if (u.role !== 'admin' && w.organizer !== u.sub) {
+  if (!u.roles.includes('admin') && w.organizer !== u.sub) {
     return NextResponse.json({ error: 'ไม่มีสิทธิ์' }, { status: 403 });
   }
   if (w.live > 0) {

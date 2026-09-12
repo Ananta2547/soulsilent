@@ -1,5 +1,7 @@
 'use client';
 
+import { hasAnyRole } from '@/lib/roles';
+
 import { PageLoader } from '@/components/design/PageLoader';
 import { TeacherSidebar } from '@/components/layout/TeacherSidebar';
 
@@ -21,9 +23,9 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
     (async () => {
       try {
         const res = await fetch('/api/auth/me');
-        const data = (await res.json()) as { user?: { role?: string } | null };
-        const role = data.user?.role;
-        if (role === 'teacher' || role === 'admin') setState('ok');
+        const data = (await res.json()) as { user?: { role?: string; roles?: string[] } | null };
+        const roles = data.user?.roles || (data.user?.role ? [data.user.role] : []);
+        if (hasAnyRole(roles, ['teacher'])) setState('ok');
         else setState('denied');
       } catch {
         setState('denied');

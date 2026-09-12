@@ -37,6 +37,7 @@ export function SiteHeader() {
 
   const links = [
     { href: '/workshops', th: 'กิจกรรม', en: 'Workshops' },
+    { href: '/teachers', th: 'ผู้สอน', en: 'Teachers' },
     { href: '/articles', th: 'บทความ', en: 'Articles' },
     { href: '/about', th: 'เกี่ยวกับเรา', en: 'About' },
   ];

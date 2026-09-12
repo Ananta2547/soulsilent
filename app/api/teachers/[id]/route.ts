@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 import { expireStaleHolds } from '@/lib/holds';
+import { roleSql } from '@/lib/roles';
 
 /* Public profile of a teacher: who they are, and every round they run from
  * today on — the rows the profile page's calendar lights up. Only fields a
@@ -20,9 +21,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
     const teacher = await db
       .prepare(
-        `SELECT id, name, nickname, avatar_url, cover_image_url, bio
-           FROM users
-          WHERE id = ? AND role IN ('teacher', 'admin') AND (account_status IS NULL OR account_status = 'active')`
+        `SELECT u.id, u.name, u.nickname, u.avatar_url, u.cover_image_url, u.bio
+           FROM users u
+          WHERE u.id = ? AND ${roleSql('u', 'teacher')} AND (u.account_status IS NULL OR u.account_status = 'active')`
       )
       .bind(id)
       .first<{ id: string; name: string; nickname: string | null; avatar_url: string | null; cover_image_url: string | null; bio: string | null }>();

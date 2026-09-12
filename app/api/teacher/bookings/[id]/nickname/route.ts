@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server';
 import { v4 as uuid } from 'uuid';
 import { getDB } from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUserWithRoles } from '@/lib/auth';
+import { hasAnyRole } from '@/lib/roles';
 
 // PUT /api/teacher/bookings/[id]/nickname — owning teacher sets a nickname for
 // the booking's student. Stored per (workshop owner, student) so it follows the
 // student into future bookings of that teacher. Body: { nickname }.
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const u = await getCurrentUser();
+  const u = await getCurrentUserWithRoles();
   if (!u) return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 });
-  if (u.role !== 'teacher' && u.role !== 'admin') {
+  if (!hasAnyRole(u.roles, ['teacher'])) {
     return NextResponse.json({ error: 'เฉพาะผู้สอน' }, { status: 403 });
   }
   const { id } = await params;
@@ -29,7 +30,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (!row || !row.student_id || !row.teacher_id) {
     return NextResponse.json({ error: 'ไม่พบการจอง' }, { status: 404 });
   }
-  if (row.teacher_id !== u.sub && u.role !== 'admin') {
+  if (row.teacher_id !== u.sub && !u.roles.includes('admin')) {
     return NextResponse.json({ error: 'ไม่มีสิทธิ์' }, { status: 403 });
   }
 

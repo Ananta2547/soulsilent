@@ -2,7 +2,9 @@ import { SignJWT, jwtVerify } from 'jose';
 import { hash, compare } from 'bcryptjs';
 import { cookies } from 'next/headers';
 import { getEnv } from './db';
-import type { JWTPayload } from './types';
+import type { CurrentUser, JWTPayload } from './types';
+import { getDB } from './db';
+import { hasAnyRole, rolesOf, type Role } from './roles';
 
 const COOKIE_NAME = 'ss_token';
 const TOKEN_EXPIRY = '7d';
@@ -98,6 +100,30 @@ export async function requireAuth(): Promise<JWTPayload> {
   const user = await getCurrentUser();
   if (!user) throw new Error('Unauthorized');
   return user;
+}
+
+/** The signed-in user with every role they hold, or null. One row read; the
+ *  roles come from the database rather than the token so an admin ticking a
+ *  role takes effect without a fresh sign-in. */
+export async function getCurrentUserWithRoles(): Promise<CurrentUser | null> {
+  const u = await getCurrentUser();
+  if (!u) return null;
+  const db = await getDB();
+  const row = await db
+    .prepare('SELECT role, roles_json, account_status FROM users WHERE id = ?')
+    .bind(u.sub)
+    .first<{ role: string; roles_json: string | null; account_status: string | null }>();
+  if (!row || (row.account_status && row.account_status !== 'active')) return null;
+  return { ...u, role: row.role as JWTPayload['role'], roles: rolesOf(row) };
+}
+
+/** Throws 'Unauthorized' when signed out, 'Forbidden' without one of `wanted`
+ *  (admin always passes). */
+export async function requireRoles(...wanted: Role[]): Promise<CurrentUser> {
+  const u = await getCurrentUserWithRoles();
+  if (!u) throw new Error('Unauthorized');
+  if (!hasAnyRole(u.roles, wanted)) throw new Error('Forbidden');
+  return u;
 }
 
 export async function requireAdmin(): Promise<JWTPayload> {

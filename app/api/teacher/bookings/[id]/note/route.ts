@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUserWithRoles } from '@/lib/auth';
+import { hasAnyRole } from '@/lib/roles';
 import { parseInstructorIds } from '@/lib/workshop-utils';
 
 // PUT /api/teacher/bookings/[id]/note — a facilitator's private note about the
@@ -10,9 +11,9 @@ import { parseInstructorIds } from '@/lib/workshop-utils';
 // teacher), plus admins. The note is staff-only and is never returned on a
 // participant-facing endpoint.
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const u = await getCurrentUser();
+  const u = await getCurrentUserWithRoles();
   if (!u) return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 });
-  if (u.role !== 'teacher' && u.role !== 'admin') {
+  if (!hasAnyRole(u.roles, ['teacher'])) {
     return NextResponse.json({ error: 'เฉพาะผู้สอน' }, { status: 403 });
   }
   const { id } = await params;
@@ -32,7 +33,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (!row) return NextResponse.json({ error: 'ไม่พบการจอง' }, { status: 404 });
 
   const facilitators = parseInstructorIds(row);
-  if (u.role !== 'admin' && !facilitators.includes(u.sub)) {
+  if (!u.roles.includes('admin') && !facilitators.includes(u.sub)) {
     return NextResponse.json({ error: 'ไม่มีสิทธิ์' }, { status: 403 });
   }
 

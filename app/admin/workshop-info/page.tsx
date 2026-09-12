@@ -1,6 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import type { Workshop } from '@/lib/types';
+
+type WorkshopRow = Workshop & { booking_count?: number };
 import Link from 'next/link';
 import { AdminFormModal } from '@/components/admin/AdminFormModal';
 import { MasterForm } from './_components/MasterForm';
@@ -17,10 +20,22 @@ export default function WorkshopInfoAdminPage() {
   // Unsaved-changes guard for the create/edit form modal.
   const [formDirty, setFormDirty] = useState(false);
   const [pendingClose, setPendingClose] = useState(false);
+  // Two kinds of workshop live here: rounds a teacher opens under a master,
+  // and standalone workshops the admin created on their own (every workshop
+  // from before migration 051 is standalone).
+  const [tab, setTab] = useState<'round' | 'single'>('round');
+  const [workshops, setWorkshops] = useState<WorkshopRow[]>([]);
+  const [openMaster, setOpenMaster] = useState<string | null>(null);
+  const roundsOf = (masterId: string) => workshops.filter((w) => w.master_id === masterId).sort((a, b) => (a.date + a.time_start).localeCompare(b.date + b.time_start));
+  const singles = workshops.filter((w) => !w.master_id).sort((a, b) => b.date.localeCompare(a.date));
 
   const load = useCallback(async () => {
     setLoadError(false);
     try {
+      fetch('/api/workshops?counts=1')
+        .then((r) => (r.ok ? (r.json() as Promise<{ workshops: WorkshopRow[] }>) : { workshops: [] }))
+        .then((d) => setWorkshops(d.workshops || []))
+        .catch(() => {});
       const res = await fetch('/api/workshop-masters');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as { masters: WorkshopMaster[] };
@@ -83,7 +98,62 @@ export default function WorkshopInfoAdminPage() {
         </button>
       </div>
 
-      {loading ? (
+      <div className="flex items-center gap-1 rounded-lg border border-gray-lighter p-1 text-sm w-fit mb-5">
+        {([
+          ['round', `Workshop รอบ · ${masters.length}`],
+          ['single', `Workshop เดี่ยว · ${singles.length}`],
+        ] as const).map(([k, label]) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setTab(k)}
+            className={`px-3 py-1.5 rounded-md ${tab === k ? 'bg-dark text-white' : 'text-gray hover:bg-surface'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'single' ? (
+        singles.length === 0 ? (
+          <div className="border border-dashed border-gray-lighter rounded-xl p-10 text-center text-gray text-sm">
+            ยังไม่มี Workshop เดี่ยว — สร้างได้ที่หน้า{' '}
+            <Link href="/admin/workshops" className="text-primary hover:underline">จัดการ Workshop</Link>
+          </div>
+        ) : (
+          <div className="card !p-0 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-surface">
+                  <tr>
+                    <th className="text-left py-3 px-4 text-gray font-medium">ชื่อ</th>
+                    <th className="text-left py-3 px-4 text-gray font-medium">วันที่</th>
+                    <th className="text-left py-3 px-4 text-gray font-medium">เวลา</th>
+                    <th className="text-left py-3 px-4 text-gray font-medium">สถานะ</th>
+                    <th className="text-center py-3 px-4 text-gray font-medium">ผู้สมัคร</th>
+                    <th className="text-right py-3 px-4 text-gray font-medium">จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {singles.map((w) => (
+                    <tr key={w.id} className="border-t border-gray-lighter hover:bg-surface/50">
+                      <td className="py-3 px-4 font-medium text-dark">{w.title}</td>
+                      <td className="py-3 px-4 text-gray">{w.date}</td>
+                      <td className="py-3 px-4 text-gray">{w.time_start}–{w.time_end}</td>
+                      <td className="py-3 px-4"><span className="badge bg-gray-lighter text-gray">{w.status}</span></td>
+                      <td className="py-3 px-4 text-center">{w.booking_count ?? 0}/{w.max_participants}</td>
+                      <td className="py-3 px-4 text-right text-xs">
+                        <Link href={`/admin/workshops/${w.id}/applicants`} className="text-primary hover:underline mr-3">ผู้สมัคร</Link>
+                        <Link href="/admin/workshops" className="text-dark hover:underline">แก้ไข ↗</Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+      ) : loading ? (
         <p className="text-gray text-sm">กำลังโหลด…</p>
       ) : loadError ? (
         <p className="text-gray text-sm">
@@ -110,6 +180,34 @@ export default function WorkshopInfoAdminPage() {
               <div className="p-4">
                 <h3 className="font-semibold text-dark">{m.title}</h3>
                 {m.organizer_name && <p className="text-xs text-gray mt-0.5">โดย {m.organizer_name}</p>}
+                <p className="text-xs text-gray mt-1">
+                  กลุ่ม {m.price_group != null ? `฿${m.price_group.toLocaleString()}` : '—'} · ส่วนตัว {m.price_private != null ? `฿${m.price_private.toLocaleString()}` : 'ไม่เปิด'}
+                </p>
+                {/* Rounds the teacher has opened under this master. */}
+                <button
+                  type="button"
+                  onClick={() => setOpenMaster((o) => (o === m.id ? null : m.id))}
+                  className="mt-2 text-xs text-dark hover:text-primary"
+                  aria-expanded={openMaster === m.id}
+                >
+                  {openMaster === m.id ? '▾' : '▸'} รอบ · {roundsOf(m.id).length}
+                </button>
+                {openMaster === m.id && (
+                  <ul className="mt-2 divide-y divide-gray-lighter border border-gray-lighter rounded-lg text-xs">
+                    {roundsOf(m.id).length === 0 && <li className="p-2 text-gray">ยังไม่มีรอบ — ผู้สอนเปิดได้ที่ Teacher Dashboard → จัดรอบสอน</li>}
+                    {roundsOf(m.id).map((w) => (
+                      <li key={w.id} className="p-2 flex items-center gap-2">
+                        <span className="flex-1 min-w-0">
+                          <span className="text-dark">{w.date}</span> · {w.time_start}–{w.time_end}
+                          {w.location ? ` · ${w.location}` : ''}
+                          {w.status !== 'active' ? ` · ${w.status}` : ''}
+                        </span>
+                        <span className="text-gray">{w.booking_count ?? 0}/{w.max_participants}</span>
+                        <Link href={`/admin/workshops/${w.id}/applicants`} className="text-primary hover:underline">ผู้สมัคร</Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 <div className="flex items-center gap-3 mt-3 text-xs">
                   <Link href={`/workshop-info/${m.id}`} target="_blank" className="text-dark hover:text-primary hover:underline">
                     ดูหน้าจริง ↗

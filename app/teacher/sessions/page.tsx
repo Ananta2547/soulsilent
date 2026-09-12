@@ -39,6 +39,11 @@ export default function TeacherSessionsPage() {
   const [timeEnd, setTimeEnd] = useState('12:00');
   const [locationId, setLocationId] = useState('');
   const [seats, setSeats] = useState('');
+  // A round can be a single day, or a run: every day / chosen weekdays,
+  // from the picked day through an end date.
+  const [repeat, setRepeat] = useState<'once' | 'daily' | 'weekly'>('once');
+  const [endDate, setEndDate] = useState('');
+  const [weekdays, setWeekdays] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -100,14 +105,25 @@ export default function TeacherSessionsPage() {
           time_end: timeEnd,
           location_id: locationId,
           max_participants: seats ? Number(seats) : undefined,
+          repeat,
+          end_date: repeat === 'once' ? undefined : endDate,
+          weekdays: repeat === 'weekly' ? weekdays : undefined,
         }),
       });
-      const d = (await res.json()) as { error?: string };
+      const d = (await res.json()) as { error?: string; created?: number; skipped?: number };
       if (!res.ok) {
         setMsg({ ok: false, text: d.error || tr(lang, 'เปิดรอบไม่สำเร็จ', 'Could not open the round') });
         return;
       }
-      setMsg({ ok: true, text: tr(lang, `เปิดรอบวันที่ ${fmtDate(date, lang)} แล้ว`, `Round opened for ${fmtDate(date, lang)}`) });
+      const n = d.created || 1;
+      const skipped = d.skipped ? tr(lang, ` (ข้าม ${d.skipped} วันที่มีอยู่แล้ว)`, ` (${d.skipped} already-open days skipped)`) : '';
+      setMsg({
+        ok: true,
+        text:
+          n === 1
+            ? tr(lang, `เปิดรอบวันที่ ${fmtDate(date, lang)} แล้ว${skipped}`, `Round opened for ${fmtDate(date, lang)}${skipped}`)
+            : tr(lang, `เปิด ${n} รอบแล้ว${skipped}`, `${n} rounds opened${skipped}`),
+      });
       setDate(null);
       await load();
     } finally {
@@ -126,7 +142,9 @@ export default function TeacherSessionsPage() {
     await load();
   }
 
-  const ready = !!master && !!date && !!locationId && timeStart < timeEnd;
+  const repeatOk = repeat === 'once' || (!!endDate && !!date && endDate >= date && (repeat === 'daily' || weekdays.length > 0));
+  const ready = !!master && !!date && !!locationId && timeStart < timeEnd && repeatOk;
+  const DOW = lang === 'th' ? ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'] : ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
   return (
     <div>
@@ -170,8 +188,51 @@ export default function TeacherSessionsPage() {
             <label className="tsm-label" style={{ marginTop: 20 }}>
               <T th="2 · วันที่" en="2 · Day" />
             </label>
+            <div className="tsm-repeat" role="radiogroup">
+              {(
+                [
+                  ['once', tr(lang, 'ครั้งเดียว', 'Once')],
+                  ['daily', tr(lang, 'ทุกวัน', 'Every day')],
+                  ['weekly', tr(lang, 'ทุกสัปดาห์', 'Weekly')],
+                ] as const
+              ).map(([k, label]) => (
+                <button key={k} type="button" role="radio" aria-checked={repeat === k} className={repeat === k ? 'on' : ''} onClick={() => setRepeat(k)}>
+                  {label}
+                </button>
+              ))}
+            </div>
             <MonthPicker value={date} onChange={(d) => { setDate(d); setMsg(null); }} marks={marks} />
-            {date && <div style={{ fontSize: 13, color: 'var(--teal-deep)', marginTop: 8, fontWeight: 600 }}>{fmtDate(date, lang)}</div>}
+            {date && (
+              <div style={{ fontSize: 13, color: 'var(--teal-deep)', marginTop: 8, fontWeight: 600 }}>
+                {repeat === 'once' ? fmtDate(date, lang) : tr(lang, `เริ่ม ${fmtDate(date, lang)}`, `From ${fmtDate(date, lang)}`)}
+              </div>
+            )}
+            {repeat !== 'once' && (
+              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {repeat === 'weekly' && (
+                  <div className="tsm-dow">
+                    {DOW.map((d, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        aria-pressed={weekdays.includes(i)}
+                        className={weekdays.includes(i) ? 'on' : ''}
+                        onClick={() => setWeekdays((w) => (w.includes(i) ? w.filter((x) => x !== i) : [...w, i].sort()))}
+                      >
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
+                  <span style={{ color: 'var(--muted)' }}>{tr(lang, 'ถึงวันที่', 'Until')}</span>
+                  <input type="date" value={endDate} min={date || undefined} onChange={(e) => setEndDate(e.target.value)} className="field" style={{ width: 170 }} />
+                </label>
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                  <T th="ระบบจะเปิดรอบให้ทุกวันที่ตรงเงื่อนไข (สูงสุด 92 รอบต่อครั้ง) วันที่มีรอบเวลานี้อยู่แล้วจะถูกข้าม" en="A round opens on every matching day (up to 92 per run); days that already have this time are skipped." />
+                </div>
+              </div>
+            )}
 
             <label className="tsm-label" style={{ marginTop: 20 }}>
               <T th="3 · เวลา" en="3 · Time" />

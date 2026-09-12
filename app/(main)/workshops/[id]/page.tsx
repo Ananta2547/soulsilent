@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { Suspense, useEffect, useState, useCallback } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import type { Workshop, Location, Review } from '@/lib/types';
+import type { WorkshopMaster, Workshop, Location, Review } from '@/lib/types';
 import { useLang, T, tr } from '@/lib/i18n';
 import { Reveal } from '@/components/design/Reveal';
 import { Btn } from '@/components/design/RippleButton';
@@ -13,6 +13,7 @@ import { ShareButton } from '@/components/design/ShareButton';
 import { Cloud, WaveLine, Star } from '@/components/design/Doodles';
 import { Countdown } from '@/components/design/Countdown';
 import { BookingModal, type BookingResult } from '@/components/workshops/BookingModal';
+import { SessionPickerModal, type BookingKind, type PickableSession } from '@/components/workshops/SessionPickerModal';
 import { ReviewModal } from '@/components/workshops/ReviewModal';
 import { AnnounceCountdown } from '@/components/workshops/AnnounceCountdown';
 import { ApplicationConsentModal } from '@/components/workshops/ApplicationConsentModal';
@@ -57,6 +58,16 @@ type Instructor = {
 const GIFT_BUTTON_ENABLED = false;
 
 export default function WorkshopDetailPage() {
+  // useSearchParams (?date from a teacher's profile) needs a Suspense
+  // boundary above it.
+  return (
+    <Suspense fallback={null}>
+      <WorkshopDetailInner />
+    </Suspense>
+  );
+}
+
+function WorkshopDetailInner() {
   const { id } = useParams<{ id: string }>();
   const { lang } = useLang();
   const [workshop, setWorkshop] = useState<Workshop | null>(null);
@@ -75,6 +86,16 @@ export default function WorkshopDetailPage() {
   const [loadError, setLoadError] = useState(false);
   const [booking, setBooking] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(false);
+  // A round under a master books through the calendar popup first: pick the
+  // day (siblings under the same master), the round, and group or private.
+  // The chosen round — which may be a sibling, not this page — then goes
+  // through the same application form.
+  const [master, setMaster] = useState<WorkshopMaster | null>(null);
+  const [siblings, setSiblings] = useState<PickableSession[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [chosen, setChosen] = useState<{ session: PickableSession; kind: BookingKind } | null>(null);
+  const search = useSearchParams();
+  const pickedDate = search.get('date');
   const [loginPromptOpen, setLoginPromptOpen] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
   // The handover link, once minted — the same modal serves a gift the buyer is
@@ -162,11 +183,52 @@ export default function WorkshopDetailPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!workshop?.master_id) return;
+    let alive = true;
+    fetch(`/api/workshop-masters/${workshop.master_id}`)
+      .then((r) => (r.ok ? (r.json() as Promise<{ master: WorkshopMaster; sessions: PickableSession[] }>) : null))
+      .then((d) => {
+        if (!alive || !d) return;
+        setMaster(d.master);
+        setSiblings(d.sessions || []);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [workshop?.master_id]);
+
   // Booking CTA: guests get the login/register prompt; signed-in users get the
-  // application form.
+  // application form — for a round, the calendar popup comes first.
   function handleBookClick() {
-    if (authed) setBookingOpen(true);
-    else setLoginPromptOpen(true);
+    if (!authed) {
+      setLoginPromptOpen(true);
+      return;
+    }
+    if (workshop?.master_id && master) setPickerOpen(true);
+    else setBookingOpen(true);
+  }
+
+  async function submitChosen(application: unknown): Promise<BookingResult> {
+    if (!chosen) return { error: 'no session' };
+    setBooking(true);
+    try {
+      const res = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workshop_id: chosen.session.id, application, booking_kind: chosen.kind }),
+      });
+      const data = (await res.json()) as BookingResult;
+      if (!res.ok) {
+        setBooking(false);
+        return { error: data.error || tr(lang, 'เกิดข้อผิดพลาด', 'Something went wrong') };
+      }
+      return data;
+    } catch {
+      setBooking(false);
+      return { error: tr(lang, 'เกิดข้อผิดพลาด', 'Something went wrong') };
+    }
   }
 
   async function handleBooking(application?: unknown): Promise<BookingResult> {
@@ -1009,6 +1071,29 @@ export default function WorkshopDetailPage() {
           workshop={workshop}
           submitting={booking}
           onSubmit={(application) => handleBooking(application)}
+        />
+      )}
+
+      {pickerOpen && master && (
+        <SessionPickerModal
+          master={master}
+          sessions={siblings}
+          initialDate={pickedDate || workshop.date}
+          onClose={() => setPickerOpen(false)}
+          onNext={(session, kind) => {
+            setPickerOpen(false);
+            setChosen({ session, kind });
+          }}
+        />
+      )}
+      {chosen && (
+        <BookingModal
+          onClose={() => setChosen(null)}
+          workshop={chosen.session}
+          submitting={booking}
+          onSubmit={submitChosen}
+          bookingKind={chosen.kind}
+          privatePrice={master?.price_private ?? null}
         />
       )}
 

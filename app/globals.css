@@ -3809,3 +3809,22 @@ body {
 .tch-view button.on { background: var(--ink); color: #fff; }
 .tch-cal { display: grid; grid-template-columns: minmax(0, 400px) minmax(0, 1fr); gap: 22px; align-items: start; }
 @media (max-width: 860px) { .tch-cal { grid-template-columns: 1fr; } }
+
+/* Session manager: repeat pattern + weekday picks */
+.tsm-repeat { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--cream); margin-bottom: 12px; }
+.tsm-repeat button { border: 0; background: transparent; font: inherit; font-size: 13px; padding: 6px 14px; border-radius: 999px; color: var(--muted); cursor: pointer; }
+.tsm-repeat button.on { background: var(--ink); color: #fff; }
+.tsm-dow { display: flex; gap: 6px; flex-wrap: wrap; }
+.tsm-dow button { width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid var(--cream-deep); background: var(--paper); font: inherit; font-size: 13px; cursor: pointer; color: var(--ink); }
+.tsm-dow button.on { background: var(--teal); border-color: var(--teal); color: #fff; }
+
+/* Teachers list */
+.tl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.tl-card { display: flex; align-items: flex-start; gap: 14px; padding: 16px; text-decoration: none; color: var(--ink); }
+.tl-avatar {
+  width: 64px; height: 64px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
+  background: var(--teal); color: #fff; font-size: 24px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.tl-avatar img { width: 100%; height: 100%; object-fit: cover; }
+@media (max-width: 560px) { .tl-grid { grid-template-columns: 1fr; } }
