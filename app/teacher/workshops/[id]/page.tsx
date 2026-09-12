@@ -171,6 +171,44 @@ export default function TeacherWorkshopDetail() {
         {days.length > 1 ? tr(lang, ` · ${days.length} วัน`, ` · ${days.length} days`) : ''} · {w.time_start}–{w.time_end}
       </p>
 
+      {/* Event photos — only when the admin has attached a Drive folder. Kept
+          above the numbers because it is the one thing a teacher opens after
+          the day itself. */}
+      {w.photos_drive_url && (
+        <a
+          href={w.photos_drive_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="card card-static"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+            marginBottom: 26,
+            textDecoration: 'none',
+            color: 'var(--ink)',
+            background: 'var(--teal-50)',
+            border: '1.5px solid var(--teal)',
+          }}
+        >
+          <span
+            aria-hidden
+            style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--teal)', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}
+          >
+            📁
+          </span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: 'block', fontWeight: 700, fontSize: 16 }}>
+              {tr(lang, 'ดูภาพถ่ายกิจกรรม (Google Drive)', 'Event photos (Google Drive)')}
+            </span>
+            <span style={{ display: 'block', fontSize: 12.5, color: 'var(--muted)', marginTop: 2 }}>
+              {tr(lang, 'โฟลเดอร์ที่ทีมงานอัปโหลดไว้ · เปิดในแท็บใหม่', 'Folder uploaded by the team · opens in a new tab')}
+            </span>
+          </span>
+          <span aria-hidden className="mono" style={{ color: 'var(--teal-deep)', fontSize: 18 }}>↗</span>
+        </a>
+      )}
+
       {/* PART 1 — Financial */}
       <section className="card card-static" style={{ marginBottom: 26 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>

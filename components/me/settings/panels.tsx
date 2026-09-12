@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLang, T, tr } from '@/lib/i18n';
 import { Btn } from '@/components/design/RippleButton';
-import { getVault, putVault } from '@/lib/vault';
+import { getVault, putVault, getIdentityLockedUntil, IdentityLockedError } from '@/lib/vault';
+import { IDENTITY_LOCK_DAYS } from '@/lib/identity-lock';
 import { ImageUploader } from '@/components/admin/image/ImageUploader';
 import { ASPECTS } from '@/lib/image-aspects';
 import { parseImageMeta } from '@/lib/image-meta';
@@ -838,6 +839,10 @@ export function AutofillPanel({
   const [touched, setTouched] = useState<Partial<Record<keyof Vault, boolean>>>({});
   /** Fields where the last keystroke/paste contained non-Thai characters. */
   const [thaiWarn, setThaiWarn] = useState<Partial<Record<keyof Vault, boolean>>>({});
+  /** Identity can be changed once every 30 days (lib/identity-lock). Epoch ms
+      the lock lifts, or null when the section is open for editing. */
+  const [identityLockedUntil, setIdentityLockedUntil] = useState<number | null>(null);
+  const identityLocked = identityLockedUntil != null && identityLockedUntil > Date.now();
   const set = (k: keyof Vault) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setV((p) => ({ ...p, [k]: e.target.value }));
 
   /** Thai-only name input: silently drops any disallowed character and flags why. */
@@ -863,6 +868,7 @@ export function AutofillPanel({
       if (!loaded.dob && me?.date_of_birth) loaded.dob = me.date_of_birth;
       setV(loaded);
       setSaved(loaded);
+      setIdentityLockedUntil(getIdentityLockedUntil());
     });
     return () => {
       alive = false;
@@ -882,22 +888,44 @@ export function AutofillPanel({
 
   /** Persist only this section's fields into the shared vault, keeping other
       sections at their last-saved values (never their unsaved edits). */
-  function saveSection(s: SectionKey) {
+  async function saveSection(s: SectionKey) {
     if (!isComplete(s, v)) return; // guarded — the button is disabled in this state
+    if (s === 'identity' && identityLocked) return;
     const next: Vault = { ...saved };
     SECTION_FIELDS[s].forEach((f) => {
       (next as Record<string, string>)[f] = v[f];
     });
     try {
-      void putVault(next as Record<string, string>); // writes localStorage + syncs to server
+      await putVault(next as Record<string, string>); // syncs to server + localStorage
       setSaved(next);
+      // The server decides whether this save started (or is still under) the
+      // identity clock; mirror it so the form greys out without a reload.
+      setIdentityLockedUntil(getIdentityLockedUntil());
       const label =
         s === 'identity' ? tr(lang, 'ตัวตน', 'Identity') : s === 'health' ? tr(lang, 'สุขภาพ & อาหาร', 'Health & dietary') : tr(lang, 'ผู้ติดต่อฉุกเฉิน', 'Emergency contact');
       onSaved(tr(lang, `บันทึกส่วน “${label}” แล้ว`, `${label} section saved`));
-    } catch {
+    } catch (e) {
+      if (e instanceof IdentityLockedError) {
+        // Refused — drop the edits so the greyed-out form shows what is on file.
+        setIdentityLockedUntil(e.until);
+        setV((p) => {
+          const back = { ...p };
+          SECTION_FIELDS.identity.forEach((f) => {
+            (back as Record<string, string>)[f] = saved[f];
+          });
+          return back;
+        });
+        onSaved(tr(lang, 'ข้อมูลตัวตนแก้ไขได้เดือนละครั้ง — ยังไม่ครบกำหนด', 'Identity can be changed once a month — not yet'));
+        return;
+      }
       onSaved(tr(lang, 'บันทึกไม่สำเร็จ', 'Save failed'));
     }
   }
+
+  /** "12 ต.ค. 2569" — the day the identity section opens again. */
+  const lockLiftsOn = identityLockedUntil
+    ? new Date(identityLockedUntil).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    : '';
 
   /** Empty-required error: after the field is blurred, once the section is
       verified (delete-prevention), or once the user has started filling it. */
@@ -930,7 +958,8 @@ export function AutofillPanel({
     const verified = isVerified(s);
     const complete = isComplete(s, v);
     const dirtyS = sectionDirty(s);
-    const canSave = complete && dirtyS;
+    const locked = s === 'identity' && identityLocked;
+    const canSave = complete && dirtyS && !locked;
     const blocked = verified && dirtyS && !complete; // a required field was cleared
 
     // "Saved" only means something once the section actually holds saved data —
@@ -938,7 +967,8 @@ export function AutofillPanel({
     const hasSavedData = SECTION_FIELDS[s].some((f) => isFilled(saved[f]));
 
     let status: { text: string; color: string; check?: boolean } | null = null;
-    if (blocked) status = { text: tr(lang, 'กรอกช่องที่จำเป็นให้ครบก่อนบันทึก — ห้ามเว้นว่าง', 'Fill the required fields before saving — they cannot be empty'), color: '#d94b46' };
+    if (locked) status = { text: tr(lang, `แก้ไขได้อีกครั้งวันที่ ${lockLiftsOn}`, `Editable again on ${lockLiftsOn}`), color: 'var(--muted)' };
+    else if (blocked) status = { text: tr(lang, 'กรอกช่องที่จำเป็นให้ครบก่อนบันทึก — ห้ามเว้นว่าง', 'Fill the required fields before saving — they cannot be empty'), color: '#d94b46' };
     else if (!verified && !complete) status = { text: tr(lang, 'กรอกช่องที่มีเครื่องหมาย * ให้ครบเพื่อบันทึกครั้งแรก', 'Fill every * field to save this section for the first time'), color: 'var(--muted)' };
     else if (canSave) status = { text: tr(lang, 'พร้อมบันทึก', 'Ready to save'), color: 'var(--muted)' };
     else if (!dirtyS && hasSavedData) status = { text: tr(lang, 'บันทึกแล้ว', 'Saved'), color: 'var(--teal-deep)', check: true };
@@ -963,11 +993,29 @@ export function AutofillPanel({
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 18px', borderRadius: 16, background: 'var(--teal-50)' }}>
         <ShieldSvg color="var(--teal-deep)" size={20} />
         <p style={{ margin: 0, fontSize: 13, color: 'var(--teal-deep)', lineHeight: 1.6 }}>
-          <T th="ข้อมูลนี้จะถูกใช้กรอกแบบฟอร์มสมัครเวิร์กชอปให้อัตโนมัติ และเก็บไว้ในเครื่องของคุณ · แต่ละส่วนบันทึกแยกกันได้" en="This vault auto-fills your workshop checkout forms. Stored on your device · each section saves independently." />
+          <T th="ข้อมูลนี้จะถูกใช้กรอกแบบฟอร์มสมัครเวิร์กชอปให้อัตโนมัติ และเก็บไว้ในเครื่องของคุณ · แต่ละส่วนบันทึกแยกกันได้ · ส่วน “ตัวตน” แก้ไขได้เดือนละครั้ง" en="This vault auto-fills your workshop checkout forms. Stored on your device · each section saves independently · Identity can be changed once a month." />
         </p>
       </div>
 
       <SectionCard title={tr(lang, 'ตัวตน', 'Identity')} badge={statusBadge('identity')}>
+        {identityLocked && (
+          <div
+            role="status"
+            style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '12px 14px', borderRadius: 12, background: '#fcefcf', color: '#7a4f0a', fontSize: 13, lineHeight: 1.55, marginBottom: 16 }}
+          >
+            <span aria-hidden>🔒</span>
+            <span>
+              {tr(
+                lang,
+                `ข้อมูลตัวตนแก้ไขได้ 1 ครั้งทุก ${IDENTITY_LOCK_DAYS} วัน — แก้ไขได้อีกครั้งวันที่ ${lockLiftsOn}`,
+                `Identity can be changed once every ${IDENTITY_LOCK_DAYS} days — editable again on ${lockLiftsOn}`
+              )}
+            </span>
+          </div>
+        )}
+        {/* A disabled fieldset greys out every control inside without touching
+            each input — the save bar below checks the same flag. */}
+        <fieldset disabled={identityLocked} style={{ border: 0, padding: 0, margin: 0, minWidth: 0, opacity: identityLocked ? 0.55 : 1 }}>
         <div className="form-grid">
           <div>
             <label className={fieldLabel}>
@@ -1108,6 +1156,7 @@ export function AutofillPanel({
             <input value={v.facebook} onChange={set('facebook')} className="field" placeholder={tr(lang, 'ลิงก์หรือชื่อโปรไฟล์ Facebook (ไม่บังคับ)', 'Facebook profile link or name (optional)')} />
           </div>
         </div>
+        </fieldset>
         {saveBar('identity')}
       </SectionCard>
 

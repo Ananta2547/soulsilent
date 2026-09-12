@@ -40,13 +40,25 @@ function purgeLegacy() {
   } catch {}
 }
 
+/** Epoch ms until which the identity section is read-only; null = editable.
+ *  Remembered from the last round-trip so the settings form can ask for it. */
+let lockedUntil: number | null = null;
+
+/** Thrown by putVault when the server refuses an identity change (lib/identity-lock). */
+export class IdentityLockedError extends Error {
+  constructor(public until: number) {
+    super('identity_locked');
+  }
+}
+
 /** Fetch the signed-in user's vault + id. null when signed-out / offline. */
 async function fetchServer(): Promise<{ vault: VaultData; userId: string } | null> {
   try {
     const res = await fetch('/api/me/vault');
     if (!res.ok) return null;
-    const d = (await res.json()) as { vault: VaultData | null; userId?: string };
+    const d = (await res.json()) as { vault: VaultData | null; userId?: string; identityLockedUntil?: number | null };
     if (!d.userId) return null;
+    lockedUntil = d.identityLockedUntil ?? null;
     return { vault: d.vault || {}, userId: d.userId };
   } catch {
     return null;
@@ -54,13 +66,24 @@ async function fetchServer(): Promise<{ vault: VaultData; userId: string } | nul
 }
 
 async function putServer(data: VaultData): Promise<void> {
+  let res: Response;
   try {
-    await fetch('/api/me/vault', {
+    res = await fetch('/api/me/vault', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ vault: data }),
     });
-  } catch {}
+  } catch {
+    return; // offline — the per-user cache keeps the edit until next sync
+  }
+  const d = (await res.json().catch(() => ({}))) as { identityLockedUntil?: number | null };
+  if (res.status === 423) throw new IdentityLockedError(d.identityLockedUntil || 0);
+  if (res.ok) lockedUntil = d.identityLockedUntil ?? null;
+}
+
+/** Identity lock as of the last server round-trip (call after getVault/putVault). */
+export function getIdentityLockedUntil(): number | null {
+  return lockedUntil;
 }
 
 /**
@@ -101,7 +124,7 @@ export async function putVault(data: VaultData): Promise<void> {
     uid = server?.userId ?? null;
     if (uid) cachedUid = uid;
   }
-  if (uid) writeLocal(keyFor(uid), data);
   purgeLegacy();
-  await putServer(data);
+  await putServer(data); // throws IdentityLockedError — nothing cached in that case
+  if (uid) writeLocal(keyFor(uid), data);
 }
