@@ -3575,13 +3575,6 @@ body {
   box-shadow: 0 24px 48px -26px rgba(13, 30, 29, 0.5);
 }
 .jn-modal-poster-frame img { width: 100%; height: 100%; object-fit: cover; }
-.jn-modal-size {
-  font-size: 10.5px;
-  letter-spacing: 0.12em;
-  color: var(--muted);
-  text-align: center;
-  margin-top: 12px;
-}
 .jn-modal-full { margin-top: 14px; justify-content: center; width: 100%; box-sizing: border-box; }
 
 .jn-modal-body { padding: 30px 34px 34px; min-width: 0; }

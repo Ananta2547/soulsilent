@@ -3,8 +3,8 @@
 /* One stop on the journey, opened in place — the popup from the Design
  * Composer "Journey + Diary" canvas. Tapping a card on /me/journey opens this
  * rather than navigating away, so the path stays behind it and closing puts the
- * reader back exactly where they were. The full page still exists at
- * /me/journey/<workshop> for a deep link. */
+ * reader back exactly where they were. There is no full-page version — the
+ * only way out, other than closing, is to the workshop itself. */
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -148,9 +148,8 @@ export function JourneyModal({
                 </span>
               )}
             </div>
-            <div className="mono jn-modal-size">A3 · 297 × 420 MM</div>
-            <Link href={`/me/journey/${item.workshop_id}`} className="btn btn-paper jn-modal-full">
-              {tr(lang, 'เปิดหน้าเต็ม', 'Open full page')} <span aria-hidden className="mono">↗</span>
+            <Link href={`/workshops/${item.workshop_id}`} className="btn btn-paper jn-modal-full">
+              {tr(lang, 'รายละเอียด', 'Details')} <span aria-hidden className="mono">↗</span>
             </Link>
           </div>
 
