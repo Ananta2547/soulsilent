@@ -40,7 +40,7 @@ const NAV: NavItem[] = [
     ),
   },
   {
-    href: '/teacher',
+    href: '/teacher/overview',
     label: 'ภาพรวม / รายได้',
     icon: (
       <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -131,10 +131,9 @@ export function TeacherSidebar() {
 
         <nav className="flex-1 p-4 space-y-1">
           {NAV.map((item) => {
-            // /teacher matches only itself; the others own their subtrees, so
-            // the workshop detail page keeps "Workshop ของฉัน" lit.
-            const active =
-              item.href === '/teacher' ? pathname === '/teacher' : pathname.startsWith(item.href);
+            // Each section owns its subtree, so the workshop detail page keeps
+            // "Workshop ของฉัน" lit.
+            const active = pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}

@@ -225,29 +225,43 @@ export default function TeacherWorkshopDetail() {
           <Stat label={tr(lang, 'ยอดโอนสุทธิ', 'Net payout')} value={baht(finance.net)} tone="var(--teal-deep)" big />
         </div>
         {w.payout_remark && (
-          <div style={{ fontSize: 13.5, color: 'var(--ink)', background: 'var(--cream)', borderRadius: 12, padding: '12px 14px', marginBottom: w.payout_slip_url ? 14 : 0 }}>
+          <div style={{ fontSize: 13.5, color: 'var(--ink)', background: 'var(--cream)', borderRadius: 12, padding: '12px 14px' }}>
             <span style={{ color: 'var(--muted)', fontSize: 11, display: 'block', marginBottom: 4 }}>{tr(lang, 'หมายเหตุจากทีมงาน', 'Note from the team')}</span>
             {w.payout_remark}
           </div>
         )}
-        {w.payout_slip_url && (
-          <div>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>{tr(lang, 'สลิปโอนเงิน', 'Transfer slip')}</div>
-            {/* The slip opens on demand. Printed into the card it took a
-                phone screen's worth of height above the participant list,
-                for something read once when the money arrives. */}
+      </section>
+
+      {/* The slip gets a card of its own, shown in full, so the money arriving
+          is something a teacher can see rather than a link to click. */}
+      {w.payout_slip_url && (
+        <section className="card card-static" style={{ marginBottom: 26 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+            <h2 className="display-th" style={{ fontSize: 20, margin: 0 }}>
+              <T th="สลิปโอนเงิน" en="Transfer slip" />
+            </h2>
             <a
               href={w.payout_slip_url}
               target="_blank"
               rel="noopener noreferrer"
               className="btn btn-paper"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13.5, padding: '9px 16px' }}
+              style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, padding: '8px 14px' }}
             >
-              {tr(lang, 'ดูสลิป', 'View slip')} <span aria-hidden className="mono">↗</span>
+              {tr(lang, 'เปิดเต็มจอ', 'Open full size')} <span aria-hidden className="mono">↗</span>
             </a>
           </div>
-        )}
-      </section>
+          <a
+            href={w.payout_slip_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="tc-slip-frame"
+            aria-label={tr(lang, 'เปิดสลิปเต็มจอ', 'Open the slip full size')}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={w.payout_slip_url} alt={tr(lang, 'สลิปโอนเงิน', 'Transfer slip')} />
+          </a>
+        </section>
+      )}
 
       {/* PART 2 — Participants */}
       <section>
