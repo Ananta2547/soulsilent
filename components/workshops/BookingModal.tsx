@@ -76,12 +76,17 @@ export function BookingModal({
   /** 'claim' = taking over a seat somebody already paid for. Same form, but
    *  nothing is owed, so the payment warning and the pay wording drop out. */
   mode = 'book',
+  bookingKind = 'group',
+  privatePrice = null,
 }: {
   onClose: () => void;
   workshop: Workshop;
   submitting: boolean;
   onSubmit: (application: unknown) => Promise<BookingResult>;
   mode?: 'book' | 'claim';
+  /** Session-based activities: 'private' takes the whole round at privatePrice. */
+  bookingKind?: 'group' | 'private';
+  privatePrice?: number | null;
 }) {
   const claiming = mode === 'claim';
   const { lang } = useLang();
@@ -465,6 +470,12 @@ export function BookingModal({
         <div style={{ padding: '20px 24px', maxHeight: '60vh', overflowY: 'auto' }}>
           {step === 1 ? (
             <>
+              {bookingKind === 'private' && (
+                <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 12, background: 'var(--teal-50)', color: 'var(--teal-deep)', fontSize: 13, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                  <span><b>{tr(lang, 'จองแบบส่วนตัว', 'Private booking')}</b> · {tr(lang, 'เหมาทั้งรอบ', 'the whole round')} · {workshop.date} {workshop.time_start}–{workshop.time_end}</span>
+                  {privatePrice != null && <b>฿{Math.round(privatePrice).toLocaleString()}</b>}
+                </div>
+              )}
               <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 16px', lineHeight: 1.6 }}>
                 <T th="ข้อมูลนี้ดึงจากโปรไฟล์ของคุณอัตโนมัติ — แก้ไขได้ที่หน้าตั้งค่า" en="Pulled from your profile automatically — edit it in settings." />
               </p>

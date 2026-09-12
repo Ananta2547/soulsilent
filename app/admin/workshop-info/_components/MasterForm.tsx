@@ -89,6 +89,11 @@ export function MasterForm({
   const [coverMeta, setCoverMeta] = useState<ImageMeta | null>(parseImageMeta(initial?.cover_image_meta ?? null));
   const [target, setTarget] = useState<string[]>(toArr(initial?.target_json));
   const [takeaways, setTakeaways] = useState<string[]>(toArr(initial?.takeaways_json));
+  // Prices every round of this master opens with (migration 051). Private is
+  // optional — leave it blank and the booking popup offers group only.
+  const [priceGroup, setPriceGroup] = useState(initial?.price_group != null ? String(initial.price_group) : '');
+  const [pricePrivate, setPricePrivate] = useState(initial?.price_private != null ? String(initial.price_private) : '');
+  const [defaultSeats, setDefaultSeats] = useState(String(initial?.default_max_participants ?? 20));
   const [teachers, setTeachers] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -105,11 +110,14 @@ export function MasterForm({
         coverMeta: parseImageMeta(initial?.cover_image_meta ?? null),
         target: toArr(initial?.target_json),
         takeaways: toArr(initial?.takeaways_json),
+        priceGroup: initial?.price_group != null ? String(initial.price_group) : '',
+        pricePrivate: initial?.price_private != null ? String(initial.price_private) : '',
+        defaultSeats: String(initial?.default_max_participants ?? 20),
       }),
     [initial],
   );
   const dirty =
-    JSON.stringify({ title, organizer, description, coverUrl, coverMeta, target, takeaways }) !== baseline;
+    JSON.stringify({ title, organizer, description, coverUrl, coverMeta, target, takeaways, priceGroup, pricePrivate, defaultSeats }) !== baseline;
   useEffect(() => {
     onDirtyChange?.(dirty);
   }, [dirty, onDirtyChange]);
@@ -142,6 +150,9 @@ export function MasterForm({
           cover_image_meta: coverMeta,
           target: target.map((s) => s.trim()).filter(Boolean),
           takeaways: takeaways.map((s) => s.trim()).filter(Boolean),
+          price_group: priceGroup.trim() === '' ? null : Number(priceGroup),
+          price_private: pricePrivate.trim() === '' ? null : Number(pricePrivate),
+          default_max_participants: Number(defaultSeats) || 20,
         }),
       });
       const data = (await res.json()) as { error?: string };
@@ -204,6 +215,24 @@ export function MasterForm({
         <label className="block text-sm font-medium text-dark mb-1">รายละเอียดกิจกรรม</label>
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={5} className="input-field" />
       </div>
+
+      <fieldset className="border border-gray-lighter rounded-lg p-3">
+        <legend className="text-sm font-medium text-dark px-1">ราคาและที่นั่ง (ใช้กับทุกรอบที่ผู้สอนเปิด)</legend>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-1">
+          <div>
+            <label className="block text-xs text-gray mb-1">ราคาแบบกลุ่ม (บาท/ที่นั่ง)</label>
+            <input type="number" min={0} step="1" value={priceGroup} onChange={(e) => setPriceGroup(e.target.value)} className="input-field" placeholder="เช่น 1200" />
+          </div>
+          <div>
+            <label className="block text-xs text-gray mb-1">ราคาแบบส่วนตัว (เหมาทั้งรอบ)</label>
+            <input type="number" min={0} step="1" value={pricePrivate} onChange={(e) => setPricePrivate(e.target.value)} className="input-field" placeholder="เว้นว่าง = ไม่เปิดแบบส่วนตัว" />
+          </div>
+          <div>
+            <label className="block text-xs text-gray mb-1">ที่นั่งต่อรอบ (ค่าเริ่มต้น)</label>
+            <input type="number" min={1} step="1" value={defaultSeats} onChange={(e) => setDefaultSeats(e.target.value)} className="input-field" />
+          </div>
+        </div>
+      </fieldset>
 
       <ListField legend="เหมาะกับใคร (Target Audience)" items={target} onChange={setTarget} placeholder="เช่น คนที่อยากพักใจ..." />
 

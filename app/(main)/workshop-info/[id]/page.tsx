@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import Link from 'next/link';
+
+import { Suspense, useEffect, useState } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useLang, T, tr } from '@/lib/i18n';
 import { Reveal } from '@/components/design/Reveal';
 import { Btn } from '@/components/design/RippleButton';
@@ -9,17 +11,74 @@ import { getEffectivePrice, safeParseArray } from '@/lib/workshop-utils';
 import type { WorkshopMaster, Workshop } from '@/lib/types';
 import { Icon } from '@/components/design/Icon';
 import { useLoadingTracker } from '@/components/design/DataLoading';
+import { SessionPickerModal, type BookingKind, type PickableSession } from '@/components/workshops/SessionPickerModal';
+import { BookingModal } from '@/components/workshops/BookingModal';
 
-type Session = Workshop & { booked: number };
+type Session = PickableSession;
 
 export default function WorkshopInfoPage() {
+  // useSearchParams (the ?date carried from a teacher's profile) needs a
+  // Suspense boundary above it.
+  return (
+    <Suspense fallback={null}>
+      <WorkshopInfoInner />
+    </Suspense>
+  );
+}
+
+function WorkshopInfoInner() {
   const { id } = useParams<{ id: string }>();
   const { lang } = useLang();
   const [master, setMaster] = useState<WorkshopMaster | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
+  // Booking runs in two popups: pick the round (and group/private), then the
+  // application form the standalone workshop page already uses.
+  const search = useSearchParams();
+  const initialDate = search.get('date');
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [chosen, setChosen] = useState<{ session: Session; kind: BookingKind } | null>(null);
+  const [me, setMe] = useState<{ id: string } | null | undefined>(undefined);
+  const [booking, setBooking] = useState(false);
 
   const track = useLoadingTracker();
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then((r) => r.json() as Promise<{ user: { id: string } | null }>)
+      .then((d) => setMe(d.user))
+      .catch(() => setMe(null));
+  }, []);
+
+  function startBooking() {
+    if (me === null) {
+      const redirect = `/workshop-info/${id}${initialDate ? `?date=${initialDate}` : ''}`;
+      window.location.href = `/auth/login?redirect=${encodeURIComponent(redirect)}`;
+      return;
+    }
+    setPickerOpen(true);
+  }
+
+  async function submitBooking(application: unknown) {
+    if (!chosen) return { error: 'no session' };
+    setBooking(true);
+    try {
+      const res = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workshop_id: chosen.session.id, application, booking_kind: chosen.kind }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setBooking(false);
+        return { error: data.error || tr(lang, 'เกิดข้อผิดพลาด', 'Something went wrong') };
+      }
+      return data;
+    } catch {
+      setBooking(false);
+      return { error: tr(lang, 'เกิดข้อผิดพลาด', 'Something went wrong') };
+    }
+  }
 
   useEffect(() => {
     track(
@@ -67,7 +126,16 @@ export default function WorkshopInfoPage() {
           <span className="eyebrow"><T th="ข้อมูลกิจกรรม" en="Activity info" /></span>
           <h1 className="display-th" style={{ fontSize: 'clamp(34px, 5vw, 60px)', margin: '14px 0 8px' }}>{master.title}</h1>
           {master.organizer_name && (
-            <p style={{ color: 'var(--muted)', fontSize: 14 }}>{tr(lang, 'จัดโดย', 'Organized by')} <strong style={{ color: 'var(--ink)' }}>{master.organizer_name}</strong></p>
+            <p style={{ color: 'var(--muted)', fontSize: 14 }}>
+              {tr(lang, 'จัดโดย', 'Organized by')}{' '}
+              {master.organizer ? (
+                <Link href={`/teachers/${master.organizer}`} style={{ color: 'var(--ink)', fontWeight: 700, textDecoration: 'underline', textUnderlineOffset: 3 }}>
+                  {master.organizer_name}
+                </Link>
+              ) : (
+                <strong style={{ color: 'var(--ink)' }}>{master.organizer_name}</strong>
+              )}
+            </p>
           )}
         </Reveal>
 
@@ -98,27 +166,78 @@ export default function WorkshopInfoPage() {
           </div>
         )}
 
-        {/* Upcoming sessions */}
+        {/* Book */}
         <div style={{ marginTop: 56 }}>
           <Reveal>
             <span className="eyebrow" style={{ color: 'var(--teal)' }}><T th="สมัครเข้าร่วม" en="Join a session" /></span>
-            <h2 className="display-th" style={{ fontSize: 'clamp(26px, 3.5vw, 40px)', margin: '12px 0 24px' }}>
-              <T th="รอบที่กำลังจะมาถึง" en="Upcoming sessions" />
+            <h2 className="display-th" style={{ fontSize: 'clamp(26px, 3.5vw, 40px)', margin: '12px 0 18px' }}>
+              <T th="เลือกวันและรอบที่สะดวก" en="Pick a day and a round" />
             </h2>
           </Reveal>
 
-          {sessions.length === 0 ? (
+          {sessions.filter((s) => s.status === 'active').length === 0 ? (
             <div style={{ padding: 40, borderRadius: 20, background: 'var(--cream)', textAlign: 'center', color: 'var(--muted)' }}>
               {tr(lang, 'ยังไม่มีรอบที่เปิดรับสมัครในขณะนี้', 'No open sessions right now.')}
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div className="card card-static" style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 220 }}>
+                <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', fontSize: 14 }}>
+                  <span>
+                    <span style={{ color: 'var(--muted)' }}>{tr(lang, 'กลุ่ม', 'Group')} </span>
+                    <b>฿{Math.round(master.price_group ?? sessions[0].price).toLocaleString()}</b>
+                    <span style={{ color: 'var(--muted)' }}>{tr(lang, '/ที่นั่ง', '/seat')}</span>
+                  </span>
+                  {master.price_private != null && (
+                    <span>
+                      <span style={{ color: 'var(--muted)' }}>{tr(lang, 'ส่วนตัว (เหมารอบ)', 'Private (whole round)')} </span>
+                      <b>฿{Math.round(master.price_private).toLocaleString()}</b>
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 6 }}>
+                  {tr(lang, `${sessions.filter((s) => s.status === 'active').length} รอบที่เปิดรับ · ${new Set(sessions.map((s) => s.date)).size} วัน`, `${sessions.filter((s) => s.status === 'active').length} open rounds · ${new Set(sessions.map((s) => s.date)).size} days`)}
+                  {initialDate && <> · {tr(lang, 'เลือกวันไว้แล้ว:', 'Day chosen:')} <b style={{ color: 'var(--teal-deep)' }}>{initialDate}</b></>}
+                </div>
+              </div>
+              <Btn kind="teal" onClick={startBooking} style={{ justifyContent: 'center', fontSize: 15, padding: '13px 24px' }}>
+                {tr(lang, 'จองที่นั่ง', 'Book a seat')} <span className="mono">→</span>
+              </Btn>
+            </div>
+          )}
+
+          {/* The rounds, for reading — booking goes through the popup. */}
+          {sessions.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 18 }}>
               {sessions.map((s) => (
                 <SessionCard key={s.id} s={s} lang={lang} />
               ))}
             </div>
           )}
         </div>
+
+        {pickerOpen && (
+          <SessionPickerModal
+            master={master}
+            sessions={sessions}
+            initialDate={initialDate}
+            onClose={() => setPickerOpen(false)}
+            onNext={(session, kind) => {
+              setPickerOpen(false);
+              setChosen({ session, kind });
+            }}
+          />
+        )}
+        {chosen && (
+          <BookingModal
+            onClose={() => setChosen(null)}
+            workshop={chosen.session}
+            submitting={booking}
+            onSubmit={submitBooking}
+            bookingKind={chosen.kind}
+            privatePrice={master.price_private}
+          />
+        )}
       </div>
     </section>
   );
@@ -129,7 +248,7 @@ function SessionCard({ s, lang }: { s: Session; lang: 'th' | 'en' }) {
   const paymentType = s.payment_type || 'paid';
   const free = paymentType === 'free' || eff.price <= 0;
   const spotsLeft = Math.max(0, s.max_participants - (s.booked || 0));
-  const soldOut = s.admission_type !== 'selection' && spotsLeft <= 0;
+  const soldOut = s.admission_type !== 'selection' && (spotsLeft <= 0 || (s.private_taken || 0) > 0);
   const dateLabel = new Date(s.date + 'T00:00:00').toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-GB', {
     weekday: 'short',
     day: 'numeric',
@@ -154,16 +273,13 @@ function SessionCard({ s, lang }: { s: Session; lang: 'th' | 'en' }) {
             ? tr(lang, 'รับสมัครแบบคัดเลือก', 'By selection')
             : soldOut
               ? tr(lang, 'เต็มแล้ว', 'Sold out')
-              : tr(lang, `เหลือ ${spotsLeft} ที่นั่ง`, `${spotsLeft} seats left`)}
+              : tr(lang, `รับ ${s.max_participants} ที่นั่ง`, `${s.max_participants} seats`)}
         </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
         <div style={{ fontFamily: 'Archivo Black, Mitr, sans-serif', fontSize: 18, color: free ? 'var(--teal)' : 'var(--ink)' }}>
           {free ? tr(lang, 'ฟรี', 'Free') : `฿${eff.price.toLocaleString()}`}
         </div>
-        <Btn kind="teal" href={`/workshops/${s.id}`} style={{ justifyContent: 'center' }}>
-          {s.admission_type === 'selection' ? tr(lang, 'ดูรายละเอียด', 'View') : tr(lang, 'สมัคร', 'Book')} <span className="mono">→</span>
-        </Btn>
       </div>
     </div>
   );

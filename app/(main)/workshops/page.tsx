@@ -333,7 +333,7 @@ function Card({ w }: { w: Workshop }) {
   const { open, badgeLabel, ctaLabel } = getWorkshopCardStatus(w);
 
   return (
-    <Link href={`/workshops/${w.id}`} className="card reveal-up dc-event-card" style={{ padding: 16, background: 'var(--paper)', display: 'flex', flexDirection: 'column', textDecoration: 'none', color: 'var(--ink)' }}>
+    <Link href={w.master_id ? `/workshop-info/${w.master_id}?date=${w.date}` : `/workshops/${w.id}`} className="card reveal-up dc-event-card" style={{ padding: 16, background: 'var(--paper)', display: 'flex', flexDirection: 'column', textDecoration: 'none', color: 'var(--ink)' }}>
       <div className="ph ph-teal card-media dc-ev-media" style={{ aspectRatio: '3/4', borderRadius: 14, marginBottom: 14, position: 'relative', overflow: 'hidden' }}>
         {w.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element

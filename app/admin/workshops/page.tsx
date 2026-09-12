@@ -42,6 +42,10 @@ export default function AdminWorkshopsPage() {
   const [loadingEdit, setLoadingEdit] = useState<string | null>(null);
   const [formDirty, setFormDirty] = useState(false);
   const [pendingClose, setPendingClose] = useState(false);
+  // 'single' = a workshop the admin created on its own; 'round' = a session a
+  // teacher opened under a master (migration 051).
+  const [kindFilter, setKindFilter] = useState<'all' | 'single' | 'round'>('all');
+  const shown = workshops.filter((w) => (kindFilter === 'all' ? true : kindFilter === 'round' ? !!w.master_id : !w.master_id));
 
   async function fetchAll() {
     setLoadError(false);
@@ -202,7 +206,23 @@ export default function AdminWorkshopsPage() {
             admin · workshops · overview
           </p>
           <h1 className="font-heading text-3xl text-dark">จัดการ Workshop</h1>
-          <p className="text-sm text-gray mt-1">ทั้งหมด {workshops.length} รายการ</p>
+          <p className="text-sm text-gray mt-1">ทั้งหมด {workshops.length} รายการ{kindFilter !== 'all' ? ` · แสดง ${shown.length}` : ''}</p>
+        </div>
+        <div className="flex items-center gap-1 rounded-lg border border-gray-lighter p-1 text-sm">
+          {([
+            ['all', 'ทั้งหมด'],
+            ['single', 'Workshop เดี่ยว'],
+            ['round', 'รอบ (ผู้สอนเปิด)'],
+          ] as const).map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setKindFilter(k)}
+              className={`px-3 py-1.5 rounded-md ${kindFilter === k ? 'bg-dark text-white' : 'text-gray hover:bg-surface'}`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
         <button
           type="button"
@@ -229,7 +249,7 @@ export default function AdminWorkshopsPage() {
               </tr>
             </thead>
             <tbody>
-              {workshops.map((ws) => {
+              {shown.map((ws) => {
                 const loc = locations.find((l) => l.id === ws.location_id);
                 return (
                   <tr key={ws.id} className="border-t border-gray-lighter hover:bg-surface/50">

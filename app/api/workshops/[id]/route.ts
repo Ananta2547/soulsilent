@@ -77,14 +77,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     // Count "taken" seats: paid + holds that haven't expired yet
     const countResult = await db
       .prepare(
-        `SELECT COUNT(*) as count FROM bookings WHERE workshop_id = ?
+        `SELECT COALESCE(SUM(CASE WHEN booking_kind = 'private' THEN ? ELSE 1 END), 0) as count
+         FROM bookings WHERE workshop_id = ?
          AND status != 'cancelled' AND (
            payment_status = 'paid' OR status = 'confirmed'
            OR (payment_status = 'pending' AND expires_at IS NOT NULL
                AND datetime(expires_at) > datetime('now'))
          )`
       )
-      .bind(id)
+      .bind(workshop.max_participants, id)
       .first<{ count: number }>();
 
     // Include the current user's booking — include expires_at so the UI can

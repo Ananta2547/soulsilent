@@ -40,6 +40,16 @@ const NAV: NavItem[] = [
     ),
   },
   {
+    href: '/teacher/sessions',
+    label: 'จัดรอบสอน',
+    icon: (
+      <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <rect x="3.5" y="5" width="17" height="15" rx="2" strokeWidth={1.5} />
+        <path strokeLinecap="round" strokeWidth={1.5} d="M8 3v4M16 3v4M3.5 10h17M12 13v4M10 15h4" />
+      </svg>
+    ),
+  },
+  {
     href: '/teacher/overview',
     label: 'ภาพรวม / รายได้',
     icon: (

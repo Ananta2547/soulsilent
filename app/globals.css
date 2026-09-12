@@ -3731,3 +3731,81 @@ body {
   .tc-slip-box { padding: 14px 14px 16px; border-radius: 18px; max-height: calc(100dvh - 24px); }
   .tc-slip-frame { padding: 8px; }
 }
+
+/* MonthPicker — one shared month grid (components/calendar/MonthPicker). */
+.mp { width: 100%; max-width: 380px; user-select: none; }
+.mp-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.mp-month { font-weight: 700; font-size: 15px; color: var(--ink); }
+.mp-nav {
+  width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--cream-deep);
+  background: var(--paper); color: var(--ink); font-size: 20px; line-height: 1; cursor: pointer;
+}
+.mp-nav:hover { background: var(--cream); }
+.mp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.mp-dow { margin-bottom: 4px; }
+.mp-dow span { text-align: center; font-size: 11px; color: var(--muted); letter-spacing: .04em; }
+.mp-day {
+  position: relative; aspect-ratio: 1; border-radius: 12px; border: 0; background: transparent;
+  color: var(--ink); font: inherit; font-size: 14px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+}
+.mp-day.has { background: var(--teal-50); color: var(--teal-deep); font-weight: 600; }
+.mp-day:hover:not(:disabled) { background: var(--cream-deep); }
+.mp-day.on, .mp-day.on:hover { background: var(--teal); color: #fff; }
+.mp-day.today .mp-num { text-decoration: underline; text-underline-offset: 3px; }
+.mp-day:disabled { color: var(--muted); opacity: .35; cursor: not-allowed; background: transparent; }
+.mp-mark { font-size: 9px; line-height: 1; font-weight: 700; }
+.mp-day.on .mp-mark { color: #fff; }
+
+/* Teacher session manager */
+.tsm-grid { display: grid; grid-template-columns: minmax(0, 440px) minmax(0, 1fr); gap: 22px; align-items: start; }
+.tsm-label { display: block; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; font-family: var(--mono, monospace); }
+@media (max-width: 900px) { .tsm-grid { grid-template-columns: 1fr; } }
+
+/* Teacher public profile */
+.tp-hero { position: relative; }
+.tp-cover { width: 100%; height: 220px; object-fit: cover; border-radius: 22px; display: block; }
+.tp-cover-blank { background: linear-gradient(135deg, var(--teal-50), var(--cream-deep)); }
+.tp-id { display: flex; align-items: flex-end; gap: 18px; margin: -44px 0 0 24px; }
+.tp-avatar {
+  width: 96px; height: 96px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
+  background: var(--teal); color: #fff; font-size: 36px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 0 4px var(--paper);
+}
+.tp-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.tp-cal { display: grid; grid-template-columns: minmax(0, 400px) minmax(0, 1fr); gap: 22px; align-items: start; }
+.tp-round { display: flex; align-items: center; gap: 14px; padding: 12px 14px; text-decoration: none; color: var(--ink); }
+.tp-round-img { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; flex-shrink: 0; display: block; }
+.tp-round-blank { background: var(--cream-deep); }
+@media (max-width: 760px) {
+  .tp-cover { height: 150px; }
+  .tp-id { margin: -36px 0 0 14px; gap: 12px; }
+  .tp-avatar { width: 76px; height: 76px; font-size: 28px; }
+  .tp-cal { grid-template-columns: 1fr; }
+}
+
+/* Session picker (workshop-info booking step 1) */
+.sp-backdrop { position: fixed; inset: 0; z-index: 1000; background: rgba(13,30,29,.45); display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; }
+.sp-box { width: 100%; max-width: 760px; background: var(--paper); border-radius: 22px; box-shadow: 0 30px 80px -24px rgba(13,30,29,.5); overflow: hidden; }
+.sp-head { padding: 18px 22px; border-bottom: 1px solid var(--cream-deep); display: flex; align-items: center; gap: 12px; }
+.sp-head > div:first-child { flex: 1; }
+.sp-close { background: none; border: 0; font-size: 24px; color: var(--muted); cursor: pointer; line-height: 1; }
+.sp-body { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 22px; padding: 20px 22px; max-height: 62vh; overflow-y: auto; }
+.sp-label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; font-family: var(--mono, monospace); }
+.sp-round, .sp-kind { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; border: 1.5px solid var(--cream-deep); cursor: pointer; background: var(--paper); }
+.sp-round.on, .sp-kind.on { border-color: var(--teal); background: var(--teal-50); }
+.sp-round.full, .sp-kind.off { opacity: .55; cursor: not-allowed; }
+.sp-foot { padding: 14px 22px; border-top: 1px solid var(--cream-deep); display: flex; align-items: center; gap: 10px; }
+@media (max-width: 640px) {
+  .sp-backdrop { padding: 12px; align-items: flex-end; }
+  .sp-body { grid-template-columns: 1fr; max-height: 68vh; }
+  .sp-box { border-radius: 18px; }
+}
+
+/* Teacher workshops: list / check-in calendar switch */
+.tch-view { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--cream); margin-bottom: 18px; }
+.tch-view button { border: 0; background: transparent; font: inherit; font-size: 13px; padding: 7px 14px; border-radius: 999px; color: var(--muted); cursor: pointer; }
+.tch-view button.on { background: var(--ink); color: #fff; }
+.tch-cal { display: grid; grid-template-columns: minmax(0, 400px) minmax(0, 1fr); gap: 22px; align-items: start; }
+@media (max-width: 860px) { .tch-cal { grid-template-columns: 1fr; } }

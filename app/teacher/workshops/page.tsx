@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useLang, T, tr } from '@/lib/i18n';
 import { Icon } from '@/components/design/Icon';
 import { Pager } from '@/components/teacher/Pager';
 import type { Workshop } from '@/lib/types';
 import { getWorkshopDays, hasWorkshopEnded } from '@/lib/workshop-utils';
+import { MonthPicker } from '@/components/calendar/MonthPicker';
+import { fmtDate } from '@/lib/datetime';
 
 type Row = Workshop & { booked: number };
 
@@ -39,6 +41,28 @@ export default function TeacherWorkshopsPage() {
   const [cols, setCols] = useState(4);
   const [narrow, setNarrow] = useState(false);
   const perPage = Math.max(1, cols * (narrow ? ROWS_NARROW : ROWS_DESKTOP));
+
+  // Check-in by calendar: every day one of these workshops runs lights up;
+  // pick a day and the rounds that day list with a way into their roster.
+  const [view, setView] = useState<'list' | 'calendar'>('list');
+  const [day, setDay] = useState<string | null>(null);
+  const byDay = useMemo(() => {
+    const m = new Map<string, Row[]>();
+    (rows || []).forEach((w) => {
+      getWorkshopDays(w).forEach((d) => {
+        if (!m.has(d)) m.set(d, []);
+        m.get(d)!.push(w);
+      });
+    });
+    return m;
+  }, [rows]);
+  const dayMarks = useMemo(() => {
+    const m: Record<string, number> = {};
+    byDay.forEach((list, d) => {
+      m[d] = list.length;
+    });
+    return m;
+  }, [byDay]);
 
   useEffect(() => {
     (async () => {
@@ -82,12 +106,52 @@ export default function TeacherWorkshopsPage() {
       <h1 className="display-th" style={{ fontSize: 'clamp(24px,3vw,32px)', margin: '8px 0 4px' }}>
         <T th="เวิร์กชอปของฉัน" en="My Workshops" />
       </h1>
-      <p style={{ fontSize: 14, color: 'var(--muted)', margin: '0 0 18px' }}>
+      <p style={{ fontSize: 14, color: 'var(--muted)', margin: '0 0 14px' }}>
         <T th="เวิร์กชอปที่คุณเป็นผู้นำกิจกรรม — ดูผู้สมัคร เช็คชื่อ และยอดโอน" en="Workshops you lead — applicants, check-in and payouts." />
       </p>
 
+      <div className="tch-view" role="tablist" aria-label={tr(lang, 'มุมมอง', 'View')}>
+        <button type="button" role="tab" aria-selected={view === 'list'} className={view === 'list' ? 'on' : ''} onClick={() => setView('list')}>
+          {tr(lang, 'รายการ', 'List')}
+        </button>
+        <button type="button" role="tab" aria-selected={view === 'calendar'} className={view === 'calendar' ? 'on' : ''} onClick={() => setView('calendar')}>
+          {tr(lang, 'ปฏิทินเช็คชื่อ', 'Check-in calendar')}
+        </button>
+      </div>
+
       {rows === null ? (
         <CardGridSkeleton />
+      ) : view === 'calendar' ? (
+        <div className="tch-cal">
+          <div className="card card-static">
+            <MonthPicker value={day} onChange={setDay} enabled={new Set(byDay.keys())} marks={dayMarks} min="" />
+            <p style={{ fontSize: 12, color: 'var(--muted)', margin: '12px 0 0' }}>
+              <T th="วันที่มีสี = มีรอบสอน · ตัวเลขคือจำนวนรอบ" en="Tinted days have a round · the number is how many" />
+            </p>
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 10 }}>
+              {day ? fmtDate(day, lang) : tr(lang, 'เลือกวันจากปฏิทิน', 'Choose a day')}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {(day ? byDay.get(day) || [] : []).map((w) => (
+                <Link key={w.id} href={`/teacher/workshops/${w.id}`} className="card card-static" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none', color: 'var(--ink)' }}>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: 'block', fontWeight: 700, fontSize: 14.5 }} className="u-clamp-2">{w.title}</span>
+                    <span className="mono" style={{ display: 'block', fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                      {w.time_start}–{w.time_end}{w.location ? ` · ${w.location}` : ''}
+                    </span>
+                  </span>
+                  <span className="tag" style={{ fontSize: 11 }}>{w.booked} {tr(lang, 'คน', 'people')}</span>
+                  <span className="btn btn-teal btn-sm">{tr(lang, 'เช็คชื่อ', 'Check in')} →</span>
+                </Link>
+              ))}
+              {day && (byDay.get(day) || []).length === 0 && (
+                <div style={{ color: 'var(--muted)', fontSize: 13.5 }}><T th="ไม่มีรอบในวันนี้" en="No round on this day." /></div>
+              )}
+            </div>
+          </div>
+        </div>
       ) : rows.length === 0 ? (
         <div className="card card-static" style={{ textAlign: 'center', padding: '48px 24px' }}>
           <p style={{ color: 'var(--muted)', margin: 0 }}>

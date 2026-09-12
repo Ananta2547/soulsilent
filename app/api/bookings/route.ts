@@ -149,13 +149,16 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await requireAuth();
-    const { workshop_id, application, gift } = (await request.json()) as {
+    const { workshop_id, application, gift, booking_kind } = (await request.json()) as {
       workshop_id: string;
       application?: unknown;
       /** Buying the seat for someone else — who it is meant for. The buyer
        *  fills no application; the receiver does, when they claim the link. */
       gift?: { name?: string; phone?: string };
+      /** Session-based activities: 'private' takes the whole round (migration 051). */
+      booking_kind?: 'group' | 'private';
     };
+    const isPrivate = booking_kind === 'private';
     const applicationJson = application != null ? JSON.stringify(application) : null;
     const db = await getDB();
 
@@ -231,14 +234,39 @@ export async function POST(request: Request) {
     // Capacity check using the seat-taken predicate (paid + live holds only).
     // Selection workshops accept applications beyond capacity (that's what the
     // waitlist is for), so the limit is only enforced for direct booking.
+    // A private booking took the whole round, so the round is full whatever
+    // max_participants says; and private itself is only possible while the
+    // round is still empty.
+    let privatePrice: number | null = null;
     if (!isSelection) {
       const countResult = await db
-        .prepare(`SELECT COUNT(*) as count FROM bookings WHERE workshop_id = ? AND ${SEAT_TAKEN_SQL}`)
-        .bind(workshop_id)
-        .first<{ count: number }>();
+        .prepare(
+          `SELECT COUNT(*) AS count,
+                  COALESCE(SUM(CASE WHEN booking_kind = 'private' THEN 1 ELSE 0 END), 0) AS priv
+             FROM bookings WHERE workshop_id = ? AND user_id != ? AND ${SEAT_TAKEN_SQL}`
+        )
+        .bind(workshop_id, user.sub)
+        .first<{ count: number; priv: number }>();
+      const taken = countResult?.count || 0;
 
-      if ((countResult?.count || 0) >= workshop.max_participants) {
+      if ((countResult?.priv || 0) > 0 || taken >= workshop.max_participants) {
         return NextResponse.json({ error: 'ที่นั่งเต็มแล้ว' }, { status: 400 });
+      }
+      if (isPrivate) {
+        if (!workshop.master_id) {
+          return NextResponse.json({ error: 'กิจกรรมนี้ไม่เปิดจองแบบส่วนตัว' }, { status: 400 });
+        }
+        const master = await db
+          .prepare('SELECT price_private FROM workshop_masters WHERE id = ?')
+          .bind(workshop.master_id)
+          .first<{ price_private: number | null }>();
+        if (master?.price_private == null) {
+          return NextResponse.json({ error: 'กิจกรรมนี้ไม่เปิดจองแบบส่วนตัว' }, { status: 400 });
+        }
+        if (taken > 0) {
+          return NextResponse.json({ error: 'รอบนี้มีผู้จองแล้ว จึงจองแบบส่วนตัวไม่ได้' }, { status: 400 });
+        }
+        privatePrice = master.price_private;
       }
     }
 
@@ -348,9 +376,11 @@ export async function POST(request: Request) {
     //   free    → 0
     //   deposit → fixed deposit_amount (refundable on event day)
     //   paid    → full effective (promo-aware) price
-    const fullPrice = getEffectivePrice(workshop).price;
+    //   private → the master's whole-round price, promo-free
+    const fullPrice = privatePrice != null ? privatePrice : getEffectivePrice(workshop).price;
     const chargeAmount =
       paymentType === 'free' ? 0 : paymentType === 'deposit' ? workshop.deposit_amount || 0 : fullPrice;
+    const kindValue = isPrivate ? 'private' : 'group';
 
     // Initial booking state by flow:
     //   selection → applied, no seat hold (decided later by admin)
@@ -378,27 +408,27 @@ export async function POST(request: Request) {
       await db
         .prepare(
           `UPDATE bookings SET status = ?, payment_status = ?, amount = ?, app_status = ?,
-             application_json = COALESCE(?, application_json),
+             application_json = COALESCE(?, application_json), booking_kind = ?,
              expires_at = ${holdExpr ? "datetime('now', ?)" : 'NULL'}
            WHERE id = ?`
         )
         .bind(
           ...(holdExpr
-            ? [rowStatus, rowPayment, chargeAmount, appStatus, applicationJson, holdExpr, bookingId]
-            : [rowStatus, rowPayment, chargeAmount, appStatus, applicationJson, bookingId])
+            ? [rowStatus, rowPayment, chargeAmount, appStatus, applicationJson, kindValue, holdExpr, bookingId]
+            : [rowStatus, rowPayment, chargeAmount, appStatus, applicationJson, kindValue, bookingId])
         )
         .run();
     } else {
       bookingId = uuid();
       await db
         .prepare(
-          `INSERT INTO bookings (id, workshop_id, user_id, status, payment_status, amount, app_status, application_json, expires_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ${holdExpr ? "datetime('now', ?)" : 'NULL'})`
+          `INSERT INTO bookings (id, workshop_id, user_id, status, payment_status, amount, app_status, application_json, booking_kind, expires_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ${holdExpr ? "datetime('now', ?)" : 'NULL'})`
         )
         .bind(
           ...(holdExpr
-            ? [bookingId, workshop_id, user.sub, rowStatus, rowPayment, chargeAmount, appStatus, applicationJson, holdExpr]
-            : [bookingId, workshop_id, user.sub, rowStatus, rowPayment, chargeAmount, appStatus, applicationJson])
+            ? [bookingId, workshop_id, user.sub, rowStatus, rowPayment, chargeAmount, appStatus, applicationJson, kindValue, holdExpr]
+            : [bookingId, workshop_id, user.sub, rowStatus, rowPayment, chargeAmount, appStatus, applicationJson, kindValue])
         )
         .run();
     }

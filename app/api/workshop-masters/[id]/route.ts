@@ -32,7 +32,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
     const sessions = await db
       .prepare(
-        `SELECT w.*, (SELECT COUNT(*) FROM bookings b WHERE b.workshop_id = w.id AND ${SEAT_TAKEN}) AS booked
+        `SELECT w.*, (SELECT COUNT(*) FROM bookings b WHERE b.workshop_id = w.id AND ${SEAT_TAKEN}) AS booked,
+                (SELECT COUNT(*) FROM bookings b WHERE b.workshop_id = w.id AND b.booking_kind = 'private' AND ${SEAT_TAKEN}) AS private_taken
          FROM workshops w
          WHERE w.master_id = ? AND w.status = 'active' AND w.date >= date('now')
          ORDER BY w.date ASC`
@@ -55,7 +56,12 @@ type Body = {
   cover_image_meta?: ImageMeta | null;
   target?: string[];
   takeaways?: string[];
+  price_group?: number | null;
+  price_private?: number | null;
+  default_max_participants?: number | null;
 };
+
+const money = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null);
 
 /** PUT /api/workshop-masters/[id] — admin updates a master. */
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -71,7 +77,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       .prepare(
         `UPDATE workshop_masters SET
            title = ?, description = ?, organizer = ?, cover_image_url = ?, cover_image_meta = ?,
-           target_json = ?, takeaways_json = ?, updated_at = datetime('now')
+           target_json = ?, takeaways_json = ?,
+           price_group = ?, price_private = ?, default_max_participants = ?,
+           updated_at = datetime('now')
          WHERE id = ?`
       )
       .bind(
@@ -82,6 +90,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         body.cover_image_meta ? JSON.stringify(body.cover_image_meta) : null,
         JSON.stringify((body.target || []).filter((s) => s.trim())),
         JSON.stringify((body.takeaways || []).filter((s) => s.trim())),
+        money(body.price_group),
+        money(body.price_private),
+        Math.max(1, Math.round(Number(body.default_max_participants) || 20)),
         id
       )
       .run();

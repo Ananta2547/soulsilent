@@ -90,6 +90,12 @@ export interface WorkshopMaster {
   target_json: string;
   /** JSON string[] — ได้อะไรจากกิจกรรม (key takeaways). */
   takeaways_json: string;
+  /** Per-seat price a round opens with (migration 051). */
+  price_group: number | null;
+  /** Price to take a whole round for yourself; null = private not offered. */
+  price_private: number | null;
+  /** Seats a new round starts with when the teacher opens one. */
+  default_max_participants: number | null;
   created_at: string;
   updated_at: string;
   /** Joined (not a column): the organizer teacher's display name. */
@@ -107,6 +113,9 @@ export interface Workshop {
   /** JSON string[] of users.id — every facilitator shown to the public, in
    *  display order. null on rows created before migration 043. */
   instructor_ids_json: string | null;
+  /** Teacher who opened this round from the session manager; NULL when the
+   *  admin created it directly (migration 051). */
+  created_by?: string | null;
   /** JSON string[] of users.id — co-facilitators an admin allowed into the
    *  teacher dashboard for this workshop. The owner is never listed here; they
    *  always have access. null = owner only (migration 046). */
@@ -199,6 +208,8 @@ export interface Booking {
   user_id: string;
   status: 'pending' | 'confirmed' | 'cancelled';
   payment_status: 'pending' | 'paid' | 'refunded' | 'expired';
+  /** 'group' takes one seat; 'private' takes the whole round (migration 051). */
+  booking_kind?: 'group' | 'private' | null;
   /** Stripe ids from before the move to Beam. Nothing writes these any more,
    *  but they are the record of what a past booking actually paid through and
    *  are kept for exactly that reason — a refund on one of these is issued from
