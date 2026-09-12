@@ -925,7 +925,6 @@ export default function WorkshopDetailPage() {
                 <BookingCardContent
                   workshop={workshop}
                   spotsLeft={spotsLeft}
-                  bookingCount={bookingCount}
                   userBooking={userBooking}
                   userAttended={userAttended}
                   userCompleted={userCompleted}
@@ -963,9 +962,11 @@ export default function WorkshopDetailPage() {
               : `฿${getEffectivePrice(workshop).price.toLocaleString()}`}
           </div>
           <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-            {spotsLeft > 0
-              ? tr(lang, `เหลือ ${spotsLeft} ที่นั่ง`, `${spotsLeft} seats left`)
-              : tr(lang, 'เต็มแล้ว', 'Sold out')}
+            {spotsLeft <= 0
+              ? tr(lang, 'เต็มแล้ว', 'Sold out')
+              : spotsLeft <= 4
+                ? tr(lang, `เหลือเพียง ${spotsLeft} ที่นั่ง`, `Only ${spotsLeft} seats left`)
+                : tr(lang, `รับ ${workshop.max_participants} ที่นั่ง`, `${workshop.max_participants} seats`)}
           </div>
         </div>
         <button
@@ -1076,7 +1077,6 @@ export default function WorkshopDetailPage() {
 function BookingCardContent({
   workshop,
   spotsLeft,
-  bookingCount,
   userBooking,
   userAttended,
   userCompleted,
@@ -1094,7 +1094,6 @@ function BookingCardContent({
 }: {
   workshop: Workshop;
   spotsLeft: number;
-  bookingCount: number;
   userBooking: UserBooking | null;
   userAttended: boolean;
   userCompleted: boolean;
@@ -1113,10 +1112,6 @@ function BookingCardContent({
   const eff = getEffectivePrice(workshop);
   // Show "Free" when the payment model is free OR the effective price is ฿0.
   const isFree = (workshop.payment_type || 'paid') === 'free' || eff.price <= 0;
-  const pct =
-    workshop.max_participants > 0
-      ? Math.round((bookingCount / workshop.max_participants) * 100)
-      : 0;
   const lowSeats = spotsLeft > 0 && spotsLeft <= 4;
   const isSelection = workshop.admission_type === 'selection';
   const paymentType = workshop.payment_type || 'paid';
@@ -1237,14 +1232,16 @@ function BookingCardContent({
         </p>
       )}
 
-      {/* Seat progress */}
+      {/* Seats. Only the capacity is shown — how many are already taken is kept
+          off the public page so a class that has just opened does not look
+          empty. Scarcity still surfaces once it is real: the last few seats,
+          or none. */}
       <div style={{ marginBottom: 18 }}>
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             fontSize: 12,
-            marginBottom: 8,
           }}
         >
           <span
@@ -1255,29 +1252,11 @@ function BookingCardContent({
               textTransform: 'uppercase',
             }}
           >
-            {isSelection ? tr(lang, 'ที่นั่งทั้งหมด', 'Total seats') : tr(lang, 'ที่นั่งที่จองแล้ว', 'Booked')}
+            {tr(lang, 'ที่นั่งทั้งหมด', 'Total seats')}
           </span>
           <span style={{ fontWeight: 600, color: 'var(--ink)' }}>
-            {bookingCount}/{workshop.max_participants}
+            {workshop.max_participants} {tr(lang, 'ที่นั่ง', 'seats')}
           </span>
-        </div>
-        <div
-          style={{
-            height: 8,
-            borderRadius: 99,
-            background: 'var(--cream)',
-            overflow: 'hidden',
-          }}
-        >
-          <div
-            style={{
-              height: '100%',
-              width: `${Math.min(100, pct)}%`,
-              background: pct >= 80 ? '#e25c3b' : 'var(--teal)',
-              borderRadius: 99,
-              transition: 'width 1s ease',
-            }}
-          />
         </div>
         {lowSeats && (
           <div
