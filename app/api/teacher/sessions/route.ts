@@ -58,9 +58,11 @@ export async function GET() {
               w.status, w.created_by, l.name AS loc_name,
               (SELECT COUNT(*) FROM bookings b WHERE b.workshop_id = w.id
                  AND b.status != 'cancelled' AND (b.payment_status = 'paid' OR b.status = 'confirmed')) AS booked
-         FROM workshops w LEFT JOIN locations l ON w.location_id = l.id
-        WHERE w.master_id IS NOT NULL
-          ${isAdmin ? '' : 'AND w.master_id IN (SELECT id FROM workshop_masters WHERE organizer = ?)'}
+         FROM workshops w
+         LEFT JOIN locations l ON w.location_id = l.id
+         JOIN workshop_masters m ON m.id = w.master_id
+        WHERE m.kind != 'single'
+          ${isAdmin ? '' : 'AND m.organizer = ?'}
         ORDER BY w.date ASC, w.time_start ASC`
     )
     .bind(...(isAdmin ? [] : [u.sub]))
