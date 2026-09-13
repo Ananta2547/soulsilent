@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { v4 as uuid } from 'uuid';
 import { getDB, getEnv } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
-import { getEffectivePrice, hasWorkshopStarted } from '@/lib/workshop-utils';
+import { getEffectivePrice, hasWorkshopStarted, getWorkshopStatusBadge } from '@/lib/workshop-utils';
 import { parseTiers } from '@/lib/pricing';
 import { settleSelection, visibleAppStatus, confirmDeadlineFor, type SettleWorkshop } from '@/lib/selection';
 import { expireStaleHolds, HOLD_MINUTES } from '@/lib/holds';
@@ -177,10 +177,16 @@ export async function POST(request: Request) {
     }
 
     // Registration closes the moment the event starts — a multi-day workshop
-    // must not take joiners once it is under way (matches the "ปิดรับ" badge).
-    if (hasWorkshopStarted(workshop)) {
+    // must not take joiners once it is under way — and, for selection, once
+    // the results are announced. Same rule as the public "ปิดรับ" badge, but
+    // judged on the server clock: a device clock wound back changes nothing.
+    if (!getWorkshopStatusBadge(workshop).open) {
       return NextResponse.json(
-        { error: 'กิจกรรมเริ่มแล้ว ไม่สามารถสมัครได้' },
+        {
+          error: hasWorkshopStarted(workshop)
+            ? 'กิจกรรมเริ่มแล้ว ไม่สามารถสมัครได้'
+            : 'ปิดรับสมัครแล้ว ไม่สามารถสมัครได้',
+        },
         { status: 400 },
       );
     }

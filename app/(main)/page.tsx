@@ -7,6 +7,7 @@ import { useLang } from '@/lib/i18n';
 import { Icon } from '@/components/design/Icon';
 import { useLoadingTracker } from '@/components/design/DataLoading';
 import { getEffectivePrice, hasWorkshopEnded, getWorkshopCardStatus, isNewWorkshop, isWorkshopFull, compareWorkshopsForListing } from '@/lib/workshop-utils';
+import { learnServerClock } from '@/lib/server-clock';
 import { categoryLabel, formatArticleDate } from '@/lib/article-utils';
 
 /* ============================================================
@@ -869,7 +870,10 @@ export default function HomePage() {
   useEffect(() => {
     track(
       fetch('/api/workshops?status=active')
-        .then((r) => r.json() as Promise<{ workshops: Workshop[] }>)
+        .then((r) => {
+          learnServerClock(r);
+          return r.json() as Promise<{ workshops: Workshop[] }>;
+        })
         .then((d) => setWorkshops(d.workshops || []))
         .catch(() => {}),
     );

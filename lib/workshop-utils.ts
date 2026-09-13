@@ -1,4 +1,5 @@
 import type { ScheduleDay, ScheduleItem, Workshop } from './types';
+import { serverNow } from './server-clock';
 
 export function safeParseArray<T>(json: string | null | undefined, fallback: T[]): T[] {
   if (!json) return fallback;
@@ -101,7 +102,7 @@ export function getWorkshopEnd(w: DateShape): Date {
 }
 
 /** True once the workshop has finished — used to lock check-in. */
-export function hasWorkshopEnded(w: DateShape, now: Date = new Date()): boolean {
+export function hasWorkshopEnded(w: DateShape, now: Date = serverNow()): boolean {
   const end = getWorkshopEnd(w);
   return !Number.isNaN(end.getTime()) && now > end;
 }
@@ -141,7 +142,7 @@ export function getWorkshopEndPrecise(w: TimeShape): Date {
 }
 
 /** True while the event is happening — from the start until the final day's end. */
-export function isWorkshopOngoing(w: TimeShape, now: Date = new Date()): boolean {
+export function isWorkshopOngoing(w: TimeShape, now: Date = serverNow()): boolean {
   const t = now.getTime();
   return t >= getWorkshopStart(w).getTime() && t <= getWorkshopEndPrecise(w).getTime();
 }
@@ -277,7 +278,7 @@ export function isShortMapLink(url: string): boolean {
  * A promo is active when: promo_price is set AND today is within [start, end]
  * (start/end optional — open-ended is allowed).
  */
-export function getEffectivePrice(w: Workshop, now: Date = new Date()):
+export function getEffectivePrice(w: Workshop, now: Date = serverNow()):
   | { price: number; isPromo: false; originalPrice: number }
   | { price: number; isPromo: true; originalPrice: number; promoEnd: string | null } {
   const original = w.price;
@@ -324,7 +325,7 @@ export const NEW_WORKSHOP_DAYS = 7;
  *  created_at is stored UTC ("YYYY-MM-DD HH:MM:SS") — normalise to ISO/UTC. */
 export function isNewWorkshop(
   w: { created_at?: string | null } & Partial<DateShape>,
-  now: Date = new Date(),
+  now: Date = serverNow(),
 ): boolean {
   if (!w.created_at) return false;
   // Past event → drop the "New" ribbon regardless of how recently it was created.
@@ -336,7 +337,7 @@ export function isNewWorkshop(
 }
 
 /** True once the event's start moment has passed — booking auto-closes then. */
-export function hasWorkshopStarted(w: TimeShape, now: Date = new Date()): boolean {
+export function hasWorkshopStarted(w: TimeShape, now: Date = serverNow()): boolean {
   const start = getWorkshopStart(w);
   return !Number.isNaN(start.getTime()) && now.getTime() >= start.getTime();
 }
@@ -353,7 +354,7 @@ export function isWorkshopFull(w: Workshop): boolean {
 /** Public booking-status badge. active = open (accent), everything else
  *  non-draft = closed (muted). Draft is never shown publicly. Once the event
  *  has STARTED, booking auto-closes → "ปิดรับ" regardless of the stored status. */
-export function getWorkshopStatusBadge(w: Workshop, now: Date = new Date()): { label: string; open: boolean } {
+export function getWorkshopStatusBadge(w: Workshop, now: Date = serverNow()): { label: string; open: boolean } {
   let open = w.status === 'active' && !hasWorkshopStarted(w, now);
   // Selection: booking (applications) close once the results are announced —
   // after that it's the confirm phase for the already-selected, not open to new
@@ -373,7 +374,7 @@ export function getWorkshopStatusBadge(w: Workshop, now: Date = new Date()): { l
  *  Both public cards (home + listing) render from this so they cannot drift. */
 export function getWorkshopCardStatus(
   w: Workshop,
-  now: Date = new Date(),
+  now: Date = serverNow(),
 ): { open: boolean; badgeLabel: string; ctaLabel: string } {
   const badge = getWorkshopStatusBadge(w, now);
   if (!badge.open) return { open: false, badgeLabel: badge.label, ctaLabel: 'ปิดรับ' };
@@ -395,7 +396,7 @@ function createdAtMs(w: { created_at?: string | null }): number {
  *   3. Closed (full / ended)     → most recently passed first (start DESC)
  *  "Open" uses the effective badge so a started (auto-closed) workshop sinks
  *  into the Closed group. */
-export function compareWorkshopsForListing(a: Workshop, b: Workshop, now: Date = new Date()): number {
+export function compareWorkshopsForListing(a: Workshop, b: Workshop, now: Date = serverNow()): number {
   const rank = (w: Workshop) => (isNewWorkshop(w, now) ? 0 : getWorkshopStatusBadge(w, now).open ? 1 : 2);
   const ra = rank(a);
   const diff = ra - rank(b);

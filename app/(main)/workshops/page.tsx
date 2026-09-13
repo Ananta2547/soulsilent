@@ -6,6 +6,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { Workshop } from '@/lib/types';
 import { getWorkshopTags, getEffectivePrice, getWorkshopCardStatus, isNewWorkshop, compareWorkshopsForListing, hasWorkshopEnded } from '@/lib/workshop-utils';
+import { learnServerClock } from '@/lib/server-clock';
 import { Icon } from '@/components/design/Icon';
 import { useLoadingTracker } from '@/components/design/DataLoading';
 
@@ -107,6 +108,7 @@ function WorkshopsListingInner() {
       fetch('/api/workshops?public=1')
         .then((r) => {
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          learnServerClock(r);
           return r.json() as Promise<{ workshops: Workshop[] }>;
         })
         .then((d) => setWorkshops(d.workshops || []))

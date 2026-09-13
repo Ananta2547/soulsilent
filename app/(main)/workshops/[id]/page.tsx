@@ -31,6 +31,7 @@ import {
   isWorkshopOngoing,
   getWorkshopDays,
 } from '@/lib/workshop-utils';
+import { learnServerClock } from '@/lib/server-clock';
 import { visibleAppStatus } from '@/lib/selection-status';
 import { GiftModal } from '@/components/workshops/GiftModal';
 import { TransferLinkModal } from '@/components/workshops/TransferLinkModal';
@@ -125,6 +126,7 @@ function WorkshopDetailInner() {
         try {
           const res = await fetch(`/api/workshops/${id}`);
           if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}`);
+          learnServerClock(res);
           const data = (await res.json()) as {
             workshop: Workshop;
             location: Location | null;
