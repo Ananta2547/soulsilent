@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid';
 import { getDB, getEnv } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { getEffectivePrice, hasWorkshopStarted } from '@/lib/workshop-utils';
+import { parseTiers } from '@/lib/pricing';
 import { settleSelection, visibleAppStatus, confirmDeadlineFor, type SettleWorkshop } from '@/lib/selection';
 import { expireStaleHolds, HOLD_MINUTES } from '@/lib/holds';
 import { claimUrl, newTransferToken, partyFromBooking } from '@/lib/transfers';
@@ -149,7 +150,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await requireAuth();
-    const { workshop_id, application, gift, booking_kind } = (await request.json()) as {
+    const { workshop_id, application, gift, booking_kind, tier_id } = (await request.json()) as {
       workshop_id: string;
       application?: unknown;
       /** Buying the seat for someone else — who it is meant for. The buyer
@@ -157,8 +158,12 @@ export async function POST(request: Request) {
       gift?: { name?: string; phone?: string };
       /** Session-based activities: 'private' takes the whole round (migration 051). */
       booking_kind?: 'group' | 'private';
+      /** Which of the master's price tiers was picked (lib/pricing); 'seat'
+       *  or absent = the round's own per-seat price. */
+      tier_id?: string;
     };
-    const isPrivate = booking_kind === 'private';
+    let isPrivate = booking_kind === 'private';
+    let tierLabel: string | null = null;
     const applicationJson = application != null ? JSON.stringify(application) : null;
     const db = await getDB();
 
@@ -238,6 +243,20 @@ export async function POST(request: Request) {
     // max_participants says; and private itself is only possible while the
     // round is still empty.
     let privatePrice: number | null = null;
+    // A named tier sets the price, and whether it buys a seat or the round.
+    let tierPrice: number | null = null;
+    if (tier_id && tier_id !== 'seat') {
+      if (!workshop.master_id) return NextResponse.json({ error: 'ราคานี้ใช้กับกิจกรรมนี้ไม่ได้' }, { status: 400 });
+      const m = await db
+        .prepare('SELECT price_group, price_tiers_json FROM workshop_masters WHERE id = ?')
+        .bind(workshop.master_id)
+        .first<{ price_group: number | null; price_tiers_json: string | null }>();
+      const tier = m ? parseTiers(m.price_tiers_json).find((t) => t.id === tier_id) : undefined;
+      if (!tier) return NextResponse.json({ error: 'ไม่พบราคาที่เลือก' }, { status: 400 });
+      tierPrice = tier.price;
+      tierLabel = tier.label;
+      isPrivate = tier.mode === 'round';
+    }
     if (!isSelection) {
       const countResult = await db
         .prepare(
@@ -253,20 +272,14 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'ที่นั่งเต็มแล้ว' }, { status: 400 });
       }
       if (isPrivate) {
-        if (!workshop.master_id) {
-          return NextResponse.json({ error: 'กิจกรรมนี้ไม่เปิดจองแบบส่วนตัว' }, { status: 400 });
-        }
-        const master = await db
-          .prepare('SELECT price_private FROM workshop_masters WHERE id = ?')
-          .bind(workshop.master_id)
-          .first<{ price_private: number | null }>();
-        if (master?.price_private == null) {
-          return NextResponse.json({ error: 'กิจกรรมนี้ไม่เปิดจองแบบส่วนตัว' }, { status: 400 });
+        // Whole-round buys come only through a round-mode tier.
+        if (tierPrice == null) {
+          return NextResponse.json({ error: 'กิจกรรมนี้ไม่เปิดจองแบบเหมาทั้งรอบ' }, { status: 400 });
         }
         if (taken > 0) {
-          return NextResponse.json({ error: 'รอบนี้มีผู้จองแล้ว จึงจองแบบส่วนตัวไม่ได้' }, { status: 400 });
+          return NextResponse.json({ error: 'รอบนี้มีผู้จองแล้ว จึงเหมาทั้งรอบไม่ได้' }, { status: 400 });
         }
-        privatePrice = master.price_private;
+        privatePrice = tierPrice;
       }
     }
 
@@ -377,7 +390,7 @@ export async function POST(request: Request) {
     //   deposit → fixed deposit_amount (refundable on event day)
     //   paid    → full effective (promo-aware) price
     //   private → the master's whole-round price, promo-free
-    const fullPrice = privatePrice != null ? privatePrice : getEffectivePrice(workshop).price;
+    const fullPrice = privatePrice != null ? privatePrice : tierPrice != null ? tierPrice : getEffectivePrice(workshop).price;
     const chargeAmount =
       paymentType === 'free' ? 0 : paymentType === 'deposit' ? workshop.deposit_amount || 0 : fullPrice;
     const kindValue = isPrivate ? 'private' : 'group';
@@ -408,27 +421,27 @@ export async function POST(request: Request) {
       await db
         .prepare(
           `UPDATE bookings SET status = ?, payment_status = ?, amount = ?, app_status = ?,
-             application_json = COALESCE(?, application_json), booking_kind = ?,
+             application_json = COALESCE(?, application_json), booking_kind = ?, booking_tier_label = ?,
              expires_at = ${holdExpr ? "datetime('now', ?)" : 'NULL'}
            WHERE id = ?`
         )
         .bind(
           ...(holdExpr
-            ? [rowStatus, rowPayment, chargeAmount, appStatus, applicationJson, kindValue, holdExpr, bookingId]
-            : [rowStatus, rowPayment, chargeAmount, appStatus, applicationJson, kindValue, bookingId])
+            ? [rowStatus, rowPayment, chargeAmount, appStatus, applicationJson, kindValue, tierLabel, holdExpr, bookingId]
+            : [rowStatus, rowPayment, chargeAmount, appStatus, applicationJson, kindValue, tierLabel, bookingId])
         )
         .run();
     } else {
       bookingId = uuid();
       await db
         .prepare(
-          `INSERT INTO bookings (id, workshop_id, user_id, status, payment_status, amount, app_status, application_json, booking_kind, expires_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ${holdExpr ? "datetime('now', ?)" : 'NULL'})`
+          `INSERT INTO bookings (id, workshop_id, user_id, status, payment_status, amount, app_status, application_json, booking_kind, booking_tier_label, expires_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${holdExpr ? "datetime('now', ?)" : 'NULL'})`
         )
         .bind(
           ...(holdExpr
-            ? [bookingId, workshop_id, user.sub, rowStatus, rowPayment, chargeAmount, appStatus, applicationJson, kindValue, holdExpr]
-            : [bookingId, workshop_id, user.sub, rowStatus, rowPayment, chargeAmount, appStatus, applicationJson, kindValue])
+            ? [bookingId, workshop_id, user.sub, rowStatus, rowPayment, chargeAmount, appStatus, applicationJson, kindValue, tierLabel, holdExpr]
+            : [bookingId, workshop_id, user.sub, rowStatus, rowPayment, chargeAmount, appStatus, applicationJson, kindValue, tierLabel])
         )
         .run();
     }

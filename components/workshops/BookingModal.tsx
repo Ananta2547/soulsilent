@@ -78,6 +78,7 @@ export function BookingModal({
   mode = 'book',
   bookingKind = 'group',
   privatePrice = null,
+  tierLabel = null,
 }: {
   onClose: () => void;
   workshop: Workshop;
@@ -86,7 +87,11 @@ export function BookingModal({
   mode?: 'book' | 'claim';
   /** Session-based activities: 'private' takes the whole round at privatePrice. */
   bookingKind?: 'group' | 'private';
+  /** Price of the picked tier when it is not the plain seat price. */
   privatePrice?: number | null;
+  /** Name of the picked tier, shown on the form so the learner sees what
+   *  they chose. */
+  tierLabel?: string | null;
 }) {
   const claiming = mode === 'claim';
   const { lang } = useLang();
@@ -470,9 +475,15 @@ export function BookingModal({
         <div style={{ padding: '20px 24px', maxHeight: '60vh', overflowY: 'auto' }}>
           {step === 1 ? (
             <>
-              {bookingKind === 'private' && (
+              {(bookingKind === 'private' || tierLabel) && (
                 <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 12, background: 'var(--teal-50)', color: 'var(--teal-deep)', fontSize: 13, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-                  <span><b>{tr(lang, 'จองแบบส่วนตัว', 'Private booking')}</b> · {tr(lang, 'เหมาทั้งรอบ', 'the whole round')} · {workshop.date} {workshop.time_start}–{workshop.time_end}</span>
+                  <span>
+                    <b>{tierLabel || tr(lang, 'จองแบบส่วนตัว', 'Private booking')}</b>
+                    {' · '}
+                    {bookingKind === 'private' ? tr(lang, 'เหมาทั้งรอบ', 'the whole round') : tr(lang, '1 ที่นั่ง', 'one seat')}
+                    {' · '}
+                    {workshop.date} {workshop.time_start}–{workshop.time_end}
+                  </span>
                   {privatePrice != null && <b>฿{Math.round(privatePrice).toLocaleString()}</b>}
                 </div>
               )}

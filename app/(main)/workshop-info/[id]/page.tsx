@@ -12,6 +12,7 @@ import type { WorkshopMaster, Workshop } from '@/lib/types';
 import { Icon } from '@/components/design/Icon';
 import { useLoadingTracker } from '@/components/design/DataLoading';
 import type { PickableSession } from '@/components/workshops/SessionPickerModal';
+import { parseTiers } from '@/lib/pricing';
 
 type Session = PickableSession;
 
@@ -118,21 +119,18 @@ export default function WorkshopInfoPage() {
             </h2>
           </Reveal>
 
-          {(master.price_group != null || master.price_private != null) && (
+          {master.price_group != null && (
             <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', fontSize: 14, marginBottom: 16 }}>
-              {master.price_group != null && (
-                <span>
-                  <span style={{ color: 'var(--muted)' }}>{tr(lang, 'กลุ่ม', 'Group')} </span>
-                  <b>฿{Math.round(master.price_group).toLocaleString()}</b>
-                  <span style={{ color: 'var(--muted)' }}>{tr(lang, '/ที่นั่ง', '/seat')}</span>
+              <span>
+                <span style={{ color: 'var(--muted)' }}>{tr(lang, 'ราคา/คน', 'Per person')} </span>
+                <b>฿{Math.round(master.price_group).toLocaleString()}</b>
+              </span>
+              {parseTiers(master.price_tiers_json).map((t) => (
+                <span key={t.id}>
+                  <span style={{ color: 'var(--muted)' }}>{t.label}{t.mode === 'round' ? tr(lang, ' (เหมารอบ)', ' (whole round)') : ''} </span>
+                  <b>฿{Math.round(t.price).toLocaleString()}</b>
                 </span>
-              )}
-              {master.price_private != null && (
-                <span>
-                  <span style={{ color: 'var(--muted)' }}>{tr(lang, 'ส่วนตัว (เหมารอบ)', 'Private (whole round)')} </span>
-                  <b>฿{Math.round(master.price_private).toLocaleString()}</b>
-                </span>
-              )}
+              ))}
             </div>
           )}
 

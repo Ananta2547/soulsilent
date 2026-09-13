@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { Workshop } from '@/lib/types';
+import { parseTiers } from '@/lib/pricing';
 
 type WorkshopRow = Workshop & { booking_count?: number };
 import Link from 'next/link';
@@ -148,7 +149,8 @@ export default function WorkshopInfoAdminPage() {
                 {m.organizer_name && <p className="text-xs text-gray mt-0.5">โดย {m.organizer_name}</p>}
                 {m.kind !== 'single' && (
                   <p className="text-xs text-gray mt-1">
-                    กลุ่ม {m.price_group != null ? `฿${m.price_group.toLocaleString()}` : '—'} · ส่วนตัว {m.price_private != null ? `฿${m.price_private.toLocaleString()}` : 'ไม่เปิด'}
+                    ราคา/คน {m.price_group != null ? `฿${m.price_group.toLocaleString()}` : '—'}
+                    {parseTiers(m.price_tiers_json).map((t) => ` · ${t.label} ฿${t.price.toLocaleString()}`).join('')}
                   </p>
                 )}
                 {/* Rounds the teacher has opened under this master. */}

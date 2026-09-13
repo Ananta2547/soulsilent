@@ -14,6 +14,7 @@ import { Cloud, WaveLine, Star } from '@/components/design/Doodles';
 import { Countdown } from '@/components/design/Countdown';
 import { BookingModal, type BookingResult } from '@/components/workshops/BookingModal';
 import { SessionPickerModal, type BookingKind, type PickableSession } from '@/components/workshops/SessionPickerModal';
+import type { PriceTier } from '@/lib/pricing';
 import { ReviewModal } from '@/components/workshops/ReviewModal';
 import { AnnounceCountdown } from '@/components/workshops/AnnounceCountdown';
 import { ApplicationConsentModal } from '@/components/workshops/ApplicationConsentModal';
@@ -93,7 +94,7 @@ function WorkshopDetailInner() {
   const [master, setMaster] = useState<WorkshopMaster | null>(null);
   const [siblings, setSiblings] = useState<PickableSession[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [chosen, setChosen] = useState<{ session: PickableSession; kind: BookingKind } | null>(null);
+  const [chosen, setChosen] = useState<{ session: PickableSession; kind: BookingKind; tier: PriceTier } | null>(null);
   const search = useSearchParams();
   const pickedDate = search.get('date');
   const [loginPromptOpen, setLoginPromptOpen] = useState(false);
@@ -217,7 +218,7 @@ function WorkshopDetailInner() {
       const res = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workshop_id: chosen.session.id, application, booking_kind: chosen.kind }),
+        body: JSON.stringify({ workshop_id: chosen.session.id, application, booking_kind: chosen.kind, tier_id: chosen.tier.id }),
       });
       const data = (await res.json()) as BookingResult;
       if (!res.ok) {
@@ -1080,9 +1081,9 @@ function WorkshopDetailInner() {
           sessions={siblings}
           initialDate={pickedDate || workshop.date}
           onClose={() => setPickerOpen(false)}
-          onNext={(session, kind) => {
+          onNext={(session, kind, tier) => {
             setPickerOpen(false);
-            setChosen({ session, kind });
+            setChosen({ session, kind, tier });
           }}
         />
       )}
@@ -1093,7 +1094,8 @@ function WorkshopDetailInner() {
           submitting={booking}
           onSubmit={submitChosen}
           bookingKind={chosen.kind}
-          privatePrice={master?.price_private ?? null}
+          tierLabel={chosen.tier.id === 'seat' ? null : chosen.tier.label}
+          privatePrice={chosen.tier.id === 'seat' ? null : chosen.tier.price}
         />
       )}
 

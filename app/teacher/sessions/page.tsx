@@ -13,6 +13,7 @@ import { MonthPicker } from '@/components/calendar/MonthPicker';
 import { TimeField24 } from '@/components/admin/TimeField24';
 import { fmtDate } from '@/lib/datetime';
 import type { WorkshopMaster } from '@/lib/types';
+import { parseTiers } from '@/lib/pricing';
 
 type Round = {
   id: string;
@@ -249,8 +250,10 @@ export default function TeacherSessionsPage() {
             </select>
             {master && (
               <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8, fontSize: 12.5, color: 'var(--muted)' }}>
-                <span>{tr(lang, 'กลุ่ม', 'Group')} <b style={{ color: 'var(--ink)' }}>{baht(master.price_group)}</b>{tr(lang, '/ที่นั่ง', '/seat')}</span>
-                <span>{tr(lang, 'ส่วนตัว', 'Private')} <b style={{ color: 'var(--ink)' }}>{master.price_private == null ? tr(lang, 'ไม่เปิด', 'off') : baht(master.price_private)}</b></span>
+                <span>{tr(lang, 'ราคา/คน', 'Per person')} <b style={{ color: 'var(--ink)' }}>{baht(master.price_group)}</b></span>
+                {parseTiers(master.price_tiers_json).map((t) => (
+                  <span key={t.id}>{t.label} <b style={{ color: 'var(--ink)' }}>{baht(t.price)}</b>{t.mode === 'round' ? tr(lang, ' เหมารอบ', ' whole round') : tr(lang, '/ที่นั่ง', '/seat')}</span>
+                ))}
                 {master.price_group == null && <span style={{ color: '#a04a14' }}>⚠ {tr(lang, 'Admin ยังไม่ตั้งราคา — เปิดรอบไม่ได้', 'No price set yet — cannot open')}</span>}
               </div>
             )}

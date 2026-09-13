@@ -97,8 +97,12 @@ export interface WorkshopMaster {
   kind: 'round' | 'single';
   /** Per-seat price a round opens with (migration 051). */
   price_group: number | null;
-  /** Price to take a whole round for yourself; null = private not offered. */
+  /** Legacy whole-round price; folded into price_tiers_json by migration 055. */
   price_private: number | null;
+  /** "กลุ่ม" — booking together; stored, not sold yet (migration 055). */
+  price_group_booking?: number | null;
+  /** Extra tiers the admin added — see lib/pricing.ts. */
+  price_tiers_json?: string | null;
   /** Seats a new round starts with when the teacher opens one. */
   default_max_participants: number | null;
   /** JSON string[] of locations.id the teacher may open rounds at; null or
@@ -220,6 +224,8 @@ export interface Booking {
   payment_status: 'pending' | 'paid' | 'refunded' | 'expired';
   /** 'group' takes one seat; 'private' takes the whole round (migration 051). */
   booking_kind?: 'group' | 'private' | null;
+  /** Name of the price tier picked, e.g. "นักเรียน" (migration 055). */
+  booking_tier_label?: string | null;
   /** Stripe ids from before the move to Beam. Nothing writes these any more,
    *  but they are the record of what a past booking actually paid through and
    *  are kept for exactly that reason — a refund on one of these is issued from

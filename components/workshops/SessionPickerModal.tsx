@@ -12,6 +12,7 @@ import { Icon } from '@/components/design/Icon';
 import { MonthPicker } from '@/components/calendar/MonthPicker';
 import { fmtDate } from '@/lib/datetime';
 import type { Workshop, WorkshopMaster } from '@/lib/types';
+import { bookableTiers, type PriceTier } from '@/lib/pricing';
 
 export type BookingKind = 'group' | 'private';
 export type PickableSession = Workshop & { booked: number; private_taken: number };
@@ -30,7 +31,7 @@ export function SessionPickerModal({
   /** YYYY-MM-DD carried in from a teacher's profile; pre-selects that day. */
   initialDate?: string | null;
   onClose: () => void;
-  onNext: (session: PickableSession, kind: BookingKind) => void;
+  onNext: (session: PickableSession, kind: BookingKind, tier: PriceTier) => void;
 }) {
   const { lang } = useLang();
 
@@ -46,7 +47,7 @@ export function SessionPickerModal({
 
   const [day, setDayState] = useState<string | null>(initialDate && days.has(initialDate) ? initialDate : null);
   const [pickedId, setSessionId] = useState<string | null>(null);
-  const [kindPicked, setKind] = useState<BookingKind>('group');
+  const [tierId, setTierId] = useState('seat');
 
   const onDay = useMemo(() => (day ? open.filter((s) => s.date === day) : []), [open, day]);
   const setDay = (d: string) => {
@@ -60,12 +61,16 @@ export function SessionPickerModal({
   const seatsLeft = session ? Math.max(0, session.max_participants - session.booked) : 0;
   const takenPrivately = !!session && session.private_taken > 0;
   const groupOk = !!session && !takenPrivately && seatsLeft > 0;
-  // Private means nobody else in the room, so it is only offered while the
-  // round is still empty.
-  const privateOffered = master.price_private != null;
-  const privateOk = !!session && privateOffered && session.booked === 0;
-  // A private pick that the chosen round cannot honour reads as group.
-  const kind: BookingKind = kindPicked === 'private' && !privateOk ? 'group' : kindPicked;
+  // A whole-round tier means nobody else in the room, so it is only offered
+  // while the round is still empty.
+  const roundOk = !!session && session.booked === 0;
+  // The base seat price is the round's own price; the admin's tiers follow.
+  const tiers = bookableTiers(master, session?.price);
+  const tierOk = (t: PriceTier) => (t.mode === 'round' ? roundOk : groupOk);
+  const picked = tiers.find((t) => t.id === tierId) || tiers[0];
+  // A pick the chosen round cannot honour falls back to the seat price.
+  const tier: PriceTier = tierOk(picked) || !session ? picked : tiers[0];
+  const kind: BookingKind = tier.mode === 'round' ? 'private' : 'group';
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -75,8 +80,7 @@ export function SessionPickerModal({
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const canNext = !!session && (kind === 'group' ? groupOk : privateOk);
-  const groupPrice = session ? session.price : master.price_group ?? 0;
+  const canNext = !!session && tierOk(tier);
 
   return (
     <div
@@ -135,40 +139,38 @@ export function SessionPickerModal({
               </div>
             )}
 
-            {/* Group or private */}
+            {/* Which price — one seat, or one of the admin's tiers */}
             <div className="sp-label" style={{ marginTop: 18 }}>
               <T th="รูปแบบการจอง" en="Booking type" />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <label className={`sp-kind${kind === 'group' ? ' on' : ''}`}>
-                <input type="radio" name="kind" checked={kind === 'group'} disabled={!!session && !groupOk} onChange={() => setKind('group')} />
-                <span style={{ flex: 1 }}>
-                  <span style={{ display: 'block', fontWeight: 700, fontSize: 14 }}>{tr(lang, 'กลุ่ม (Group)', 'Group')}</span>
-                  <span style={{ display: 'block', fontSize: 12.5, color: 'var(--muted)' }}>{tr(lang, 'จอง 1 ที่นั่ง เรียนร่วมกับคนอื่น', 'One seat, alongside others')}</span>
-                </span>
-                <b style={{ color: 'var(--teal-deep)' }}>{baht(groupPrice)}</b>
-              </label>
-              {privateOffered && (
-                <label className={`sp-kind${kind === 'private' ? ' on' : ''}${session && !privateOk ? ' off' : ''}`}>
-                  <input type="radio" name="kind" checked={kind === 'private'} disabled={!!session && !privateOk} onChange={() => setKind('private')} />
-                  <span style={{ flex: 1 }}>
-                    <span style={{ display: 'block', fontWeight: 700, fontSize: 14 }}>{tr(lang, 'ส่วนตัว (Private)', 'Private')}</span>
-                    <span style={{ display: 'block', fontSize: 12.5, color: 'var(--muted)' }}>
-                      {session && !privateOk
-                        ? tr(lang, 'รอบนี้มีคนจองแล้ว จึงเหมาไม่ได้', 'Someone already booked this round')
-                        : tr(lang, 'เหมาทั้งรอบ ไม่มีคนอื่นร่วม', 'The whole round, nobody else')}
+              {tiers.map((t) => {
+                const ok = !session || tierOk(t);
+                const on = tier.id === t.id;
+                return (
+                  <label key={t.id} className={`sp-kind${on ? ' on' : ''}${!ok ? ' off' : ''}`}>
+                    <input type="radio" name="kind" checked={on} disabled={!ok} onChange={() => setTierId(t.id)} />
+                    <span style={{ flex: 1 }}>
+                      <span style={{ display: 'block', fontWeight: 700, fontSize: 14 }}>{t.label}</span>
+                      <span style={{ display: 'block', fontSize: 12.5, color: 'var(--muted)' }}>
+                        {t.mode === 'round'
+                          ? !ok
+                            ? tr(lang, 'รอบนี้มีคนจองแล้ว จึงเหมาไม่ได้', 'Someone already booked this round')
+                            : tr(lang, 'เหมาทั้งรอบ ไม่มีคนอื่นร่วม', 'The whole round, nobody else')
+                          : tr(lang, 'จอง 1 ที่นั่ง เรียนร่วมกับคนอื่น', 'One seat, alongside others')}
+                      </span>
                     </span>
-                  </span>
-                  <b style={{ color: 'var(--teal-deep)' }}>{baht(master.price_private || 0)}</b>
-                </label>
-              )}
+                    <b style={{ color: 'var(--teal-deep)' }}>{baht(t.price)}</b>
+                  </label>
+                );
+              })}
             </div>
           </div>
         </div>
 
         <div className="sp-foot">
           <button type="button" onClick={onClose} className="btn btn-paper btn-sm">{tr(lang, 'ยกเลิก', 'Cancel')}</button>
-          <Btn kind="teal" disabled={!canNext} onClick={() => session && onNext(session, kind)} style={{ marginLeft: 'auto', opacity: canNext ? 1 : 0.5 }}>
+          <Btn kind="teal" disabled={!canNext} onClick={() => session && onNext(session, kind, tier)} style={{ marginLeft: 'auto', opacity: canNext ? 1 : 0.5 }}>
             {tr(lang, 'ต่อไป', 'Next')} <span className="mono">→</span>
           </Btn>
         </div>

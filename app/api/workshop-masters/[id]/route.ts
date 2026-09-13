@@ -3,6 +3,7 @@ import { getDB } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
 import { expireStaleHolds } from '@/lib/holds';
 import type { ImageMeta, WorkshopMaster } from '@/lib/types';
+import { normalizeTiers } from '@/lib/pricing';
 
 /** Seats counted as taken (paid + live holds); mirrors bookings route. */
 const SEAT_TAKEN = `
@@ -61,6 +62,8 @@ type Body = {
   default_max_participants?: number | null;
   kind?: 'round' | 'single';
   location_ids?: string[];
+  price_group_booking?: number | null;
+  price_tiers?: unknown;
 };
 const locIds = (v: unknown): string => JSON.stringify(Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x) : []);
 const kindOf = (v: unknown): 'round' | 'single' => (v === 'single' ? 'single' : 'round');
@@ -83,6 +86,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
            title = ?, description = ?, organizer = ?, cover_image_url = ?, cover_image_meta = ?,
            target_json = ?, takeaways_json = ?,
            price_group = ?, price_private = ?, default_max_participants = ?, kind = ?, location_ids_json = ?,
+           price_group_booking = ?, price_tiers_json = ?,
            updated_at = datetime('now')
          WHERE id = ?`
       )
@@ -99,6 +103,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         Math.max(1, Math.round(Number(body.default_max_participants) || 20)),
         kindOf(body.kind),
         locIds(body.location_ids),
+        money(body.price_group_booking),
+        JSON.stringify(normalizeTiers(body.price_tiers)),
         id
       )
       .run();
