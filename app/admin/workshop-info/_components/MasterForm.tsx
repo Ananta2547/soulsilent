@@ -69,8 +69,7 @@ export function MasterForm({
   onCancel,
   onDirtyChange,
   pendingClose,
-  onStay,
-}: {
+  onStay, kind = 'round',}: {
   initial?: WorkshopMaster | null;
   editingId?: string;
   onSuccess: () => void;
@@ -81,7 +80,8 @@ export function MasterForm({
   pendingClose?: boolean;
   /** User chose to keep editing. */
   onStay?: () => void;
-}) {
+  /** 'round' (teacher opens rounds) or 'single' (admin links workshops). */
+  kind?: 'round' | 'single';}) {
   const [title, setTitle] = useState(initial?.title || '');
   const [organizer, setOrganizer] = useState(initial?.organizer || '');
   const [description, setDescription] = useState(initial?.description || '');
@@ -153,6 +153,7 @@ export function MasterForm({
           price_group: priceGroup.trim() === '' ? null : Number(priceGroup),
           price_private: pricePrivate.trim() === '' ? null : Number(pricePrivate),
           default_max_participants: Number(defaultSeats) || 20,
+          kind: initial?.kind || kind,
         }),
       });
       const data = (await res.json()) as { error?: string };
@@ -216,6 +217,7 @@ export function MasterForm({
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={5} className="input-field" />
       </div>
 
+      {(initial?.kind || kind) === 'round' && (
       <fieldset className="border border-gray-lighter rounded-lg p-3">
         <legend className="text-sm font-medium text-dark px-1">ราคาและที่นั่ง (ใช้กับทุกรอบที่ผู้สอนเปิด)</legend>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-1">
@@ -233,6 +235,7 @@ export function MasterForm({
           </div>
         </div>
       </fieldset>
+      )}
 
       <ListField legend="เหมาะกับใคร (Target Audience)" items={target} onChange={setTarget} placeholder="เช่น คนที่อยากพักใจ..." />
 

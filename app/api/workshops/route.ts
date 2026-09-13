@@ -57,8 +57,9 @@ export async function GET(request: Request) {
       ", (SELECT COALESCE(SUM(CASE WHEN bookings.booking_kind = 'private' THEN workshops.max_participants ELSE 1 END), 0) FROM bookings WHERE bookings.workshop_id = workshops.id AND bookings.status != 'cancelled' AND bookings.payment_status != 'expired') AS booking_count";
     // Join the linked location so cards can format "name-province, district"
     // without a second round-trip (public read of name/province/district only).
-    let query = `SELECT workshops.*, l.name AS loc_name, l.province AS loc_province, l.district AS loc_district${countSelect}
-       FROM workshops LEFT JOIN locations l ON workshops.location_id = l.id`;
+    let query = `SELECT workshops.*, l.name AS loc_name, l.province AS loc_province, l.district AS loc_district, m.kind AS master_kind${countSelect}
+       FROM workshops LEFT JOIN locations l ON workshops.location_id = l.id
+       LEFT JOIN workshop_masters m ON m.id = workshops.master_id`;
     if (where.length > 0) query += ' WHERE ' + where.join(' AND ');
     query += ' ORDER BY date DESC';
 

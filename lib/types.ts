@@ -92,6 +92,9 @@ export interface WorkshopMaster {
   target_json: string;
   /** JSON string[] — ได้อะไรจากกิจกรรม (key takeaways). */
   takeaways_json: string;
+  /** 'round' = teacher opens repeating rounds; 'single' = admin creates each
+   *  workshop and links it (migration 053). */
+  kind: 'round' | 'single';
   /** Per-seat price a round opens with (migration 051). */
   price_group: number | null;
   /** Price to take a whole round for yourself; null = private not offered. */
@@ -118,6 +121,8 @@ export interface Workshop {
   /** Teacher who opened this round from the session manager; NULL when the
    *  admin created it directly (migration 051). */
   created_by?: string | null;
+  /** Joined from the master when listed: 'round' | 'single' | null. */
+  master_kind?: 'round' | 'single' | null;
   /** JSON string[] of users.id — co-facilitators an admin allowed into the
    *  teacher dashboard for this workshop. The owner is never listed here; they
    *  always have access. null = owner only (migration 046). */

@@ -206,7 +206,7 @@ function WorkshopDetailInner() {
       setLoginPromptOpen(true);
       return;
     }
-    if (workshop?.master_id && master) setPickerOpen(true);
+    if (workshop?.master_id && master && master.kind !== 'single') setPickerOpen(true);
     else setBookingOpen(true);
   }
 

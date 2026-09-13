@@ -459,7 +459,7 @@ function UpcomingEvents({ workshops }: { workshops: Workshop[] }) {
   const upcoming = useMemo(
     // New (≤7d) → Open → Closed, each by soonest event date. Rounds a teacher
     // opened under a master have their own section below.
-    () => workshops.filter((w) => !hasWorkshopEnded(w) && !w.master_id).sort((a, b) => compareWorkshopsForListing(a, b)),
+    () => workshops.filter((w) => !hasWorkshopEnded(w) && w.master_kind !== 'round').sort((a, b) => compareWorkshopsForListing(a, b)),
     [workshops],
   );
   const categories = useMemo(
@@ -532,7 +532,7 @@ function RoundsSection({ workshops }: { workshops: Workshop[] }) {
   // badge says how many more days it runs on.
   const groups = useMemo(() => {
     const open = workshops
-      .filter((w) => !!w.master_id && !hasWorkshopEnded(w))
+      .filter((w) => w.master_kind === 'round' && !hasWorkshopEnded(w))
       .sort((a, b) => (a.date + a.time_start).localeCompare(b.date + b.time_start));
     const byMaster = new Map<string, { first: Workshop; count: number; days: Set<string> }>();
     open.forEach((w) => {

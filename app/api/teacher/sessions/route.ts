@@ -37,7 +37,7 @@ export async function GET() {
     .prepare(
       `SELECT m.*, u.name AS organizer_name
          FROM workshop_masters m LEFT JOIN users u ON m.organizer = u.id
-        ${isAdmin ? '' : 'WHERE m.organizer = ?'}
+        WHERE m.kind != 'single' ${isAdmin ? '' : 'AND m.organizer = ?'}
         ORDER BY m.title ASC`
     )
     .bind(...(isAdmin ? [] : [u.sub]))
@@ -141,6 +141,9 @@ export async function POST(request: Request) {
     .bind(body.master_id)
     .first<WorkshopMaster>();
   if (!master) return NextResponse.json({ error: 'ไม่พบ Workshop' }, { status: 404 });
+  if (master.kind === 'single') {
+    return NextResponse.json({ error: 'Workshop เดี่ยว — Admin สร้างรอบให้ที่หน้าจัดการ Workshop' }, { status: 400 });
+  }
   if (!u.roles.includes('admin') && master.organizer !== u.sub) {
     return NextResponse.json({ error: 'คุณไม่ได้เป็นผู้สอนของ Workshop นี้' }, { status: 403 });
   }

@@ -189,7 +189,9 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
       .then(([loc, t, m]) => {
         setLocations(loc.locations || []);
         setTeachers(t.users || []);
-        setMasters(m.masters || []);
+        // Round masters get their workshops from the teacher's session
+        // manager; only single masters are linked from here.
+        setMasters((m.masters || []).filter((x) => x.kind !== 'round'));
       })
       .catch(() => {});
   }, []);
