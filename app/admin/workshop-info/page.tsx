@@ -133,14 +133,15 @@ export default function WorkshopInfoAdminPage() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        // Cards are poster-wide: as many A3 portraits fit the row as can.
+        <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 260px))' }}>
           {shownMasters.map((m) => (
             <div key={m.id} className="border border-gray-lighter rounded-xl bg-white overflow-hidden">
               {m.cover_image_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={m.cover_image_url} alt={m.title} className="w-full max-w-[240px] mx-auto aspect-[297/420] object-cover" />
+                <img src={m.cover_image_url} alt={m.title} className="w-full aspect-[297/420] object-cover" />
               ) : (
-                <div className="w-full max-w-[240px] mx-auto aspect-[297/420] bg-surface flex items-center justify-center text-gray text-sm">ไม่มีรูปปก</div>
+                <div className="w-full aspect-[297/420] bg-surface flex items-center justify-center text-gray text-sm">ไม่มีรูปปก</div>
               )}
               <div className="p-4">
                 <h3 className="font-semibold text-dark">{m.title}</h3>
