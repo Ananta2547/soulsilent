@@ -1,6 +1,14 @@
 'use client';
 
-import { EXTRA_ROLES, parseRoles } from '@/lib/roles';
+import { EXTRA_ROLES, rolesOf } from '@/lib/roles';
+import { MultiSelect } from '@/components/admin/MultiSelect';
+
+/** Everything the picker offers: admin on top, then the extras. */
+const ROLE_OPTIONS = [
+  { value: 'admin', label: 'admin', hint: 'จัดการทุกอย่างในระบบ' },
+  ...EXTRA_ROLES.map((r) => ({ value: r.value, label: r.label, hint: r.hint })),
+];
+const ROLE_LABEL: Record<string, string> = Object.fromEntries(ROLE_OPTIONS.map((o) => [o.value, o.label]));
 
 import { PageLoader } from '@/components/design/PageLoader';
 
@@ -40,8 +48,9 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editRole, setEditRole] = useState('');
-  const [editExtras, setEditExtras] = useState<string[]>([]);
+  // One picker holds every role a user has. Saving maps it back onto the
+  // primary `role` column (admin > teacher > user) plus the extras.
+  const [editRoles, setEditRoles] = useState<string[]>([]);
   const [authError, setAuthError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('all');
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -70,7 +79,10 @@ export default function AdminUsersPage() {
     await fetch(`/api/users/${userId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role: editRole, roles: editExtras }),
+      body: JSON.stringify({
+        role: editRoles.includes('admin') ? 'admin' : editRoles.includes('teacher') ? 'teacher' : 'user',
+        roles: editRoles.filter((r) => r !== 'admin'),
+      }),
     });
     setEditingId(null);
     fetchUsers();
@@ -147,7 +159,7 @@ export default function AdminUsersPage() {
         </p>
         <h1 className="font-heading text-3xl text-dark">จัดการผู้ใช้งาน</h1>
         <p className="text-sm text-gray mt-1">
-          ทั้งหมด {users.length} คน · role หลัก: admin, teacher, user · เพิ่มได้: ผู้สอน, ผู้จัดรอบ
+          ทั้งหมด {users.length} คน · กด แก้ไข แล้วติ๊ก role ได้หลายอัน (admin / ผู้สอน / ผู้จัดรอบ)
         </p>
       </header>
 
@@ -221,55 +233,35 @@ export default function AdminUsersPage() {
                   <td className="py-3 px-4 text-gray">{user.email}</td>
                   <td className="py-3 px-4">
                     {editingId === user.id && !owner ? (
-                      <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-2">
-                          <select
-                            value={editRole}
-                            onChange={(e) => setEditRole(e.target.value)}
-                            className="input-field !py-1.5 !px-2 !text-xs w-24"
-                          >
-                            <option value="user">user</option>
-                            <option value="teacher">teacher</option>
-                            <option value="admin">admin</option>
-                          </select>
-                          <button onClick={() => handleUpdateRole(user.id)} className="text-primary text-xs font-medium">บันทึก</button>
-                          <button onClick={() => setEditingId(null)} className="text-gray text-xs">ยกเลิก</button>
-                        </div>
-                        {/* Extra roles stack on the primary one — a user can be
-                            teacher AND ผู้จัดรอบ at once. */}
-                        <div className="flex flex-wrap gap-3">
-                          {EXTRA_ROLES.map((r) => (
-                            <label key={r.value} className="inline-flex items-center gap-1.5 text-xs text-dark" title={r.hint}>
-                              <input
-                                type="checkbox"
-                                checked={editExtras.includes(r.value)}
-                                onChange={(e) =>
-                                  setEditExtras((x) => (e.target.checked ? [...x, r.value] : x.filter((v) => v !== r.value)))
-                                }
-                              />
-                              {r.label}
-                            </label>
-                          ))}
-                        </div>
+                      <div className="flex items-center gap-2 min-w-[260px]">
+                        <MultiSelect
+                          className="flex-1"
+                          options={ROLE_OPTIONS}
+                          value={editRoles}
+                          onChange={setEditRoles}
+                          placeholder="user (ไม่มี role พิเศษ)"
+                          summary={(c) => c.map((o) => o.label).join(' · ')}
+                        />
+                        <button onClick={() => handleUpdateRole(user.id)} className="text-primary text-xs font-medium whitespace-nowrap">บันทึก</button>
+                        <button onClick={() => setEditingId(null)} className="text-gray text-xs">ยกเลิก</button>
                       </div>
                     ) : (
-                      <span className={
-                        user.role === 'admin' ? 'badge-danger' :
-                        user.role === 'teacher' ? 'badge-primary' :
-                        'badge bg-gray-lighter text-gray'
-                      }>
-                        {user.role}
-                      </span>
-                    )}
-                    {editingId !== user.id && parseRoles(user.roles_json).filter((r) => r !== user.role).length > 0 && (
-                      <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
-                        {parseRoles(user.roles_json)
-                          .filter((r) => r !== user.role)
-                          .map((r) => (
-                            <span key={r} className="badge" style={{ background: '#e6f4f1', color: '#0f766e' }}>
-                              {EXTRA_ROLES.find((x) => x.value === r)?.label || r}
-                            </span>
-                          ))}
+                      <span className="inline-flex flex-wrap gap-1">
+                        {rolesOf(user).length === 1 && rolesOf(user)[0] === 'user' ? (
+                          <span className="badge bg-gray-lighter text-gray">user</span>
+                        ) : (
+                          rolesOf(user)
+                            .filter((r) => r !== 'user')
+                            .map((r) => (
+                              <span
+                                key={r}
+                                className={r === 'admin' ? 'badge-danger' : r === 'teacher' ? 'badge-primary' : 'badge'}
+                                style={r === 'session_host' ? { background: '#e6f4f1', color: '#0f766e' } : undefined}
+                              >
+                                {ROLE_LABEL[r] || r}
+                              </span>
+                            ))
+                        )}
                       </span>
                     )}
                   </td>
@@ -317,7 +309,7 @@ export default function AdminUsersPage() {
                     ) : (
                     <div className="flex items-center justify-end gap-3">
                       <button
-                        onClick={() => { setEditingId(user.id); setEditRole(user.role); setEditExtras(parseRoles(user.roles_json)); }}
+                        onClick={() => { setEditingId(user.id); setEditRoles(rolesOf(user).filter((r) => r !== 'user')); }}
                         className="text-primary text-xs font-medium hover:underline"
                       >
                         แก้ไข

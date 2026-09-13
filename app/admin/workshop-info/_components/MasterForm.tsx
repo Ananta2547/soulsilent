@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { MultiSelect } from '@/components/admin/MultiSelect';
 import { ImageUploader } from '@/components/admin/image/ImageUploader';
 import { ASPECTS } from '@/lib/image-aspects';
 import { parseImageMeta } from '@/lib/image-meta';
@@ -253,20 +254,22 @@ export function MasterForm({
           {locations.length === 0 ? (
             <p className="text-xs text-gray mt-1">ยังไม่มีสถานที่ในระบบ — เพิ่มได้ที่เมนู สถานที่</p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 mt-1">
-              {locations.map((l) => (
-                <label key={l.id} className="inline-flex items-center gap-2 text-sm text-dark">
-                  <input
-                    type="checkbox"
-                    checked={locationIds.includes(l.id)}
-                    onChange={(e) => setLocationIds((x) => (e.target.checked ? [...x, l.id] : x.filter((v) => v !== l.id)))}
-                  />
-                  {l.name} <span className="text-gray text-xs">· {l.province}</span>
-                </label>
+            <MultiSelect
+              className="mt-1"
+              options={locations.map((l) => ({ value: l.id, label: l.name, hint: l.province }))}
+              value={locationIds}
+              onChange={setLocationIds}
+              placeholder="ทุกสถานที่ (ยังไม่ได้เลือก)"
+            />
+          )}
+          {locationIds.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {locations.filter((l) => locationIds.includes(l.id)).map((l) => (
+                <span key={l.id} className="badge" style={{ background: '#e6f4f1', color: '#0f766e' }}>{l.name}</span>
               ))}
             </div>
           )}
-          <p className="text-xs text-gray mt-2">ไม่ติ๊กเลย = ให้เลือกได้ทุกสถานที่</p>
+          <p className="text-xs text-gray mt-2">ไม่เลือกเลย = ให้ผู้สอนเลือกได้ทุกสถานที่</p>
         </fieldset>
       )}
 
