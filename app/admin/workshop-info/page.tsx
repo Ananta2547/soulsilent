@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { Workshop } from '@/lib/types';
+import { WorkshopForm, emptyWorkshopForm } from '@/app/admin/workshops/_components/WorkshopForm';
 
 type WorkshopRow = Workshop & { booking_count?: number };
 import Link from 'next/link';
@@ -9,7 +10,9 @@ import { AdminFormModal } from '@/components/admin/AdminFormModal';
 import { MasterForm } from './_components/MasterForm';
 import type { WorkshopMaster } from '@/lib/types';
 
-type Modal = { mode: 'create' } | { mode: 'edit'; master: WorkshopMaster } | null;
+// 'single' opens the standalone-workshop form — the same one the workshop
+// list uses — so a one-off workshop can be made from here as well.
+type Modal = { mode: 'create' } | { mode: 'edit'; master: WorkshopMaster } | { mode: 'single' } | null;
 
 export default function WorkshopInfoAdminPage() {
   const [masters, setMasters] = useState<WorkshopMaster[]>([]);
@@ -87,15 +90,25 @@ export default function WorkshopInfoAdminPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-dark">ข้อมูล Workshop</h1>
-          <p className="text-sm text-gray mt-1">ภาพรวมกิจกรรม (Master) แยกจากรอบที่จัดจริง</p>
+          <p className="text-sm text-gray mt-1">Workshop รอบ = ภาพรวม (Master) ที่ผู้สอนเปิดรอบเอง · Workshop เดี่ยว = จัดครั้งเดียว กำหนดวันเองที่นี่</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setModal({ mode: 'create' })}
-          className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90"
-        >
-          + เพิ่มข้อมูล
-        </button>
+        {tab === 'single' ? (
+          <button
+            type="button"
+            onClick={() => setModal({ mode: 'single' })}
+            className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90"
+          >
+            + เพิ่ม Workshop เดี่ยว
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setModal({ mode: 'create' })}
+            className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90"
+          >
+            + เพิ่ม Workshop รอบ (Master)
+          </button>
+        )}
       </div>
 
       <div className="flex items-center gap-1 rounded-lg border border-gray-lighter p-1 text-sm w-fit mb-5">
@@ -117,8 +130,10 @@ export default function WorkshopInfoAdminPage() {
       {tab === 'single' ? (
         singles.length === 0 ? (
           <div className="border border-dashed border-gray-lighter rounded-xl p-10 text-center text-gray text-sm">
-            ยังไม่มี Workshop เดี่ยว — สร้างได้ที่หน้า{' '}
-            <Link href="/admin/workshops" className="text-primary hover:underline">จัดการ Workshop</Link>
+            ยังไม่มี Workshop เดี่ยว —{' '}
+            <button type="button" onClick={() => setModal({ mode: 'single' })} className="text-primary hover:underline">
+              เพิ่มรายการแรก
+            </button>
           </div>
         ) : (
           <div className="card !p-0 overflow-hidden">
@@ -227,7 +242,7 @@ export default function WorkshopInfoAdminPage() {
 
       <AdminFormModal
         open={modal !== null}
-        title={modal?.mode === 'edit' ? 'แก้ไขข้อมูล Workshop' : 'เพิ่มข้อมูล Workshop'}
+        title={modal?.mode === 'edit' ? 'แก้ไขข้อมูล Workshop' : modal?.mode === 'single' ? 'เพิ่ม Workshop เดี่ยว' : 'เพิ่ม Workshop รอบ (Master)'}
         subtitle={modal?.mode === 'edit' ? modal.master.title : undefined}
         onClose={requestClose}
       >
@@ -249,6 +264,17 @@ export default function WorkshopInfoAdminPage() {
             onCancel={closeModal}
             onDirtyChange={setFormDirty}
             pendingClose={pendingClose}
+            onStay={() => setPendingClose(false)}
+          />
+        ) : modal?.mode === 'single' ? (
+          <WorkshopForm
+            key="single"
+            initial={emptyWorkshopForm}
+            onSuccess={closeAndRefresh}
+            onCancel={closeModal}
+            onDirtyChange={setFormDirty}
+            pendingClose={pendingClose}
+            onAttemptClose={requestClose}
             onStay={() => setPendingClose(false)}
           />
         ) : null}
