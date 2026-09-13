@@ -517,11 +517,11 @@ function UpcomingEvents({ workshops, rounds }: { workshops: Workshop[]; rounds?:
           </div>
         )}
 
-        {rounds}
-
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 44 }}>
-          <Link href="/workshops" className="btn btn-ghost">ดูทั้งหมด <span className="mono">→</span></Link>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 36 }}>
+          <Link href="/workshops?kind=single" className="btn btn-ghost">ดู Workshop เดี่ยวทั้งหมด <span className="mono">→</span></Link>
         </div>
+
+        {rounds}
       </div>
     </section>
   );
@@ -577,6 +577,10 @@ function RoundsSection({ workshops }: { workshops: Workshop[] }) {
             )}
           </div>
         ))}
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 36 }}>
+        <Link href="/workshops?kind=round" className="btn btn-ghost">ดู Workshop รอบทั้งหมด <span className="mono">→</span></Link>
       </div>
     </div>
   );

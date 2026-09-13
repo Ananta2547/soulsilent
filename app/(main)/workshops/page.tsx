@@ -1,6 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { Workshop } from '@/lib/types';
 import { getWorkshopTags, getEffectivePrice, getWorkshopCardStatus, isNewWorkshop, compareWorkshopsForListing } from '@/lib/workshop-utils';
@@ -68,7 +70,23 @@ function fmtLocation(w: Workshop): string {
 const PER_PAGE = 12;
 
 export default function WorkshopsListingPage() {
+  // ?kind= arrives from the home page's two "ดูทั้งหมด" buttons and needs a
+  // Suspense boundary above useSearchParams.
+  return (
+    <Suspense fallback={null}>
+      <WorkshopsListingInner />
+    </Suspense>
+  );
+}
+
+type Kind = 'all' | 'single' | 'round';
+
+function WorkshopsListingInner() {
+  const search = useSearchParams();
+  const kindParam = search.get('kind');
   const [workshops, setWorkshops] = useState<Workshop[]>([]);
+  // Standalone (or admin-linked) workshops vs rounds a teacher opened.
+  const [kindFilter, setKindFilter] = useState<Kind>(kindParam === 'single' || kindParam === 'round' ? kindParam : 'all');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -120,13 +138,15 @@ export default function WorkshopsListingPage() {
     () =>
       workshops
         .filter((w) => {
+          if (kindFilter === 'round' && w.master_kind !== 'round') return false;
+          if (kindFilter === 'single' && w.master_kind === 'round') return false;
           if (categoryFilter !== 'all' && w.category !== categoryFilter) return false;
           if (tagFilter && !getWorkshopTags(w).includes(tagFilter)) return false;
           return true;
         })
         // New (≤7d) → Open → Closed, each by soonest event date.
         .sort((a, b) => compareWorkshopsForListing(a, b)),
-    [workshops, categoryFilter, tagFilter],
+    [workshops, kindFilter, categoryFilter, tagFilter],
   );
 
   // Clamped rather than reset, so a filter that narrows the list while the
@@ -166,6 +186,33 @@ export default function WorkshopsListingPage() {
       {/* ---- Filter bar ---- */}
       <section className="bg-cream" style={{ padding: '28px 0 32px' }}>
         <div className="container wk-filters" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Kind first: it is what the home page's buttons preset. */}
+          <div className="wk-kind" role="tablist" aria-label="ชนิดกิจกรรม">
+            {([
+              ['all', 'ทั้งหมด'],
+              ['single', 'Workshop เดี่ยว'],
+              ['round', 'Workshop รอบ'],
+            ] as const).map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                role="tab"
+                aria-selected={kindFilter === k}
+                className={kindFilter === k ? 'on' : ''}
+                onClick={() => {
+                  setKindFilter(k);
+                  setPage(1);
+                  // Keep the address shareable; no reload, no history spam.
+                  const url = new URL(window.location.href);
+                  if (k === 'all') url.searchParams.delete('kind');
+                  else url.searchParams.set('kind', k);
+                  window.history.replaceState(null, '', url.toString());
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <FilterPill active={categoryFilter === 'all'} onClick={() => { setCategoryFilter('all'); setPage(1); }}>ทั้งหมด</FilterPill>
             {categories.map((c) => (
