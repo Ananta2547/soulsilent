@@ -25,6 +25,7 @@ export function MonthPicker({
   min,
   marks,
   initialMonth,
+  multi,
 }: {
   /** Selected day, or null. */
   value: string | null;
@@ -37,12 +38,15 @@ export function MonthPicker({
   marks?: Record<string, number>;
   /** Month to open on (YYYY-MM-DD); defaults to the value, else today. */
   initialMonth?: string;
+  /** Extra days drawn as selected — for picking several at once. The caller
+   *  toggles membership in onChange. */
+  multi?: string[];
 }) {
   const { lang } = useLang();
   const enabledSet = enabled ? (enabled instanceof Set ? enabled : new Set(enabled)) : null;
   const floor = min === undefined ? todayYmd() : min;
 
-  const seed = value || initialMonth || todayYmd();
+  const seed = value || initialMonth || (multi && multi[0]) || todayYmd();
   const [cursor, setCursor] = useState(() => {
     const [y, m] = seed.split('-').map(Number);
     return { y, m: m - 1 };
@@ -83,7 +87,7 @@ export function MonthPicker({
         {cells.map((day, i) => {
           if (!day) return <span key={`e${i}`} />;
           const disabled = (floor && day < floor) || (enabledSet ? !enabledSet.has(day) : false);
-          const selected = value === day;
+          const selected = value === day || (multi ? multi.includes(day) : false);
           const count = marks?.[day];
           return (
             <button

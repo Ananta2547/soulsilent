@@ -94,9 +94,36 @@ export default function TeacherWorkshopsPage() {
     return () => ro.disconnect();
   }, [rows]);
 
-  const pageCount = Math.max(1, Math.ceil((rows?.length || 0) / perPage));
+  // Rounds a teacher opened under one master are one card — the nearest
+  // upcoming round (or the latest past one) stands for the activity, and the
+  // card opens the activity's calendar rather than a single roster.
+  const cards = useMemo(() => {
+    const list = rows || [];
+    const groups = new Map<string, Row[]>();
+    const out: { w: Row; group?: Row[] }[] = [];
+    list.forEach((w) => {
+      if (w.master_kind !== 'round' || !w.master_id) {
+        out.push({ w });
+        return;
+      }
+      if (!groups.has(w.master_id)) {
+        groups.set(w.master_id, []);
+        out.push({ w, group: groups.get(w.master_id) });
+      }
+      groups.get(w.master_id)!.push(w);
+    });
+    const today = new Date().toISOString().slice(0, 10);
+    return out.map((c) => {
+      if (!c.group) return c;
+      const sorted = [...c.group].sort((a, b) => a.date.localeCompare(b.date));
+      const rep = sorted.find((x) => x.date >= today) || sorted[sorted.length - 1];
+      return { w: rep, group: sorted };
+    });
+  }, [rows]);
+
+  const pageCount = Math.max(1, Math.ceil(cards.length / perPage));
   const current = Math.min(page, pageCount);
-  const shown = (rows || []).slice((current - 1) * perPage, current * perPage);
+  const shown = cards.slice((current - 1) * perPage, current * perPage);
 
   return (
     <div>
@@ -161,12 +188,14 @@ export default function TeacherWorkshopsPage() {
       ) : (
         <>
         <div ref={gridRef} className="tch-wgrid">
-          {shown.map((w) => {
+          {shown.map(({ w, group }) => {
             const days = getWorkshopDays(w);
             const st = STATUS(w);
             const dateLabel = new Date(days[0] + 'T00:00:00').toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+            const roundDays = group ? new Set(group.map((g) => g.date)).size : 0;
+            const href = group ? `/teacher/rounds/${w.master_id}` : `/teacher/workshops/${w.id}`;
             return (
-              <Link key={w.id} href={`/teacher/workshops/${w.id}`} className="card card-static" style={{ padding: 0, overflow: 'hidden', textDecoration: 'none', display: 'block' }}>
+              <Link key={group ? `m-${w.master_id}` : w.id} href={href} className="card card-static" style={{ padding: 0, overflow: 'hidden', textDecoration: 'none', display: 'block' }}>
                 {/* Posters are drawn at A3, so the frame is A3: the image fills
                     it edge to edge instead of sitting between bands of
                     background, and stays contained rather than cropped so an
@@ -207,7 +236,11 @@ export default function TeacherWorkshopsPage() {
                     <span style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                       <span>
                         <Icon name="date" size={13} /> {dateLabel}
-                        {days.length > 1 ? tr(lang, ` · ${days.length} วัน`, ` · ${days.length} days`) : ''}
+                        {group
+                          ? tr(lang, ` · ${roundDays} วัน · ${group.length} รอบ`, ` · ${roundDays} days · ${group.length} rounds`)
+                          : days.length > 1
+                            ? tr(lang, ` · ${days.length} วัน`, ` · ${days.length} days`)
+                            : ''}
                       </span>
                       <span style={{ whiteSpace: 'nowrap' }}>
                         <Icon name="participants" size={13} /> {w.booked}/{w.max_participants} {tr(lang, 'ที่นั่ง', 'seats')}

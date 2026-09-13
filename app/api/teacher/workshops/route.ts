@@ -15,11 +15,12 @@ export async function GET() {
   const db = await getDB();
   const rows = await db
     .prepare(
-      `SELECT w.*,
+      `SELECT w.*, m.kind AS master_kind,
               (SELECT COUNT(*) FROM bookings b
                 WHERE b.workshop_id = w.id
                   AND (b.payment_status = 'paid' OR b.status = 'confirmed')) AS booked
          FROM workshops w
+         LEFT JOIN workshop_masters m ON m.id = w.master_id
         WHERE w.instructor_id = ?
            OR EXISTS (
                 SELECT 1 FROM json_each(COALESCE(w.dashboard_access_json, '[]'))

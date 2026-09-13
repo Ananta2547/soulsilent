@@ -77,15 +77,21 @@ export async function GET() {
   });
 }
 
+type Slot = { time_start: string; time_end: string };
+
 type Body = {
   master_id: string;
-  /** First (or only) day. */
-  date: string;
-  time_start: string;
-  time_end: string;
+  /** First (or only) day — used by the daily/weekly patterns. */
+  date?: string;
+  /** Hand-picked days; when given (repeat 'once') these are the days. */
+  dates?: string[];
+  /** One time range, or several (e.g. a morning and an evening round). */
+  time_start?: string;
+  time_end?: string;
+  slots?: Slot[];
   location_id: string;
   max_participants?: number;
-  /** 'once' (default) opens the one day; 'daily' / 'weekly' open every
+  /** 'once' (default) opens the picked day(s); 'daily' / 'weekly' open every
    *  matching day from `date` through `end_date`. */
   repeat?: 'once' | 'daily' | 'weekly';
   end_date?: string;
@@ -93,13 +99,30 @@ type Body = {
   weekdays?: number[];
 };
 
+/** The time ranges a request opens: `slots` if given, else the single pair. */
+function slotsOf(b: Body): Slot[] {
+  const list = Array.isArray(b.slots) && b.slots.length ? b.slots : [{ time_start: b.time_start || '', time_end: b.time_end || '' }];
+  // Same range twice would open the same round twice.
+  const seen = new Set<string>();
+  return list.filter((s) => {
+    const k = `${s.time_start}-${s.time_end}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
 /** How many rounds one request may open — a daily pattern over a quarter. */
 const MAX_ROUNDS = 92;
 
 /** Every day the pattern lands on, in order. */
 function expandDates(b: Body): string[] {
   const repeat = b.repeat || 'once';
-  if (repeat === 'once') return [b.date];
+  if (repeat === 'once') {
+    const picked = Array.isArray(b.dates) && b.dates.length ? b.dates : b.date ? [b.date] : [];
+    return [...new Set(picked.filter((d) => DATE_RE.test(d)))].sort();
+  }
+  if (!b.date) return [];
   const end = b.end_date && DATE_RE.test(b.end_date) ? b.end_date : b.date;
   const wanted = new Set((b.weekdays || []).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6));
   const out: string[] = [];
@@ -122,19 +145,10 @@ export async function POST(request: Request) {
   const body = (await request.json()) as Body;
 
   if (!body.master_id) return NextResponse.json({ error: 'กรุณาเลือก Workshop' }, { status: 400 });
-  if (!DATE_RE.test(body.date || '')) return NextResponse.json({ error: 'กรุณาเลือกวันที่' }, { status: 400 });
-  if (!TIME_RE.test(body.time_start || '') || !TIME_RE.test(body.time_end || '')) {
-    return NextResponse.json({ error: 'กรุณากรอกเวลาเริ่มและเวลาจบ' }, { status: 400 });
-  }
-  if (body.time_end <= body.time_start) {
-    return NextResponse.json({ error: 'เวลาจบต้องหลังเวลาเริ่ม' }, { status: 400 });
-  }
-  if (!body.location_id) return NextResponse.json({ error: 'กรุณาเลือกสถานที่' }, { status: 400 });
-  const today = new Date().toISOString().slice(0, 10);
-  if (body.date < today) return NextResponse.json({ error: 'เปิดรอบย้อนหลังไม่ได้' }, { status: 400 });
   const repeat = body.repeat || 'once';
   if (repeat !== 'once') {
-    if (!body.end_date || !DATE_RE.test(body.end_date) || body.end_date < body.date) {
+    if (!DATE_RE.test(body.date || '')) return NextResponse.json({ error: 'กรุณาเลือกวันเริ่ม' }, { status: 400 });
+    if (!body.end_date || !DATE_RE.test(body.end_date) || body.end_date < (body.date as string)) {
       return NextResponse.json({ error: 'กรุณาเลือกวันสิ้นสุดของรอบซ้ำ' }, { status: 400 });
     }
     if (repeat === 'weekly' && !(body.weekdays || []).length) {
@@ -142,7 +156,19 @@ export async function POST(request: Request) {
     }
   }
   const dates = expandDates(body);
-  if (dates.length === 0) return NextResponse.json({ error: 'รูปแบบซ้ำนี้ไม่ตรงกับวันไหนเลย' }, { status: 400 });
+  if (dates.length === 0) return NextResponse.json({ error: 'กรุณาเลือกวันที่อย่างน้อย 1 วัน' }, { status: 400 });
+  const today = new Date().toISOString().slice(0, 10);
+  if (dates[0] < today) return NextResponse.json({ error: 'เปิดรอบย้อนหลังไม่ได้' }, { status: 400 });
+  const slots = slotsOf(body);
+  for (const sl of slots) {
+    if (!TIME_RE.test(sl.time_start) || !TIME_RE.test(sl.time_end)) {
+      return NextResponse.json({ error: 'กรุณากรอกเวลาเริ่มและเวลาจบให้ครบทุกช่วง' }, { status: 400 });
+    }
+    if (sl.time_end <= sl.time_start) {
+      return NextResponse.json({ error: `เวลาจบต้องหลังเวลาเริ่ม (${sl.time_start}–${sl.time_end})` }, { status: 400 });
+    }
+  }
+  if (!body.location_id) return NextResponse.json({ error: 'กรุณาเลือกสถานที่' }, { status: 400 });
 
   const db = await getDB();
   const master = await db
@@ -172,31 +198,38 @@ export async function POST(request: Request) {
 
   const seats = Math.max(1, Math.round(Number(body.max_participants) || master.default_max_participants || 20));
 
-  // Two rounds of the same activity on the same day at the same hour would
-  // be one round twice — those days are skipped, not errors, so a repeating
-  // run can be widened later without re-entering it.
+  // A round of the same activity on the same day at the same hour would be
+  // the same round twice — those are skipped, not errors, so a run can be
+  // widened later without re-entering it.
   const taken = new Set(
     (
       await db
-        .prepare("SELECT date FROM workshops WHERE master_id = ? AND time_start = ? AND status != 'cancelled'")
-        .bind(master.id, body.time_start)
-        .all<{ date: string }>()
-    ).results.map((r) => r.date)
+        .prepare("SELECT date, time_start FROM workshops WHERE master_id = ? AND status != 'cancelled'")
+        .bind(master.id)
+        .all<{ date: string; time_start: string }>()
+    ).results.map((r) => `${r.date} ${r.time_start}`)
   );
-  const toOpen = dates.filter((d) => !taken.has(d));
+  const toOpen: { date: string; slot: Slot }[] = [];
+  let skipped = 0;
+  for (const date of dates) {
+    for (const slot of slots) {
+      if (taken.has(`${date} ${slot.time_start}`)) skipped += 1;
+      else toOpen.push({ date, slot });
+    }
+  }
   if (toOpen.length === 0) {
-    return NextResponse.json({ error: repeat === 'once' ? 'มีรอบวันและเวลานี้อยู่แล้ว' : 'ทุกวันในช่วงนี้มีรอบเวลานี้อยู่แล้ว' }, { status: 409 });
+    return NextResponse.json({ error: 'ทุกวันและเวลาที่เลือกมีรอบอยู่แล้ว' }, { status: 409 });
   }
 
   const ids: string[] = [];
-  for (const date of toOpen) {
+  for (const { date, slot } of toOpen) {
     const id = uuid();
     ids.push(id);
-    await insertRound(db, id, master, loc, date, body, seats, u.sub);
+    await insertRound(db, id, master, loc, date, slot, seats, u.sub);
   }
 
   const first = await db.prepare('SELECT * FROM workshops WHERE id = ?').bind(ids[0]).first<Workshop>();
-  return NextResponse.json({ round: first, created: ids.length, skipped: dates.length - toOpen.length, ids }, { status: 201 });
+  return NextResponse.json({ round: first, created: ids.length, skipped, ids }, { status: 201 });
 }
 
 async function insertRound(
@@ -205,7 +238,7 @@ async function insertRound(
   master: WorkshopMaster,
   loc: { id: string; name: string; map_url: string | null },
   date: string,
-  body: Body,
+  slot: Slot,
   seats: number,
   createdBy: string
 ) {
@@ -228,8 +261,8 @@ async function insertRound(
       master.organizer,
       JSON.stringify(master.organizer ? [master.organizer] : []),
       date,
-      body.time_start,
-      body.time_end,
+      slot.time_start,
+      slot.time_end,
       loc.name,
       loc.id,
       master.takeaways_json || '[]',
