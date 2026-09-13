@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { Workshop } from '@/lib/types';
-import { getWorkshopTags, getEffectivePrice, getWorkshopCardStatus, isNewWorkshop, compareWorkshopsForListing } from '@/lib/workshop-utils';
+import { getWorkshopTags, getEffectivePrice, getWorkshopCardStatus, isNewWorkshop, compareWorkshopsForListing, hasWorkshopEnded } from '@/lib/workshop-utils';
 import { Icon } from '@/components/design/Icon';
 import { useLoadingTracker } from '@/components/design/DataLoading';
 
@@ -134,6 +134,17 @@ function WorkshopsListingInner() {
     return Array.from(set).sort();
   }, [workshops]);
 
+  function pick(kind: Kind, category: string) {
+    setKindFilter(kind);
+    setCategoryFilter(category);
+    setPage(1);
+    // Keep the address shareable; no reload, no history spam.
+    const url = new URL(window.location.href);
+    if (kind === 'all') url.searchParams.delete('kind');
+    else url.searchParams.set('kind', kind);
+    window.history.replaceState(null, '', url.toString());
+  }
+
   const filtered = useMemo(
     () =>
       workshops
@@ -149,12 +160,42 @@ function WorkshopsListingInner() {
     [workshops, kindFilter, categoryFilter, tagFilter],
   );
 
+  // Rounds a teacher opened under one master are one card — its nearest open
+  // round — with a badge saying how many more days and rounds it runs.
+  const rounds = useMemo(() => {
+    const m = new Map<string, { count: number; days: Set<string> }>();
+    workshops.forEach((w) => {
+      if (w.master_kind !== 'round' || !w.master_id || hasWorkshopEnded(w)) return;
+      const g = m.get(w.master_id) || { count: 0, days: new Set<string>() };
+      g.count += 1;
+      g.days.add(w.date);
+      m.set(w.master_id, g);
+    });
+    return m;
+  }, [workshops]);
+  const collapsed = useMemo(() => {
+    const seen = new Set<string>();
+    const nearest = new Map<string, string>();
+    [...workshops]
+      .filter((w) => w.master_kind === 'round' && w.master_id && !hasWorkshopEnded(w))
+      .sort((a, b) => (a.date + a.time_start).localeCompare(b.date + b.time_start))
+      .forEach((w) => {
+        if (!nearest.has(w.master_id as string)) nearest.set(w.master_id as string, w.id);
+      });
+    return filtered.filter((w) => {
+      if (w.master_kind !== 'round' || !w.master_id) return true;
+      if (seen.has(w.master_id)) return false;
+      seen.add(w.master_id);
+      return true;
+    }).map((w) => (w.master_kind === 'round' && w.master_id && nearest.has(w.master_id) ? workshops.find((x) => x.id === nearest.get(w.master_id as string)) || w : w));
+  }, [filtered, workshops]);
+
   // Clamped rather than reset, so a filter that narrows the list while the
   // reader is on page 4 lands them on the last page that still has cards
   // instead of an empty one.
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  const pageCount = Math.max(1, Math.ceil(collapsed.length / PER_PAGE));
   const current = Math.min(page, pageCount);
-  const shown = filtered.slice((current - 1) * PER_PAGE, current * PER_PAGE);
+  const shown = collapsed.slice((current - 1) * PER_PAGE, current * PER_PAGE);
 
   function goToPage(n: number) {
     setPage(n);
@@ -186,37 +227,14 @@ function WorkshopsListingInner() {
       {/* ---- Filter bar ---- */}
       <section className="bg-cream" style={{ padding: '28px 0 32px' }}>
         <div className="container wk-filters" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {/* Kind first: it is what the home page's buttons preset. */}
-          <div className="wk-kind" role="tablist" aria-label="ชนิดกิจกรรม">
-            {([
-              ['all', 'ทั้งหมด'],
-              ['single', 'Workshop เดี่ยว'],
-              ['round', 'Workshop รอบ'],
-            ] as const).map(([k, label]) => (
-              <button
-                key={k}
-                type="button"
-                role="tab"
-                aria-selected={kindFilter === k}
-                className={kindFilter === k ? 'on' : ''}
-                onClick={() => {
-                  setKindFilter(k);
-                  setPage(1);
-                  // Keep the address shareable; no reload, no history spam.
-                  const url = new URL(window.location.href);
-                  if (k === 'all') url.searchParams.delete('kind');
-                  else url.searchParams.set('kind', k);
-                  window.history.replaceState(null, '', url.toString());
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          {/* One row: the two kinds sit with the categories, and exactly one
+              pill is lit. The home page's buttons preset the kind via ?kind=. */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <FilterPill active={categoryFilter === 'all'} onClick={() => { setCategoryFilter('all'); setPage(1); }}>ทั้งหมด</FilterPill>
+            <FilterPill active={kindFilter === 'all' && categoryFilter === 'all'} onClick={() => pick('all', 'all')}>ทั้งหมด</FilterPill>
+            <FilterPill active={kindFilter === 'single'} onClick={() => pick('single', 'all')}>Workshop เดี่ยว</FilterPill>
+            <FilterPill active={kindFilter === 'round'} onClick={() => pick('round', 'all')}>Workshop รอบ</FilterPill>
             {categories.map((c) => (
-              <FilterPill key={c} active={categoryFilter === c} onClick={() => { setCategoryFilter(c); setPage(1); }}>{c}</FilterPill>
+              <FilterPill key={c} active={categoryFilter === c} onClick={() => pick('all', c)}>{c}</FilterPill>
             ))}
           </div>
           {tags.length > 0 && (
@@ -258,7 +276,19 @@ function WorkshopsListingInner() {
           ) : (
             <>
               <div className="wk-grid">
-                {shown.map((w) => <Card key={w.id} w={w} />)}
+                {shown.map((w) => {
+                  const g = w.master_kind === 'round' && w.master_id ? rounds.get(w.master_id) : undefined;
+                  return (
+                    <div key={w.id} style={{ position: 'relative', display: 'flex' }}>
+                      <Card w={w} />
+                      {g && g.count > 1 && (
+                        <span className="tag" style={{ position: 'absolute', top: 12, right: 12, background: 'var(--ink)', color: '#fff', fontSize: 11, pointerEvents: 'none' }}>
+                          {g.days.size} วัน · {g.count} รอบ
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
               <Pagination current={current} pageCount={pageCount} total={filtered.length} onGo={goToPage} />
             </>

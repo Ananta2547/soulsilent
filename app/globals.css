@@ -3838,7 +3838,6 @@ body {
   .home-rounds-head { margin-bottom: 18px; }
 }
 
-/* Workshops list: kind switch above the category pills */
-.wk-kind { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--paper); align-self: flex-start; }
-.wk-kind button { border: 0; background: transparent; font: inherit; font-size: 13.5px; font-weight: 600; padding: 8px 16px; border-radius: 999px; color: var(--muted); cursor: pointer; }
-.wk-kind button.on { background: var(--ink); color: #fff; }
+
+/* Workshops list: the grid cell wrapper must not break the card's stretch. */
+.wk-grid > div > .dc-event-card { flex: 1; }
