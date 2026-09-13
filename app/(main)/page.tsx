@@ -455,7 +455,7 @@ function EventCard({ w }: { w: Workshop }) {
   );
 }
 
-function UpcomingEvents({ workshops }: { workshops: Workshop[] }) {
+function UpcomingEvents({ workshops, rounds }: { workshops: Workshop[]; rounds?: React.ReactNode }) {
   const upcoming = useMemo(
     // New (≤7d) → Open → Closed, each by soonest event date. Rounds a teacher
     // opened under a master have their own section below.
@@ -517,6 +517,8 @@ function UpcomingEvents({ workshops }: { workshops: Workshop[] }) {
           </div>
         )}
 
+        {rounds}
+
         <div style={{ display: 'flex', justifyContent: 'center', marginTop: 44 }}>
           <Link href="/workshops" className="btn btn-ghost">ดูทั้งหมด <span className="mono">→</span></Link>
         </div>
@@ -548,43 +550,35 @@ function RoundsSection({ workshops }: { workshops: Workshop[] }) {
   if (groups.length === 0) return null;
 
   return (
-    <section className="section" style={{ background: 'var(--paper)' }}>
-      <div className="container">
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 40 }}>
-          <div className="reveal-up">
-            <div className="mono" style={{ color: 'var(--muted)', letterSpacing: '.14em', fontSize: 11, textTransform: 'uppercase', marginBottom: 10 }}>— 02 · รอบสอน</div>
-            <h2 className="display-th" style={{ fontSize: 'clamp(30px,4.4vw,46px)', margin: 0, color: 'var(--ink)' }}>
-              เลือกวันที่สะดวก<br />
-              แล้ว<span style={{ position: 'relative', display: 'inline-block' }}>
-                มาเจอกัน
-                <svg viewBox="0 0 300 18" preserveAspectRatio="none" style={{ position: 'absolute', left: 0, right: 0, bottom: -10, width: '100%', height: 16 }} aria-hidden="true">
-                  <path d="M2 11 Q 40 2 78 10 T 152 9 T 226 10 T 298 8" fill="none" stroke="var(--teal)" strokeWidth="5" strokeLinecap="round" />
-                </svg>
-              </span>
-            </h2>
-            <p style={{ margin: '20px 0 0', fontSize: 15, lineHeight: 1.6, color: 'var(--muted)', maxWidth: 440 }}>
-              กิจกรรมที่ผู้สอนเปิดเป็นรอบ ทุกวันหรือทุกสัปดาห์ — จิ้มวันในปฏิทินแล้วจองได้เลย
-            </p>
-          </div>
+    <div className="home-rounds">
+      <div className="home-rounds-head">
+        <div>
+          <div className="mono" style={{ color: 'var(--muted)', letterSpacing: '.14em', fontSize: 11, textTransform: 'uppercase', marginBottom: 8 }}>— 02 · รอบสอน</div>
+          <h3 className="display-th" style={{ fontSize: 'clamp(22px,3vw,30px)', margin: 0, color: 'var(--ink)' }}>
+            เลือกวันที่สะดวก แล้ว<span style={{ color: 'var(--teal)' }}>มาเจอกัน</span>
+          </h3>
         </div>
-
-        <div className="dc-events-grid">
-          {groups.map((g) => (
-            <div key={g.first.master_id as string} style={{ position: 'relative' }}>
-              <EventCard w={g.first} />
-              {g.days.size > 1 && (
-                <span
-                  className="tag"
-                  style={{ position: 'absolute', top: 12, right: 12, background: 'var(--ink)', color: '#fff', fontSize: 11, pointerEvents: 'none' }}
-                >
-                  {g.days.size} วัน · {g.count} รอบ
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
+        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: 'var(--muted)', maxWidth: 380 }}>
+          กิจกรรมที่ผู้สอนเปิดเป็นรอบ ทุกวันหรือทุกสัปดาห์ — จิ้มวันในปฏิทินแล้วจองได้เลย
+        </p>
       </div>
-    </section>
+
+      <div className="dc-events-grid">
+        {groups.map((g) => (
+          <div key={g.first.master_id as string} style={{ position: 'relative' }}>
+            <EventCard w={g.first} />
+            {g.days.size > 1 && (
+              <span
+                className="tag"
+                style={{ position: 'absolute', top: 12, right: 12, background: 'var(--ink)', color: '#fff', fontSize: 11, pointerEvents: 'none' }}
+              >
+                {g.days.size} วัน · {g.count} รอบ
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -914,8 +908,7 @@ export default function HomePage() {
   return (
     <div className="home-dc">
       <Hero workshops={featuredWorkshops} />
-      <UpcomingEvents workshops={workshops} />
-      <RoundsSection workshops={workshops} />
+      <UpcomingEvents workshops={workshops} rounds={<RoundsSection workshops={workshops} />} />
       <ArticlesSection lead={leadArticle} side={sideArticles} categories={articleCategories} />
       <ReviewsSection reviews={reviews} />
       <StatsSection stats={stats} />
