@@ -3841,3 +3841,6 @@ body {
 
 /* Workshops list: the grid cell wrapper must not break the card's stretch. */
 .wk-grid > div > .dc-event-card { flex: 1; }
+
+/* Session manager: 24h time dropdowns sized to their digits */
+.tsm-slot select.field { width: auto; min-width: 72px; padding-right: 28px; }

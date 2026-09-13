@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { useLang, T, tr } from '@/lib/i18n';
 import { Btn } from '@/components/design/RippleButton';
 import { MonthPicker } from '@/components/calendar/MonthPicker';
+import { TimeField24 } from '@/components/admin/TimeField24';
 import { fmtDate } from '@/lib/datetime';
 import type { WorkshopMaster } from '@/lib/types';
 
@@ -343,10 +344,21 @@ export default function TeacherSessionsPage() {
             </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {slots.map((sl, i) => (
-                <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <input type="time" value={sl.time_start} disabled={editLocked} onChange={(e) => setSlots((x) => x.map((s, j) => (j === i ? { ...s, time_start: e.target.value } : s)))} className="field" style={{ width: 130 }} />
-                  <span style={{ color: 'var(--muted)' }}>–</span>
-                  <input type="time" value={sl.time_end} disabled={editLocked} onChange={(e) => setSlots((x) => x.map((s, j) => (j === i ? { ...s, time_end: e.target.value } : s)))} className="field" style={{ width: 130 }} />
+                <div key={i} className="tsm-slot" style={{ display: 'flex', gap: 14, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  {/* Hour and minute dropdowns, 24-hour, whatever the device
+                      locale — the same field the admin forms use. */}
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>{tr(lang, 'เวลาเริ่ม (24 ชม.)', 'Start (24h)')}</div>
+                    <fieldset disabled={editLocked} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+                      <TimeField24 className="field" value={sl.time_start} onChange={(v) => setSlots((x) => x.map((s, j) => (j === i ? { ...s, time_start: v } : s)))} />
+                    </fieldset>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>{tr(lang, 'เวลาจบ (24 ชม.)', 'End (24h)')}</div>
+                    <fieldset disabled={editLocked} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+                      <TimeField24 className="field" value={sl.time_end} onChange={(v) => setSlots((x) => x.map((s, j) => (j === i ? { ...s, time_end: v } : s)))} />
+                    </fieldset>
+                  </div>
                   {!editing && slots.length > 1 && (
                     <button type="button" onClick={() => setSlots((x) => x.filter((_, j) => j !== i))} className="btn btn-paper btn-sm" aria-label={tr(lang, 'ลบช่วงเวลา', 'Remove range')} style={{ color: '#a04a14' }}>
                       ✕
