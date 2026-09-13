@@ -95,6 +95,10 @@ export function MasterForm({
   const [pricePrivate, setPricePrivate] = useState(initial?.price_private != null ? String(initial.price_private) : '');
   const [defaultSeats, setDefaultSeats] = useState(String(initial?.default_max_participants ?? 20));
   const [teachers, setTeachers] = useState<{ id: string; name: string }[]>([]);
+  // Venues a round master may run at — the teacher picks one of these when
+  // opening a round. None ticked = any venue.
+  const [locations, setLocations] = useState<{ id: string; name: string; province: string }[]>([]);
+  const [locationIds, setLocationIds] = useState<string[]>(toArr(initial?.location_ids_json));
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -113,11 +117,12 @@ export function MasterForm({
         priceGroup: initial?.price_group != null ? String(initial.price_group) : '',
         pricePrivate: initial?.price_private != null ? String(initial.price_private) : '',
         defaultSeats: String(initial?.default_max_participants ?? 20),
+        locationIds: toArr(initial?.location_ids_json),
       }),
     [initial],
   );
   const dirty =
-    JSON.stringify({ title, organizer, description, coverUrl, coverMeta, target, takeaways, priceGroup, pricePrivate, defaultSeats }) !== baseline;
+    JSON.stringify({ title, organizer, description, coverUrl, coverMeta, target, takeaways, priceGroup, pricePrivate, defaultSeats, locationIds }) !== baseline;
   useEffect(() => {
     onDirtyChange?.(dirty);
   }, [dirty, onDirtyChange]);
@@ -127,6 +132,10 @@ export function MasterForm({
     fetch('/api/users?role=teacher,admin')
       .then((r) => r.json() as Promise<{ users: { id: string; name: string }[] }>)
       .then((d) => setTeachers(d.users || []))
+      .catch(() => {});
+    fetch('/api/locations')
+      .then((r) => r.json() as Promise<{ locations: { id: string; name: string; province: string }[] }>)
+      .then((d) => setLocations(d.locations || []))
       .catch(() => {});
   }, []);
 
@@ -154,6 +163,7 @@ export function MasterForm({
           price_private: pricePrivate.trim() === '' ? null : Number(pricePrivate),
           default_max_participants: Number(defaultSeats) || 20,
           kind: initial?.kind || kind,
+          location_ids: locationIds,
         }),
       });
       const data = (await res.json()) as { error?: string };
@@ -235,6 +245,29 @@ export function MasterForm({
           </div>
         </div>
       </fieldset>
+      )}
+
+      {(initial?.kind || kind) === 'round' && (
+        <fieldset className="border border-gray-lighter rounded-lg p-3">
+          <legend className="text-sm font-medium text-dark px-1">สถานที่ที่เปิดรอบได้ (ผู้สอนเลือกอีกครั้งตอนเปิดรอบ)</legend>
+          {locations.length === 0 ? (
+            <p className="text-xs text-gray mt-1">ยังไม่มีสถานที่ในระบบ — เพิ่มได้ที่เมนู สถานที่</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 mt-1">
+              {locations.map((l) => (
+                <label key={l.id} className="inline-flex items-center gap-2 text-sm text-dark">
+                  <input
+                    type="checkbox"
+                    checked={locationIds.includes(l.id)}
+                    onChange={(e) => setLocationIds((x) => (e.target.checked ? [...x, l.id] : x.filter((v) => v !== l.id)))}
+                  />
+                  {l.name} <span className="text-gray text-xs">· {l.province}</span>
+                </label>
+              ))}
+            </div>
+          )}
+          <p className="text-xs text-gray mt-2">ไม่ติ๊กเลย = ให้เลือกได้ทุกสถานที่</p>
+        </fieldset>
       )}
 
       <ListField legend="เหมาะกับใคร (Target Audience)" items={target} onChange={setTarget} placeholder="เช่น คนที่อยากพักใจ..." />

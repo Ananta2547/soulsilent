@@ -60,7 +60,9 @@ type Body = {
   price_private?: number | null;
   default_max_participants?: number | null;
   kind?: 'round' | 'single';
+  location_ids?: string[];
 };
+const locIds = (v: unknown): string => JSON.stringify(Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x) : []);
 const kindOf = (v: unknown): 'round' | 'single' => (v === 'single' ? 'single' : 'round');
 
 const money = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null);
@@ -80,7 +82,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         `UPDATE workshop_masters SET
            title = ?, description = ?, organizer = ?, cover_image_url = ?, cover_image_meta = ?,
            target_json = ?, takeaways_json = ?,
-           price_group = ?, price_private = ?, default_max_participants = ?, kind = ?,
+           price_group = ?, price_private = ?, default_max_participants = ?, kind = ?, location_ids_json = ?,
            updated_at = datetime('now')
          WHERE id = ?`
       )
@@ -96,6 +98,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         money(body.price_private),
         Math.max(1, Math.round(Number(body.default_max_participants) || 20)),
         kindOf(body.kind),
+        locIds(body.location_ids),
         id
       )
       .run();

@@ -35,7 +35,9 @@ type Body = {
   price_private?: number | null;
   default_max_participants?: number | null;
   kind?: 'round' | 'single';
+  location_ids?: string[];
 };
+const locIds = (v: unknown): string => JSON.stringify(Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x) : []);
 const kindOf = (v: unknown): 'round' | 'single' => (v === 'single' ? 'single' : 'round');
 
 const money = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null);
@@ -54,8 +56,8 @@ export async function POST(request: Request) {
       .prepare(
         `INSERT INTO workshop_masters
           (id, title, description, organizer, cover_image_url, cover_image_meta, target_json, takeaways_json,
-           price_group, price_private, default_max_participants, kind)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           price_group, price_private, default_max_participants, kind, location_ids_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         id,
@@ -69,7 +71,8 @@ export async function POST(request: Request) {
         money(body.price_group),
         money(body.price_private),
         Math.max(1, Math.round(Number(body.default_max_participants) || 20)),
-        kindOf(body.kind)
+        kindOf(body.kind),
+        locIds(body.location_ids)
       )
       .run();
     return NextResponse.json({ id }, { status: 201 });

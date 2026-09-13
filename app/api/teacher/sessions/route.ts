@@ -11,6 +11,15 @@ import type { Workshop, WorkshopMaster } from '@/lib/types';
  * bookings and payout. The row copies what the master says so every public
  * page keeps reading the workshop it always did. */
 
+function parseIds(json: string | null | undefined): string[] {
+  try {
+    const a = json ? (JSON.parse(json) as unknown) : [];
+    return Array.isArray(a) ? a.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
 const TIME_RE = /^\d{2}:\d{2}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -155,6 +164,11 @@ export async function POST(request: Request) {
     .bind(body.location_id)
     .first<{ id: string; name: string; map_url: string | null }>();
   if (!loc) return NextResponse.json({ error: 'ไม่พบสถานที่' }, { status: 400 });
+  // The admin may have narrowed the venues this activity runs at.
+  const allowed = parseIds(master.location_ids_json);
+  if (allowed.length > 0 && !allowed.includes(loc.id)) {
+    return NextResponse.json({ error: 'สถานที่นี้ไม่อยู่ในรายการที่ Admin กำหนดให้ Workshop นี้' }, { status: 400 });
+  }
 
   const seats = Math.max(1, Math.round(Number(body.max_participants) || master.default_max_participants || 20));
 

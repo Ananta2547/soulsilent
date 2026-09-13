@@ -72,6 +72,18 @@ export default function TeacherSessionsPage() {
   }, []);
 
   const master = data?.masters.find((m) => m.id === masterId) || null;
+  // Venues the admin allowed for this activity; none listed = every venue.
+  const allowedLocs = useMemo(() => {
+    if (!data) return [];
+    let ids: string[] = [];
+    try {
+      const a = master?.location_ids_json ? (JSON.parse(master.location_ids_json) as unknown) : [];
+      ids = Array.isArray(a) ? (a as string[]) : [];
+    } catch {
+      ids = [];
+    }
+    return ids.length ? data.locations.filter((l) => ids.includes(l.id)) : data.locations;
+  }, [data, master]);
 
   // Days this activity already runs on — drawn as counts under the day so
   // the teacher sees the month at a glance while picking.
@@ -171,7 +183,7 @@ export default function TeacherSessionsPage() {
             <label className="tsm-label">
               <T th="1 · Workshop" en="1 · Activity" />
             </label>
-            <select value={masterId} onChange={(e) => { setMasterId(e.target.value); setMsg(null); const m = data.masters.find((x) => x.id === e.target.value); setSeats(m?.default_max_participants ? String(m.default_max_participants) : ''); }} className="field">
+            <select value={masterId} onChange={(e) => { setMasterId(e.target.value); setMsg(null); setLocationId(''); const m = data.masters.find((x) => x.id === e.target.value); setSeats(m?.default_max_participants ? String(m.default_max_participants) : ''); }} className="field">
               <option value="">{tr(lang, '— เลือก Workshop —', '— choose —')}</option>
               {data.masters.map((m) => (
                 <option key={m.id} value={m.id}>{m.title}</option>
@@ -248,12 +260,17 @@ export default function TeacherSessionsPage() {
             </label>
             <select value={locationId} onChange={(e) => setLocationId(e.target.value)} className="field">
               <option value="">{tr(lang, '— เลือกสถานที่ —', '— choose a venue —')}</option>
-              {data.locations.map((l) => (
+              {allowedLocs.map((l) => (
                 <option key={l.id} value={l.id}>
                   {l.name}{l.province ? ` · ${l.province}` : ''}
                 </option>
               ))}
             </select>
+            {master && allowedLocs.length < data.locations.length && (
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
+                {tr(lang, `Admin กำหนดให้เปิดได้ ${allowedLocs.length} สถานที่`, `Admin allows ${allowedLocs.length} venues for this activity`)}
+              </div>
+            )}
 
             <label className="tsm-label" style={{ marginTop: 20 }}>
               <T th="5 · จำนวนที่นั่ง" en="5 · Seats" />

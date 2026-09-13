@@ -101,6 +101,9 @@ export interface WorkshopMaster {
   price_private: number | null;
   /** Seats a new round starts with when the teacher opens one. */
   default_max_participants: number | null;
+  /** JSON string[] of locations.id the teacher may open rounds at; null or
+   *  [] = any venue (migration 054). */
+  location_ids_json?: string | null;
   created_at: string;
   updated_at: string;
   /** Joined (not a column): the organizer teacher's display name. */
