@@ -108,6 +108,32 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         id
       )
       .run();
+    // Rounds are copies of the master taken when the teacher opened them, so
+    // an edit here has to reach them too — otherwise the public cards keep
+    // showing the old poster and title. Bookings keep their own amount, so
+    // re-syncing the price does not touch money already agreed.
+    if (kindOf(body.kind) === 'round') {
+      await db
+        .prepare(
+          `UPDATE workshops SET
+             title = ?, description = ?, instructor_id = ?, instructor_ids_json = ?,
+             image_url = ?, image_meta = ?, learn_json = ?, target_json = ?, price = ?
+           WHERE master_id = ? AND status != 'cancelled'`
+        )
+        .bind(
+          body.title.trim(),
+          body.description || null,
+          body.organizer || null,
+          JSON.stringify(body.organizer ? [body.organizer] : []),
+          body.cover_image_url || null,
+          body.cover_image_meta ? JSON.stringify(body.cover_image_meta) : null,
+          JSON.stringify((body.takeaways || []).filter((s) => s.trim())),
+          JSON.stringify((body.target || []).filter((s) => s.trim())),
+          money(body.price_group) ?? 0,
+          id
+        )
+        .run();
+    }
     return NextResponse.json({ success: true });
   } catch (error) {
     const err = error as Error;
