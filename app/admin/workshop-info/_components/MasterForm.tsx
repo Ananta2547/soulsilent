@@ -327,7 +327,7 @@ export function MasterForm({
         )}
         <button
           type="button"
-          onClick={() => setTiers((x) => [...x, { id: `t-${Date.now().toString(36)}`, label: '', price: 0, mode: 'seat' }])}
+          onClick={() => setTiers((x) => [...x, { id: `t-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, label: '', price: 0, mode: 'seat' }])}
           className="mt-3 text-sm text-primary hover:underline"
         >
           + เพิ่มราคาอีกแบบ (ตั้งชื่อเอง)
