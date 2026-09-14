@@ -502,7 +502,7 @@ function ApplicationDetail({ json, lang }: { json: string | null; lang: 'th' | '
   const fmt = (v: unknown) => (Array.isArray(v) ? v.join(', ') : String(v ?? '')) || '—';
 
   return (
-    <div style={{ marginTop: 12, paddingTop: 14, borderTop: '1px dashed var(--cream-deep)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: '10px 14px' }}>
+    <div style={{ marginTop: 12, paddingTop: 14, borderTop: '1px dashed var(--cream-deep)', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px 24px' }}>
       <Field label={tr(lang, 'ชื่อ-นามสกุล', 'Full name')} value={p.fullName || '—'} />
       <Field label={tr(lang, 'อายุ', 'Age')} value={p.age != null ? `${p.age}` : '—'} />
       <Field label={tr(lang, 'เพศ', 'Gender')} value={p.gender || '—'} />
