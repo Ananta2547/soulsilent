@@ -101,6 +101,20 @@ function WorkshopDetailInner() {
   const [master, setMaster] = useState<WorkshopMaster | null>(null);
   const [siblings, setSiblings] = useState<PickableSession[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // The browser's back button from the payment page restores this page from
+  // the bfcache exactly as it was left — button reading "กำลังดำเนินการ" and
+  // disabled. The restore event is the one place that state can be reset.
+  useEffect(() => {
+    const onShow = (e: PageTransitionEvent) => {
+      if (e.persisted) {
+        setBooking(false);
+        setChosen(null);
+        setPickerOpen(false);
+      }
+    };
+    window.addEventListener('pageshow', onShow);
+    return () => window.removeEventListener('pageshow', onShow);
+  }, []);
   const [chosen, setChosen] = useState<{ session: PickableSession; kind: BookingKind; tier: PriceTier; seats: number } | null>(null);
   const search = useSearchParams();
   const pickedDate = search.get('date');

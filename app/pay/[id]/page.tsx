@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useLang, T, tr, type Lang } from '@/lib/i18n';
 import { Btn } from '@/components/design/RippleButton';
+import { InviteLinkBox } from '@/components/workshops/InviteLinkBox';
 import { Icon } from '@/components/design/Icon';
 import { BeamMark } from '@/components/design/BeamMark';
 import { fmtDate, sqliteToMs } from '@/lib/datetime';
@@ -51,6 +52,8 @@ type BookingSummary = {
   locProvince: string | null;
   locDistrict: string | null;
   imageUrl: string | null;
+  /** Seats this booking holds — a group's size, else 1. */
+  seats?: number | string;
 };
 
 type PayState = 'loading' | 'ready' | 'paid' | 'expired' | 'error';
@@ -207,6 +210,18 @@ function HoldNote({
 
 /** The gift link, shown the moment the payment lands — the seat is secured,
  *  so the link now works, and the buyer can send it on. */
+function InvitePanel({ url }: { url: string }) {
+  const { lang } = useLang();
+  return (
+    <div style={{ width: '100%', maxWidth: 420, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <InviteLinkBox url={url} />
+      <Link href="/me/bookings" className="btn btn-paper" style={{ justifyContent: 'center' }}>
+        {tr(lang, 'ไปที่การจองของฉัน', 'Go to my bookings')}
+      </Link>
+    </div>
+  );
+}
+
 function GiftLinkPanel({ url }: { url: string }) {
   const { lang } = useLang();
   const [copied, setCopied] = useState(false);
@@ -273,6 +288,7 @@ function StateBody({
   retryable,
   onRetry,
   giftUrl,
+  inviteUrl,
 }: {
   state: PayState;
   error: string | null;
@@ -281,6 +297,8 @@ function StateBody({
   /** Set when the seat just paid for was bought for somebody else: the link
    *  that hands it to them, which only exists once the money is in. */
   giftUrl?: string | null;
+  /** Set when a group was just paid for: the link its members follow. */
+  inviteUrl?: string | null;
 }) {
   if (state === 'loading') {
     return (
@@ -304,6 +322,8 @@ function StateBody({
           // A gift: the buyer is not the one attending, so the thing they came
           // for is the link, and this is the first moment it is worth anything.
           <GiftLinkPanel url={giftUrl} />
+        ) : inviteUrl ? (
+          <InvitePanel url={inviteUrl} />
         ) : (
           <span style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.65 }}>
             <T
@@ -383,8 +403,18 @@ export default function PayPage() {
   const [error, setError] = useState<string | null>(null);
   // Set only for a gift, once it is paid for: the link to hand to the receiver.
   const [giftUrl, setGiftUrl] = useState<string | null>(null);
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [retryable, setRetryable] = useState(false);
   const [cardLoading, setCardLoading] = useState(false);
+  // Back button from the card checkout restores this page from the bfcache
+  // with the button still "loading"; the restore event is where that resets.
+  useEffect(() => {
+    const onShow = (e: PageTransitionEvent) => {
+      if (e.persisted) setCardLoading(false);
+    };
+    window.addEventListener('pageshow', onShow);
+    return () => window.removeEventListener('pageshow', onShow);
+  }, []);
   const [now, setNow] = useState(() => Date.now());
 
   // Counts polls so every fifth one asks Beam directly instead of only reading
@@ -403,6 +433,7 @@ export default function PayPage() {
           expiresAt?: string | null;
           booking?: BookingSummary;
           paid?: boolean;
+          inviteUrl?: string | null;
           expired?: boolean;
           error?: string;
           retryable?: boolean;
@@ -416,6 +447,12 @@ export default function PayPage() {
 
         if (data.paid) {
           setState('paid');
+          // A group: the invite link is live from this moment, so it is put
+          // in front of the booker here rather than left behind a redirect.
+          if (data.inviteUrl) {
+            setInviteUrl(data.inviteUrl);
+            return;
+          }
           // A gift stays here instead: the link is the whole point of the
           // purchase and this is the first moment it works, so it is put in
           // front of the buyer rather than left behind a redirect.
@@ -640,7 +677,7 @@ export default function PayPage() {
                 }}
               >
                 <Icon name="participants" size={17} style={{ color: 'var(--teal)' }} />
-                <T th="1 ที่นั่ง · จองไว้ชั่วคราว" en="1 seat · held temporarily" />
+                {tr(lang, `${Number(booking?.seats) || 1} ที่นั่ง · จองไว้ชั่วคราว`, `${Number(booking?.seats) || 1} seat${(Number(booking?.seats) || 1) > 1 ? 's' : ''} · held temporarily`)}
               </span>
             </div>
           </div>
@@ -782,6 +819,7 @@ export default function PayPage() {
                 retryable={retryable}
                 onRetry={() => void load(false)}
                 giftUrl={giftUrl}
+                inviteUrl={inviteUrl}
               />
             </div>
           )}
@@ -902,7 +940,7 @@ export default function PayPage() {
                     {booking?.title || '—'}
                   </span>
                   <span className="mono" style={{ ...MONO_LABEL, fontSize: 9.5, letterSpacing: '0.14em' }}>
-                    <T th="1 ที่นั่ง · จองไว้ชั่วคราว" en="1 seat · held temporarily" />
+                    {tr(lang, `${Number(booking?.seats) || 1} ที่นั่ง · จองไว้ชั่วคราว`, `${Number(booking?.seats) || 1} seat${(Number(booking?.seats) || 1) > 1 ? 's' : ''} · held temporarily`)}
                   </span>
                 </div>
               </div>
@@ -939,6 +977,7 @@ export default function PayPage() {
               retryable={retryable}
               onRetry={() => void load(false)}
               giftUrl={giftUrl}
+              inviteUrl={inviteUrl}
             />
           </div>
         )}

@@ -483,7 +483,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ submitted: true, mode: 'selection', bookingId });
     }
     if (isFreeConfirm) {
-      return NextResponse.json({ submitted: true, mode: 'free', bookingId });
+      // A free group is secured at once, so its invite link is live now.
+      let inviteUrl: string | null = null;
+      if (groupSize) {
+        const row = await db.prepare('SELECT invite_token FROM bookings WHERE id = ?').bind(bookingId).first<{ invite_token: string | null }>();
+        const site = (await getEnv()).SITE_URL || 'http://localhost:3000';
+        if (row?.invite_token) inviteUrl = `${site}/invite/${row.invite_token}`;
+      }
+      return NextResponse.json({ submitted: true, mode: 'free', bookingId, inviteUrl });
     }
 
     // Direct deposit / paid → send them to OUR payment page, not Beam's.

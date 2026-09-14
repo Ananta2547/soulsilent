@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useLang, T, tr, pick } from '@/lib/i18n';
+import { InviteLinkBox } from '@/components/workshops/InviteLinkBox';
 import { fmtDateTime } from '@/lib/datetime';
 import { getVault } from '@/lib/vault';
 import { TRAVEL_OPTIONS, type TravelMethod } from '@/lib/travel';
@@ -18,6 +19,8 @@ export type BookingResult = {
   checkoutUrl?: string;
   amount?: number;
   bookingId?: string;
+  /** Group booking secured without payment: the link its members follow. */
+  inviteUrl?: string | null;
   error?: string;
 };
 
@@ -376,7 +379,12 @@ export function BookingModal({
               <T th="เงินมัดจำสามารถขอคืนได้ในวันงาน (เฉพาะการโอนเท่านั้น)" en="Deposit is refundable on the event day (Transfer only)." />
             </div>
           )}
-          {result.mode === 'free' && <div style={{ height: 8 }} />}
+          {result.mode === 'free' && !result.inviteUrl && <div style={{ height: 8 }} />}
+          {result.inviteUrl && (
+            <div style={{ margin: '0 0 18px' }}>
+              <InviteLinkBox url={result.inviteUrl} />
+            </div>
+          )}
 
           {isDeposit && result.checkoutUrl && (
             <div style={{ background: '#fdecec', border: '1px solid #f0b4b4', borderRadius: 14, padding: '11px 15px', margin: '0 0 14px', fontSize: 12.5, color: '#a13030', lineHeight: 1.55, textAlign: 'left' }}>

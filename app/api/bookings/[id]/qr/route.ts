@@ -67,10 +67,17 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       locProvince: booking.loc_province,
       locDistrict: booking.loc_district,
       imageUrl: booking.w_image_url,
+      seats: String(Number(booking.group_size || 1)),
     };
 
+    // A group's invite link is what the booker came for, and this is the
+    // first moment it works — so it rides along with "paid".
+    const inviteUrl =
+      Number(booking.group_size || 1) > 1 && booking.invite_token && !booking.parent_booking_id
+        ? `${(await getEnv()).SITE_URL || 'http://localhost:3000'}/invite/${booking.invite_token}`
+        : null;
     if (booking.payment_status === 'paid' || booking.status === 'confirmed') {
-      return NextResponse.json({ paid: true, bookingId: id, booking: summary });
+      return NextResponse.json({ paid: true, bookingId: id, booking: summary, inviteUrl });
     }
 
     // `expires_at` is the authority, not the status flags: the sweep that sets
@@ -122,7 +129,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             )
             .bind(booking.beam_qr_charge_id, id)
             .run();
-          return NextResponse.json({ paid: true, bookingId: id, booking: summary });
+          return NextResponse.json({ paid: true, bookingId: id, booking: summary, inviteUrl });
         }
       } catch (e) {
         // Beam being unreachable must not break the page — the stored QR is
