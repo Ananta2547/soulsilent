@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { MultiSelect } from '@/components/admin/MultiSelect';
-import { parseTiers, type PriceTier } from '@/lib/pricing';
+import { parseTiers, isGroupTier, type PriceTier } from '@/lib/pricing';
 import { ImageUploader } from '@/components/admin/image/ImageUploader';
 import { ASPECTS } from '@/lib/image-aspects';
 import { parseImageMeta } from '@/lib/image-meta';
@@ -94,7 +94,9 @@ export function MasterForm({
   // Prices every round of this master opens with (migration 051). Private is
   // optional — leave it blank and the booking popup offers group only.
   const [priceGroup, setPriceGroup] = useState(initial?.price_group != null ? String(initial.price_group) : '');
-  const [priceGroupBooking, setPriceGroupBooking] = useState(initial?.price_group_booking != null ? String(initial.price_group_booking) : '');
+  // Kept as stored (migration 055) — group prices are tier rows now, so this
+  // no longer has a field of its own.
+  const [priceGroupBooking] = useState(initial?.price_group_booking != null ? String(initial.price_group_booking) : '');
   // Extra tiers, each named by the admin and sold per seat or per round.
   const [tiers, setTiers] = useState<PriceTier[]>(parseTiers(initial?.price_tiers_json));
   const [defaultSeats, setDefaultSeats] = useState(String(initial?.default_max_participants ?? 20));
@@ -247,41 +249,80 @@ export function MasterForm({
       {(initial?.kind || kind) === 'round' && (
       <fieldset className="border border-gray-lighter rounded-lg p-3">
         <legend className="text-sm font-medium text-dark px-1">ราคา (ใช้กับทุกรอบที่ผู้สอนเปิด)</legend>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
-          <div>
-            <label className="block text-xs text-gray mb-1">ราคา/คน (บาท/ที่นั่ง)</label>
-            <input type="number" min={0} step="1" value={priceGroup} onChange={(e) => setPriceGroup(e.target.value)} className="input-field" placeholder="เช่น 1200" />
-          </div>
-          <div>
-            <label className="block text-xs text-gray mb-1">กลุ่ม (บาท) <span className="text-gray">· เก็บไว้ก่อน ยังไม่เปิดขาย</span></label>
-            <input type="number" min={0} step="1" value={priceGroupBooking} onChange={(e) => setPriceGroupBooking(e.target.value)} className="input-field" placeholder="เช่น 4000" />
-          </div>
+        <div className="mt-1 max-w-[260px]">
+          <label className="block text-xs text-gray mb-1">ราคา/คน (บาท/ที่นั่ง) · ราคาปกติ</label>
+          <input type="number" min={0} step="1" value={priceGroup} onChange={(e) => setPriceGroup(e.target.value)} className="input-field" placeholder="เช่น 1200" />
         </div>
+        <p className="text-xs text-gray mt-2">
+          ราคาอื่นเพิ่มเป็นแถวด้านล่าง — ต่อคน / เหมาทั้งรอบ / แพ็กคงที่ / กลุ่มระบุจำนวน (ราคากลุ่มคิดต่อคน × จำนวน · ผู้จองนับเป็น 1 คน แล้วส่งลิงก์เชิญเพื่อนที่เหลือ)
+        </p>
 
         {/* Tiers the admin adds: a name, a price, and whether one purchase
             buys a seat or the whole round. */}
         {tiers.length > 0 && (
           <div className="mt-3 flex flex-col gap-2">
-            {tiers.map((t, i) => (
-              <div key={t.id} className="grid grid-cols-1 sm:grid-cols-[1fr_140px_150px_32px] gap-2 items-end">
-                <div>
-                  <label className="block text-xs text-gray mb-1">ชื่อราคา</label>
-                  <input value={t.label} onChange={(e) => setTiers((x) => x.map((y, j) => (j === i ? { ...y, label: e.target.value } : y)))} className="input-field" placeholder="เช่น นักเรียน / องค์กร" />
+            {tiers.map((t, i) => {
+              const set = (patch: Partial<PriceTier>) => setTiers((x) => x.map((y, j) => (j === i ? { ...y, ...patch } : y)));
+              return (
+                <div key={t.id} className="border border-gray-lighter rounded-md p-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_130px_190px_32px] gap-2 items-end">
+                    <div>
+                      <label className="block text-xs text-gray mb-1">ชื่อราคา</label>
+                      <input value={t.label} onChange={(e) => set({ label: e.target.value })} className="input-field" placeholder="เช่น นักเรียน / แพ็ก 3 คน / องค์กร" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray mb-1">{t.mode === 'round' ? 'บาท (ทั้งรอบ)' : 'บาท/คน'}</label>
+                      <input type="number" min={0} step="1" value={t.price} onChange={(e) => set({ price: Number(e.target.value) })} className="input-field" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray mb-1">ประเภท</label>
+                      <select
+                        value={t.mode}
+                        onChange={(e) => {
+                          const mode = e.target.value as PriceTier['mode'];
+                          set(mode === 'pack' ? { mode, size: t.size || 3, lock: !!t.lock } : mode === 'range' ? { mode, min: t.min || 2, max: t.max || 5, lock: !!t.lock } : { mode });
+                        }}
+                        className="input-field"
+                      >
+                        <option value="seat">ต่อคน (1 ที่นั่ง)</option>
+                        <option value="round">เหมาทั้งรอบ</option>
+                        <option value="pack">แพ็กคงที่ (N คน)</option>
+                        <option value="range">กลุ่มระบุจำนวน (min–max)</option>
+                      </select>
+                    </div>
+                    <button type="button" onClick={() => setTiers((x) => x.filter((_, j) => j !== i))} className="h-10 text-red-500 text-sm" aria-label="ลบราคานี้">✕</button>
+                  </div>
+                  {isGroupTier(t) && (
+                    <div className="flex flex-wrap items-end gap-3 mt-2">
+                      {t.mode === 'pack' ? (
+                        <div>
+                          <label className="block text-xs text-gray mb-1">จำนวนคนต่อแพ็ก (รวมผู้จอง)</label>
+                          <input type="number" min={2} step="1" value={t.size ?? 3} onChange={(e) => set({ size: Number(e.target.value) })} className="input-field w-28" />
+                        </div>
+                      ) : (
+                        <>
+                          <div>
+                            <label className="block text-xs text-gray mb-1">ต่ำสุด (คน)</label>
+                            <input type="number" min={2} step="1" value={t.min ?? 2} onChange={(e) => set({ min: Number(e.target.value) })} className="input-field w-24" />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray mb-1">สูงสุด (คน)</label>
+                            <input type="number" min={2} step="1" value={t.max ?? 5} onChange={(e) => set({ max: Number(e.target.value) })} className="input-field w-24" />
+                          </div>
+                        </>
+                      )}
+                      <label className="flex items-center gap-2 text-sm pb-2">
+                        <input type="checkbox" checked={!!t.lock} onChange={(e) => set({ lock: e.target.checked })} />
+                        ล็อกรอบเป็นส่วนตัว (Private) — จองแล้วรอบนั้นไม่รับคนอื่น
+                      </label>
+                      <span className="text-xs text-gray pb-2">
+                        {t.lock ? 'Private: จองได้เฉพาะรอบว่าง' : 'Public: รับได้หลายกลุ่มจนกว่าที่นั่งจะเต็ม'}
+                      </span>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <label className="block text-xs text-gray mb-1">บาท</label>
-                  <input type="number" min={0} step="1" value={t.price} onChange={(e) => setTiers((x) => x.map((y, j) => (j === i ? { ...y, price: Number(e.target.value) } : y)))} className="input-field" />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray mb-1">คิดต่อ</label>
-                  <select value={t.mode} onChange={(e) => setTiers((x) => x.map((y, j) => (j === i ? { ...y, mode: e.target.value as PriceTier['mode'] } : y)))} className="input-field">
-                    <option value="seat">ต่อคน (1 ที่นั่ง)</option>
-                    <option value="round">เหมาทั้งรอบ</option>
-                  </select>
-                </div>
-                <button type="button" onClick={() => setTiers((x) => x.filter((_, j) => j !== i))} className="h-10 text-red-500 text-sm" aria-label="ลบราคานี้">✕</button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
         <button

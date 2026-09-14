@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { seatsOfRowSql } from '@/lib/seats';
 import { getDB } from '@/lib/db';
 import { getCurrentUserWithRoles } from '@/lib/auth';
 import { hasAnyRole } from '@/lib/roles';
@@ -16,8 +17,8 @@ export async function GET() {
   const rows = await db
     .prepare(
       `SELECT w.*, m.kind AS master_kind,
-              (SELECT COUNT(*) FROM bookings b
-                WHERE b.workshop_id = w.id
+              (SELECT COALESCE(SUM(${seatsOfRowSql('b', 'w.max_participants')}), 0) FROM bookings b
+                WHERE b.workshop_id = w.id AND b.status != 'cancelled'
                   AND (b.payment_status = 'paid' OR b.status = 'confirmed')) AS booked
          FROM workshops w
          LEFT JOIN workshop_masters m ON m.id = w.master_id

@@ -79,6 +79,7 @@ export function BookingModal({
   bookingKind = 'group',
   privatePrice = null,
   tierLabel = null,
+  groupSeats = 1,
 }: {
   onClose: () => void;
   workshop: Workshop;
@@ -92,6 +93,8 @@ export function BookingModal({
   /** Name of the picked tier, shown on the form so the learner sees what
    *  they chose. */
   tierLabel?: string | null;
+  /** Group tiers: how many seats this booking buys (the booker included). */
+  groupSeats?: number;
 }) {
   const claiming = mode === 'claim';
   const { lang } = useLang();
@@ -480,7 +483,9 @@ export function BookingModal({
                   <span>
                     <b>{tierLabel || tr(lang, 'จองแบบส่วนตัว', 'Private booking')}</b>
                     {' · '}
-                    {bookingKind === 'private' ? tr(lang, 'เหมาทั้งรอบ', 'the whole round') : tr(lang, '1 ที่นั่ง', 'one seat')}
+                    {groupSeats > 1
+                      ? tr(lang, `กลุ่ม ${groupSeats} คน (รวมคุณ)${bookingKind === 'private' ? ' · ล็อกรอบส่วนตัว' : ''}`, `group of ${groupSeats} (you included)${bookingKind === 'private' ? ' · private round' : ''}`)
+                      : bookingKind === 'private' ? tr(lang, 'เหมาทั้งรอบ', 'the whole round') : tr(lang, '1 ที่นั่ง', 'one seat')}
                     {' · '}
                     {workshop.date} {workshop.time_start}–{workshop.time_end}
                   </span>

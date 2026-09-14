@@ -21,7 +21,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
     const booking = await db
       .prepare(
-        `SELECT id, user_id, workshop_id, status, payment_status, amount, application_json
+        `SELECT id, user_id, workshop_id, status, payment_status, amount, application_json,
+                group_size, parent_booking_id
            FROM bookings WHERE id = ?`,
       )
       .bind(id)
@@ -33,10 +34,17 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
         payment_status: string;
         amount: number | null;
         application_json: string | null;
+        group_size: number | null;
+        parent_booking_id: string | null;
       }>();
 
     if (!booking || booking.user_id !== user.sub) {
       return NextResponse.json({ error: 'ไม่พบการจองนี้' }, { status: 404 });
+    }
+    // A group's seats travel by its own invite link; a member's seat was
+    // never theirs to sell on.
+    if ((booking.group_size || 1) > 1 || booking.parent_booking_id) {
+      return NextResponse.json({ error: 'ที่นั่งแบบกลุ่มโอนสิทธิ์ไม่ได้ ใช้ลิงก์เชิญเพื่อนแทน' }, { status: 400 });
     }
     // Only a secured seat can be handed on. A pending hold is not yours yet,
     // and a cancelled one is nobody's.

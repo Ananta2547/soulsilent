@@ -27,6 +27,11 @@ type Row = {
   app_status?: string;
   waitlist_rank?: number | null;
   confirmed_at?: string | null;
+  /** Group booking (migration 056). */
+  group_size?: number | null;
+  parent_booking_id?: string | null;
+  booking_tier_label?: string | null;
+  group_claimed?: number;
 };
 type Finance = { gross: number; deduction: number; net: number };
 type Data = { workshop: Workshop; bookings: Row[]; finance: Finance };
@@ -324,7 +329,7 @@ export default function TeacherWorkshopDetail() {
               const map = parseMap(b.attendance_json);
               const expanded = openApps.has(b.id);
               return (
-                <div key={b.id} className="card card-static" style={{ padding: 0, border: '1.5px solid var(--cream-deep)', overflow: 'hidden' }}>
+                <div key={b.id} className="card card-static" style={{ padding: 0, border: '1.5px solid var(--cream-deep)', overflow: 'hidden', marginLeft: b.parent_booking_id ? 22 : 0 }}>
                   {/* Name header band — clearer separation per applicant */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '14px 16px', background: 'var(--cream)', borderBottom: '1px solid var(--cream-deep)' }}>
                     <span style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--teal)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
@@ -339,6 +344,18 @@ export default function TeacherWorkshopDetail() {
                           </span>
                         )}
                         <PdpaBadge applicationJson={b.application_json} lang={lang} />
+                        {(b.group_size || 1) > 1 && (
+                          <span style={{ fontSize: 11.5, fontWeight: 600, color: '#8a5a00', background: '#fcefcf', borderRadius: 999, padding: '2px 10px' }}>
+                            {tr(lang, `กลุ่ม ${b.group_size} คน · รับสิทธิ์แล้ว ${b.group_claimed || 0}/${(b.group_size || 1) - 1} · ว่าง ${(b.group_size || 1) - 1 - (b.group_claimed || 0)}`, `group of ${b.group_size} · ${b.group_claimed || 0}/${(b.group_size || 1) - 1} claimed · ${(b.group_size || 1) - 1 - (b.group_claimed || 0)} open`)}
+                            {b.booking_tier_label ? ` · ${b.booking_tier_label}` : ''}
+                          </span>
+                        )}
+                        {b.parent_booking_id && (
+                          <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--teal-deep)', background: 'var(--teal-50)', borderRadius: 999, padding: '2px 10px' }}>
+                            {tr(lang, 'สมาชิกกลุ่ม', 'Group member')}
+                            {(() => { const p = bookings.find((x) => x.id === b.parent_booking_id); return p ? ` · ${tr(lang, 'ของ', 'of')} ${applicantName(p.application_json, p.user_name)}` : ''; })()}
+                          </span>
+                        )}
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--muted)' }}>{b.user_email || '—'}</div>
                       {w.admission_type === 'selection' && b.app_status && (

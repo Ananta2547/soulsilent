@@ -12,7 +12,7 @@ import type { WorkshopMaster, Workshop } from '@/lib/types';
 import { Icon } from '@/components/design/Icon';
 import { useLoadingTracker } from '@/components/design/DataLoading';
 import type { PickableSession } from '@/components/workshops/SessionPickerModal';
-import { parseTiers } from '@/lib/pricing';
+import { parseTiers, tierDesc } from '@/lib/pricing';
 
 type Session = PickableSession;
 
@@ -127,7 +127,7 @@ export default function WorkshopInfoPage() {
               </span>
               {parseTiers(master.price_tiers_json).map((t) => (
                 <span key={t.id}>
-                  <span style={{ color: 'var(--muted)' }}>{t.label}{t.mode === 'round' ? tr(lang, ' (เหมารอบ)', ' (whole round)') : ''} </span>
+                  <span style={{ color: 'var(--muted)' }}>{t.label} ({tierDesc(t, lang)}) </span>
                   <b>฿{Math.round(t.price).toLocaleString()}</b>
                 </span>
               ))}

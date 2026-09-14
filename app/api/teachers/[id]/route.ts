@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { seatsHeldSubquery } from '@/lib/seats';
 import { getDB } from '@/lib/db';
 import { expireStaleHolds } from '@/lib/holds';
 import { roleSql } from '@/lib/roles';
@@ -36,7 +37,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         `SELECT w.id, w.master_id, w.title, w.date, w.end_date, w.workshop_type, w.dates_json,
                 w.time_start, w.time_end, w.image_url, w.price, w.max_participants, w.is_online,
                 l.name AS loc_name, l.province AS loc_province,
-                (SELECT COUNT(*) FROM bookings b WHERE b.workshop_id = w.id AND ${SEAT_TAKEN}) AS booked,
+                ${seatsHeldSubquery('w')} AS booked,
                 (SELECT COALESCE(SUM(CASE WHEN b.booking_kind = 'private' THEN 1 ELSE 0 END), 0)
                    FROM bookings b WHERE b.workshop_id = w.id AND ${SEAT_TAKEN}) AS private_taken
            FROM workshops w

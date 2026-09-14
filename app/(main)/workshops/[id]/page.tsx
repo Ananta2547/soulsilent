@@ -44,7 +44,11 @@ type UserBooking = {
   expires_at: string | null;
   app_status: string | null;
   application_json: string | null;
+  /** Group booking (migration 056): seats bought, or a member's parent. */
+  group_size?: number | null;
+  parent_booking_id?: string | null;
 };
+type GroupInvite = { url: string; size: number; claimed: number };
 type Instructor = {
   id: string;
   name: string;
@@ -78,6 +82,8 @@ function WorkshopDetailInner() {
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [bookingCount, setBookingCount] = useState(0);
   const [userBooking, setUserBooking] = useState<UserBooking | null>(null);
+  const [groupInvite, setGroupInvite] = useState<GroupInvite | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [userAttended, setUserAttended] = useState(false);
   const [userCompleted, setUserCompleted] = useState(false);
   const [userIncompleteReason, setUserIncompleteReason] = useState<string | null>(null);
@@ -95,7 +101,7 @@ function WorkshopDetailInner() {
   const [master, setMaster] = useState<WorkshopMaster | null>(null);
   const [siblings, setSiblings] = useState<PickableSession[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [chosen, setChosen] = useState<{ session: PickableSession; kind: BookingKind; tier: PriceTier } | null>(null);
+  const [chosen, setChosen] = useState<{ session: PickableSession; kind: BookingKind; tier: PriceTier; seats: number } | null>(null);
   const search = useSearchParams();
   const pickedDate = search.get('date');
   const [loginPromptOpen, setLoginPromptOpen] = useState(false);
@@ -134,6 +140,7 @@ function WorkshopDetailInner() {
             instructors?: Instructor[];
             bookingCount: number;
             userBooking: UserBooking | null;
+            groupInvite?: GroupInvite | null;
             userAttended?: boolean;
             userCompleted?: boolean;
             userIncompleteReason?: string | null;
@@ -152,6 +159,7 @@ function WorkshopDetailInner() {
           );
           setBookingCount(data.bookingCount || 0);
           setUserBooking(data.userBooking);
+          setGroupInvite(data.groupInvite || null);
           setUserAttended(!!data.userAttended);
           setUserCompleted(!!data.userCompleted);
           setUserIncompleteReason(data.userIncompleteReason ?? null);
@@ -220,7 +228,7 @@ function WorkshopDetailInner() {
       const res = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workshop_id: chosen.session.id, application, booking_kind: chosen.kind, tier_id: chosen.tier.id }),
+        body: JSON.stringify({ workshop_id: chosen.session.id, application, booking_kind: chosen.kind, tier_id: chosen.tier.id, group_size: chosen.seats }),
       });
       const data = (await res.json()) as BookingResult;
       if (!res.ok) {
@@ -1000,6 +1008,8 @@ function WorkshopDetailInner() {
                   onGift={handleGiftClick}
                   onTransfer={openTransferLink}
                   transferBusy={transferBusy}
+                  groupInvite={groupInvite}
+                  onInvite={() => setInviteOpen(true)}
                   onResume={resumePayment}
                   onReview={() => setReviewOpen(true)}
                   onViewApplication={() => setConsentOpen(true)}
@@ -1083,9 +1093,9 @@ function WorkshopDetailInner() {
           sessions={siblings}
           initialDate={pickedDate || workshop.date}
           onClose={() => setPickerOpen(false)}
-          onNext={(session, kind, tier) => {
+          onNext={(session, kind, tier, seats) => {
             setPickerOpen(false);
-            setChosen({ session, kind, tier });
+            setChosen({ session, kind, tier, seats });
           }}
         />
       )}
@@ -1097,7 +1107,8 @@ function WorkshopDetailInner() {
           onSubmit={submitChosen}
           bookingKind={chosen.kind}
           tierLabel={chosen.tier.id === 'seat' ? null : chosen.tier.label}
-          privatePrice={chosen.tier.id === 'seat' ? null : chosen.tier.price}
+          privatePrice={chosen.tier.id === 'seat' ? null : chosen.tier.mode === 'round' ? chosen.tier.price : chosen.tier.price * chosen.seats}
+          groupSeats={chosen.seats}
         />
       )}
 
@@ -1107,6 +1118,15 @@ function WorkshopDetailInner() {
           submitting={booking}
           onClose={() => setGiftOpen(false)}
           onSubmit={submitGift}
+        />
+      )}
+
+      {inviteOpen && groupInvite && (
+        <TransferLinkModal
+          url={groupInvite.url}
+          kind="invite"
+          invite={{ slots: Math.max(0, groupInvite.size - 1), claimed: groupInvite.claimed }}
+          onClose={() => setInviteOpen(false)}
         />
       )}
 
@@ -1176,6 +1196,8 @@ function BookingCardContent({
   onGift,
   onTransfer,
   transferBusy,
+  groupInvite,
+  onInvite,
   onResume,
   onReview,
   onViewApplication,
@@ -1193,6 +1215,9 @@ function BookingCardContent({
   onGift: () => void;
   onTransfer: () => void;
   transferBusy: boolean;
+  /** Set when this user's paid booking is a group: the link its members follow. */
+  groupInvite: GroupInvite | null;
+  onInvite: () => void;
   onResume: () => void;
   onReview: () => void;
   onViewApplication: () => void;
@@ -1457,7 +1482,26 @@ function BookingCardContent({
               pass on that the receiver could not book themselves — and only
               before the day: once the workshop is under way nobody could take
               it up, and the API refuses too. */}
-          {!started && !isFree && (
+          {/* A group: the link its members follow, with how many have come. */}
+          {groupInvite && (
+            <button
+              type="button"
+              onClick={onInvite}
+              className="btn btn-teal"
+              style={{ width: '100%', justifyContent: 'center', marginTop: 10, gap: 8 }}
+            >
+              {tr(lang, 'ลิงก์เชิญเพื่อน', 'Invite link')}
+              <span className="mono" style={{ fontSize: 12, opacity: 0.85 }}>
+                {groupInvite.claimed}/{Math.max(0, groupInvite.size - 1)}
+              </span>
+            </button>
+          )}
+          {userBooking?.parent_booking_id && (
+            <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '10px 0 0', textAlign: 'center' }}>
+              {tr(lang, 'ที่นั่งนี้เป็นส่วนหนึ่งของการจองกลุ่ม', 'This seat is part of a group booking')}
+            </p>
+          )}
+          {!started && !isFree && !groupInvite && !userBooking?.parent_booking_id && (
             <button
               type="button"
               onClick={onTransfer}

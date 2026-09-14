@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { seatsHeldSubquery } from '@/lib/seats';
 import { getDB } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
 import { expireStaleHolds } from '@/lib/holds';
@@ -33,7 +34,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
     const sessions = await db
       .prepare(
-        `SELECT w.*, (SELECT COUNT(*) FROM bookings b WHERE b.workshop_id = w.id AND ${SEAT_TAKEN}) AS booked,
+        `SELECT w.*, ${seatsHeldSubquery('w')} AS booked,
                 (SELECT COUNT(*) FROM bookings b WHERE b.workshop_id = w.id AND b.booking_kind = 'private' AND ${SEAT_TAKEN}) AS private_taken
          FROM workshops w
          WHERE w.master_id = ? AND w.status = 'active' AND w.date >= date('now')

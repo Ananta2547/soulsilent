@@ -11,11 +11,14 @@ export function TransferLinkModal({
   kind,
   recipient,
   onClose,
+  invite,
 }: {
   url: string;
-  kind: 'gift' | 'transfer';
+  kind: 'gift' | 'transfer' | 'invite';
   /** Who the buyer said the gift was for. Absent for a plain transfer. */
   recipient?: string | null;
+  /** Invite links: seats for friends, and how many are already taken. */
+  invite?: { slots: number; claimed: number };
   onClose: () => void;
 }) {
   const { lang } = useLang();
@@ -34,6 +37,7 @@ export function TransferLinkModal({
   }
 
   const isGift = kind === 'gift';
+  const isInvite = kind === 'invite';
 
   return (
     <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -48,15 +52,23 @@ export function TransferLinkModal({
         </button>
 
         <div className="mono" style={{ fontSize: 11, color: 'var(--teal)', letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: 10 }}>
-          {isGift ? tr(lang, 'ลิงก์ของขวัญ', 'Gift link') : tr(lang, 'ลิงก์โอนสิทธิ์', 'Transfer link')}
+          {isInvite ? tr(lang, 'ลิงก์เชิญเพื่อน', 'Invite link') : isGift ? tr(lang, 'ลิงก์ของขวัญ', 'Gift link') : tr(lang, 'ลิงก์โอนสิทธิ์', 'Transfer link')}
         </div>
         <h3 className="display-th" style={{ fontSize: 22, margin: '0 0 10px', lineHeight: 1.3 }}>
-          {isGift
-            ? tr(lang, 'ส่งลิงก์นี้ให้ผู้รับ', 'Send this link to the recipient')
-            : tr(lang, 'ส่งลิงก์นี้ให้เพื่อน', 'Send this link to your friend')}
+          {isInvite
+            ? tr(lang, 'ส่งลิงก์นี้ให้เพื่อนในกลุ่ม', 'Send this link to your group')
+            : isGift
+              ? tr(lang, 'ส่งลิงก์นี้ให้ผู้รับ', 'Send this link to the recipient')
+              : tr(lang, 'ส่งลิงก์นี้ให้เพื่อน', 'Send this link to your friend')}
         </h3>
         <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.6, margin: '0 0 18px' }}>
-          {recipient
+          {isInvite && invite
+            ? tr(
+                lang,
+                `เพื่อนแต่ละคนเข้าสู่ระบบและกรอกใบสมัครของตัวเอง — รับสิทธิ์แล้ว ${invite.claimed}/${invite.slots} คน${invite.claimed >= invite.slots ? ' ลิงก์ใช้ครบแล้ว' : ''}`,
+                `Each friend signs in and fills in their own application — ${invite.claimed}/${invite.slots} claimed${invite.claimed >= invite.slots ? ', the link is used up' : ''}.`,
+              )
+            : recipient
             ? tr(
                 lang,
                 `สำหรับ ${recipient} — ผู้รับต้องเข้าสู่ระบบและกรอกใบสมัครของตัวเองก่อน สิทธิ์จึงจะย้าย`,
@@ -93,10 +105,17 @@ export function TransferLinkModal({
         </div>
 
         <div style={{ background: '#fcefcf', border: '1px solid #f0dfae', borderRadius: 12, padding: '11px 14px', fontSize: 12.5, color: '#8a5a00', lineHeight: 1.6 }}>
-          <T
-            th="ลิงก์นี้ใช้ได้ครั้งเดียว — ใครก็ตามที่เปิดลิงก์และกดรับสิทธิ์จะได้ที่นั่งนี้ไป ส่งให้เฉพาะคนที่ตั้งใจเท่านั้น"
-            en="This link works once — whoever opens it and claims takes the seat. Send it only to the person you mean to."
-          />
+          {isInvite ? (
+            <T
+              th="ใครก็ตามที่เปิดลิงก์และกดรับสิทธิ์จะได้ที่นั่งในกลุ่มไป จนกว่าจะครบจำนวน — ส่งให้เฉพาะคนในกลุ่มเท่านั้น ลิงก์ใช้ได้จนถึงเวลาเริ่มรอบ"
+              en="Whoever opens the link and claims takes a seat in the group until they run out — send it only to your group. It works until the round starts."
+            />
+          ) : (
+            <T
+              th="ลิงก์นี้ใช้ได้ครั้งเดียว — ใครก็ตามที่เปิดลิงก์และกดรับสิทธิ์จะได้ที่นั่งนี้ไป ส่งให้เฉพาะคนที่ตั้งใจเท่านั้น"
+              en="This link works once — whoever opens it and claims takes the seat. Send it only to the person you mean to."
+            />
+          )}
         </div>
 
       </div>

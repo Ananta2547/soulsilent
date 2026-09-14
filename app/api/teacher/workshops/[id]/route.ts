@@ -36,6 +36,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       `SELECT b.id, b.user_id, b.amount, b.payment_status, b.status, b.attended,
               b.attendance_json, b.application_json, b.facilitator_note, b.created_at,
               b.app_status, b.waitlist_rank, b.confirmed_at,
+              b.group_size, b.parent_booking_id, b.booking_tier_label,
+              (SELECT COUNT(*) FROM bookings m WHERE m.parent_booking_id = b.id AND m.status != 'cancelled') AS group_claimed,
               us.name AS user_name, us.email AS user_email,
               sn.nickname AS teacher_nickname
          FROM bookings b
@@ -51,7 +53,18 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     .bind(workshop.instructor_id, id, workshop.admission_type || 'direct')
     .all();
 
-  const bookings = bookingsRes.results || [];
+  // Members sit right after the booking that brought them, so a group reads
+  // as one block on the roster.
+  type R = { id: string; parent_booking_id?: string | null; created_at?: string };
+  const raw = (bookingsRes.results || []) as R[];
+  const parents = raw.filter((r) => !r.parent_booking_id);
+  const members = raw.filter((r) => r.parent_booking_id);
+  const bookings: R[] = [];
+  for (const p of parents) {
+    bookings.push(p, ...members.filter((m) => m.parent_booking_id === p.id));
+  }
+  // Orphans (parent cancelled or missing) still show, at the end.
+  for (const m of members) if (!bookings.includes(m)) bookings.push(m);
   // Finance counts only money actually collected.
   const gross = bookings
     .filter((b) => {

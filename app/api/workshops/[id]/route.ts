@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getDB } from '@/lib/db';
+import { seatsOfRowSql } from '@/lib/seats';
+import { getDB, getEnv } from '@/lib/db';
 import { requireAdmin, getCurrentUser } from '@/lib/auth';
 import { expireStaleHolds } from '@/lib/holds';
 import {
@@ -77,7 +78,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     // Count "taken" seats: paid + holds that haven't expired yet
     const countResult = await db
       .prepare(
-        `SELECT COALESCE(SUM(CASE WHEN booking_kind = 'private' THEN ? ELSE 1 END), 0) as count
+        `SELECT COALESCE(SUM(${seatsOfRowSql('bookings', '?')}), 0) as count
          FROM bookings WHERE workshop_id = ?
          AND status != 'cancelled' AND (
            payment_status = 'paid' OR status = 'confirmed'
@@ -97,6 +98,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       expires_at: string | null;
       app_status: string | null;
       application_json: string | null;
+      group_size: number | null;
+      invite_token: string | null;
+      parent_booking_id: string | null;
+      group_claimed: number;
     } | null = null;
     const user = await getCurrentUser();
     if (user) {
@@ -105,7 +110,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
           // Surface a live booking OR a rejected one (which is cancelled) so the
           // page can show the "not selected — can't re-apply" state. Plain
           // abandoned/auto-cancelled holds stay hidden (user may book again).
-          `SELECT id, status, payment_status, expires_at, app_status, application_json FROM bookings
+          `SELECT id, status, payment_status, expires_at, app_status, application_json,
+                  group_size, invite_token, parent_booking_id,
+                  (SELECT COUNT(*) FROM bookings m WHERE m.parent_booking_id = bookings.id AND m.status != 'cancelled') AS group_claimed
+             FROM bookings
            WHERE workshop_id = ? AND user_id = ? AND (status != 'cancelled' OR app_status = 'rejected')
            ORDER BY created_at DESC LIMIT 1`
         )
@@ -117,6 +125,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
           expires_at: string | null;
           app_status: string | null;
           application_json: string | null;
+          group_size: number | null;
+          invite_token: string | null;
+          parent_booking_id: string | null;
+          group_claimed: number;
         }>();
     }
 
@@ -170,11 +182,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       // signed-out visitors and users with a pending hold — gets it stripped,
       // so the URL never reaches a browser that shouldn't have it.
       workshop: { ...workshop, online_url: mayJoinOnline ? workshop.online_url : null },
+      // The invite link exists from the moment the group is booked, but is
+      // only handed out once the seats are actually paid for.
+      groupInvite:
+        userBooking && mayJoinOnline && (userBooking.group_size || 1) > 1 && userBooking.invite_token && !userBooking.parent_booking_id
+          ? { url: `${(await getEnv()).SITE_URL || 'http://localhost:3000'}/invite/${userBooking.invite_token}`, size: userBooking.group_size, claimed: userBooking.group_claimed }
+          : null,
       location,
       instructor,
       instructors,
       bookingCount: countResult?.count || 0,
-      userBooking,
+      userBooking: userBooking ? { ...userBooking, invite_token: undefined } : null,
       userAttended,
       userCompleted,
       userIncompleteReason,

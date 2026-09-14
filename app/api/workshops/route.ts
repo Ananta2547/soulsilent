@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { seatsOfRowSql } from '@/lib/seats';
 import { v4 as uuid } from 'uuid';
 import { getDB } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
@@ -54,7 +55,7 @@ export async function GET(request: Request) {
     // admin flag still gates other admin-only concerns but no longer this.
     const countSelect =
       // A private booking took the whole round, so it counts as every seat.
-      ", (SELECT COALESCE(SUM(CASE WHEN bookings.booking_kind = 'private' THEN workshops.max_participants ELSE 1 END), 0) FROM bookings WHERE bookings.workshop_id = workshops.id AND bookings.status != 'cancelled' AND bookings.payment_status != 'expired') AS booking_count";
+      `, (SELECT COALESCE(SUM(${seatsOfRowSql('bookings', 'workshops.max_participants')}), 0) FROM bookings WHERE bookings.workshop_id = workshops.id AND bookings.status != 'cancelled' AND bookings.payment_status != 'expired') AS booking_count`;
     // Join the linked location so cards can format "name-province, district"
     // without a second round-trip (public read of name/province/district only).
     let query = `SELECT workshops.*, l.name AS loc_name, l.province AS loc_province, l.district AS loc_district, m.kind AS master_kind${countSelect}
