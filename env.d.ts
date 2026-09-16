@@ -14,6 +14,9 @@ declare global {
     EMAIL_FROM: string;
     /** Shared secret guarding the cron sweep endpoint (/api/cron/expire-holds). */
     CRON_SECRET: string;
+    /** Shared key guarding the read-only finance export (/api/export/finance).
+     *  Also salts the customer pseudonyms in that export. */
+    FINANCE_EXPORT_KEY?: string;
     /** Beam Checkout merchant id, e.g. "allsoullearn-xxxxxx". Not secret. */
     BEAM_MERCHANT_ID: string;
     /** Beam API key. Playground and production keys are NOT interchangeable. */

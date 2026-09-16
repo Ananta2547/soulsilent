@@ -50,6 +50,8 @@ bucket_name = "soulsilent-preview-media"
 #   - GOOGLE_CLIENT_SECRET
 #   - RESEND_API_KEY
 #   - CRON_SECRET           (only if a preview cron is ever added)
+#   - FINANCE_EXPORT_KEY    (wrangler secret put FINANCE_EXPORT_KEY) — read-only
+#                           finance export /api/export/finance; long random string
 [vars]
 GOOGLE_CLIENT_ID = "798833181382-0sf30qcflhmpo6sepoke9i8ojab71fbp.apps.googleusercontent.com"
 # Beam merchant identifier — not a secret (the API key and the webhook HMAC key

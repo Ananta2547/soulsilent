@@ -51,6 +51,8 @@ custom_domain = true
 #     signing key of the webhook endpoint registered for THIS site. Production
 #     and preview are separate endpoints with separate keys; a booking confirmed
 #     by the wrong key is a booking never confirmed at all.
+#   - FINANCE_EXPORT_KEY    (wrangler secret put FINANCE_EXPORT_KEY) — read-only
+#                           finance export /api/export/finance; long random string
 [vars]
 GOOGLE_CLIENT_ID = "798833181382-0sf30qcflhmpo6sepoke9i8ojab71fbp.apps.googleusercontent.com"
 SITE_URL = "https://allsoullearn.com"
