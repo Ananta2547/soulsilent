@@ -7,7 +7,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useLang, T, tr } from '@/lib/i18n';
 import type { Workshop } from '@/lib/types';
-import { getWorkshopDays, hasWorkshopEnded } from '@/lib/workshop-utils';
+import { getWorkshopDays } from '@/lib/workshop-utils';
 import { PdpaBadge } from '@/components/workshops/PdpaBadge';
 import { FacilitatorNote } from '@/components/admin/FacilitatorNote';
 import { applicantName } from '@/lib/applicant';
@@ -60,7 +60,7 @@ function appStatusStyle(s: string): { background: string; color: string } {
   return { background: 'var(--cream-deep)', color: 'var(--muted)' };
 }
 
-function chipStyle(active: boolean, tone: 'green' | 'red', ended: boolean): React.CSSProperties {
+function chipStyle(active: boolean, tone: 'green' | 'red'): React.CSSProperties {
   const bg = tone === 'green' ? 'var(--teal)' : '#d35d52';
   return {
     fontSize: 12.5,
@@ -68,8 +68,7 @@ function chipStyle(active: boolean, tone: 'green' | 'red', ended: boolean): Reac
     borderRadius: 999,
     padding: '6px 14px',
     border: 0,
-    cursor: ended ? 'not-allowed' : 'pointer',
-    opacity: ended ? 0.55 : 1,
+    cursor: 'pointer',
     background: active ? bg : 'var(--cream)',
     color: active ? '#fff' : 'var(--muted)',
   };
@@ -123,7 +122,6 @@ export default function TeacherWorkshopDetail() {
 
   const { workshop: w, bookings, finance } = data;
   const days = getWorkshopDays(w);
-  const ended = hasWorkshopEnded(w);
 
   async function setDay(bookingId: string, dayIndex: number, value: number | null) {
     const key = `${bookingId}:${dayIndex}`;
@@ -312,11 +310,6 @@ export default function TeacherWorkshopDetail() {
             <T th="ผู้เข้าร่วม" en="Participants" />
           </h2>
           <span style={{ fontSize: 13, color: 'var(--muted)' }}>· {bookings.length} {tr(lang, 'คน', 'people')}</span>
-          {ended && (
-            <span style={{ fontSize: 12, color: '#9a4a3f', background: '#f6e7e4', borderRadius: 999, padding: '3px 10px' }}>
-              🔒 {tr(lang, 'ปิดการเช็คชื่อ (จบแล้ว)', 'Check-in locked (ended)')}
-            </span>
-          )}
         </div>
 
         {bookings.length === 0 ? (
@@ -428,10 +421,10 @@ export default function TeacherWorkshopDetail() {
                             <span style={{ fontSize: 12.5, color: 'var(--muted)', minWidth: 56, fontWeight: 600 }}>
                               {tr(lang, `วันที่ ${di + 1}`, `Day ${di + 1}`)}
                             </span>
-                            <button type="button" disabled={ended || busy} onClick={() => setDay(b.id, di, present ? null : 1)} style={chipStyle(present, 'green', ended)}>
+                            <button type="button" disabled={busy} onClick={() => setDay(b.id, di, present ? null : 1)} style={chipStyle(present, 'green')}>
                               {tr(lang, 'มา', 'In')}
                             </button>
-                            <button type="button" disabled={ended || busy} onClick={() => setDay(b.id, di, absent ? null : 0)} style={chipStyle(absent, 'red', ended)}>
+                            <button type="button" disabled={busy} onClick={() => setDay(b.id, di, absent ? null : 0)} style={chipStyle(absent, 'red')}>
                               {tr(lang, 'ไม่มา', 'Out')}
                             </button>
                           </div>

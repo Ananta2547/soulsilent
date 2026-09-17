@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 import { getCurrentUserWithRoles } from '@/lib/auth';
 import { hasAnyRole } from '@/lib/roles';
-import { hasWorkshopEnded, canAccessTeacherDashboard } from '@/lib/workshop-utils';
+import { canAccessTeacherDashboard } from '@/lib/workshop-utils';
 import type { Workshop } from '@/lib/types';
 
 // PUT /api/teacher/bookings/[id] — per-day check-in by the owning teacher.
@@ -54,9 +54,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (!u.roles.includes('admin') && !canAccessTeacherDashboard(row, u.sub)) {
     return NextResponse.json({ error: 'ไม่มีสิทธิ์' }, { status: 403 });
   }
-  if (hasWorkshopEnded(row)) {
-    return NextResponse.json({ error: 'กิจกรรมจบแล้ว — ปิดการเช็คชื่อ' }, { status: 409 });
-  }
+  // No cut-off after the workshop ends: teachers fix the roster days later.
 
   let map: Record<string, number> = {};
   try {
