@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useLang, T, tr } from '@/lib/i18n';
 import { Btn } from '@/components/design/RippleButton';
+import { AllSoulLearnLogo } from '@/components/layout/AllSoulLearnLogo';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -76,49 +77,8 @@ export default function RegisterPage() {
     >
       <div style={{ width: '100%', maxWidth: 440 }}>
         <div style={{ textAlign: 'center', marginBottom: 22 }}>
-          <Link
-            href="/"
-            style={{
-              display: 'inline-flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 12,
-              textDecoration: 'none',
-              color: 'var(--ink)',
-            }}
-          >
-            <span
-              style={{
-                width: 56,
-                height: 56,
-                borderRadius: '50%',
-                background: 'var(--teal)',
-                color: '#fff',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontFamily: 'Mitr',
-                fontWeight: 600,
-                fontSize: 26,
-                position: 'relative',
-              }}
-            >
-              s
-              <span
-                style={{
-                  position: 'absolute',
-                  top: -4,
-                  right: -4,
-                  width: 12,
-                  height: 12,
-                  background: 'var(--accent)',
-                  borderRadius: '50%',
-                }}
-              />
-            </span>
-            <span style={{ fontFamily: 'Mitr', fontWeight: 500, fontSize: 22 }}>
-              soulsilent<span style={{ color: 'var(--teal)' }}>.</span>
-            </span>
+          <Link href="/" aria-label="AllSoulLearn" style={{ display: 'inline-block' }}>
+            <AllSoulLearnLogo height={30} />
           </Link>
         </div>
 
