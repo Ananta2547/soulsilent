@@ -59,14 +59,13 @@ export async function GET() {
     const db = await getDB();
     const teachersRes = await db
       .prepare(
-        `SELECT u.id, u.name, u.nickname, u.avatar_url, u.bio
+        `SELECT u.id, u.name, u.nickname, u.avatar_url, u.bio, u.role
            FROM users u
           WHERE ${roleSql('u', 'teacher')}
-            AND u.role != 'admin'
             AND (u.account_status IS NULL OR u.account_status = 'active')
           ORDER BY u.name ASC`,
       )
-      .all<{ id: string; name: string; nickname: string | null; avatar_url: string | null; bio: string | null }>();
+      .all<{ id: string; name: string; nickname: string | null; avatar_url: string | null; bio: string | null; role: string }>();
     const teachers = teachersRes.results || [];
     if (teachers.length === 0) {
       return NextResponse.json({ teachers: [], stats: { makers: 0, rounds: 0, people: 0 } });
@@ -123,7 +122,9 @@ export async function GET() {
       }
     }
 
-    const cards: TeacherCard[] = teachers.map((t) => {
+    // Admins pass roleSql, but they only belong on the makers page when they
+    // actually lead a workshop of their own; the other admins stay off it.
+    const cards: TeacherCard[] = teachers.filter((t) => t.role !== 'admin' || byTeacher.has(t.id)).map((t) => {
       const mine = byTeacher.get(t.id) || [];
       const open = mine.filter((w) => w.date >= today);
       const past = mine.filter((w) => w.date < today);
