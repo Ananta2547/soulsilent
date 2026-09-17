@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server';
-import { seatsHeldSubquery } from '@/lib/seats';
+import { seatsHeldSubquery, seatsOfRowSql } from '@/lib/seats';
 import { getDB } from '@/lib/db';
 import { expireStaleHolds } from '@/lib/holds';
 import { roleSql } from '@/lib/roles';
+import { getCurrentUserWithRoles } from '@/lib/auth';
+import { parseTeacherProfile, type TeacherProfile } from '@/lib/teacher-profile';
 
-/* Public profile of a teacher: who they are, and every round they run from
+/* Public profile of a teacher: who they are, what they wrote about
+ * themselves, the workshops they have run, and every round they run from
  * today on — the rows the profile page's calendar lights up. Only fields a
- * visitor may see leave here. */
+ * visitor may see leave here. `can_edit` is true for the teacher themself
+ * and for admins, so the page can offer the in-place editor. */
 
 const SEAT_TAKEN = `
   b.status != 'cancelled' AND (
@@ -14,28 +18,52 @@ const SEAT_TAKEN = `
     OR (b.payment_status = 'pending' AND b.expires_at IS NOT NULL AND datetime(b.expires_at) > datetime('now'))
   )`;
 
+/** Rounds this teacher leads: listed as an instructor on the row, or
+ *  organizer of the master the row belongs to. Binds the id three times. */
+const MINE = `(
+  w.instructor_id = ?
+  OR EXISTS (SELECT 1 FROM json_each(COALESCE(w.instructor_ids_json, '[]')) WHERE json_each.value = ?)
+  OR m.organizer = ?
+)`;
+
+export type TeacherPublic = {
+  id: string;
+  name: string;
+  nickname: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  /** Workshop categories they have taught, most frequent first. */
+  crafts: string[];
+  profile: TeacherProfile;
+  /** Rounds already held and people who sat in them (collected seats). */
+  hosted: number;
+  joined: number;
+  /** Distinct workshops, open ones first then the newest past ones. */
+  works: { id: string; title: string; image_url: string | null }[];
+};
+
+type WorkRow = { id: string; title: string; image_url: string | null; category: string | null };
+
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const db = await getDB();
     await expireStaleHolds(db);
 
-    const teacher = await db
+    const row = await db
       .prepare(
-        `SELECT u.id, u.name, u.nickname, u.avatar_url, u.cover_image_url, u.bio
+        `SELECT u.id, u.name, u.nickname, u.avatar_url, u.bio, u.teacher_profile_json
            FROM users u
           WHERE u.id = ? AND ${roleSql('u', 'teacher')} AND (u.account_status IS NULL OR u.account_status = 'active')`
       )
       .bind(id)
-      .first<{ id: string; name: string; nickname: string | null; avatar_url: string | null; cover_image_url: string | null; bio: string | null }>();
-    if (!teacher) return NextResponse.json({ error: 'ไม่พบผู้สอน' }, { status: 404 });
+      .first<{ id: string; name: string; nickname: string | null; avatar_url: string | null; bio: string | null; teacher_profile_json: string | null }>();
+    if (!row) return NextResponse.json({ error: 'ไม่พบผู้สอน' }, { status: 404 });
 
-    // Rounds they lead: listed as an instructor on the row, or organizer of
-    // the master the row belongs to.
     const rounds = await db
       .prepare(
         `SELECT w.id, w.master_id, w.title, w.date, w.end_date, w.workshop_type, w.dates_json,
-                w.time_start, w.time_end, w.image_url, w.price, w.max_participants, w.is_online,
+                w.time_start, w.time_end, w.image_url, w.price, w.max_participants, w.is_online, w.category,
                 l.name AS loc_name, l.province AS loc_province,
                 ${seatsHeldSubquery('w')} AS booked,
                 (SELECT COALESCE(SUM(CASE WHEN b.booking_kind = 'private' THEN 1 ELSE 0 END), 0)
@@ -43,19 +71,63 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
            FROM workshops w
            LEFT JOIN locations l ON l.id = w.location_id
            LEFT JOIN workshop_masters m ON m.id = w.master_id
-          WHERE w.status = 'active'
-            AND w.date >= date('now')
-            AND (
-              w.instructor_id = ?
-              OR EXISTS (SELECT 1 FROM json_each(COALESCE(w.instructor_ids_json, '[]')) WHERE json_each.value = ?)
-              OR m.organizer = ?
-            )
+          WHERE w.status = 'active' AND w.date >= date('now') AND ${MINE}
           ORDER BY w.date ASC, w.time_start ASC`
       )
       .bind(id, id, id)
       .all();
 
-    return NextResponse.json({ teacher, rounds: rounds.results || [] });
+    // Everything they have already run, for the works rail, the crafts and
+    // the "rounds hosted" number. Newest first.
+    const past = await db
+      .prepare(
+        `SELECT w.id, w.title, w.image_url, w.category
+           FROM workshops w
+           LEFT JOIN workshop_masters m ON m.id = w.master_id
+          WHERE w.status = 'active' AND w.date < date('now') AND ${MINE}
+          ORDER BY w.date DESC`
+      )
+      .bind(id, id, id)
+      .all<WorkRow>();
+
+    const joined = await db
+      .prepare(
+        `SELECT COALESCE(SUM(${seatsOfRowSql('b', 'w.max_participants')}), 0) AS n
+           FROM bookings b
+           JOIN workshops w ON w.id = b.workshop_id
+           LEFT JOIN workshop_masters m ON m.id = w.master_id
+          WHERE w.status = 'active' AND ${MINE}
+            AND b.status != 'cancelled' AND (b.payment_status = 'paid' OR b.status = 'confirmed')`
+      )
+      .bind(id, id, id)
+      .first<{ n: number }>();
+
+    const open = (rounds.results || []) as unknown as WorkRow[];
+    const pastRows = past.results || [];
+    const craftCount = new Map<string, number>();
+    [...open, ...pastRows].forEach((w) => w.category && craftCount.set(w.category, (craftCount.get(w.category) || 0) + 1));
+    const seen = new Set<string>();
+    const works = [...open, ...pastRows]
+      .filter((w) => (seen.has(w.title) ? false : (seen.add(w.title), true)))
+      .slice(0, 8)
+      .map((w) => ({ id: w.id, title: w.title, image_url: w.image_url }));
+
+    const me = await getCurrentUserWithRoles();
+    const can_edit = !!me && (me.sub === id || me.roles.includes('admin'));
+
+    const teacher: TeacherPublic = {
+      id: row.id,
+      name: row.name,
+      nickname: row.nickname,
+      avatar_url: row.avatar_url,
+      bio: row.bio,
+      crafts: [...craftCount.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c),
+      profile: parseTeacherProfile(row.teacher_profile_json),
+      hosted: pastRows.length,
+      joined: Number(joined?.n) || 0,
+      works,
+    };
+    return NextResponse.json({ teacher, rounds: rounds.results || [], can_edit });
   } catch (error) {
     console.error('Teacher profile error:', error);
     return NextResponse.json({ error: 'เกิดข้อผิดพลาด' }, { status: 500 });
