@@ -1707,33 +1707,43 @@ function LoginPromptModal({
   lang: 'th' | 'en';
 }) {
   const q = `redirect=${encodeURIComponent(redirectTo)}`;
+  const th = lang === 'th';
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
+    <div
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(13,30,29,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}
+    >
+      <div role="dialog" aria-modal="true" style={{ width: '100%', maxWidth: 420, background: 'var(--paper)', borderRadius: 28, boxShadow: '0 30px 70px -22px rgba(13,30,29,.5)', overflow: 'hidden', position: 'relative' }}>
         <button
           type="button"
           onClick={onClose}
           aria-label={tr(lang, 'ปิด', 'Close')}
-          style={{ position: 'absolute', top: 16, right: 18, background: 'none', border: 0, fontSize: 22, lineHeight: 1, color: 'var(--muted)', cursor: 'pointer' }}
+          style={{ position: 'absolute', top: 18, right: 18, background: 'var(--cream)', border: 0, width: 32, height: 32, borderRadius: '50%', fontSize: 19, color: 'var(--ink)', cursor: 'pointer', lineHeight: 1 }}
         >
           ×
         </button>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--teal)', letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: 10 }}>
-          {tr(lang, 'ต้องเข้าสู่ระบบก่อน', 'Sign in required')}
-        </div>
-        <h3 className="display-th" style={{ fontSize: 22, margin: '0 0 12px', lineHeight: 1.3 }}>
-          {tr(lang, 'เข้าสู่ระบบเพื่อจองที่นั่ง', 'Sign in to book a seat')}
-        </h3>
-        <p style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.6, margin: '0 0 24px' }}>
-          {tr(lang, 'กรุณาเข้าสู่ระบบหรือสมัครสมาชิกก่อน เพื่อดำเนินการจองและกรอกใบสมัคร', 'Please sign in or create an account to continue with your booking.')}
-        </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <Link href={`/auth/login?${q}`} className="btn btn-teal" style={{ width: '100%', justifyContent: 'center', fontSize: 15, padding: '14px 22px' }}>
-            {tr(lang, 'เข้าสู่ระบบ', 'Sign in')} <span className="mono">→</span>
-          </Link>
-          <Link href={`/auth/register?${q}`} className="btn" style={{ width: '100%', justifyContent: 'center', background: 'var(--cream)', color: 'var(--ink)', fontSize: 14, padding: '13px 22px' }}>
-            {tr(lang, 'สมัครสมาชิก', 'Create an account')}
-          </Link>
+        <div style={{ padding: '30px 26px 24px' }}>
+          <div className="mono" style={{ fontSize: 9.5, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--teal-deep)' }}>
+            {tr(lang, 'ต้องเข้าสู่ระบบก่อน', 'Sign in required')}
+          </div>
+          <h2 className="display-th" style={{ fontSize: 25, margin: '9px 0 0', lineHeight: 1.22 }}>
+            {th ? <>เก็บที่นั่งนี้ไว้<br />ในชื่อของคุณ</> : <>Keep this seat<br />under your name</>}
+          </h2>
+          <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.65, margin: '10px 0 20px' }}>
+            {tr(lang, 'ใบสมัครจะกรอกให้อัตโนมัติจากโปรไฟล์ และดูสถานะการจองได้ทุกเมื่อ', 'Your application fills itself in from your profile, and you can check your booking any time.')}
+          </p>
+          <div style={{ background: 'var(--cream)', borderRadius: 18, padding: '14px 16px', marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 9 }}>
+            <span style={{ display: 'flex', gap: 9, fontSize: 13, color: 'var(--ink)', lineHeight: 1.5 }}><span style={{ color: 'var(--teal)' }}>✓</span>{tr(lang, 'กรอกข้อมูลครั้งเดียว ใช้กับทุกกิจกรรม', 'Fill in your details once, use them for every activity')}</span>
+            <span style={{ display: 'flex', gap: 9, fontSize: 13, color: 'var(--ink)', lineHeight: 1.5 }}><span style={{ color: 'var(--teal)' }}>✓</span>{tr(lang, 'ติดตามสถานะและใบเสร็จได้ในหน้าการจอง', 'Track status and receipts on your bookings page')}</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+            <Link href={`/auth/login?${q}`} className="btn btn-teal" style={{ width: '100%', justifyContent: 'center', boxSizing: 'border-box' }}>
+              {tr(lang, 'เข้าสู่ระบบ', 'Sign in')} <span className="mono">→</span>
+            </Link>
+            <Link href={`/auth/register?${q}`} className="btn btn-paper" style={{ width: '100%', justifyContent: 'center', boxSizing: 'border-box', background: 'var(--cream)' }}>
+              {tr(lang, 'สมัครสมาชิก', 'Create an account')}
+            </Link>
+          </div>
         </div>
       </div>
     </div>

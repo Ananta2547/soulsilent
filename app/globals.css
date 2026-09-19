@@ -3857,22 +3857,54 @@ body {
   .tp2-cell-time { display: none; }
 }
 
-/* Session picker (workshop-info booking step 1) */
-.sp-backdrop { position: fixed; inset: 0; z-index: 1000; background: rgba(13,30,29,.45); display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; }
-.sp-box { width: 100%; max-width: 760px; background: var(--paper); border-radius: 22px; box-shadow: 0 30px 80px -24px rgba(13,30,29,.5); overflow: hidden; }
-.sp-head { padding: 18px 22px; border-bottom: 1px solid var(--cream-deep); display: flex; align-items: center; gap: 12px; }
-.sp-head > div:first-child { flex: 1; }
-.sp-close { background: none; border: 0; font-size: 24px; color: var(--muted); cursor: pointer; line-height: 1; }
-.sp-body { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 22px; padding: 20px 22px; max-height: 62vh; overflow-y: auto; }
-.sp-label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; font-family: var(--mono, monospace); }
-.sp-round, .sp-kind { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; border: 1.5px solid var(--cream-deep); cursor: pointer; background: var(--paper); }
-.sp-round.on, .sp-kind.on { border-color: var(--teal); background: var(--teal-50); }
-.sp-round.full, .sp-kind.off { opacity: .55; cursor: not-allowed; }
-.sp-foot { padding: 14px 22px; border-top: 1px solid var(--cream-deep); display: flex; align-items: center; gap: 10px; }
+/* Session picker (workshop-info booking step 1) — "Application Popups" 2b */
+.sp2-backdrop { position: fixed; inset: 0; z-index: 1000; background: rgba(13,30,29,.55); display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; }
+.sp2-box { width: 100%; max-width: 640px; background: var(--paper); border-radius: 28px; box-shadow: 0 24px 60px -20px rgba(13,30,29,.4); overflow: hidden; }
+.sp2-head { padding: 22px 26px 0; display: flex; align-items: flex-start; gap: 12px; }
+.sp2-eyebrow { font-size: 10.5px; color: var(--teal-deep); letter-spacing: .14em; text-transform: uppercase; }
+.sp2-close { background: var(--cream); border: 0; width: 34px; height: 34px; border-radius: 50%; font-size: 20px; color: var(--ink); cursor: pointer; line-height: 1; flex-shrink: 0; }
+.sp2-body { padding: 20px 26px 0; display: flex; flex-direction: column; gap: 22px; }
+.sp2-cal { border-radius: 22px; padding: 4px 2px 2px; user-select: none; }
+.sp2-cal .mp-head { align-items: flex-end; margin-bottom: 14px; }
+.sp2-cal .mp-month { font-family: var(--font-display-th); font-weight: 500; font-size: 22px; line-height: 1; order: -1; margin-right: auto; }
+.sp2-cal .mp-nav { width: 32px; height: 32px; border: 0; background: var(--cream); font-size: 17px; margin-left: 6px; }
+.sp2-cal .mp-dow { padding-bottom: 8px; border-bottom: 1px solid rgba(13,30,29,.08); margin-bottom: 8px; }
+.sp2-cal .mp-dow span { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .1em; }
+.sp2-cal .mp-day { aspect-ratio: auto; height: 54px; border-radius: 16px; }
+.sp2-cal .mp-day.has .mp-num { font-size: 15px; font-weight: 600; }
+.sp2-cal .mp-day.on { box-shadow: 0 10px 22px -12px rgba(13,138,126,.9); }
+.sp2-cal .mp-day.on .mp-num { font-weight: 700; }
+.sp2-cal .mp-mark { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: .06em; font-weight: 400; color: var(--teal); }
+.sp2-cal .mp-day.on .mp-mark { color: var(--accent); }
+.sp2-cal .mp-mark::after { content: ' รอบ'; }
+.sp2-legend { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin: 12px 2px 0; }
+.sp2-legend span { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
+.sp2-legend i { width: 14px; height: 14px; border-radius: 5px; display: inline-block; }
+.sp2-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+.sp2-round { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 18px; background: var(--cream); cursor: pointer; }
+.sp2-round input { position: absolute; opacity: 0; pointer-events: none; }
+.sp2-round.on { background: var(--teal-50); box-shadow: inset 0 0 0 2px var(--teal); }
+.sp2-round.full { cursor: not-allowed; opacity: .55; }
+.sp2-seg { display: flex; flex-wrap: wrap; gap: 6px; background: var(--cream); border-radius: 999px; padding: 4px; margin-bottom: 12px; }
+.sp2-seg button { flex: 1; border: 0; border-radius: 999px; background: transparent; color: var(--ink); font: inherit; font-size: 12.5px; font-weight: 600; padding: 9px 6px; cursor: pointer; white-space: nowrap; }
+.sp2-seg button.on { background: var(--paper); color: var(--teal-deep); font-weight: 700; box-shadow: 0 4px 12px -6px rgba(13,30,29,.25); }
+.sp2-seg button:disabled { color: var(--muted); cursor: not-allowed; opacity: .5; }
+.sp2-tier { background: var(--teal-50); border-radius: 18px; padding: 14px 16px; }
+.sp2-stepper { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--teal-100); }
+.sp2-stepper-ctl { display: flex; align-items: center; background: var(--paper); border-radius: 999px; padding: 3px; margin-left: auto; }
+.sp2-stepper-ctl button { width: 30px; height: 30px; border: 0; border-radius: 50%; background: var(--cream); color: var(--ink); font-size: 17px; line-height: 1; cursor: pointer; }
+.sp2-stepper-ctl button.plus { background: var(--teal); color: #fff; }
+.sp2-stepper-ctl button:disabled { opacity: .4; cursor: not-allowed; }
+.sp2-stepper-ctl > span { min-width: 34px; text-align: center; font-size: 17px; }
+.sp2-foot { margin-top: 22px; padding: 18px 26px; background: var(--cream); display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 @media (max-width: 640px) {
-  .sp-backdrop { padding: 12px; align-items: flex-end; }
-  .sp-body { grid-template-columns: 1fr; max-height: 68vh; }
-  .sp-box { border-radius: 18px; }
+  .sp2-backdrop { padding: 12px; align-items: flex-end; }
+  .sp2-box { border-radius: 22px; }
+  .sp2-head { padding: 18px 18px 0; }
+  .sp2-body { padding: 16px 18px 0; }
+  .sp2-cols { grid-template-columns: 1fr; }
+  .sp2-cal .mp-day { height: 46px; }
+  .sp2-foot { padding: 16px 18px; }
 }
 
 /* Teacher workshops: list / check-in calendar switch */
