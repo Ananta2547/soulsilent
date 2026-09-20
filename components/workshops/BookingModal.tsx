@@ -876,7 +876,7 @@ function Shell({ children, onClose, maxWidth, paper, top }: { children: React.Re
       }}
       style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(13,30,29,.55)', display: 'flex', alignItems: top ? 'flex-start' : 'center', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}
     >
-      <div role="dialog" aria-modal="true" style={{ width: '100%', maxWidth, background: paper ? 'var(--paper)' : 'var(--cream)', borderRadius: 28, boxShadow: '0 30px 70px -22px rgba(13,30,29,.5)', overflow: 'hidden', position: 'relative' }}>
+      <div role="dialog" aria-modal="true" className="pop-mitr" style={{ width: '100%', maxWidth, background: paper ? 'var(--paper)' : 'var(--cream)', borderRadius: 28, boxShadow: '0 30px 70px -22px rgba(13,30,29,.5)', overflow: 'hidden', position: 'relative' }}>
         {children}
       </div>
     </div>

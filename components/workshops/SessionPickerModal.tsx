@@ -124,7 +124,7 @@ export function SessionPickerModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="sp2-box" role="dialog" aria-modal="true" aria-label={tr(lang, 'เลือกรอบ', 'Choose a round')}>
+      <div className="sp2-box pop-mitr" role="dialog" aria-modal="true" aria-label={tr(lang, 'เลือกรอบ', 'Choose a round')}>
         <div className="sp2-head">
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="mono sp2-eyebrow">{tr(lang, 'เลือกรอบ · 3 ขั้น', 'Choose a round · 3 steps')}</div>
@@ -136,14 +136,9 @@ export function SessionPickerModal({
         <div className="sp2-body">
           {/* 01 — day */}
           <div>
-            <div className="mono sp2-eyebrow" style={{ marginBottom: 10 }}>01 — {tr(lang, 'วัน', 'Day')} · {tr(lang, `${days.size} วันเปิดรอบ`, `${days.size} days with rounds`)}</div>
+            <div className="mono sp2-eyebrow" style={{ marginBottom: 10 }}>01 — {tr(lang, 'วัน', 'Day')}</div>
             <div className="sp2-cal">
-              <MonthPicker value={day} onChange={setDay} enabled={days} marks={marks} initialMonth={open[0]?.date} />
-            </div>
-            <div className="sp2-legend">
-              <span><i style={{ background: 'var(--teal-50)' }} />{tr(lang, 'วันที่เปิดรอบ', 'Has a round')}</span>
-              <span><i style={{ background: 'var(--teal)' }} />{tr(lang, 'วันที่คุณเลือก', 'Your pick')}</span>
-              <span style={{ opacity: 0.7 }}><i style={{ background: 'var(--cream)' }} />{tr(lang, 'ไม่มีรอบ', 'No round')}</span>
+              <MonthPicker value={day} onChange={setDay} enabled={days} marks={marks} initialMonth={open[0]?.date} sub={tr(lang, `${days.size} วันเปิดรอบ`, `${days.size} days with rounds`)} />
             </div>
           </div>
 

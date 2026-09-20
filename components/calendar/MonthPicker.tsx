@@ -26,6 +26,7 @@ export function MonthPicker({
   marks,
   initialMonth,
   multi,
+  sub,
 }: {
   /** Selected day, or null. */
   value: string | null;
@@ -41,6 +42,9 @@ export function MonthPicker({
   /** Extra days drawn as selected — for picking several at once. The caller
    *  toggles membership in onChange. */
   multi?: string[];
+  /** A note drawn under the month name next to the year, e.g. "5 วันเปิดรอบ".
+   *  Turns the header into a two-line title with the arrows on the right. */
+  sub?: string;
 }) {
   const { lang } = useLang();
   const enabledSet = enabled ? (enabled instanceof Set ? enabled : new Set(enabled)) : null;
@@ -65,19 +69,36 @@ export function MonthPicker({
     const d = new Date(cursor.y, cursor.m + delta, 1);
     setCursor({ y: d.getFullYear(), m: d.getMonth() });
   };
-  const monthLabel = lang === 'th' ? `${TH_MONTHS[cursor.m]} ${cursor.y + 543}` : `${EN_MONTHS[cursor.m]} ${cursor.y}`;
+  const monthName = lang === 'th' ? TH_MONTHS[cursor.m] : EN_MONTHS[cursor.m];
+  const year = lang === 'th' ? cursor.y + 543 : cursor.y;
+  const prev = (
+    <button type="button" className="mp-nav" onClick={() => step(-1)} aria-label={tr(lang, 'เดือนก่อน', 'Previous month')}>
+      ‹
+    </button>
+  );
+  const next = (
+    <button type="button" className="mp-nav" onClick={() => step(1)} aria-label={tr(lang, 'เดือนถัดไป', 'Next month')}>
+      ›
+    </button>
+  );
 
   return (
     <div className="mp">
-      <div className="mp-head">
-        <button type="button" className="mp-nav" onClick={() => step(-1)} aria-label={tr(lang, 'เดือนก่อน', 'Previous month')}>
-          ‹
-        </button>
-        <span className="mp-month">{monthLabel}</span>
-        <button type="button" className="mp-nav" onClick={() => step(1)} aria-label={tr(lang, 'เดือนถัดไป', 'Next month')}>
-          ›
-        </button>
-      </div>
+      {sub ? (
+        <div className="mp-head mp-head-sub">
+          <div>
+            <div className="mp-month">{monthName}</div>
+            <div className="mp-sub">{year} · {sub}</div>
+          </div>
+          <div className="mp-navs">{prev}{next}</div>
+        </div>
+      ) : (
+        <div className="mp-head">
+          {prev}
+          <span className="mp-month">{monthName} {year}</span>
+          {next}
+        </div>
+      )}
       <div className="mp-grid mp-dow">
         {(lang === 'th' ? TH_DOW : EN_DOW).map((d) => (
           <span key={d}>{d}</span>

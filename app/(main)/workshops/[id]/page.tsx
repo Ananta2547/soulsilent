@@ -1713,7 +1713,7 @@ function LoginPromptModal({
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
       style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(13,30,29,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}
     >
-      <div role="dialog" aria-modal="true" style={{ width: '100%', maxWidth: 420, background: 'var(--paper)', borderRadius: 28, boxShadow: '0 30px 70px -22px rgba(13,30,29,.5)', overflow: 'hidden', position: 'relative' }}>
+      <div role="dialog" aria-modal="true" className="pop-mitr" style={{ width: '100%', maxWidth: 420, background: 'var(--paper)', borderRadius: 28, boxShadow: '0 30px 70px -22px rgba(13,30,29,.5)', overflow: 'hidden', position: 'relative' }}>
         <button
           type="button"
           onClick={onClose}
