@@ -111,8 +111,10 @@ export function SessionPickerModal({
     )
     .join(' · ');
 
+  // A whole-round buy is the room itself, so the band counts its seats.
+  const shown = tier.mode === 'round' && session ? session.max_participants : seats;
   const summary = session
-    ? `${fmtDate(session.date, lang, 'medium')} · ${session.time_start}–${session.time_end} · ${tr(lang, `${seats} คน`, `${seats} ${seats === 1 ? 'person' : 'people'}`)}`
+    ? `${fmtDate(session.date, lang, 'medium')} · ${session.time_start}–${session.time_end} · ${tr(lang, `${shown} คน`, `${shown} ${shown === 1 ? 'person' : 'people'}`)}`
     : day
       ? tr(lang, 'เลือกรอบของวันนี้', 'Pick a round for this day')
       : tr(lang, 'ยังไม่ได้เลือกวัน', 'No day chosen yet');
