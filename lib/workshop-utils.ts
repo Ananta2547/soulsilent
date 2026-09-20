@@ -353,9 +353,15 @@ export function isWorkshopFull(w: Workshop): boolean {
 
 /** Public booking-status badge. active = open (accent), everything else
  *  non-draft = closed (muted). Draft is never shown publicly. Once the event
- *  has STARTED, booking auto-closes → "ปิดรับ" regardless of the stored status. */
+ *  has STARTED, or the admin's close_at has passed, booking auto-closes →
+ *  "ปิดรับ" regardless of the stored status. */
 export function getWorkshopStatusBadge(w: Workshop, now: Date = serverNow()): { label: string; open: boolean } {
   let open = w.status === 'active' && !hasWorkshopStarted(w, now);
+  // The admin may close registration earlier than the event itself.
+  if (open && w.close_at) {
+    const closes = new Date(`${w.close_at}:00${TH_OFFSET}`).getTime();
+    if (!Number.isNaN(closes) && now.getTime() >= closes) open = false;
+  }
   // Selection: booking (applications) close once the results are announced —
   // after that it's the confirm phase for the already-selected, not open to new
   // applicants. announce_at is Thai wall-clock ("YYYY-MM-DDTHH:MM").

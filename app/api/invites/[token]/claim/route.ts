@@ -4,7 +4,7 @@ import { getDB } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { ageFromDob } from '@/lib/transfers';
 import { loadInvite } from '@/lib/invites';
-import { hasWorkshopStarted } from '@/lib/workshop-utils';
+import { getWorkshopStatusBadge, hasWorkshopStarted } from '@/lib/workshop-utils';
 import type { Workshop } from '@/lib/types';
 
 /**
@@ -46,8 +46,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     if (!workshop || workshop.status !== 'active') {
       return NextResponse.json({ error: 'กิจกรรมนี้ไม่เปิดรับแล้ว' }, { status: 400 });
     }
-    if (hasWorkshopStarted(workshop)) {
-      return NextResponse.json({ error: 'กิจกรรมเริ่มแล้ว ไม่สามารถรับสิทธิ์ได้' }, { status: 400 });
+    if (!getWorkshopStatusBadge(workshop).open) {
+      return NextResponse.json(
+        { error: hasWorkshopStarted(workshop) ? 'กิจกรรมเริ่มแล้ว ไม่สามารถรับสิทธิ์ได้' : 'ปิดรับสมัครแล้ว ไม่สามารถรับสิทธิ์ได้' },
+        { status: 400 },
+      );
     }
 
     // One person, one seat on the day.

@@ -30,6 +30,7 @@ import {
   hasWorkshopStarted,
   isWorkshopOngoing,
   getWorkshopDays,
+  getWorkshopStatusBadge,
 } from '@/lib/workshop-utils';
 import { learnServerClock } from '@/lib/server-clock';
 import { visibleAppStatus } from '@/lib/selection-status';
@@ -409,6 +410,10 @@ function WorkshopDetailInner() {
         <span className="tag" style={{ background: '#fde7d3', color: '#a04a14' }}>
           {tr(lang, 'ยกเลิก', 'Cancelled')}
         </span>
+      ) : !getWorkshopStatusBadge(workshop).open ? (
+        <span className="tag" style={{ background: 'var(--cream-deep)', color: 'var(--muted)' }}>
+          {tr(lang, 'ปิดรับ', 'Closed')}
+        </span>
       ) : (
         <span className="tag tag-accent">{tr(lang, 'เปิดจอง', 'Open')}</span>
       )}
@@ -647,6 +652,11 @@ function WorkshopDetailInner() {
                     <div style={{ fontSize: 13.5, color: 'var(--muted)', marginTop: 8 }}>
                       {tr(lang, 'เวลา', 'Time')} {workshop.time_start}–{workshop.time_end} {tr(lang, 'น.', '')}
                     </div>
+                    {workshop.close_at && (
+                      <div style={{ fontSize: 13.5, color: getWorkshopStatusBadge(workshop).open ? 'var(--teal-deep)' : 'var(--muted)', marginTop: 6, fontWeight: 600 }}>
+                        <Icon name="reminder" size={16} /> {tr(lang, 'ปิดรับสมัคร', 'Registration closes')}: {fmtDateTime(`${workshop.close_at}:00+07:00`, lang, 'long')}
+                      </div>
+                    )}
                     {workshop.admission_type === 'selection' && workshop.announce_at && (
                       <div style={{ fontSize: 13.5, color: 'var(--teal-deep)', marginTop: 6, fontWeight: 600 }}>
                         <Icon name="reminder" size={16} /> {tr(lang, 'ประกาศผลคัดเลือก', 'Results announced')}: {fmtDateTime(workshop.announce_at, lang, 'long')}
@@ -1250,6 +1260,9 @@ function BookingCardContent({
   // First day already under way → registration closes (matches the "ปิดรับ"
   // badge in listings). Multi-day events must not accept joiners mid-run.
   const started = hasWorkshopStarted(workshop);
+  // Registration is open — same rule as the cards and the booking API: not
+  // started, not past the admin's close_at, not past a selection's announce.
+  const regOpen = getWorkshopStatusBadge(workshop).open;
   // Currently taking place (start → last day's end) — multi-day aware.
   const ongoing = isWorkshopOngoing(workshop);
   const wsDays = getWorkshopDays(workshop);
@@ -1515,7 +1528,7 @@ function BookingCardContent({
               {tr(lang, 'ที่นั่งนี้เป็นส่วนหนึ่งของการจองกลุ่ม', 'This seat is part of a group booking')}
             </p>
           )}
-          {!started && !isFree && !groupInvite && !userBooking?.parent_booking_id && (
+          {regOpen && !isFree && !groupInvite && !userBooking?.parent_booking_id && (
             <button
               type="button"
               onClick={onTransfer}
@@ -1589,14 +1602,16 @@ function BookingCardContent({
         >
           {tr(lang, 'ดูสถานะการสมัคร', 'View application status')} <span className="mono">→</span>
         </Link>
-      ) : started ? (
+      ) : !regOpen ? (
         <button
           type="button"
           disabled
           className="btn"
           style={{ width: '100%', justifyContent: 'center', fontSize: 15, padding: '15px 22px', background: 'var(--cream-deep)', color: 'var(--muted)', cursor: 'not-allowed' }}
         >
-          {tr(lang, 'ปิดรับสมัคร — กิจกรรมเริ่มแล้ว', 'Registration closed — event started')}
+          {started
+            ? tr(lang, 'ปิดรับสมัคร — กิจกรรมเริ่มแล้ว', 'Registration closed — event started')
+            : tr(lang, 'ปิดรับสมัครแล้ว', 'Registration closed')}
         </button>
       ) : (
         <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>

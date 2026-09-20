@@ -3,7 +3,7 @@ import { getDB } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { partyFromBooking } from '@/lib/transfers';
 import { loadInvite } from '@/lib/invites';
-import { hasWorkshopStarted } from '@/lib/workshop-utils';
+import { getWorkshopStatusBadge } from '@/lib/workshop-utils';
 import type { Workshop } from '@/lib/types';
 
 /**
@@ -50,7 +50,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
     isMember = !!own;
   }
 
-  const claimable = secured && left > 0 && workshop.status === 'active' && !hasWorkshopStarted(workshop);
+  // A friend joining by invite is a new registration, so the admin's
+  // close_at applies to them too.
+  const claimable = secured && left > 0 && getWorkshopStatusBadge(workshop).open;
 
   return NextResponse.json({
     invite: {

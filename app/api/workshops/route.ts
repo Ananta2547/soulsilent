@@ -120,6 +120,7 @@ export async function POST(request: Request) {
       payment_type?: string;
       deposit_amount?: number;
       announce_at?: string | null;
+      close_at?: string | null;
       confirm_main_by?: string | null;
       confirm_waitlist_by?: string | null;
       require_consent?: boolean | number;
@@ -148,11 +149,11 @@ export async function POST(request: Request) {
           schedule_json, learn_json, target_json, category, tags_json,
           promo_price, promo_start, promo_end, map_url, theme_color,
           max_participants, min_age, max_age, price, image_url, image_meta, status,
-          admission_type, payment_type, deposit_amount, announce_at, confirm_main_by, confirm_waitlist_by,
+          admission_type, payment_type, deposit_amount, announce_at, close_at, confirm_main_by, confirm_waitlist_by,
           require_consent, master_id, day_times_json, photos_drive_url,
           is_online, online_platform, online_platform_other, online_url,
           dashboard_access_json
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         id,
@@ -190,6 +191,7 @@ export async function POST(request: Request) {
         body.payment_type || 'paid',
         body.deposit_amount || 0,
         body.announce_at || null,
+        body.close_at || null,
         body.confirm_main_by || null,
         body.confirm_waitlist_by || null,
         body.require_consent ? 1 : 0,

@@ -247,6 +247,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       payment_type?: string;
       deposit_amount?: number;
       announce_at?: string | null;
+      close_at?: string | null;
       confirm_main_by?: string | null;
       confirm_waitlist_by?: string | null;
       require_consent?: boolean | number;
@@ -277,7 +278,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
            promo_price = ?, promo_start = ?, promo_end = ?, map_url = ?, theme_color = ?,
            max_participants = ?, min_age = ?, max_age = ?, price = ?, image_url = ?, image_meta = ?, status = ?,
            admission_type = ?, payment_type = ?, deposit_amount = ?,
-           announce_at = ?, confirm_main_by = ?, confirm_waitlist_by = ?,
+           announce_at = ?, close_at = ?, confirm_main_by = ?, confirm_waitlist_by = ?,
            require_consent = ?, photos_drive_url = ?, master_id = ?,
            is_online = ?, online_platform = ?, online_platform_other = ?, online_url = ?,
            dashboard_access_json = ?,
@@ -320,6 +321,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         body.payment_type || 'paid',
         body.deposit_amount || 0,
         body.announce_at || null,
+        body.close_at || null,
         body.confirm_main_by || null,
         body.confirm_waitlist_by || null,
         body.require_consent ? 1 : 0,

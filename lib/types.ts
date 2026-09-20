@@ -186,6 +186,9 @@ export interface Workshop {
   payment_type: 'free' | 'deposit' | 'paid';
   deposit_amount: number;
   announce_at: string | null;
+  /** Registration closes here (Thai wall-clock "YYYY-MM-DDTHH:MM"); null =
+   *  when the event starts. */
+  close_at?: string | null;
   confirm_main_by: string | null;
   confirm_waitlist_by: string | null;
   /** When 1, the booking form requires a PDPA photo/video consent choice. */

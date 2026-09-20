@@ -148,6 +148,7 @@ export default function AdminWorkshopsPage() {
         payment_type: w.payment_type || 'paid',
         deposit_amount: w.deposit_amount || 0,
         announce_at: w.announce_at || '',
+        close_at: w.close_at || '',
         confirm_main_by: w.confirm_main_by || '',
         confirm_waitlist_by: w.confirm_waitlist_by || '',
         require_consent: !!w.require_consent,

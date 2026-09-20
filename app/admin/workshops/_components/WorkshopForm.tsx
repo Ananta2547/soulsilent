@@ -73,6 +73,8 @@ export type WorkshopFormValues = {
   payment_type: 'free' | 'deposit' | 'paid';
   deposit_amount: number;
   announce_at: string;
+  /** Registration closes ("YYYY-MM-DDTHH:MM"); blank = when the event starts. */
+  close_at: string;
   confirm_main_by: string;
   confirm_waitlist_by: string;
   require_consent: boolean;
@@ -123,6 +125,7 @@ export const emptyWorkshopForm: WorkshopFormValues = {
   payment_type: 'paid',
   deposit_amount: 0,
   announce_at: '',
+  close_at: '',
   confirm_main_by: '',
   confirm_waitlist_by: '',
   require_consent: false,
@@ -325,6 +328,10 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
   const eventFirstDate =
     form.workshop_type === 'multi_part' ? [...form.dates].sort()[0] || '' : form.date;
   const wsStartDT = eventFirstDate ? `${eventFirstDate}T${form.time_start || '00:00'}` : '';
+  const closeErr =
+    form.close_at && wsStartDT && form.close_at > wsStartDT
+      ? 'ต้องไม่เกินเวลาเริ่มกิจกรรม'
+      : null;
   const announceErr =
     form.announce_at && wsStartDT && form.announce_at >= wsStartDT
       ? 'ต้องอยู่ก่อนวันจัดกิจกรรม'
@@ -404,6 +411,10 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
       }
     }
 
+    if (closeErr) {
+      setError(`วันปิดรับสมัคร${closeErr}`);
+      return;
+    }
     // Selection rounds must run in order: announce → confirm main → confirm waitlist.
     if (hasSelectionDateError) {
       setError('กรุณาแก้ไขลำดับวันที่คัดเลือกให้ถูกต้อง (ประกาศผล → ยืนยันตัวจริง → ยืนยันตัวสำรอง)');
@@ -1203,6 +1214,16 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="max-w-[320px]">
+          <label className="block text-sm font-medium text-dark mb-1">ปิดรับสมัคร</label>
+          <DateTimePicker value={form.close_at} onChange={(v) => setForm({ ...form, close_at: v })} invalid={!!closeErr} />
+          {closeErr ? (
+            <p className="text-xs text-red-500 mt-1">⚠ {closeErr}</p>
+          ) : (
+            <p className="text-xs text-gray mt-1">ไม่ใส่ = ปิดรับเมื่อกิจกรรมเริ่ม</p>
+          )}
         </div>
 
         <div>
