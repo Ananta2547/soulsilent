@@ -13,7 +13,7 @@ import { MonthPicker } from '@/components/calendar/MonthPicker';
 import { TimeField24 } from '@/components/admin/TimeField24';
 import { fmtDate } from '@/lib/datetime';
 import type { WorkshopMaster } from '@/lib/types';
-import { parseTiers, tierDesc } from '@/lib/pricing';
+import { bookableTiers, parseTiers, tierDesc } from '@/lib/pricing';
 
 type Round = {
   id: string;
@@ -200,7 +200,8 @@ export default function TeacherSessionsPage() {
 
   const slotsOk = slots.every((s) => s.time_start && s.time_end && s.time_start < s.time_end);
   const daysOk = repeat === 'once' ? dates.length > 0 : !!date && !!endDate && endDate >= date && (repeat === 'daily' || weekdays.length > 0);
-  const ready = !!master && daysOk && slotsOk && !!locationId && master.price_group != null;
+  const priced = !!master && (master.price_group != null || parseTiers(master.price_tiers_json).length > 0);
+  const ready = !!master && daysOk && slotsOk && !!locationId && priced;
   const DOW = lang === 'th' ? ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'] : ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
   const editLocked = !!editing && editing.booked > 0;
 
@@ -250,11 +251,10 @@ export default function TeacherSessionsPage() {
             </select>
             {master && (
               <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8, fontSize: 12.5, color: 'var(--muted)' }}>
-                <span>{tr(lang, 'ราคา/คน', 'Per person')} <b style={{ color: 'var(--ink)' }}>{baht(master.price_group)}</b></span>
-                {parseTiers(master.price_tiers_json).map((t) => (
+                {bookableTiers(master).map((t) => (
                   <span key={t.id}>{t.label} <b style={{ color: 'var(--ink)' }}>{baht(t.price)}</b> · {tierDesc(t, lang)}</span>
                 ))}
-                {master.price_group == null && <span style={{ color: '#a04a14' }}>⚠ {tr(lang, 'Admin ยังไม่ตั้งราคา — เปิดรอบไม่ได้', 'No price set yet — cannot open')}</span>}
+                {!priced && <span style={{ color: '#a04a14' }}>⚠ {tr(lang, 'Admin ยังไม่ตั้งราคา — เปิดรอบไม่ได้', 'No price set yet — cannot open')}</span>}
               </div>
             )}
 

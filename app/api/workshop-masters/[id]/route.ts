@@ -4,7 +4,7 @@ import { getDB } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
 import { expireStaleHolds } from '@/lib/holds';
 import type { ImageMeta, WorkshopMaster } from '@/lib/types';
-import { normalizeTiers } from '@/lib/pricing';
+import { cardPrice, normalizeTiers, seatPrice } from '@/lib/pricing';
 
 /** Seats counted as taken (paid + live holds); mirrors bookings route. */
 const SEAT_TAKEN = `
@@ -81,6 +81,11 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: 'กรุณากรอกชื่อกิจกรรม' }, { status: 400 });
     }
     const db = await getDB();
+    // Prices are tiers; price_group is the per-seat one, and the rounds
+    // carry the card price (per seat, else whole round). A single master (no
+    // tiers) still takes the price it was sent.
+    const tiers = normalizeTiers(body.price_tiers);
+    const priceGroup = tiers.length ? seatPrice(tiers) : money(body.price_group);
     await db
       .prepare(
         `UPDATE workshop_masters SET
@@ -99,13 +104,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         body.cover_image_meta ? JSON.stringify(body.cover_image_meta) : null,
         JSON.stringify((body.target || []).filter((s) => s.trim())),
         JSON.stringify((body.takeaways || []).filter((s) => s.trim())),
-        money(body.price_group),
+        priceGroup,
         money(body.price_private),
         Math.max(1, Math.round(Number(body.default_max_participants) || 20)),
         kindOf(body.kind),
         locIds(body.location_ids),
         money(body.price_group_booking),
-        JSON.stringify(normalizeTiers(body.price_tiers)),
+        JSON.stringify(tiers),
         id
       )
       .run();
@@ -130,7 +135,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           body.cover_image_meta ? JSON.stringify(body.cover_image_meta) : null,
           JSON.stringify((body.takeaways || []).filter((s) => s.trim())),
           JSON.stringify((body.target || []).filter((s) => s.trim())),
-          money(body.price_group) ?? 0,
+          (tiers.length ? cardPrice(tiers) : priceGroup) ?? 0,
           id
         )
         .run();

@@ -12,7 +12,7 @@ import type { WorkshopMaster, Workshop } from '@/lib/types';
 import { Icon } from '@/components/design/Icon';
 import { useLoadingTracker } from '@/components/design/DataLoading';
 import type { PickableSession } from '@/components/workshops/SessionPickerModal';
-import { parseTiers, tierDesc } from '@/lib/pricing';
+import { bookableTiers, parseTiers, tierDesc } from '@/lib/pricing';
 
 type Session = PickableSession;
 
@@ -119,13 +119,9 @@ export default function WorkshopInfoPage() {
             </h2>
           </Reveal>
 
-          {master.price_group != null && (
+          {(master.price_group != null || parseTiers(master.price_tiers_json).length > 0) && (
             <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', fontSize: 14, marginBottom: 16 }}>
-              <span>
-                <span style={{ color: 'var(--muted)' }}>{tr(lang, 'ราคา/คน', 'Per person')} </span>
-                <b>฿{Math.round(master.price_group).toLocaleString()}</b>
-              </span>
-              {parseTiers(master.price_tiers_json).map((t) => (
+              {bookableTiers(master).map((t) => (
                 <span key={t.id}>
                   <span style={{ color: 'var(--muted)' }}>{t.label} ({tierDesc(t, lang)}) </span>
                   <b>฿{Math.round(t.price).toLocaleString()}</b>

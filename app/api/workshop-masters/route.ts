@@ -3,7 +3,7 @@ import { v4 as uuid } from 'uuid';
 import { getDB } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
 import type { ImageMeta, WorkshopMaster } from '@/lib/types';
-import { normalizeTiers } from '@/lib/pricing';
+import { normalizeTiers, seatPrice } from '@/lib/pricing';
 
 /** GET /api/workshop-masters — list all masters (public read; used by the
  *  admin list + the session form's master dropdown). */
@@ -55,6 +55,10 @@ export async function POST(request: Request) {
     }
     const db = await getDB();
     const id = uuid();
+    // Prices are tiers; price_group is the per-seat one. A single master (no
+    // tiers) still takes the price it was sent.
+    const tiers = normalizeTiers(body.price_tiers);
+    const priceGroup = tiers.length ? seatPrice(tiers) : money(body.price_group);
     await db
       .prepare(
         `INSERT INTO workshop_masters
@@ -72,13 +76,13 @@ export async function POST(request: Request) {
         body.cover_image_meta ? JSON.stringify(body.cover_image_meta) : null,
         JSON.stringify((body.target || []).filter((s) => s.trim())),
         JSON.stringify((body.takeaways || []).filter((s) => s.trim())),
-        money(body.price_group),
+        priceGroup,
         money(body.price_private),
         Math.max(1, Math.round(Number(body.default_max_participants) || 20)),
         kindOf(body.kind),
         locIds(body.location_ids),
         money(body.price_group_booking),
-        JSON.stringify(normalizeTiers(body.price_tiers))
+        JSON.stringify(tiers)
       )
       .run();
     return NextResponse.json({ id }, { status: 201 });

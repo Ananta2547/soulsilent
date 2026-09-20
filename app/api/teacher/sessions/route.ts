@@ -5,6 +5,7 @@ import { getDB } from '@/lib/db';
 import { getCurrentUserWithRoles } from '@/lib/auth';
 import { hasAnyRole } from '@/lib/roles';
 import type { Workshop, WorkshopMaster } from '@/lib/types';
+import { bookableTiers, cardPrice } from '@/lib/pricing';
 
 /* The teacher's session manager. A master is the activity the admin wrote up
  * and handed to a teacher (workshop_masters.organizer); a round is one row in
@@ -185,7 +186,9 @@ export async function POST(request: Request) {
   if (!u.roles.includes('admin') && master.organizer !== u.sub) {
     return NextResponse.json({ error: 'คุณไม่ได้เป็นผู้สอนของ Workshop นี้' }, { status: 403 });
   }
-  if (master.price_group == null) {
+  // Any price will do — a round-only master carries the round price on
+  // its cards and sells through its tiers.
+  if (cardPrice(bookableTiers(master)) == null) {
     return NextResponse.json({ error: 'Admin ยังไม่ได้ตั้งราคาให้ Workshop นี้' }, { status: 400 });
   }
   const loc = await db
@@ -272,7 +275,7 @@ async function insertRound(
       master.target_json || '[]',
       loc.map_url,
       seats,
-      master.price_group,
+      cardPrice(bookableTiers(master)) ?? 0,
       master.cover_image_url,
       master.cover_image_meta,
       master.id,

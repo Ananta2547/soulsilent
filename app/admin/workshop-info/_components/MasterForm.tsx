@@ -64,6 +64,17 @@ function ListField({
   );
 }
 
+
+/** The tier rows the form opens with. A master saved before every price was
+ *  a tier has only price_group — that becomes its first "ราคา/คน" row. */
+function loadTiers(initial: WorkshopMaster | null | undefined): PriceTier[] {
+  const tiers = parseTiers(initial?.price_tiers_json);
+  if (initial?.price_group != null && !tiers.some((t) => t.mode === 'seat')) {
+    return [{ id: 'base-seat', label: 'ราคา/คน', price: initial.price_group, mode: 'seat' }, ...tiers];
+  }
+  return tiers;
+}
+
 export function MasterForm({
   initial,
   editingId,
@@ -91,14 +102,16 @@ export function MasterForm({
   const [coverMeta, setCoverMeta] = useState<ImageMeta | null>(parseImageMeta(initial?.cover_image_meta ?? null));
   const [target, setTarget] = useState<string[]>(toArr(initial?.target_json));
   const [takeaways, setTakeaways] = useState<string[]>(toArr(initial?.takeaways_json));
-  // Prices every round of this master opens with (migration 051). Private is
-  // optional — leave it blank and the booking popup offers group only.
-  const [priceGroup, setPriceGroup] = useState(initial?.price_group != null ? String(initial.price_group) : '');
+  // price_group is derived from the tiers on save (lib/pricing cardPrice);
+  // it is only sent as-is for a single master, which has no tier rows.
+  const [priceGroup] = useState(initial?.price_group != null ? String(initial.price_group) : '');
   // Kept as stored (migration 055) — group prices are tier rows now, so this
   // no longer has a field of its own.
   const [priceGroupBooking] = useState(initial?.price_group_booking != null ? String(initial.price_group_booking) : '');
-  // Extra tiers, each named by the admin and sold per seat or per round.
-  const [tiers, setTiers] = useState<PriceTier[]>(parseTiers(initial?.price_tiers_json));
+  // Every price is a tier row, each named by the admin and sold per seat,
+  // per group, or per round. A master saved when the seat price was still a
+  // field of its own gets that price as its first row.
+  const [tiers, setTiers] = useState<PriceTier[]>(() => loadTiers(initial));
   const [defaultSeats, setDefaultSeats] = useState(String(initial?.default_max_participants ?? 20));
   const [teachers, setTeachers] = useState<{ id: string; name: string }[]>([]);
   // Venues a round master may run at — the teacher picks one of these when
@@ -122,7 +135,7 @@ export function MasterForm({
         takeaways: toArr(initial?.takeaways_json),
         priceGroup: initial?.price_group != null ? String(initial.price_group) : '',
         priceGroupBooking: initial?.price_group_booking != null ? String(initial.price_group_booking) : '',
-        tiers: parseTiers(initial?.price_tiers_json),
+        tiers: loadTiers(initial),
         defaultSeats: String(initial?.default_max_participants ?? 20),
         locationIds: toArr(initial?.location_ids_json),
       }),
@@ -249,13 +262,10 @@ export function MasterForm({
       {(initial?.kind || kind) === 'round' && (
       <fieldset className="border border-gray-lighter rounded-lg p-3">
         <legend className="text-sm font-medium text-dark px-1">ราคา (ใช้กับทุกรอบที่ผู้สอนเปิด)</legend>
-        <div className="mt-1 max-w-[260px]">
-          <label className="block text-xs text-gray mb-1">ราคา/คน (บาท/ที่นั่ง) · ราคาปกติ</label>
-          <input type="number" min={0} step="1" value={priceGroup} onChange={(e) => setPriceGroup(e.target.value)} className="input-field" placeholder="เช่น 1200" />
-        </div>
-        <p className="text-xs text-gray mt-2">
-          ราคาอื่นเพิ่มเป็นแถวด้านล่าง — ต่อคน / เหมาทั้งรอบ / แพ็กคงที่ / กลุ่มระบุจำนวน (ราคากลุ่มคิดต่อคน × จำนวน · ผู้จองนับเป็น 1 คน แล้วส่งลิงก์เชิญเพื่อนที่เหลือ)
+        <p className="text-xs text-gray mt-1">
+          เพิ่มราคาเป็นแถว — ต่อคน / เหมาทั้งรอบ / แพ็กคงที่ / กลุ่มระบุจำนวน (ราคากลุ่มคิดต่อคน × จำนวน · ผู้จองนับเป็น 1 คน แล้วส่งลิงก์เชิญเพื่อนที่เหลือ) · การ์ดโชว์ราคาต่อคนแถวแรก ถ้าไม่มีก็โชว์ราคาเหมารอบ
         </p>
+        {tiers.length === 0 && <p className="text-xs mt-2" style={{ color: '#a04a14' }}>⚠ ยังไม่มีราคา — ผู้สอนเปิดรอบไม่ได้จนกว่าจะเพิ่มอย่างน้อย 1 แถว</p>}
 
         {/* Tiers the admin adds: a name, a price, and whether one purchase
             buys a seat or the whole round. */}
@@ -280,7 +290,7 @@ export function MasterForm({
                         value={t.mode}
                         onChange={(e) => {
                           const mode = e.target.value as PriceTier['mode'];
-                          set(mode === 'pack' ? { mode, size: t.size || 3, lock: !!t.lock } : mode === 'range' ? { mode, min: t.min || 2, max: t.max || 5, lock: !!t.lock } : { mode });
+                          set(mode === 'pack' ? { mode, size: t.size || 3, lock: !!t.lock } : mode === 'range' ? { mode, min: t.min || 2, max: t.max || 5, lock: !!t.lock } : mode === 'seat' ? { mode, lock: !!t.lock } : { mode, lock: true });
                         }}
                         className="input-field"
                       >
@@ -292,6 +302,24 @@ export function MasterForm({
                     </div>
                     <button type="button" onClick={() => setTiers((x) => x.filter((_, j) => j !== i))} className="h-10 text-red-500 text-sm" aria-label="ลบราคานี้">✕</button>
                   </div>
+                  {t.mode === 'seat' && (
+                    <div className="flex flex-wrap items-center gap-3 mt-2">
+                      <label className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" checked={!!t.lock} onChange={(e) => set({ lock: e.target.checked })} />
+                        ล็อกรอบเป็นส่วนตัว (Private) — จอง 1 คนแล้วรอบนั้นไม่รับคนอื่น
+                      </label>
+                      <span className="text-xs text-gray">{t.lock ? 'Private: จองได้เฉพาะรอบว่าง · คิดราคาต่อ 1 คน' : 'Public: นั่งร่วมกับคนอื่นจนกว่าที่นั่งจะเต็ม'}</span>
+                    </div>
+                  )}
+                  {t.mode === 'round' && (
+                    <div className="flex flex-wrap items-center gap-3 mt-2">
+                      <label className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" checked readOnly disabled />
+                        ล็อกรอบเป็นส่วนตัว (Private) — เหมารอบย่อมปิดรับคนอื่นเสมอ
+                      </label>
+                      <span className="text-xs text-gray">ที่นั่ง {Number(defaultSeats) || 20} คน (ตามค่าที่นั่งต่อรอบด้านบน)</span>
+                    </div>
+                  )}
                   {isGroupTier(t) && (
                     <div className="flex flex-wrap items-end gap-3 mt-2">
                       {t.mode === 'pack' ? (

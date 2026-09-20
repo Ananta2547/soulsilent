@@ -48,7 +48,7 @@ export function SessionPickerModal({
 
   const [day, setDayState] = useState<string | null>(initialDate && days.has(initialDate) ? initialDate : null);
   const [pickedId, setSessionId] = useState<string | null>(null);
-  const [tierId, setTierId] = useState('seat');
+  const [tierId, setTierId] = useState('');
   // Range group tiers: how many people the booker is bringing (themselves included).
   const [groupN, setGroupN] = useState<number | null>(null);
 
@@ -67,14 +67,14 @@ export function SessionPickerModal({
   // A whole-round tier means nobody else in the room, so it is only offered
   // while the round is still empty.
   const roundOk = !!session && session.booked === 0;
-  // The base seat price is the round's own price; the admin's tiers follow.
+  // The admin's tiers; an older master's seat price leads them.
   const tiers = bookableTiers(master, session?.price);
   // What a tier needs from the round: a locking tier (whole round, or a group
   // that locks it) needs it empty; a group needs room for its smallest size.
   const tierOk = (t: PriceTier) => {
     if (t.mode === 'round') return roundOk;
     if (!groupOk) return false;
-    if (t.lock) return roundOk && seatsLeft >= (t.mode === 'pack' ? t.size || 2 : t.min || 2);
+    if (t.lock) return roundOk && seatsLeft >= (t.mode === 'pack' ? t.size || 2 : t.mode === 'range' ? t.min || 2 : 1);
     if (t.mode === 'pack') return seatsLeft >= (t.size || 2);
     if (t.mode === 'range') return seatsLeft >= (t.min || 2);
     return true;
@@ -198,7 +198,9 @@ export function SessionPickerModal({
                     ? tr(lang, 'เหมาทั้งรอบ ไม่มีคนอื่นร่วม', 'The whole round, nobody else')
                     : isGroupTier(tier)
                       ? tierDesc(tier, lang) + (tier.lock ? '' : tr(lang, ' · เรียนร่วมกับคนอื่นได้', ' · alongside others')) + (session ? tr(lang, ` · รอบนี้รับได้ถึง ${seatsLeft} คน`, ` · this round has room for ${seatsLeft}`) : '')
-                      : tr(lang, 'จอง 1 ที่นั่ง เรียนร่วมกับคนอื่น', 'One seat, alongside others')}
+                      : tier.lock
+                        ? tr(lang, 'จอง 1 ที่นั่ง แล้วรอบนี้เป็นของคุณคนเดียว', 'One seat, and the round is yours alone')
+                        : tr(lang, 'จอง 1 ที่นั่ง เรียนร่วมกับคนอื่น', 'One seat, alongside others')}
                 </p>
                 {tier.mode === 'range' && (
                   <div className="sp2-stepper">

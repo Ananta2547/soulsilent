@@ -1,7 +1,8 @@
 /** Price tiers on a round master (migrations 055, 056).
  *
- * price_group is the base "ราคา/คน" (one seat). Every further tier the admin
- * adds lives in price_tiers_json. A tier's `mode` says what one purchase buys:
+ * Every price the admin sells lives in price_tiers_json; price_group is the
+ * per-seat price derived from it (see seatPrice), kept for older rounds.
+ * A tier's `mode` says what one purchase buys:
  *   seat  — one seat
  *   round — the whole round (nobody else joins)
  *   pack  — a fixed group of `size` people
@@ -24,7 +25,7 @@ export interface PriceTier {
   /** range: smallest / largest group allowed (booker included). */
   min?: number;
   max?: number;
-  /** Group tiers: the booking locks the round as private. */
+  /** Seat and group tiers: the booking locks the round as private. */
   lock?: boolean;
 }
 
@@ -38,7 +39,9 @@ const int = (v: unknown, fallback: number): number => {
 function shape(t: Partial<PriceTier>, id: string, label: string, price: number): PriceTier {
   const mode: TierMode = t.mode === 'round' || t.mode === 'pack' || t.mode === 'range' ? t.mode : 'seat';
   const out: PriceTier = { id, label, price, mode };
-  if (mode === 'pack') {
+  if (mode === 'seat') {
+    if (t.lock) out.lock = true;
+  } else if (mode === 'pack') {
     out.size = Math.max(2, int(t.size, 2));
     out.lock = !!t.lock;
   } else if (mode === 'range') {
@@ -80,11 +83,25 @@ export function normalizeTiers(input: unknown): PriceTier[] {
   return out;
 }
 
-/** Everything a learner can pick in the booking popup: the base seat price
- *  first, then the admin's tiers. */
-export function bookableTiers(master: { price_group: number | null; price_tiers_json?: string | null }, seatPrice?: number): PriceTier[] {
-  const base: PriceTier = { id: 'seat', label: 'ราคา/คน', price: seatPrice ?? master.price_group ?? 0, mode: 'seat' };
-  return [base, ...parseTiers(master.price_tiers_json)];
+/** The per-seat price: the first per-seat tier. Stored as price_group. */
+export function seatPrice(tiers: PriceTier[]): number | null {
+  return tiers.find((t) => t.mode === 'seat')?.price ?? null;
+}
+
+/** The one number a card or a round carries: the per-seat price, else the
+ *  whole-round price, else nothing. */
+export function cardPrice(tiers: PriceTier[]): number | null {
+  return (tiers.find((t) => t.mode === 'seat') ?? tiers.find((t) => t.mode === 'round'))?.price ?? null;
+}
+
+/** Everything a learner can pick in the booking popup. A master saved before
+ *  prices became tiers has only price_group, so that still shows as a
+ *  "ราคา/คน" row until a per-seat tier replaces it. */
+export function bookableTiers(master: { price_group: number | null; price_tiers_json?: string | null }, roundPrice?: number): PriceTier[] {
+  const tiers = parseTiers(master.price_tiers_json);
+  if (tiers.some((t) => t.mode === 'seat') || master.price_group == null) return tiers;
+  const base: PriceTier = { id: 'seat', label: 'ราคา/คน', price: roundPrice ?? master.price_group, mode: 'seat' };
+  return [base, ...tiers];
 }
 
 /** How many seats one purchase of this tier takes, given the group size the
@@ -115,6 +132,6 @@ export function tierDesc(t: PriceTier, lang: 'th' | 'en' = 'th'): string {
     case 'range':
       return (lang === 'th' ? `กลุ่ม ${t.min}–${t.max} คน · ต่อคน` : `group of ${t.min}–${t.max} · per person`) + lock;
     default:
-      return lang === 'th' ? 'ต่อคน' : 'per person';
+      return (lang === 'th' ? 'ต่อคน' : 'per person') + lock;
   }
 }
