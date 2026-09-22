@@ -22,10 +22,10 @@ function SocialIcon({ label }: { label: string }) {
 }
 
 /** An entry with no href is shown but not clickable — the account exists in the
- *  set, its link just hasn't been given yet (Instagram). */
+ *  set, its link just hasn't been given yet. */
 const SOCIALS: { label: string; href?: string }[] = [
   { label: 'Facebook', href: 'https://www.facebook.com/allsoullearn' },
-  { label: 'Instagram' },
+  { label: 'Instagram', href: 'https://www.instagram.com/allsoullearn/' },
   { label: 'YouTube', href: 'https://www.youtube.com/@allsoullearn' },
   { label: 'TikTok', href: 'https://www.tiktok.com/@allsoullearn' },
   { label: 'X', href: 'https://x.com/allsoullearn' },
