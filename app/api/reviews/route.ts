@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid';
 import { getDB } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
 import type { Review } from '@/lib/types';
+import { reviewListSql } from '@/lib/home-data';
 
 /**
  * GET /api/reviews — public list of reviews (joined with author + workshop).
@@ -18,23 +19,13 @@ export async function GET(request: Request) {
     const limit = limitRaw ? Math.min(50, Math.max(1, parseInt(limitRaw, 10) || 0)) : null;
     const featuredOnly = url.searchParams.get('featured') === '1';
 
-    let sql = `
-      SELECT r.id, r.rating, r.comment, r.featured, r.created_at,
-             u.name AS user_name,
-             w.id AS workshop_id, w.title AS workshop_title, w.master_id AS master_id
-      FROM reviews r
-      LEFT JOIN users u ON r.user_id = u.id
-      LEFT JOIN workshops w ON r.workshop_id = w.id`;
-    const where: string[] = [];
-    // A limited (public) list only shows reviews that have a comment.
-    if (limit) where.push(`r.comment IS NOT NULL AND trim(r.comment) != ''`);
-    if (featuredOnly) where.push(`r.featured = 1`);
-    if (where.length) sql += ` WHERE ${where.join(' AND ')}`;
-    sql += ` ORDER BY r.created_at DESC`;
-    if (limit) sql += ` LIMIT ${limit}`;
-
-    const rows = await db.prepare(sql).all();
-    const totalRow = await db.prepare('SELECT COUNT(*) AS c FROM reviews').first<{ c: number }>();
+    // A limited (public) list only shows reviews that have a comment. Both
+    // statements go in one batch — one D1 round trip.
+    const [rows, totalRes] = await db.batch([
+      db.prepare(reviewListSql({ limit, featured: featuredOnly })),
+      db.prepare('SELECT COUNT(*) AS c FROM reviews'),
+    ]);
+    const totalRow = (totalRes.results as { c: number }[])[0];
 
     return NextResponse.json({ reviews: rows.results || [], total: totalRow?.c || 0 });
   } catch (error) {

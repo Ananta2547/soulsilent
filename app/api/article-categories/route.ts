@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
 import type { ArticleCategory } from '@/lib/types';
+import { ARTICLE_CATEGORIES_SQL } from '@/lib/home-data';
 
 export async function GET() {
   try {
     const db = await getDB();
     const result = await db
-      .prepare('SELECT * FROM article_categories ORDER BY sort_order, key')
+      .prepare(ARTICLE_CATEGORIES_SQL)
       .all<ArticleCategory>();
     return NextResponse.json({ categories: result.results });
   } catch (error) {

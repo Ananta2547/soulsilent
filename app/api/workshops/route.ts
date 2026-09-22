@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { seatsOfRowSql } from '@/lib/seats';
 import { v4 as uuid } from 'uuid';
 import { getDB } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
 import { normalizeInstructorIds } from '@/lib/workshop-utils';
 import { normalizeOnlineFields } from '@/lib/online-platform';
 import type { Workshop } from '@/lib/types';
+import { workshopListSql } from '@/lib/home-data';
 
 export async function GET(request: Request) {
   try {
@@ -53,16 +53,9 @@ export async function GET(request: Request) {
     // booking_count is always included so cards can show a "full" state (it's
     // already exposed per-workshop on the public detail page). The `counts=1`
     // admin flag still gates other admin-only concerns but no longer this.
-    const countSelect =
-      // A private booking took the whole round, so it counts as every seat.
-      `, (SELECT COALESCE(SUM(${seatsOfRowSql('bookings', 'workshops.max_participants')}), 0) FROM bookings WHERE bookings.workshop_id = workshops.id AND bookings.status != 'cancelled' AND bookings.payment_status != 'expired') AS booking_count`;
-    // Join the linked location so cards can format "name-province, district"
+    // The venue is joined so cards can format "name-province, district"
     // without a second round-trip (public read of name/province/district only).
-    let query = `SELECT workshops.*, l.name AS loc_name, l.province AS loc_province, l.district AS loc_district, m.kind AS master_kind${countSelect}
-       FROM workshops LEFT JOIN locations l ON workshops.location_id = l.id
-       LEFT JOIN workshop_masters m ON m.id = workshops.master_id`;
-    if (where.length > 0) query += ' WHERE ' + where.join(' AND ');
-    query += ' ORDER BY date DESC';
+    const query = workshopListSql(where);
 
     const stmt =
       params.length > 0 ? db.prepare(query).bind(...params) : db.prepare(query);

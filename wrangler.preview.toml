@@ -62,3 +62,9 @@ BEAM_MERCHANT_ID = "allsoullearn-vg1ez5"
 # redirects will bounce users to production.
 SITE_URL = "https://soulsilent-preview.soulsilent-official.workers.dev"
 EMAIL_FROM = "AllSoulLearn Preview <noreply@allsoullearn.com>"
+
+# Run the Worker near the D1 database rather than at the visitor's colo: every
+# request makes several D1 round trips, and those are far shorter than the one
+# hop from the visitor.
+[placement]
+mode = "smart"

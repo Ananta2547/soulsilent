@@ -868,44 +868,30 @@ export default function HomePage() {
   const track = useLoadingTracker();
 
   useEffect(() => {
+    // One request, one D1 batch, for everything below the fold — the six
+    // pieces used to be six round trips fired after hydration.
     track(
-      fetch('/api/workshops?status=active')
+      fetch('/api/home')
         .then((r) => {
           learnServerClock(r);
-          return r.json() as Promise<{ workshops: Workshop[] }>;
+          return r.json() as Promise<{
+            workshops?: Workshop[];
+            featured?: Workshop[];
+            articles?: Article[];
+            categories?: ArticleCategory[];
+            reviews?: PublicReview[];
+            stats?: Partial<SiteStats>;
+          }>;
         })
-        .then((d) => setWorkshops(d.workshops || []))
-        .catch(() => {}),
-    );
-    // Hero fan shows only admin-starred workshops.
-    track(
-      fetch('/api/workshops?featured=1&public=1')
-        .then((r) => r.json() as Promise<{ workshops: Workshop[] }>)
-        .then((d) => setFeaturedWorkshops(d.workshops || []))
-        .catch(() => {}),
-    );
-    track(
-      fetch('/api/articles')
-        .then((r) => r.json() as Promise<{ articles: Article[] }>)
-        .then((d) => setArticles(d.articles || []))
-        .catch(() => {}),
-    );
-    track(
-      fetch('/api/article-categories')
-        .then((r) => r.json() as Promise<{ categories: ArticleCategory[] }>)
-        .then((d) => setArticleCategories(d.categories || []))
-        .catch(() => {}),
-    );
-    track(
-      fetch('/api/reviews?featured=1&limit=10')
-        .then((r) => r.json() as Promise<{ reviews: PublicReview[] }>)
-        .then((d) => setReviews(d.reviews || []))
-        .catch(() => {}),
-    );
-    track(
-      fetch('/api/stats')
-        .then((r) => r.json() as Promise<Partial<SiteStats>>)
-        .then((d) => setStats({ workshops: d.workshops ?? 11, participants: d.participants ?? 125, locations: d.locations ?? 0 }))
+        .then((d) => {
+          setWorkshops(d.workshops || []);
+          // Hero fan shows only admin-starred workshops.
+          setFeaturedWorkshops(d.featured || []);
+          setArticles(d.articles || []);
+          setArticleCategories(d.categories || []);
+          setReviews(d.reviews || []);
+          setStats({ workshops: d.stats?.workshops ?? 11, participants: d.stats?.participants ?? 125, locations: d.stats?.locations ?? 0 });
+        })
         .catch(() => {}),
     );
   }, [track]);

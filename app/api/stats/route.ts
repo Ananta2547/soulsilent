@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
+import { STATS_SQL, statsFromRow, BASE_WORKSHOPS, BASE_PARTICIPANTS, type StatsRow } from '@/lib/home-data';
 
 /**
  * GET /api/stats — public homepage statistics.
@@ -11,40 +12,12 @@ import { getDB } from '@/lib/db';
  * Project founding date: 15 Nov 2022 (พ.ศ. 2565) — use for any future
  * duration-based figures.
  */
-const BASE_WORKSHOPS = 11;
-const BASE_PARTICIPANTS = 125;
-
 export async function GET() {
   try {
     const db = await getDB();
-
-    const wRow = await db
-      .prepare('SELECT COUNT(*) AS c FROM workshops')
-      .first<{ c: number }>();
-
-    const pRow = await db
-      .prepare(
-        `SELECT COUNT(*) AS c FROM bookings
-          WHERE status != 'cancelled'
-            AND (payment_status = 'paid' OR status = 'confirmed' OR attended = 1)`,
-      )
-      .first<{ c: number }>();
-
-    // Distinct venues actually used by workshops (prefer the linked location_id,
-    // fall back to the free-text location).
-    const lRow = await db
-      .prepare(
-        `SELECT COUNT(DISTINCT COALESCE(NULLIF(TRIM(location_id), ''), NULLIF(TRIM(location), ''))) AS c
-           FROM workshops
-          WHERE COALESCE(NULLIF(TRIM(location_id), ''), NULLIF(TRIM(location), '')) IS NOT NULL`,
-      )
-      .first<{ c: number }>();
-
-    return NextResponse.json({
-      workshops: BASE_WORKSHOPS + (wRow?.c || 0),
-      participants: BASE_PARTICIPANTS + (pRow?.c || 0),
-      locations: lRow?.c || 0,
-    });
+    // One statement, one D1 round trip, for the three counters.
+    const row = await db.prepare(STATS_SQL).first<StatsRow>();
+    return NextResponse.json(statsFromRow(row));
   } catch (error) {
     console.error('Stats error:', error);
     // Never break the homepage — return the base numbers on failure.
