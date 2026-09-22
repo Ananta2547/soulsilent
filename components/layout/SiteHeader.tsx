@@ -76,9 +76,10 @@ export function SiteHeader() {
             href="/calendar"
             aria-label={tr(lang, 'ปฏิทิน', 'Calendar')}
             title={tr(lang, 'ปฏิทิน Workshop', 'Workshop Calendar')}
-            className="nav-icon-btn"
+            className="nav-icon-btn nav-cal"
           >
             <CalendarDaysIcon color="currentColor" size={18} />
+            <span className="hide-xs">{tr(lang, 'ปฏิทิน', 'Calendar')}</span>
           </Link>
 
           <LangSwitch />
