@@ -202,6 +202,24 @@ export default function TeacherSessionsPage() {
   const daysOk = repeat === 'once' ? dates.length > 0 : !!date && !!endDate && endDate >= date && (repeat === 'daily' || weekdays.length > 0);
   const priced = !!master && (master.price_group != null || parseTiers(master.price_tiers_json).length > 0);
   const ready = !!master && daysOk && slotsOk && !!locationId && priced;
+  // Why the open button is greyed out, spelled out under it — one line per
+  // step still missing, in the order the form asks for them.
+  const blockers: string[] = [];
+  if (!master) blockers.push(tr(lang, 'ยังไม่ได้เลือก Workshop (ข้อ 1)', 'Pick a workshop (step 1)'));
+  else if (!priced) blockers.push(tr(lang, 'Admin ยังไม่ได้ตั้งราคาให้ Workshop นี้ — ติดต่อ Admin', 'No price set for this workshop yet — ask an admin'));
+  if (!daysOk) {
+    if (repeat === 'once') blockers.push(tr(lang, 'ยังไม่ได้เลือกวันจากปฏิทิน (ข้อ 2)', 'Pick at least one day on the calendar (step 2)'));
+    else if (!date || !endDate) blockers.push(tr(lang, 'ยังไม่ได้ใส่วันเริ่มและวันสิ้นสุด (ข้อ 2)', 'Set a start and an end date (step 2)'));
+    else if (endDate < date) blockers.push(tr(lang, 'วันสิ้นสุดอยู่ก่อนวันเริ่ม (ข้อ 2)', 'The end date is before the start date (step 2)'));
+    else blockers.push(tr(lang, 'ยังไม่ได้เลือกวันในสัปดาห์ (ข้อ 2)', 'Pick the weekdays (step 2)'));
+  }
+  if (!slotsOk) blockers.push(tr(lang, 'เวลาเริ่มต้องอยู่ก่อนเวลาจบทุกช่วง (ข้อ 3)', 'Every time slot must start before it ends (step 3)'));
+  if (!locationId)
+    blockers.push(
+      master && allowedLocs.length === 0
+        ? tr(lang, 'ยังไม่มีสถานที่ให้เลือกสำหรับ Workshop นี้ — ติดต่อ Admin ให้เพิ่มสถานที่', 'No venue is available for this workshop — ask an admin to add one')
+        : tr(lang, 'ยังไม่ได้เลือกสถานที่ (ข้อ 4)', 'Pick a venue (step 4)'),
+    );
   const DOW = lang === 'th' ? ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'] : ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
   const editLocked = !!editing && editing.booked > 0;
 
@@ -434,6 +452,14 @@ export default function TeacherSessionsPage() {
                 </button>
               )}
             </div>
+            {!ready && !saving && blockers.length > 0 && (
+              <div role="alert" style={{ marginTop: 12, padding: '10px 14px', borderRadius: 12, fontSize: 13, lineHeight: 1.6, background: '#fde7d3', color: '#a04a14' }}>
+                <div style={{ fontWeight: 700 }}>{tr(lang, 'ยังเปิดรอบไม่ได้ เพราะ', 'Can’t open yet:')}</div>
+                {blockers.map((b) => (
+                  <div key={b}>⚠ {b}</div>
+                ))}
+              </div>
+            )}
           </section>
 
           {/* Right: what is already open */}
