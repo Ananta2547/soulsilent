@@ -465,7 +465,6 @@ export default function TeacherProfilePage() {
             {onDay.map((r, i) => {
               const full = r.private_taken > 0 || r.booked >= r.max_participants;
               const on = hover === r.id;
-              const left = r.max_participants - r.booked;
               return (
                 <Link
                   key={r.id}
@@ -485,7 +484,7 @@ export default function TeacherProfilePage() {
                     <span className="tp2-round-meta">
                       <span>{r.time_start}–{r.time_end}</span>
                       <span>{r.is_online ? 'ONLINE' : r.loc_name || '—'}</span>
-                      <span>{full ? (th ? 'เต็ม' : 'full') : th ? `เหลือ ${left} ที่` : `${left} seats left`}</span>
+                      <span>{full ? (th ? 'เต็ม' : 'full') : th ? `รับ ${r.max_participants} ที่` : `${r.max_participants} seats`}</span>
                     </span>
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 14 }}>

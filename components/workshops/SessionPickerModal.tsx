@@ -164,7 +164,7 @@ export function SessionPickerModal({
                           <span style={{ display: 'block', fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{s.is_online ? 'ONLINE' : s.location || '—'}</span>
                         </span>
                         <span className={`tag ${full ? 'tag-warn' : 'tag-ink'}`} style={{ fontSize: 11, padding: '4px 10px' }}>
-                          {full ? tr(lang, 'เต็ม', 'Full') : s.booked === 0 ? tr(lang, 'ว่าง', 'Open') : tr(lang, `เหลือ ${left}`, `${left} left`)}
+                          {full ? tr(lang, 'เต็ม', 'Full') : tr(lang, 'ว่าง', 'Open')}
                         </span>
                       </label>
                     );
@@ -199,7 +199,7 @@ export function SessionPickerModal({
                   {tier.mode === 'round'
                     ? tr(lang, 'เหมาทั้งรอบ ไม่มีคนอื่นร่วม', 'The whole round, nobody else')
                     : isGroupTier(tier)
-                      ? tierDesc(tier, lang) + (tier.lock ? '' : tr(lang, ' · เรียนร่วมกับคนอื่นได้', ' · alongside others')) + (session ? tr(lang, ` · รอบนี้รับได้ถึง ${seatsLeft} คน`, ` · this round has room for ${seatsLeft}`) : '')
+                      ? tierDesc(tier, lang) + (tier.lock ? '' : tr(lang, ' · เรียนร่วมกับคนอื่นได้', ' · alongside others')) + (session ? tr(lang, ` · รอบนี้รับ ${session.max_participants} คน`, ` · this round takes ${session.max_participants}`) : '')
                       : tier.lock
                         ? tr(lang, 'จอง 1 ที่นั่ง แล้วรอบนี้เป็นของคุณคนเดียว', 'One seat, and the round is yours alone')
                         : tr(lang, 'จอง 1 ที่นั่ง เรียนร่วมกับคนอื่น', 'One seat, alongside others')}

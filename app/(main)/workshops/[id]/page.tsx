@@ -1063,9 +1063,7 @@ function WorkshopDetailInner() {
           <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
             {spotsLeft <= 0
               ? tr(lang, 'เต็มแล้ว', 'Sold out')
-              : spotsLeft <= 4
-                ? tr(lang, `เหลือเพียง ${spotsLeft} ที่นั่ง`, `Only ${spotsLeft} seats left`)
-                : tr(lang, `รับ ${workshop.max_participants} ที่นั่ง`, `${workshop.max_participants} seats`)}
+              : tr(lang, `รับ ${workshop.max_participants} ที่นั่ง`, `${workshop.max_participants} seats`)}
           </div>
         </div>
         <button
@@ -1250,7 +1248,6 @@ function BookingCardContent({
   const eff = getEffectivePrice(workshop);
   // Show "Free" when the payment model is free OR the effective price is ฿0.
   const isFree = (workshop.payment_type || 'paid') === 'free' || eff.price <= 0;
-  const lowSeats = spotsLeft > 0 && spotsLeft <= 4;
   const isSelection = workshop.admission_type === 'selection';
   const paymentType = workshop.payment_type || 'paid';
   // Organizer/admin cancelled the whole event → no booking, show the reason.
@@ -1399,21 +1396,6 @@ function BookingCardContent({
             {workshop.max_participants} {tr(lang, 'ที่นั่ง', 'seats')}
           </span>
         </div>
-        {lowSeats && (
-          <div
-            style={{
-              fontSize: 12.5,
-              color: '#a04a14',
-              marginTop: 10,
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 5,
-            }}
-          >
-            ⚠ {tr(lang, `เหลือเพียง ${spotsLeft} ที่นั่ง`, `Only ${spotsLeft} seats left`)}
-          </div>
-        )}
       </div>
 
       {/* Announcement date + countdown for selection workshops */}
