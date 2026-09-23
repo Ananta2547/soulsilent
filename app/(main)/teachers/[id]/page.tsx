@@ -16,7 +16,20 @@ import { useParams } from 'next/navigation';
 import { useLang, tr } from '@/lib/i18n';
 import { Btn } from '@/components/design/RippleButton';
 import { useLoadingTracker } from '@/components/design/DataLoading';
-import { EMPTY_PROFILE, LIMITS, MAX_TAKEAWAYS, parseTeacherProfile, type TeacherProfile } from '@/lib/teacher-profile';
+import {
+  EMPTY_PROFILE,
+  LIMITS,
+  MAX_JOURNEY,
+  MAX_SOCIALS,
+  MAX_TAKEAWAYS,
+  SOCIAL_KINDS,
+  SOCIAL_LABEL,
+  parseTeacherProfile,
+  sortedJourney,
+  type JourneyStep,
+  type SocialLink,
+  type TeacherProfile,
+} from '@/lib/teacher-profile';
 import type { TeacherPublic } from '@/app/api/teachers/[id]/route';
 
 type Round = {
@@ -167,9 +180,46 @@ export default function TeacherProfilePage() {
       const cur = d || EMPTY_PROFILE;
       return cur.takeaways.length >= MAX_TAKEAWAYS ? cur : { ...cur, takeaways: [...cur.takeaways, { title: '', body: '' }] };
     });
+  // Journey steps and contact links: the same edit-in-place list pattern.
+  const patchStep = (i: number, p: Partial<JourneyStep>) =>
+    setDraft((d) => {
+      const cur = d || EMPTY_PROFILE;
+      return { ...cur, journey: cur.journey.map((t, j) => (j === i ? { ...t, ...p } : t)) };
+    });
+  const removeStep = (i: number) =>
+    setDraft((d) => {
+      const cur = d || EMPTY_PROFILE;
+      return { ...cur, journey: cur.journey.filter((_, j) => j !== i) };
+    });
+  const addStep = () =>
+    setDraft((d) => {
+      const cur = d || EMPTY_PROFILE;
+      return cur.journey.length >= MAX_JOURNEY ? cur : { ...cur, journey: [...cur.journey, { year: '', title: '', body: '' }] };
+    });
+  const patchSocial = (i: number, p: Partial<SocialLink>) =>
+    setDraft((d) => {
+      const cur = d || EMPTY_PROFILE;
+      return { ...cur, socials: cur.socials.map((t, j) => (j === i ? { ...t, ...p } : t)) };
+    });
+  const removeSocial = (i: number) =>
+    setDraft((d) => {
+      const cur = d || EMPTY_PROFILE;
+      return { ...cur, socials: cur.socials.filter((_, j) => j !== i) };
+    });
+  const addSocial = () =>
+    setDraft((d) => {
+      const cur = d || EMPTY_PROFILE;
+      const unused = SOCIAL_KINDS.find((k) => !cur.socials.some((s) => s.kind === k)) || 'website';
+      return cur.socials.length >= MAX_SOCIALS ? cur : { ...cur, socials: [...cur.socials, { kind: unused, url: '' }] };
+    });
   const startEdit = () => {
     setSaveError(null);
-    setDraft({ ...teacher.profile, takeaways: teacher.profile.takeaways.map((t) => ({ ...t })) });
+    setDraft({
+      ...teacher.profile,
+      takeaways: teacher.profile.takeaways.map((t) => ({ ...t })),
+      journey: teacher.profile.journey.map((t) => ({ ...t })),
+      socials: teacher.profile.socials.map((t) => ({ ...t })),
+    });
   };
   const cancelEdit = () => {
     setDraft(null);
@@ -198,6 +248,7 @@ export default function TeacherProfilePage() {
 
   const showTake = editing || profile.takeaways.length > 0;
   const showBelief = editing || !!profile.belief;
+  const showJourney = editing || profile.journey.length > 0;
 
   return (
     <div className="tm tp2" data-lang={lang} data-editing={editing ? '1' : undefined}>
@@ -279,7 +330,8 @@ export default function TeacherProfilePage() {
         </div>
       </section>
 
-      {/* Editor bar — sticks under the site header while editing */}
+      {/* Editor bar — pinned to the bottom of the screen while editing, so
+          save is always one reach away wherever the teacher has scrolled */}
       {editing && (
         <div className="tp2-editbar">
           <div className="tp2-wrap tp2-editbar-row">
@@ -339,6 +391,59 @@ export default function TeacherProfilePage() {
         </section>
       )}
 
+      {/* Journey — a timeline by year */}
+      {showJourney && (
+        <section className="tp2-section">
+          <div className="tp2-wrap">
+            <span className="tm-eyebrow">{th ? `เส้นทางของ${display}` : `${display} — the path`}</span>
+            <h2 className="tp2-h2" style={{ maxWidth: 620 }}>{th ? 'เส้นทางที่ค่อย ๆ เดินมา' : 'The road so far'}</h2>
+            {editing ? (
+              <div className="tp2-journey">
+                {profile.journey.map((k, i) => (
+                  <div key={i} className="tp2-jstep">
+                    <span className="tp2-jdot" aria-hidden="true" />
+                    <div className="tp2-jedit">
+                      <label className="tp2-field" style={{ maxWidth: 160 }}>
+                        <span className="tp2-field-label">{th ? 'ปี' : 'Year'}</span>
+                        <input className="tp2-input" maxLength={LIMITS.year} value={k.year} placeholder={th ? 'เช่น 2017' : 'e.g. 2017'} onChange={(e) => patchStep(i, { year: e.target.value })} />
+                      </label>
+                      <label className="tp2-field">
+                        <span className="tp2-field-label">{th ? 'หัวข้อ' : 'Title'}</span>
+                        <input className="tp2-input tp2-input-title" maxLength={LIMITS.title} value={k.title} placeholder={th ? 'เช่น เริ่มสอนคลาสแรก' : 'e.g. First class taught'} onChange={(e) => patchStep(i, { title: e.target.value })} />
+                      </label>
+                      <label className="tp2-field">
+                        <span className="tp2-field-label">{th ? 'เล่าสั้น ๆ' : 'Story'}</span>
+                        <textarea className="tp2-input" rows={3} maxLength={LIMITS.journeyBody} value={k.body} onChange={(e) => patchStep(i, { body: e.target.value })} />
+                      </label>
+                      <button type="button" className="tp2-remove" style={{ gridColumn: 'auto' }} onClick={() => removeStep(i)}>✕ {th ? 'ลบปีนี้' : 'Remove'}</button>
+                    </div>
+                  </div>
+                ))}
+                {profile.journey.length === 0 && (
+                  <div className="tp2-empty-hint">{th ? 'ยังไม่มีเส้นทาง — เพิ่มทีละปี (ถ้าไม่มีเลย ส่วนนี้จะไม่แสดง) หน้าเว็บจะเรียงตามปีให้เอง' : 'No steps yet — add one per year (none hides this section); the page sorts them by year'}</div>
+                )}
+                {profile.journey.length < MAX_JOURNEY && (
+                  <button type="button" className="tp2-add" onClick={addStep}>
+                    + {th ? `เพิ่มปี (${profile.journey.length}/${MAX_JOURNEY})` : `Add a year (${profile.journey.length}/${MAX_JOURNEY})`}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <ol className="tp2-journey">
+                {sortedJourney(profile.journey).map((k, i) => (
+                  <li key={i} className="tp2-jstep">
+                    <span className="tp2-jdot" aria-hidden="true" />
+                    {k.year && <div className="tp2-jyear">{k.year}</div>}
+                    {k.title && <div className="tp2-jtitle">{k.title}</div>}
+                    {k.body && <p className="tp2-jbody">{k.body}</p>}
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        </section>
+      )}
+
       {/* Belief */}
       {showBelief && (
         <section className="tp2-band">
@@ -391,6 +496,7 @@ export default function TeacherProfilePage() {
                       <img src={w.image_url} alt="" />
                     )}
                     <span aria-hidden="true" className="tm-work-no">{pad2(i + 1)}</span>
+                    <span className={`tp2-work-status ${w.open ? 'open' : ''}`}>{w.open ? (th ? 'เปิดรับ' : 'Open') : th ? 'ปิดรับ' : 'Closed'}</span>
                     <span aria-hidden="true" className="tm-work-star">✺</span>
                     <span className="tm-work-name" style={{ transform: `translateY(${on ? '0%' : '101%'})` }}>{w.title}</span>
                   </Link>
@@ -515,6 +621,39 @@ export default function TeacherProfilePage() {
           </div>
           <Btn kind="paper" href="/help">{th ? `ส่งคำถามถึง${display}` : `Ask ${display}`} <span className="mono">→</span></Btn>
         </div>
+        {(editing || profile.socials.length > 0) && (
+          <div className="tp2-wrap" style={{ position: 'relative', marginTop: 30 }}>
+            <span className="tm-eyebrow" style={{ color: 'rgba(255,255,255,.7)' }}>{th ? 'ช่องทางติดต่อ' : 'Find them on'}</span>
+            {editing ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12, maxWidth: 640 }}>
+                {profile.socials.map((s, i) => (
+                  <div key={i} className="tp2-social-edit">
+                    <select className="tp2-input tp2-social-kind" value={s.kind} onChange={(e) => patchSocial(i, { kind: e.target.value as SocialLink['kind'] })}>
+                      {SOCIAL_KINDS.map((k) => (
+                        <option key={k} value={k}>{SOCIAL_LABEL[k]}</option>
+                      ))}
+                    </select>
+                    <input className="tp2-input tp2-social-url" maxLength={LIMITS.url} value={s.url} placeholder={s.kind === 'line' ? 'https://line.me/ti/p/…' : 'https://…'} onChange={(e) => patchSocial(i, { url: e.target.value })} />
+                    <button type="button" className="tp2-remove" style={{ color: 'var(--accent)' }} onClick={() => removeSocial(i)} aria-label={th ? 'ลบช่องทางนี้' : 'Remove this link'}>✕</button>
+                  </div>
+                ))}
+                {profile.socials.length < MAX_SOCIALS && (
+                  <button type="button" className="tp2-add" style={{ color: '#fff', borderColor: 'rgba(255,255,255,.5)' }} onClick={addSocial}>
+                    + {th ? 'เพิ่มช่องทาง' : 'Add a link'}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="tp2-socials">
+                {profile.socials.map((s, i) => (
+                  <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className="tp2-social">
+                    {SOCIAL_LABEL[s.kind]} <span className="mono">↗</span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </section>
     </div>
   );

@@ -5,6 +5,8 @@ import { expireStaleHolds } from '@/lib/holds';
 import { roleSql } from '@/lib/roles';
 import { getCurrentUserWithRoles } from '@/lib/auth';
 import { parseTeacherProfile, type TeacherProfile } from '@/lib/teacher-profile';
+import { getWorkshopStatusBadge } from '@/lib/workshop-utils';
+import type { Workshop } from '@/lib/types';
 
 /* Public profile of a teacher: who they are, what they wrote about
  * themselves, the workshops they have run, and every round they run from
@@ -39,10 +41,10 @@ export type TeacherPublic = {
   hosted: number;
   joined: number;
   /** Distinct workshops, open ones first then the newest past ones. */
-  works: { id: string; title: string; image_url: string | null }[];
+  works: { id: string; title: string; image_url: string | null; open: boolean }[];
 };
 
-type WorkRow = { id: string; title: string; image_url: string | null; category: string | null };
+type WorkRow = { id: string; title: string; image_url: string | null; category: string | null; open?: boolean };
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -64,6 +66,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       .prepare(
         `SELECT w.id, w.master_id, w.title, w.date, w.end_date, w.workshop_type, w.dates_json,
                 w.time_start, w.time_end, w.image_url, w.price, w.max_participants, w.is_online, w.category,
+                w.status, w.close_at, w.admission_type, w.announce_at, w.day_times_json,
                 l.name AS loc_name, l.province AS loc_province,
                 ${seatsHeldSubquery('w')} AS booked,
                 (SELECT COALESCE(SUM(CASE WHEN b.booking_kind = 'private' THEN 1 ELSE 0 END), 0)
@@ -102,7 +105,17 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       .bind(id, id, id)
       .first<{ n: number }>();
 
-    const open = (rounds.results || []) as unknown as WorkRow[];
+    // A work is open while its round still takes bookings: registration not
+    // closed (start, close_at, announce) and seats not gone.
+    const open = ((rounds.results || []) as unknown as (Workshop & { booked: number; private_taken: number })[]).map(
+      (w): WorkRow => ({
+        id: w.id,
+        title: w.title,
+        image_url: w.image_url,
+        category: w.category ?? null,
+        open: getWorkshopStatusBadge(w).open && w.private_taken === 0 && w.booked < w.max_participants,
+      }),
+    );
     const pastRows = past.results || [];
     const craftCount = new Map<string, number>();
     [...open, ...pastRows].forEach((w) => w.category && craftCount.set(w.category, (craftCount.get(w.category) || 0) + 1));
@@ -110,7 +123,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const works = [...open, ...pastRows]
       .filter((w) => (seen.has(w.title) ? false : (seen.add(w.title), true)))
       .slice(0, 8)
-      .map((w) => ({ id: w.id, title: w.title, image_url: w.image_url }));
+      .map((w) => ({ id: w.id, title: w.title, image_url: w.image_url, open: !!w.open }));
 
     const me = await getCurrentUserWithRoles();
     const can_edit = !!me && (me.sub === id || me.roles.includes('admin'));
