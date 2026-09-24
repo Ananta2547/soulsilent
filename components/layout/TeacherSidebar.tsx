@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { RailToggleIcon, useRailCollapsed } from './useRailCollapsed';
 import { hasAnyRole } from '@/lib/roles';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -78,6 +79,8 @@ const NAV: NavItem[] = [
 export function TeacherSidebar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  // Desktop only: fold the rail down to its icons.
+  const [collapsed, toggleRail] = useRailCollapsed();
   // "จัดรอบสอน" is for the ผู้จัดรอบ role (session_host); admin sees it too.
   const [roles, setRoles] = useState<string[]>([]);
   useEffect(() => {
@@ -126,17 +129,27 @@ export function TeacherSidebar() {
       )}
 
       <aside
-        className={`w-64 bg-dark min-h-screen flex flex-col shrink-0 ${
+        className={`w-64 ${collapsed ? 'lg:w-[76px]' : ''} bg-dark min-h-screen flex flex-col shrink-0 transition-[width] duration-200 ${
           open
             ? 'fixed inset-y-0 left-0 z-50 shadow-2xl lg:static lg:shadow-none'
             : 'hidden lg:flex'
         }`}
       >
-        <div className="p-6 border-b border-white/10 flex items-start gap-3">
+        <div className={`p-6 border-b border-white/10 flex items-start gap-3 ${collapsed ? 'lg:flex-col lg:items-center lg:px-3 lg:py-5' : ''}`}>
           <div className="min-w-0">
             <Logo size="sm" markOnly />
-            <p className="text-xs text-gray mt-1 font-mono tracking-wider">TEACHER</p>
+            <p className={`text-xs text-gray mt-1 font-mono tracking-wider ${collapsed ? 'lg:hidden' : ''}`}>TEACHER</p>
           </div>
+          <button
+            type="button"
+            onClick={toggleRail}
+            aria-label={collapsed ? 'ขยายเมนู' : 'ย่อเมนู'}
+            title={collapsed ? 'ขยายเมนู' : 'ย่อเมนู'}
+            aria-expanded={!collapsed}
+            className={`hidden lg:flex w-9 h-9 items-center justify-center rounded-xl text-gray-light hover:text-white hover:bg-white/5 shrink-0 ${collapsed ? '' : 'ml-auto -mt-1 -mr-1'}`}
+          >
+            <RailToggleIcon collapsed={collapsed} />
+          </button>
           <button
             type="button"
             onClick={() => setOpen(false)}
@@ -149,7 +162,7 @@ export function TeacherSidebar() {
           </button>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className={`flex-1 p-4 space-y-1 ${collapsed ? 'lg:px-3' : ''}`}>
           {nav.map((item) => {
             // Each section owns its subtree, so the workshop detail page keeps
             // "Workshop ของฉัน" lit.
@@ -162,27 +175,29 @@ export function TeacherSidebar() {
                 // Closes the drawer on the way out: the page behind it has just
                 // changed, and a menu left over it hides what was asked for.
                 onClick={() => setOpen(false)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
+                title={collapsed ? item.label : undefined}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${collapsed ? 'lg:justify-center lg:px-0' : ''} ${
                   active ? 'bg-primary text-white' : 'text-gray-light hover:text-white hover:bg-white/5'
                 }`}
               >
                 {item.icon}
-                {item.label}
+                <span className={collapsed ? 'lg:hidden' : ''}>{item.label}</span>
               </Link>
             );
           })}
         </nav>
 
-        <div className="p-4 border-t border-white/10">
+        <div className={`p-4 border-t border-white/10 ${collapsed ? 'lg:px-3' : ''}`}>
           <Link
             href="/"
             onClick={() => setOpen(false)}
-            className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-gray-light hover:text-white hover:bg-white/5 transition-colors"
+            title={collapsed ? 'กลับหน้าเว็บ' : undefined}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-gray-light hover:text-white hover:bg-white/5 transition-colors ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}
           >
             <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 17l-5-5m0 0l5-5m-5 5h12" />
             </svg>
-            กลับหน้าเว็บ
+            <span className={collapsed ? 'lg:hidden' : ''}>กลับหน้าเว็บ</span>
           </Link>
         </div>
       </aside>

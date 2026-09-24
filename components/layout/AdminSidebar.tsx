@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { RailToggleIcon, useRailCollapsed } from './useRailCollapsed';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Logo } from './Logo';
@@ -132,6 +133,8 @@ export function AdminSidebar() {
   const pathname = usePathname();
 
   // Auto-expand groups when their basePath matches the current route
+  // Fold the rail down to its icons.
+  const [collapsed, toggleRail, setCollapsed] = useRailCollapsed();
   const [open, setOpen] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
     NAV.forEach((item) => {
@@ -156,13 +159,25 @@ export function AdminSidebar() {
   }, [pathname]);
 
   return (
-    <aside className="w-64 bg-dark min-h-screen flex flex-col">
-      <div className="p-6 border-b border-white/10">
-        <Logo size="sm" markOnly />
-        <p className="text-xs text-gray mt-1 font-mono tracking-wider">ADMIN</p>
+    <aside className={`${collapsed ? 'w-[76px]' : 'w-64'} bg-dark min-h-screen flex flex-col shrink-0 transition-[width] duration-200`}>
+      <div className={`border-b border-white/10 flex gap-3 ${collapsed ? 'flex-col items-center px-3 py-5' : 'items-start p-6'}`}>
+        <div className="min-w-0">
+          <Logo size="sm" markOnly />
+          {!collapsed && <p className="text-xs text-gray mt-1 font-mono tracking-wider">ADMIN</p>}
+        </div>
+        <button
+          type="button"
+          onClick={toggleRail}
+          aria-label={collapsed ? 'ขยายเมนู' : 'ย่อเมนู'}
+          title={collapsed ? 'ขยายเมนู' : 'ย่อเมนู'}
+          aria-expanded={!collapsed}
+          className={`flex w-9 h-9 items-center justify-center rounded-xl text-gray-light hover:text-white hover:bg-white/5 shrink-0 ${collapsed ? '' : 'ml-auto -mt-1 -mr-1'}`}
+        >
+          <RailToggleIcon collapsed={collapsed} />
+        </button>
       </div>
 
-      <nav className="flex-1 p-4 space-y-1">
+      <nav className={`flex-1 space-y-1 ${collapsed ? 'px-3 py-4' : 'p-4'}`}>
         {NAV.map((item) => {
           if (!isGroup(item)) {
             const active = pathname === item.href;
@@ -170,14 +185,15 @@ export function AdminSidebar() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
+                title={collapsed ? item.label : undefined}
+                className={`flex items-center gap-3 py-3 rounded-xl text-sm font-medium transition-colors ${collapsed ? 'justify-center px-0' : 'px-4'} ${
                   active
                     ? 'bg-primary text-white'
                     : 'text-gray-light hover:text-white hover:bg-white/5'
                 }`}
               >
                 {item.icon}
-                {item.label}
+                {!collapsed && item.label}
               </Link>
             );
           }
@@ -189,17 +205,25 @@ export function AdminSidebar() {
             <div key={item.basePath}>
               <button
                 type="button"
-                onClick={() => setOpen({ ...open, [item.basePath]: !expanded })}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
+                onClick={() => {
+                  // Folded, a group has nowhere to list its pages: unfold the
+                  // rail and open the group.
+                  if (collapsed) {
+                    setCollapsed(false);
+                    setOpen({ ...open, [item.basePath]: true });
+                  } else setOpen({ ...open, [item.basePath]: !expanded });
+                }}
+                title={collapsed ? item.label : undefined}
+                className={`w-full flex items-center gap-3 py-3 rounded-xl text-sm font-medium transition-colors ${collapsed ? 'justify-center px-0' : 'px-4'} ${
                   isParentActive
                     ? 'bg-white/10 text-white'
                     : 'text-gray-light hover:text-white hover:bg-white/5'
                 }`}
               >
                 {item.icon}
-                <span className="flex-1 text-left">{item.label}</span>
+                {!collapsed && <span className="flex-1 text-left">{item.label}</span>}
                 <svg
-                  className={`w-3 h-3 transition-transform ${expanded ? 'rotate-90' : ''}`}
+                  className={`w-3 h-3 transition-transform ${expanded ? 'rotate-90' : ''} ${collapsed ? 'hidden' : ''}`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -207,7 +231,7 @@ export function AdminSidebar() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </button>
-              {expanded && (
+              {expanded && !collapsed && (
                 <div className="mt-1 ml-3 pl-4 border-l border-white/10 space-y-1">
                   {item.children.map((child) => {
                     const active = pathname === child.href;
@@ -232,15 +256,16 @@ export function AdminSidebar() {
         })}
       </nav>
 
-      <div className="p-4 border-t border-white/10">
+      <div className={`border-t border-white/10 ${collapsed ? 'px-3 py-4' : 'p-4'}`}>
         <Link
           href="/"
-          className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-gray-light hover:text-white hover:bg-white/5 transition-colors"
+          title={collapsed ? 'กลับหน้าเว็บ' : undefined}
+          className={`flex items-center gap-3 py-3 rounded-xl text-sm text-gray-light hover:text-white hover:bg-white/5 transition-colors ${collapsed ? 'justify-center px-0' : 'px-4'}`}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 17l-5-5m0 0l5-5m-5 5h12" />
           </svg>
-          กลับหน้าเว็บ
+          {!collapsed && 'กลับหน้าเว็บ'}
         </Link>
       </div>
     </aside>
