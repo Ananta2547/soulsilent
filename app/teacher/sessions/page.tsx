@@ -1,9 +1,11 @@
 'use client';
 
 /* Session manager — where a teacher opens rounds of the activities the admin
- * handed them. Pick the activity, the days (several at once, or a daily /
- * weekly pattern), one or more time ranges, a venue — and every day × time
- * becomes a bookable round. An opened round can be edited from the list. */
+ * handed them. Each activity is a card; its "add rounds" button opens a popup
+ * to pick the days (several at once, or a daily / weekly pattern), one or
+ * more time ranges and a venue — every day × time becomes a bookable round.
+ * An opened round can be edited from the list under the cards, in the same
+ * popup. */
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -51,6 +53,8 @@ export default function TeacherSessionsPage() {
   const [seats, setSeats] = useState('');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // What the last save did, shown on the page once the popup has closed.
+  const [notice, setNotice] = useState<string | null>(null);
   // A round being edited: the form shows that one round's fields.
   const [editing, setEditing] = useState<Round | null>(null);
 
@@ -114,7 +118,26 @@ export default function TeacherSessionsPage() {
     setMsg(null);
   }
 
+  // The popup is open whenever an activity is chosen; closing clears it.
+  function closeForm() {
+    resetForm();
+    setMasterId('');
+  }
+
+  function openAdd(m: WorkshopMaster) {
+    resetForm();
+    setNotice(null);
+    setMasterId(m.id);
+    setRepeat('once');
+    setWeekdays([]);
+    setEndDate('');
+    setSlots([{ time_start: '09:00', time_end: '12:00' }]);
+    setLocationId('');
+    setSeats(m.default_max_participants ? String(m.default_max_participants) : '');
+  }
+
   function startEdit(r: Round) {
+    setNotice(null);
     setEditing(r);
     setMasterId(r.master_id);
     setRepeat('once');
@@ -124,7 +147,6 @@ export default function TeacherSessionsPage() {
     setLocationId(r.location_id || '');
     setSeats(String(r.max_participants));
     setMsg(null);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   async function submit() {
@@ -149,9 +171,8 @@ export default function TeacherSessionsPage() {
           setMsg({ ok: false, text: d.error || tr(lang, 'แก้ไขไม่สำเร็จ', 'Could not save') });
           return;
         }
-        setMsg({ ok: true, text: tr(lang, 'บันทึกการแก้ไขแล้ว', 'Round updated') });
-        setEditing(null);
-        setDates([]);
+        setNotice(tr(lang, 'บันทึกการแก้ไขแล้ว', 'Round updated'));
+        closeForm();
         await load();
         return;
       }
@@ -177,9 +198,8 @@ export default function TeacherSessionsPage() {
       }
       const n = d.created || 1;
       const skipped = d.skipped ? tr(lang, ` (ข้าม ${d.skipped} รอบที่มีอยู่แล้ว)`, ` (${d.skipped} already-open rounds skipped)`) : '';
-      setMsg({ ok: true, text: n === 1 ? tr(lang, `เปิดรอบแล้ว${skipped}`, `Round opened${skipped}`) : tr(lang, `เปิด ${n} รอบแล้ว${skipped}`, `${n} rounds opened${skipped}`) });
-      setDates([]);
-      setDate(null);
+      setNotice(n === 1 ? tr(lang, `เปิดรอบ ${master.title} แล้ว${skipped}`, `Round opened for ${master.title}${skipped}`) : tr(lang, `เปิด ${n} รอบของ ${master.title} แล้ว${skipped}`, `${n} rounds opened for ${master.title}${skipped}`));
+      closeForm();
       await load();
     } finally {
       setSaving(false);
@@ -194,7 +214,7 @@ export default function TeacherSessionsPage() {
       setMsg({ ok: false, text: d.error || tr(lang, 'ยกเลิกไม่สำเร็จ', 'Could not cancel') });
       return;
     }
-    if (editing?.id === r.id) resetForm();
+    if (editing?.id === r.id) closeForm();
     await load();
   }
 
@@ -205,20 +225,19 @@ export default function TeacherSessionsPage() {
   // Why the open button is greyed out, spelled out under it — one line per
   // step still missing, in the order the form asks for them.
   const blockers: string[] = [];
-  if (!master) blockers.push(tr(lang, 'ยังไม่ได้เลือก Workshop (ข้อ 1)', 'Pick a workshop (step 1)'));
-  else if (!priced) blockers.push(tr(lang, 'Admin ยังไม่ได้ตั้งราคาให้ Workshop นี้ — ติดต่อ Admin', 'No price set for this workshop yet — ask an admin'));
+  if (master && !priced) blockers.push(tr(lang, 'Admin ยังไม่ได้ตั้งราคาให้ Workshop นี้ — ติดต่อ Admin', 'No price set for this workshop yet — ask an admin'));
   if (!daysOk) {
-    if (repeat === 'once') blockers.push(tr(lang, 'ยังไม่ได้เลือกวันจากปฏิทิน (ข้อ 2)', 'Pick at least one day on the calendar (step 2)'));
-    else if (!date || !endDate) blockers.push(tr(lang, 'ยังไม่ได้ใส่วันเริ่มและวันสิ้นสุด (ข้อ 2)', 'Set a start and an end date (step 2)'));
-    else if (endDate < date) blockers.push(tr(lang, 'วันสิ้นสุดอยู่ก่อนวันเริ่ม (ข้อ 2)', 'The end date is before the start date (step 2)'));
-    else blockers.push(tr(lang, 'ยังไม่ได้เลือกวันในสัปดาห์ (ข้อ 2)', 'Pick the weekdays (step 2)'));
+    if (repeat === 'once') blockers.push(tr(lang, 'ยังไม่ได้เลือกวันจากปฏิทิน (ข้อ 1)', 'Pick at least one day on the calendar (step 1)'));
+    else if (!date || !endDate) blockers.push(tr(lang, 'ยังไม่ได้ใส่วันเริ่มและวันสิ้นสุด (ข้อ 1)', 'Set a start and an end date (step 1)'));
+    else if (endDate < date) blockers.push(tr(lang, 'วันสิ้นสุดอยู่ก่อนวันเริ่ม (ข้อ 1)', 'The end date is before the start date (step 1)'));
+    else blockers.push(tr(lang, 'ยังไม่ได้เลือกวันในสัปดาห์ (ข้อ 1)', 'Pick the weekdays (step 1)'));
   }
-  if (!slotsOk) blockers.push(tr(lang, 'เวลาเริ่มต้องอยู่ก่อนเวลาจบทุกช่วง (ข้อ 3)', 'Every time slot must start before it ends (step 3)'));
+  if (!slotsOk) blockers.push(tr(lang, 'เวลาเริ่มต้องอยู่ก่อนเวลาจบทุกช่วง (ข้อ 2)', 'Every time slot must start before it ends (step 2)'));
   if (!locationId)
     blockers.push(
       master && allowedLocs.length === 0
         ? tr(lang, 'ยังไม่มีสถานที่ให้เลือกสำหรับ Workshop นี้ — ติดต่อ Admin ให้เพิ่มสถานที่', 'No venue is available for this workshop — ask an admin to add one')
-        : tr(lang, 'ยังไม่ได้เลือกสถานที่ (ข้อ 4)', 'Pick a venue (step 4)'),
+        : tr(lang, 'ยังไม่ได้เลือกสถานที่ (ข้อ 3)', 'Pick a venue (step 3)'),
     );
   const DOW = lang === 'th' ? ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'] : ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
   const editLocked = !!editing && editing.booked > 0;
@@ -229,13 +248,15 @@ export default function TeacherSessionsPage() {
         <T th="จัดรอบสอน" en="session manager" />
       </span>
       <h1 className="display-th" style={{ fontSize: 'clamp(24px,3vw,32px)', margin: '8px 0 4px' }}>
-        {editing ? <T th="แก้ไขรอบ" en="Edit a round" /> : <T th="เปิดรอบสอน" en="Open rounds" />}
+        <T th="เปิดรอบสอน" en="Open rounds" />
       </h1>
       <p style={{ fontSize: 14, color: 'var(--muted)', margin: '0 0 22px' }}>
-        {editing
-          ? tr(lang, `${fmtDate(editing.date, lang)} · ${editing.time_start}–${editing.time_end} — เปลี่ยนวัน เวลา สถานที่ หรือที่นั่ง แล้วกดบันทึก`, `${fmtDate(editing.date, lang)} · ${editing.time_start}–${editing.time_end} — change the day, time, venue or seats, then save`)
-          : tr(lang, 'เลือก Workshop จิ้มวันในปฏิทินได้หลายวัน ใส่ช่วงเวลาได้หลายช่วง (เช่น รอบเช้า รอบเย็น) เลือกสถานที่ — ทุกวัน × ทุกช่วงเวลาจะเปิดเป็นรอบให้จอง', 'Pick an activity, tap as many days as you like, add one or more time ranges (say, morning and evening), choose a venue — every day × time opens as a bookable round.')}
+        {tr(lang, 'กด "เพิ่มรอบ" ที่การ์ด Workshop แล้วจิ้มวันในปฏิทินได้หลายวัน ใส่ช่วงเวลาได้หลายช่วง เลือกสถานที่ — ทุกวัน × ทุกช่วงเวลาจะเปิดเป็นรอบให้จอง', 'Press "Add rounds" on a workshop card, tap as many days as you like, add one or more time ranges and a venue — every day × time opens as a bookable round.')}
       </p>
+
+      {notice && (
+        <div style={{ marginBottom: 18, padding: '10px 14px', borderRadius: 12, fontSize: 13.5, background: 'var(--teal-50)', color: 'var(--teal-deep)', fontWeight: 600 }}>✓ {notice}</div>
+      )}
 
       {data === null ? null : data.masters.length === 0 ? (
         <div className="card card-static" style={{ textAlign: 'center', padding: '48px 24px' }}>
@@ -244,41 +265,70 @@ export default function TeacherSessionsPage() {
           </p>
         </div>
       ) : (
-        <div className="tsm-grid">
-          {/* Left: the form */}
-          <section className="card card-static" style={editing ? { outline: '2px solid var(--teal)' } : undefined}>
-            <label className="tsm-label">
-              <T th="1 · Workshop" en="1 · Activity" />
-            </label>
-            <select
-              value={masterId}
-              disabled={!!editing}
-              onChange={(e) => {
-                setMasterId(e.target.value);
-                setMsg(null);
-                setLocationId('');
-                const m = data.masters.find((x) => x.id === e.target.value);
-                setSeats(m?.default_max_participants ? String(m.default_max_participants) : '');
+        <>
+          {/* Workshop cards — each opens the round popup */}
+          <div className="tsm-cards">
+            {data.masters.map((m) => {
+              const mine = upcoming.filter((r) => r.master_id === m.id);
+              const tiers = bookableTiers(m);
+              return (
+                <article key={m.id} className="tsm-card">
+                  {m.cover_image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={m.cover_image_url} alt="" className="tsm-card-img" />
+                  ) : (
+                    <span className="tsm-card-img ph ph-teal" />
+                  )}
+                  <div className="tsm-card-body">
+                    <h3 className="display-th tsm-card-title">{m.title}</h3>
+                    <div className="tsm-card-meta">
+                      {tiers.length ? tiers.slice(0, 3).map((t) => <span key={t.id}>{t.label} <b>{baht(t.price)}</b></span>) : <span style={{ color: '#a04a14' }}>⚠ {tr(lang, 'ยังไม่ตั้งราคา', 'No price yet')}</span>}
+                    </div>
+                    <div className="tsm-card-meta">
+                      {mine.length
+                        ? tr(lang, `เปิดอยู่ ${mine.length} รอบ · ถัดไป ${fmtDate(mine[0].date, lang)}`, `${mine.length} open · next ${fmtDate(mine[0].date, lang)}`)
+                        : tr(lang, 'ยังไม่มีรอบที่เปิด', 'No rounds open')}
+                    </div>
+                    <Btn kind="teal" onClick={() => openAdd(m)} style={{ marginTop: 'auto', alignSelf: 'flex-start' }}>
+                      + {tr(lang, 'เพิ่มรอบ', 'Add rounds')}
+                    </Btn>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+
+          {/* Popup: pick days, times, venue for the chosen workshop */}
+          {master && (
+            <div
+              className="tsm-pop-backdrop"
+              onMouseDown={(e) => {
+                if (e.target === e.currentTarget && !saving) closeForm();
               }}
-              className="field"
             >
-              <option value="">{tr(lang, '— เลือก Workshop —', '— choose —')}</option>
-              {data.masters.map((m) => (
-                <option key={m.id} value={m.id}>{m.title}</option>
-              ))}
-            </select>
-            {master && (
-              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8, fontSize: 12.5, color: 'var(--muted)' }}>
-                {bookableTiers(master).map((t) => (
-                  <span key={t.id}>{t.label} <b style={{ color: 'var(--ink)' }}>{baht(t.price)}</b> · {tierDesc(t, lang)}</span>
-                ))}
-                {!priced && <span style={{ color: '#a04a14' }}>⚠ {tr(lang, 'Admin ยังไม่ตั้งราคา — เปิดรอบไม่ได้', 'No price set yet — cannot open')}</span>}
-              </div>
-            )}
+              <section className="tsm-pop" role="dialog" aria-modal="true" aria-label={master.title}>
+                <div className="tsm-pop-head">
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="eyebrow" style={{ fontSize: 11 }}>{editing ? tr(lang, 'แก้ไขรอบ', 'Edit a round') : tr(lang, 'เพิ่มรอบ', 'Add rounds')}</div>
+                    <h2 className="display-th" style={{ fontSize: 22, margin: '4px 0 0' }}>{master.title}</h2>
+                    {editing && (
+                      <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>
+                        {tr(lang, `${fmtDate(editing.date, lang)} · ${editing.time_start}–${editing.time_end} — เปลี่ยนวัน เวลา สถานที่ หรือที่นั่ง แล้วกดบันทึก`, `${fmtDate(editing.date, lang)} · ${editing.time_start}–${editing.time_end} — change the day, time, venue or seats, then save`)}
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8, fontSize: 12.5, color: 'var(--muted)' }}>
+                      {bookableTiers(master).map((t) => (
+                        <span key={t.id}>{t.label} <b style={{ color: 'var(--ink)' }}>{baht(t.price)}</b> · {tierDesc(t, lang)}</span>
+                      ))}
+                      {!priced && <span style={{ color: '#a04a14' }}>⚠ {tr(lang, 'Admin ยังไม่ตั้งราคา — เปิดรอบไม่ได้', 'No price set yet — cannot open')}</span>}
+                    </div>
+                  </div>
+                  <button type="button" className="tsm-pop-close" onClick={closeForm} disabled={saving} aria-label={tr(lang, 'ปิด', 'Close')}>×</button>
+                </div>
 
             {/* Days */}
             <label className="tsm-label" style={{ marginTop: 20 }}>
-              <T th="2 · วันที่" en="2 · Days" />
+              <T th="1 · วันที่" en="1 · Days" />
             </label>
             {!editing && (
               <div className="tsm-repeat" role="radiogroup">
@@ -361,7 +411,7 @@ export default function TeacherSessionsPage() {
 
             {/* Time ranges */}
             <label className="tsm-label" style={{ marginTop: 20 }}>
-              <T th="3 · ช่วงเวลา" en="3 · Time ranges" />
+              <T th="2 · ช่วงเวลา" en="2 · Time ranges" />
             </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {slots.map((sl, i) => (
@@ -409,7 +459,7 @@ export default function TeacherSessionsPage() {
 
             {/* Venue */}
             <label className="tsm-label" style={{ marginTop: 20 }}>
-              <T th="4 · สถานที่" en="4 · Venue" />
+              <T th="3 · สถานที่" en="3 · Venue" />
             </label>
             <select value={locationId} onChange={(e) => setLocationId(e.target.value)} className="field">
               <option value="">{tr(lang, '— เลือกสถานที่ —', '— choose a venue —')}</option>
@@ -427,7 +477,7 @@ export default function TeacherSessionsPage() {
 
             {/* Seats */}
             <label className="tsm-label" style={{ marginTop: 20 }}>
-              <T th="5 · จำนวนที่นั่ง" en="5 · Seats" />
+              <T th="4 · จำนวนที่นั่ง" en="4 · Seats" />
             </label>
             <input type="number" min={editing?.booked || 1} value={seats} onChange={(e) => setSeats(e.target.value)} className="field" style={{ width: 130 }} placeholder={String(master?.default_max_participants ?? 20)} />
 
@@ -446,11 +496,9 @@ export default function TeacherSessionsPage() {
                     : tr(lang, `เปิดรอบ${repeat === 'once' && dates.length * slots.length > 1 ? ` ${dates.length * slots.length} รอบ` : ''}`, `Open ${repeat === 'once' && dates.length * slots.length > 1 ? `${dates.length * slots.length} rounds` : 'round'}`)}{' '}
                 <span className="mono">→</span>
               </Btn>
-              {editing && (
-                <button type="button" onClick={resetForm} className="btn btn-paper btn-sm">
-                  {tr(lang, 'ยกเลิกการแก้ไข', 'Stop editing')}
-                </button>
-              )}
+              <button type="button" onClick={closeForm} disabled={saving} className="btn btn-paper btn-sm">
+                {tr(lang, 'ยกเลิก', 'Cancel')}
+              </button>
             </div>
             {!ready && !saving && blockers.length > 0 && (
               <div role="alert" style={{ marginTop: 12, padding: '10px 14px', borderRadius: 12, fontSize: 13, lineHeight: 1.6, background: '#fde7d3', color: '#a04a14' }}>
@@ -460,10 +508,12 @@ export default function TeacherSessionsPage() {
                 ))}
               </div>
             )}
-          </section>
+              </section>
+            </div>
+          )}
 
-          {/* Right: what is already open */}
-          <section>
+          {/* Every upcoming round, across the workshops */}
+          <section style={{ marginTop: 34 }}>
             <h2 className="display-th" style={{ fontSize: 18, margin: '0 0 12px' }}>
               <T th="รอบที่เปิดอยู่" en="Open rounds" /> <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 400 }}>· {upcoming.length}</span>
             </h2>
@@ -494,7 +544,7 @@ export default function TeacherSessionsPage() {
               </div>
             )}
           </section>
-        </div>
+        </>
       )}
     </div>
   );
