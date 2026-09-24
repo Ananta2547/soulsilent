@@ -48,7 +48,7 @@ export default function TeacherWorkshopsPage() {
   const [day, setDay] = useState<string | null>(null);
   const byDay = useMemo(() => {
     const m = new Map<string, Row[]>();
-    (rows || []).forEach((w) => {
+    (rows || []).filter((w) => w.master_kind !== 'round').forEach((w) => {
       getWorkshopDays(w).forEach((d) => {
         if (!m.has(d)) m.set(d, []);
         m.get(d)!.push(w);
@@ -94,32 +94,12 @@ export default function TeacherWorkshopsPage() {
     return () => ro.disconnect();
   }, [rows]);
 
-  // Rounds a teacher opened under one master are one card — the nearest
-  // upcoming round (or the latest past one) stands for the activity, and the
-  // card opens the activity's calendar rather than a single roster.
-  const cards = useMemo(() => {
-    const list = rows || [];
-    const groups = new Map<string, Row[]>();
-    const out: { w: Row; group?: Row[] }[] = [];
-    list.forEach((w) => {
-      if (w.master_kind !== 'round' || !w.master_id) {
-        out.push({ w });
-        return;
-      }
-      if (!groups.has(w.master_id)) {
-        groups.set(w.master_id, []);
-        out.push({ w, group: groups.get(w.master_id) });
-      }
-      groups.get(w.master_id)!.push(w);
-    });
-    const today = new Date().toISOString().slice(0, 10);
-    return out.map((c) => {
-      if (!c.group) return c;
-      const sorted = [...c.group].sort((a, b) => a.date.localeCompare(b.date));
-      const rep = sorted.find((x) => x.date >= today) || sorted[sorted.length - 1];
-      return { w: rep, group: sorted };
-    });
-  }, [rows]);
+  // Only one-day workshops live here; activities that run in rounds are
+  // managed under "จัดรอบสอน" (/teacher/sessions).
+  const cards = useMemo(
+    () => (rows || []).filter((w) => w.master_kind !== 'round').map((w): { w: Row; group?: Row[] } => ({ w })),
+    [rows],
+  );
 
   const pageCount = Math.max(1, Math.ceil(cards.length / perPage));
   const current = Math.min(page, pageCount);
@@ -179,10 +159,10 @@ export default function TeacherWorkshopsPage() {
             </div>
           </div>
         </div>
-      ) : rows.length === 0 ? (
+      ) : cards.length === 0 ? (
         <div className="card card-static" style={{ textAlign: 'center', padding: '48px 24px' }}>
           <p style={{ color: 'var(--muted)', margin: 0 }}>
-            <T th="ยังไม่มีเวิร์กชอปที่คุณดูแล" en="You don't lead any workshops yet." />
+            <T th="ยังไม่มีเวิร์กชอปแบบวันเดียวที่คุณดูแล — Workshop แบบเลือกรอบอยู่ในเมนู จัดรอบสอน" en="No one-day workshops yet — round-based ones are under Session manager." />
           </p>
         </div>
       ) : (
