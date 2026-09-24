@@ -18,7 +18,8 @@ export type TeacherCard = {
   next_date: string | null;
   /** Rounds already held (past, active). */
   hosted: number;
-  rounds: { id: string; date: string; time_start: string; title: string; booked: number; max: number }[];
+  /** Capacity and whether it is full — never how many are booked. */
+  rounds: { id: string; date: string; time_start: string; title: string; max: number; full: boolean }[];
   works: { id: string; title: string; image_url: string | null }[];
   quote: { comment: string; workshop: string } | null;
 };
@@ -145,7 +146,7 @@ export async function GET() {
         upcoming: open.length,
         next_date: open[0]?.date || null,
         hosted: past.length,
-        rounds: open.slice(0, 6).map((w) => ({ id: w.id, date: w.date, time_start: w.time_start, title: w.title, booked: Number(w.booked) || 0, max: w.max_participants })),
+        rounds: open.slice(0, 6).map((w) => ({ id: w.id, date: w.date, time_start: w.time_start, title: w.title, max: w.max_participants, full: (Number(w.booked) || 0) >= w.max_participants })),
         works,
         quote: quoteOf.get(t.id) || null,
       };

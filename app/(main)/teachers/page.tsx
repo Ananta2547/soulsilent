@@ -242,7 +242,7 @@ export default function TeachersPage() {
                           <span className="tm-round-date">{shortDate(r.date)}</span>
                           <span style={{ fontSize: 13.5, lineHeight: 1.5, minWidth: 0 }}>{r.title}</span>
                           <span style={{ flex: 1 }} />
-                          <span className="mono" style={{ fontSize: 11.5, color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>{r.booked}/{r.max}</span>
+                          <span className="mono" style={{ fontSize: 11.5, color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>{r.full ? (th ? 'เต็ม' : 'full') : th ? `${r.max} ที่นั่ง` : `${r.max} seats`}</span>
                         </Link>
                       ))
                     )}
