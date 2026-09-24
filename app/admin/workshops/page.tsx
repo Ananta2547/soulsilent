@@ -35,6 +35,8 @@ function safeParseArray<T>(json: string | null | undefined, fallback: T[]): T[] 
 
 export default function AdminWorkshopsPage() {
   const [workshops, setWorkshops] = useState<Workshop[]>([]);
+  // One-day workshops vs rounds opened under a round master.
+  const [kindFilter, setKindFilter] = useState<'all' | 'single' | 'round'>('all');
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -195,6 +197,15 @@ export default function AdminWorkshopsPage() {
     );
   }
 
+  const isRound = (w: Workshop) => w.master_kind === 'round';
+  const roundCount = workshops.filter(isRound).length;
+  const shownWorkshops = kindFilter === 'all' ? workshops : workshops.filter((w) => (kindFilter === 'round' ? isRound(w) : !isRound(w)));
+  const KIND_TABS: { key: 'all' | 'single' | 'round'; label: string; n: number }[] = [
+    { key: 'all', label: 'ทั้งหมด', n: workshops.length },
+    { key: 'single', label: 'Workshop เดี่ยว', n: workshops.length - roundCount },
+    { key: 'round', label: 'แบบรอบ', n: roundCount },
+  ];
+
   return (
     <div className="space-y-6">
       <header className="flex items-end justify-between gap-4 flex-wrap">
@@ -214,6 +225,23 @@ export default function AdminWorkshopsPage() {
         </button>
       </header>
 
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="ประเภท Workshop">
+        {KIND_TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={kindFilter === t.key}
+            onClick={() => setKindFilter(t.key)}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              kindFilter === t.key ? 'bg-primary text-white' : 'bg-white text-gray hover:text-dark'
+            }`}
+          >
+            {t.label} <span className={kindFilter === t.key ? 'text-white/80' : 'text-gray'}>· {t.n}</span>
+          </button>
+        ))}
+      </div>
+
       <div className="card !p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -230,7 +258,7 @@ export default function AdminWorkshopsPage() {
               </tr>
             </thead>
             <tbody>
-              {workshops.map((ws) => {
+              {shownWorkshops.map((ws) => {
                 const loc = locations.find((l) => l.id === ws.location_id);
                 return (
                   <tr key={ws.id} className="border-t border-gray-lighter hover:bg-surface/50">
@@ -341,6 +369,11 @@ export default function AdminWorkshopsPage() {
                   </tr>
                 );
               })}
+              {workshops.length > 0 && shownWorkshops.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="py-8 text-center text-gray">ไม่มี Workshop ในประเภทนี้</td>
+                </tr>
+              )}
               {workshops.length === 0 && (
                 <tr>
                   <td colSpan={8} className="py-8 text-center text-gray">
