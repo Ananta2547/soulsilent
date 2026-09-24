@@ -17,7 +17,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const db = await getDB();
 
-  const workshop = await db.prepare('SELECT * FROM workshops WHERE id = ?').bind(id).first<Workshop>();
+  // master_kind tells the roster page where "back" goes: a round belongs to
+  // the session manager, a one-day workshop to its own list.
+  const workshop = await db
+    .prepare('SELECT w.*, m.kind AS master_kind FROM workshops w LEFT JOIN workshop_masters m ON m.id = w.master_id WHERE w.id = ?')
+    .bind(id)
+    .first<Workshop>();
   if (!workshop) return NextResponse.json({ error: 'ไม่พบเวิร์กชอป' }, { status: 404 });
   // Owner, or a co-facilitator the admin ticked (migration 046).
   if (!u.roles.includes('admin') && !canAccessTeacherDashboard(workshop, u.sub)) {

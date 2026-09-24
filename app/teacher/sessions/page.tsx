@@ -1,22 +1,22 @@
 'use client';
 
 /* Session manager, first screen: one card per activity the admin handed this
- * teacher that runs in rounds ("เลือกรอบ"). A card shows its prices and how
- * many rounds are open; tapping it opens that activity's calendar, where
- * rounds are added, edited and checked in. */
+ * teacher that runs in rounds ("เลือกรอบ"), drawn like the one-day workshop
+ * cards — A3 poster, open / ended and payout badges, the date with how many
+ * days and rounds, seats and venue. The nearest upcoming round (or the latest
+ * past one) stands for the activity. Tapping a card opens that activity's
+ * calendar, where rounds are added, edited and checked in. */
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useLang, T, tr } from '@/lib/i18n';
+import { Icon } from '@/components/design/Icon';
 import { todayYmd } from '@/components/calendar/MonthPicker';
-import { fmtDate } from '@/lib/datetime';
-import type { WorkshopMaster } from '@/lib/types';
-import { bookableTiers } from '@/lib/pricing';
+import type { Workshop, WorkshopMaster } from '@/lib/types';
+import { hasWorkshopEnded } from '@/lib/workshop-utils';
 
-type Round = { id: string; master_id: string; date: string; status: string };
+type Round = Workshop & { booked: number };
 type Data = { masters: WorkshopMaster[]; rounds: Round[] };
-
-const baht = (n: number | null | undefined) => (n == null ? '—' : '฿' + Math.round(n).toLocaleString());
 
 export default function TeacherSessionsPage() {
   const { lang } = useLang();
@@ -24,8 +24,13 @@ export default function TeacherSessionsPage() {
 
   useEffect(() => {
     let alive = true;
-    fetch('/api/teacher/sessions')
-      .then((res) => (res.ok ? (res.json() as Promise<Data>) : { masters: [], rounds: [] }))
+    // Masters come from the session manager (what this teacher runs); the
+    // rounds with their payout state and venue come from the workshop list.
+    Promise.all([
+      fetch('/api/teacher/sessions').then((r) => (r.ok ? (r.json() as Promise<{ masters: WorkshopMaster[] }>) : { masters: [] })),
+      fetch('/api/teacher/workshops').then((r) => (r.ok ? (r.json() as Promise<{ workshops: Round[] }>) : { workshops: [] })),
+    ])
+      .then(([s, w]) => ({ masters: s.masters || [], rounds: (w.workshops || []).filter((x) => x.status !== 'cancelled') }))
       .catch(() => ({ masters: [], rounds: [] }))
       .then((d) => {
         if (alive) setData(d);
@@ -36,6 +41,7 @@ export default function TeacherSessionsPage() {
   }, []);
 
   const today = todayYmd();
+  const fmt = (ymd: string) => new Date(ymd + 'T00:00:00').toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
   return (
     <div>
@@ -56,40 +62,75 @@ export default function TeacherSessionsPage() {
           </p>
         </div>
       ) : (
-        <div className="tsm-cards">
+        <div className="tch-wgrid">
           {data.masters.map((m) => {
-            const live = data.rounds.filter((r) => r.master_id === m.id && r.status !== 'cancelled' && r.date >= today);
-            const days = new Set(live.map((r) => r.date)).size;
-            const tiers = bookableTiers(m);
+            const group = data.rounds.filter((r) => r.master_id === m.id).sort((a, b) => a.date.localeCompare(b.date) || a.time_start.localeCompare(b.time_start));
+            const rep = group.find((r) => r.date >= today) || group[group.length - 1] || null;
+            const days = new Set(group.map((r) => r.date)).size;
+            const ended = !rep || rep.status === 'completed' || hasWorkshopEnded(rep);
+            const st = !rep
+              ? { th: 'ยังไม่มีรอบ', en: 'No rounds', tone: 'var(--muted)', bg: 'var(--cream)' }
+              : ended
+                ? { th: 'จบแล้ว', en: 'Ended', tone: 'var(--muted)', bg: 'var(--cream)' }
+                : { th: 'เปิดรับ', en: 'Open', tone: 'var(--teal-deep)', bg: 'var(--teal-50)' };
+            const image = rep?.image_url || m.cover_image_url;
+            const venue = rep?.location || null;
             return (
-              <Link key={m.id} href={`/teacher/sessions/${m.id}`} className="tsm-card tsm-card-link">
-                {m.cover_image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={m.cover_image_url} alt="" className="tsm-card-img" />
-                ) : (
-                  <span className="tsm-card-img ph ph-teal" />
-                )}
-                <div className="tsm-card-body">
-                  <h3 className="display-th tsm-card-title">{m.title}</h3>
-                  <div className="tsm-card-meta">
-                    {tiers.length ? (
-                      tiers.slice(0, 3).map((t) => (
-                        <span key={t.id}>
-                          {t.label} <b>{baht(t.price)}</b>
+              <Link key={m.id} href={`/teacher/sessions/${m.id}`} className="card card-static" style={{ padding: 0, overflow: 'hidden', textDecoration: 'none', display: 'block' }}>
+                {/* A3 poster frame, like the one-day workshop cards. */}
+                <div style={{ aspectRatio: '297 / 420', background: 'var(--cream)', position: 'relative' }}>
+                  {image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={image} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                  ) : null}
+                  <span className="tch-wbadge" style={{ position: 'absolute', top: 10, right: 10, fontSize: 11, fontWeight: 600, color: st.tone, background: st.bg, borderRadius: 999, padding: '4px 10px' }}>
+                    {tr(lang, st.th, st.en)}
+                  </span>
+                  {rep && (
+                    <span
+                      className="tch-wbadge"
+                      style={{
+                        position: 'absolute',
+                        top: 10,
+                        left: 10,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        borderRadius: 999,
+                        padding: '4px 10px',
+                        color: rep.payout_status === 'paid' ? 'var(--teal-deep)' : '#8a5a00',
+                        background: rep.payout_status === 'paid' ? 'var(--teal-50)' : '#fcefcf',
+                      }}
+                    >
+                      {rep.payout_status === 'paid' ? tr(lang, 'โอนแล้ว', 'Paid out') : tr(lang, 'รอโอน', 'Awaiting payout')}
+                    </span>
+                  )}
+                </div>
+                <div className="tch-wcard-body" style={{ padding: 16 }}>
+                  <h3 className="display-th tch-wcard-title" style={{ fontSize: 17, margin: '0 0 8px', lineHeight: 1.3, color: 'var(--ink)' }}>
+                    {m.title}
+                  </h3>
+                  <div className="tch-wmeta" style={{ fontSize: 13, color: 'var(--muted)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {rep ? (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                        <span>
+                          <Icon name="date" size={13} /> {fmt(rep.date)}
+                          {tr(lang, ` · ${days} วัน · ${group.length} รอบ`, ` · ${days} days · ${group.length} rounds`)}
                         </span>
-                      ))
+                        <span style={{ whiteSpace: 'nowrap' }}>
+                          <Icon name="participants" size={13} /> {rep.booked}/{rep.max_participants} {tr(lang, 'ที่นั่ง', 'seats')}
+                        </span>
+                      </span>
                     ) : (
-                      <span style={{ color: '#a04a14' }}>⚠ {tr(lang, 'ยังไม่ตั้งราคา', 'No price yet')}</span>
+                      <span>
+                        <Icon name="date" size={13} /> {tr(lang, 'ยังไม่มีรอบ — กดเพื่อเพิ่มรอบ', 'No rounds yet — tap to add')}
+                      </span>
+                    )}
+                    {venue && (
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <Icon name="location" size={13} /> {venue}
+                      </span>
                     )}
                   </div>
-                  <div className="tsm-card-meta">
-                    {live.length
-                      ? tr(lang, `เปิดอยู่ ${live.length} รอบ · ${days} วัน · ถัดไป ${fmtDate(live[0].date, lang)}`, `${live.length} open · ${days} days · next ${fmtDate(live[0].date, lang)}`)
-                      : tr(lang, 'ยังไม่มีรอบที่เปิด', 'No rounds open')}
-                  </div>
-                  <span className="btn btn-teal btn-sm" style={{ marginTop: 'auto', alignSelf: 'flex-start' }}>
-                    {tr(lang, 'จัดรอบ', 'Manage rounds')} →
-                  </span>
                 </div>
               </Link>
             );

@@ -64,8 +64,8 @@ export default function TeacherRoundsPage() {
 
   return (
     <div>
-      <Link href="/teacher/workshops" className="mono" style={{ fontSize: 12, color: 'var(--muted)', textDecoration: 'none' }}>
-        ← {tr(lang, 'กลับไปเวิร์กชอปของฉัน', 'Back to my workshops')}
+      <Link href="/teacher/sessions" className="mono" style={{ fontSize: 12, color: 'var(--muted)', textDecoration: 'none' }}>
+        ← {tr(lang, 'กลับไปจัดรอบสอน', 'Back to the session manager')}
       </Link>
       <h1 className="display-th" style={{ fontSize: 'clamp(24px,3.5vw,36px)', margin: '12px 0 4px' }}>
         {first?.title || tr(lang, 'รอบสอน', 'Rounds')}

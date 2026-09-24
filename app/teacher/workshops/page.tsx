@@ -108,13 +108,13 @@ export default function TeacherWorkshopsPage() {
   return (
     <div>
       <span className="eyebrow">
-        <T th="workshop ของฉัน" en="my workshops" />
+        <T th="workshop เดี่ยว" en="one-day workshops" />
       </span>
       <h1 className="display-th" style={{ fontSize: 'clamp(24px,3vw,32px)', margin: '8px 0 4px' }}>
-        <T th="เวิร์กชอปของฉัน" en="My Workshops" />
+        <T th="Workshop เดี่ยว" en="One-day workshops" />
       </h1>
       <p style={{ fontSize: 14, color: 'var(--muted)', margin: '0 0 14px' }}>
-        <T th="เวิร์กชอปที่คุณเป็นผู้นำกิจกรรม — ดูผู้สมัคร เช็คชื่อ และยอดโอน" en="Workshops you lead — applicants, check-in and payouts." />
+        <T th="Workshop แบบวันเดียวที่คุณเป็นผู้นำกิจกรรม — ดูผู้สมัคร เช็คชื่อ และยอดโอน (แบบเลือกรอบอยู่ในเมนู จัดรอบสอน)" en="One-day workshops you lead — applicants, check-in and payouts (round-based ones are under Session manager)." />
       </p>
 
       <div className="tch-view" role="tablist" aria-label={tr(lang, 'มุมมอง', 'View')}>

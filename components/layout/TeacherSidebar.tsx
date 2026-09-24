@@ -28,7 +28,7 @@ type NavItem = { href: string; label: string; icon: React.ReactNode };
 const NAV: NavItem[] = [
   {
     href: '/teacher/workshops',
-    label: 'Workshop ของฉัน',
+    label: 'Workshop เดี่ยว',
     icon: (
       <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path
