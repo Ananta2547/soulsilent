@@ -1544,6 +1544,11 @@ body {
     @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-accent/20 text-accent-dark;
   }
 
+  /* Base pill for admin status badges; colour comes from the bg-/text-
+     utilities next to it (utilities outrank this layer). */
+  .badge {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap;
+  }
   .badge-success {
     @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700;
   }
@@ -3763,6 +3768,13 @@ body {
 /* Teacher session manager */
 .tsm-grid { display: grid; grid-template-columns: minmax(0, 440px) minmax(0, 1fr); gap: 22px; align-items: start; }
 /* Teacher session manager: workshop cards + the add-round popup */
+/* Admin workshop list: one pill shape for every status */
+.adm-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 1.5; white-space: nowrap; }
+.adm-pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.adm-pill-open { background: #d1fae5; color: #047857; }
+.adm-pill-closed { background: #eceeed; color: #5b6664; }
+.adm-pill-draft { background: #fef3c7; color: #b45309; }
+.adm-pill-cancel { background: #fde2dd; color: #a13a2c; }
 .tsm-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px; }
 .tsm-card { display: flex; flex-direction: column; background: var(--paper); border-radius: 20px; overflow: hidden; box-shadow: 0 1px 2px rgba(13,30,29,.04), 0 12px 30px -20px rgba(13,30,29,.18); }
 .tsm-card-img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }

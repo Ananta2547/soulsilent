@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { DayTime, Location, Workshop, ApplicationQuestion } from '@/lib/types';
 import { parseImageMeta } from '@/lib/image-meta';
-import { parseSchedule, parseInstructorIds, parseDashboardAccess } from '@/lib/workshop-utils';
+import { parseSchedule, parseInstructorIds, parseDashboardAccess, getWorkshopStatusBadge } from '@/lib/workshop-utils';
 import { AdminFormModal } from '@/components/admin/AdminFormModal';
 import {
   WorkshopForm,
@@ -254,21 +254,19 @@ export default function AdminWorkshopsPage() {
                       ฿{ws.price.toLocaleString()}
                     </td>
                     <td className="py-3 px-4">
-                      <span
-                        className={
-                          ws.status === 'active'
-                            ? 'badge-success'
-                            : ws.status === 'draft'
-                              ? 'badge bg-amber-100 text-amber-700'
-                              : 'badge bg-gray-lighter text-gray'
-                        }
-                      >
-                        {ws.status === 'active'
-                          ? 'เปิดจอง'
-                          : ws.status === 'draft'
-                            ? 'แบบร่าง'
-                            : 'ปิดรับ'}
-                      </span>
+                      {(() => {
+                        // What visitors actually see: an active workshop past its
+                        // close date or start reads "ปิดรับ" on the site too.
+                        const st =
+                          ws.status === 'draft'
+                            ? { label: 'แบบร่าง', cls: 'adm-pill adm-pill-draft' }
+                            : ws.status === 'cancelled'
+                              ? { label: 'ยกเลิก', cls: 'adm-pill adm-pill-cancel' }
+                              : getWorkshopStatusBadge(ws).open
+                                ? { label: 'เปิดจอง', cls: 'adm-pill adm-pill-open' }
+                                : { label: 'ปิดรับ', cls: 'adm-pill adm-pill-closed' };
+                        return <span className={st.cls}>{st.label}</span>;
+                      })()}
                     </td>
                     <td className="py-3 px-4 text-center whitespace-nowrap">
                       <span className="text-dark font-semibold">{ws.booking_count ?? 0}</span>
