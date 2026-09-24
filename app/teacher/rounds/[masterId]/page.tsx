@@ -73,7 +73,7 @@ export default function TeacherRoundsPage() {
       <p style={{ fontSize: 14, color: 'var(--muted)', margin: '0 0 22px' }}>
         {tr(lang, `${rows.length} รอบ · ${byDay.size} วัน — จิ้มวันเพื่อดูรอบและเช็คชื่อ`, `${rows.length} rounds on ${byDay.size} days — tap a day to see its rounds and check in`)}
         {' · '}
-        <Link href="/teacher/sessions" style={{ color: 'var(--teal-deep)' }}>{tr(lang, 'เปิด/แก้ไขรอบ', 'Open or edit rounds')} →</Link>
+        <Link href={`/teacher/sessions/${masterId}`} style={{ color: 'var(--teal-deep)' }}>{tr(lang, 'เปิด/แก้ไขรอบ', 'Open or edit rounds')} →</Link>
       </p>
 
       {rows.length === 0 ? (

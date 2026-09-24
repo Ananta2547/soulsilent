@@ -3770,6 +3770,16 @@ body {
 .tsm-card-title { font-size: 18px; line-height: 1.3; margin: 0; }
 .tsm-card-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; color: var(--muted); }
 .tsm-card-meta b { color: var(--ink); }
+.tsm-card-link { color: inherit; text-decoration: none; transition: transform .2s ease, box-shadow .2s ease; }
+.tsm-card-link:hover { transform: translateY(-2px); box-shadow: 0 16px 34px -18px rgba(13,30,29,.3); }
+.tsm-head { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
+.tsm-view { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 22px; align-items: start; margin-top: 22px; }
+.tsm-view-cal .mp { max-width: none; }
+.tsm-view-cal .mp-day { aspect-ratio: auto; height: 58px; border-radius: 14px; }
+.tsm-view-cal .mp-num { font-size: 16px; }
+.tsm-view-cal .mp-mark { font-size: 10.5px; }
+.tsm-round { padding: 14px 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+@media (max-width: 900px) { .tsm-view { grid-template-columns: 1fr; } .tsm-view-cal .mp-day { height: 46px; } }
 .tsm-pop-backdrop { position: fixed; inset: 0; z-index: 1000; background: rgba(13,30,29,.55); display: flex; align-items: flex-start; justify-content: center; padding: 32px 16px; overflow-y: auto; }
 .tsm-pop { width: 100%; max-width: 760px; background: var(--paper); border-radius: 24px; padding: 22px 24px 24px; box-shadow: 0 24px 60px -20px rgba(13,30,29,.4); }
 .tsm-pop-head { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 8px; }
