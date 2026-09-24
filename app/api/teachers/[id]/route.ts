@@ -140,7 +140,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       joined: Number(joined?.n) || 0,
       works,
     };
-    return NextResponse.json({ teacher, rounds: rounds.results || [], can_edit });
+    // Visitors see a round's capacity and whether it is full, never how many
+    // are booked — the counts stay on the server.
+    const publicRounds = ((rounds.results || []) as (Record<string, unknown> & { booked: number; private_taken: number; max_participants: number })[]).map(
+      ({ booked, private_taken, ...r }) => ({ ...r, full: private_taken > 0 || booked >= r.max_participants }),
+    );
+    return NextResponse.json({ teacher, rounds: publicRounds, can_edit });
   } catch (error) {
     console.error('Teacher profile error:', error);
     return NextResponse.json({ error: 'เกิดข้อผิดพลาด' }, { status: 500 });

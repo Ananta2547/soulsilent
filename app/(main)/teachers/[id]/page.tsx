@@ -43,8 +43,8 @@ type Round = {
   max_participants: number;
   is_online: number;
   loc_name: string | null;
-  booked: number;
-  private_taken: number;
+  /** Capacity reached (or taken privately) — the count itself is not sent. */
+  full: boolean;
 };
 
 const TH_MONTHS_FULL = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
@@ -569,7 +569,7 @@ export default function TeacherProfilePage() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {onDay.map((r, i) => {
-              const full = r.private_taken > 0 || r.booked >= r.max_participants;
+              const full = r.full;
               const on = hover === r.id;
               return (
                 <Link
