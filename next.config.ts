@@ -43,6 +43,8 @@ const nextConfig: NextConfig = {
 
 export default nextConfig;
 
-// Cloudflare bindings for `next dev` — makes getCloudflareContext() work locally
+// Cloudflare bindings for `next dev` — makes getCloudflareContext() work locally.
+// Only for dev: it starts the local workerd runtime, which a production build
+// never needs (and which a locked-down Windows may refuse to run).
 import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
-initOpenNextCloudflareForDev();
+if (process.env.NODE_ENV === "development") initOpenNextCloudflareForDev();
