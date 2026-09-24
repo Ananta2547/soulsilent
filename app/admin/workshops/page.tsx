@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { DayTime, Location, Workshop, ApplicationQuestion } from '@/lib/types';
 import { parseImageMeta } from '@/lib/image-meta';
-import { parseSchedule, parseInstructorIds, parseDashboardAccess, getWorkshopStatusBadge } from '@/lib/workshop-utils';
+import { parseSchedule, parseInstructorIds, parseDashboardAccess, getWorkshopStatusBadge, hasWorkshopEnded } from '@/lib/workshop-utils';
 import { AdminFormModal } from '@/components/admin/AdminFormModal';
 import {
   WorkshopForm,
@@ -262,9 +262,11 @@ export default function AdminWorkshopsPage() {
                             ? { label: 'แบบร่าง', cls: 'adm-pill adm-pill-draft' }
                             : ws.status === 'cancelled'
                               ? { label: 'ยกเลิก', cls: 'adm-pill adm-pill-cancel' }
-                              : getWorkshopStatusBadge(ws).open
-                                ? { label: 'เปิดจอง', cls: 'adm-pill adm-pill-open' }
-                                : { label: 'ปิดรับ', cls: 'adm-pill adm-pill-closed' };
+                              : ws.status === 'completed' || hasWorkshopEnded(ws)
+                                ? { label: 'จบแล้ว', cls: 'adm-pill adm-pill-ended' }
+                                : getWorkshopStatusBadge(ws).open
+                                  ? { label: 'เปิดจอง', cls: 'adm-pill adm-pill-open' }
+                                  : { label: 'ปิดรับ', cls: 'adm-pill adm-pill-closed' };
                         return <span className={st.cls}>{st.label}</span>;
                       })()}
                     </td>

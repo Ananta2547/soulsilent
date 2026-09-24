@@ -3773,6 +3773,7 @@ body {
 .adm-pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .adm-pill-open { background: #d1fae5; color: #047857; }
 .adm-pill-closed { background: #eceeed; color: #5b6664; }
+.adm-pill-ended { background: #e3e8f0; color: #475569; }
 .adm-pill-draft { background: #fef3c7; color: #b45309; }
 .adm-pill-cancel { background: #fde2dd; color: #a13a2c; }
 .tsm-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px; }
