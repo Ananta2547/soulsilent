@@ -159,7 +159,7 @@ export function AdminSidebar() {
   }, [pathname]);
 
   return (
-    <aside className={`${collapsed ? 'w-[76px]' : 'w-64'} bg-dark min-h-screen flex flex-col shrink-0 transition-[width] duration-200`}>
+    <aside className={`${collapsed ? 'w-[76px]' : 'w-64'} bg-dark h-screen sticky top-0 self-start flex flex-col shrink-0 transition-[width] duration-200`}>
       <div className={`border-b border-white/10 flex gap-3 ${collapsed ? 'flex-col items-center px-3 py-5' : 'items-start p-6'}`}>
         <div className="min-w-0">
           <Logo size="sm" markOnly />
@@ -177,7 +177,7 @@ export function AdminSidebar() {
         </button>
       </div>
 
-      <nav className={`flex-1 space-y-1 ${collapsed ? 'px-3 py-4' : 'p-4'}`}>
+      <nav className={`flex-1 min-h-0 overflow-y-auto space-y-1 ${collapsed ? 'px-3 py-4' : 'p-4'}`}>
         {NAV.map((item) => {
           if (!isGroup(item)) {
             const active = pathname === item.href;
