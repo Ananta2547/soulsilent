@@ -619,7 +619,6 @@ export default function TeacherProfilePage() {
               {th ? `เล่าให้เราฟังว่าคุณอยากได้อะไรจากวันนั้น เราจะช่วยเลือกรอบให้ หรือส่งต่อให้${display}ตอบคุณเอง` : `Tell us what you want from the day. We’ll help you pick a round — or pass it on to ${display}.`}
             </p>
           </div>
-          <Btn kind="paper" href="/help">{th ? `ส่งคำถามถึง${display}` : `Ask ${display}`} <span className="mono">→</span></Btn>
         </div>
         {(editing || profile.socials.length > 0) && (
           <div className="tp2-wrap" style={{ position: 'relative', marginTop: 30 }}>
