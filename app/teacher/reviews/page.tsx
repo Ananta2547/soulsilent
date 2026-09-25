@@ -2,12 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useLang, T, tr } from '@/lib/i18n';
-import { Stars } from '@/components/design/Icon';
-import { Pager } from '@/components/teacher/Pager';
+import { TdbPager } from '@/components/teacher/tdb';
 
 /** Cards per page — the stats, the filter row and four cards clear a 900px
  *  window without the page scrolling. */
-const PER_PAGE = 4;
+const PER_PAGE = 6;
 
 type ReviewRow = {
   id: string;
@@ -49,6 +48,8 @@ export default function TeacherReviewsPage() {
 
   // Stars are 1-5, so a mean is meaningful; guard the empty list.
   const avg = all.length ? all.reduce((a, r) => a + r.rating, 0) / all.length : 0;
+  // How many reviews gave each star count, 5 down to 1.
+  const dist = [5, 4, 3, 2, 1].map((n) => ({ n, c: all.filter((r) => r.rating === n).length }));
 
   /** Only workshops that actually have a review — an option matching nothing is
    *  worse than no option at all. */
@@ -85,163 +86,111 @@ export default function TeacherReviewsPage() {
 
   return (
     <div>
-      <span className="eyebrow">
-        <T th="คำติชม" en="feedback" />
-      </span>
-      <h1 className="display-th" style={{ fontSize: 'clamp(24px,3vw,32px)', margin: '8px 0 4px' }}>
-        <T th="รีวิวที่คุณได้รับ" en="Your reviews" />
-      </h1>
-      <p style={{ fontSize: 14, color: 'var(--muted)', margin: '0 0 18px' }}>
-        <T th="สิ่งที่ผู้เข้าร่วมเขียนถึงเวิร์กชอปของคุณ" en="What participants wrote about your workshops." />
-      </p>
-
-      {/* Headline numbers */}
-      <section
-        style={{
-          display: 'grid',
-          // Two numbers, always one row: at 200px minimum they wrapped on a
-          // phone and the pair read as two unrelated cards.
-          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-          gap: 14,
-          marginBottom: 22,
-        }}
-      >
-        {/* The number is the point of each box: label above, figure below, both
-            centred, and nothing else competing with them. */}
-        <div className="card card-static" style={{ padding: '18px 14px', textAlign: 'center' }}>
-          <div className="mono" style={LABEL}>
-            {tr(lang, 'ดาวเฉลี่ย', 'Average rating')}
-          </div>
-          {/* Stars under the figure, not beside it: side by side they push the
-              number off centre and the card stops lining up with the one next
-              to it. */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-            <span style={BIG}>{all.length ? avg.toFixed(1) : '—'}</span>
-            {all.length > 0 && <Stars value={Math.round(avg)} size={15} />}
-          </div>
+      <div className="tdb-head">
+        <div>
+          <span className="tdb-eyebrow">03 — รีวิว</span>
+          <h1 className="tdb-h1">รีวิว.</h1>
+          <p className="tdb-lead">
+            <T th="สิ่งที่ผู้เข้าร่วมเขียนถึงเวิร์กชอปของคุณ — รวมดาวจากแบบสอบถาม AAR ด้วย" en="What participants wrote about your workshops, including AAR stars." />
+          </p>
         </div>
+      </div>
 
-        <div className="card card-static" style={{ padding: '18px 14px', textAlign: 'center' }}>
-          <div className="mono" style={LABEL}>
-            {tr(lang, 'รีวิวทั้งหมด', 'Total reviews')}
+      <div className="tdb-rv-top">
+        <div className="tdb-panel tdb-rv-score">
+          <span className="tdb-mono-label">{tr(lang, 'ดาวเฉลี่ย', 'Average rating')}</span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, margin: '8px 0 6px' }}>
+            <span style={{ fontFamily: "'Mitr', sans-serif", fontWeight: 500, fontSize: 56, lineHeight: 1, color: 'var(--teal)' }}>{all.length ? avg.toFixed(1) : '—'}</span>
+            <span style={{ fontFamily: "'Mitr', sans-serif", fontSize: 18 }}>/ 5</span>
           </div>
-          <div style={BIG}>{all.length.toLocaleString()}</div>
+          <span style={{ fontSize: 22, color: '#e0a526', letterSpacing: 2 }}>
+            {'★'.repeat(Math.round(avg))}
+            <span style={{ color: 'var(--cream-deep)' }}>{'★'.repeat(5 - Math.round(avg))}</span>
+          </span>
+          <span style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>{tr(lang, `จาก ${all.length.toLocaleString()} รีวิว`, `from ${all.length.toLocaleString()} reviews`)}</span>
         </div>
-      </section>
+        <div className="tdb-panel" style={{ display: 'flex', flexDirection: 'column', gap: 8, justifyContent: 'center' }}>
+          {dist.map(({ n, c }) => (
+            <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span className="tdb-bar-n" style={{ width: 28 }}>{n} ★</span>
+              <div className="tdb-bar-track" style={{ height: 8 }}>
+                <div className="tdb-bar-fill" style={{ width: `${all.length ? (c / all.length) * 100 : 0}%`, background: '#e0a526' }} />
+              </div>
+              <span className="tdb-bar-n" style={{ width: 28, textAlign: 'right' }}>{c}</span>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {all.length === 0 ? (
-        <div className="card card-static" style={{ textAlign: 'center', padding: '48px 24px' }}>
-          <p style={{ color: 'var(--muted)', margin: 0 }}>
-            <T th="ยังไม่มีรีวิว" en="No reviews yet" />
-          </p>
+        <div className="tdb-empty">
+          <h3><T th="ยังไม่มีรีวิว" en="No reviews yet" /></h3>
+          <p><T th="เมื่อผู้เข้าร่วมตอบแบบสอบถาม AAR หรือรีวิวกิจกรรม จะแสดงที่นี่" en="Reviews and AAR stars show up here." /></p>
         </div>
       ) : (
         <>
-          {/* Sort + filter, one row above the list */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
-            <div style={{ display: 'inline-flex', background: 'var(--cream)', borderRadius: 999, padding: 3 }}>
+            <div className="tdb-seg" style={{ padding: 3, gap: 2 }}>
               {(
                 [
                   ['newest', tr(lang, 'ล่าสุด', 'Newest')],
                   ['oldest', tr(lang, 'เก่าสุด', 'Oldest')],
                 ] as const
               ).map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => { setSort(key); setPage(1); }}
-                  aria-pressed={sort === key}
-                  style={{
-                    border: 0,
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    borderRadius: 999,
-                    padding: '6px 14px',
-                    background: sort === key ? 'var(--paper)' : 'transparent',
-                    color: sort === key ? 'var(--ink)' : 'var(--muted)',
-                    boxShadow: sort === key ? '0 1px 4px rgba(13,30,29,.12)' : 'none',
-                  }}
-                >
+                <button key={key} type="button" className={sort === key ? 'on' : ''} aria-pressed={sort === key} onClick={() => { setSort(key); setPage(1); }} style={{ fontSize: 13, padding: '8px 16px' }}>
                   {label}
                 </button>
               ))}
             </div>
-
             <select
               value={wsFilter}
               onChange={(e) => { setWsFilter(e.target.value); setPage(1); }}
               aria-label={tr(lang, 'แยกรายการตามเวิร์กชอป', 'Filter by workshop')}
               className="field"
-              style={{ width: 'auto', maxWidth: 280, padding: '8px 14px', fontSize: 13 }}
+              style={{ width: 'auto', maxWidth: 300, padding: '10px 16px', fontSize: 13.5, background: '#fff', borderRadius: 999 }}
             >
-              <option value="">{tr(lang, 'แยกรายการ — ทุกเวิร์กชอป', 'All workshops')}</option>
+              <option value="">{tr(lang, 'ทุกเวิร์กชอป', 'All workshops')}</option>
               {workshops.map(([id, title]) => (
                 <option key={id} value={id}>
                   {title}
                 </option>
               ))}
             </select>
-
-            <span style={{ fontSize: 12, color: 'var(--muted)', marginLeft: 'auto' }}>
-              {tr(lang, `แสดง ${visible.length} รีวิว`, `showing ${visible.length}`)}
-            </span>
+            <span className="tdb-mono-label" style={{ marginLeft: 'auto' }}>{tr(lang, `${visible.length} รีวิว`, `${visible.length} shown`)}</span>
           </div>
 
           {visible.length === 0 ? (
-            <div className="card card-static" style={{ textAlign: 'center', padding: '40px 24px' }}>
-              <p style={{ color: 'var(--muted)', margin: 0 }}>
-                <T th="ไม่มีรีวิวของเวิร์กชอปนี้" en="No reviews for this workshop" />
-              </p>
-            </div>
+            <div className="tdb-dashed"><T th="ไม่มีรีวิวของเวิร์กชอปนี้" en="No reviews for this workshop" /></div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {shown.map((r) => (
-                <article
-                  key={r.id}
-                  className="card card-static"
-                  style={{ padding: 16, display: 'flex', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}
-                >
-                  <div style={{ flex: 1, minWidth: 220 }}>
-                    {/* Who wrote it and which workshop it is about lead the card:
-                        those two together are what identifies a review. */}
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 700, color: 'var(--ink)', fontSize: 14.5 }}>
-                        {r.user_name || '—'}
-                      </span>
-                      <span style={{ color: 'var(--muted)', fontSize: 12 }}>·</span>
-                      <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--teal-deep)' }}>
-                        {r.workshop_title || '—'}
-                      </span>
-                      <Stars value={r.rating} size={13} />
-                    </div>
-                    {r.comment && (
-                      <p
-                        style={{
-                          fontSize: 14,
-                          lineHeight: 1.65,
-                          color: 'var(--ink)',
-                          margin: '8px 0 0',
-                          whiteSpace: 'pre-line',
-                        }}
-                      >
-                        {r.comment}
-                      </p>
-                    )}
-                  </div>
-
-                  <time
-                    dateTime={r.created_at}
-                    className="mono"
-                    style={{ fontSize: 11.5, color: 'var(--muted)', whiteSpace: 'nowrap', marginLeft: 'auto' }}
-                  >
-                    {fmtReviewedAt(r.created_at)}
-                  </time>
-                </article>
-              ))}
-              <Pager page={current} pageCount={pageCount} onChange={setPage} label="หน้ารีวิว" />
-            </div>
+            <>
+              <div className="tdb-rv-grid">
+                {shown.map((r) => {
+                  const who = r.user_name || '—';
+                  return (
+                    <article key={r.id} className="tdb-panel tdb-rv-card">
+                      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                        <span className="tdb-av" style={{ width: 40, height: 40, fontSize: 15, background: '#eaf6f4', color: 'var(--teal-deep)' }}>{(who.trim()[0] || '?').toUpperCase()}</span>
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ display: 'block', fontWeight: 600, fontSize: 14.5 }}>{who}</span>
+                          <span style={{ display: 'block', fontSize: 12.5, color: 'var(--teal-deep)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.workshop_title || '—'}</span>
+                        </span>
+                        <span style={{ color: '#e0a526', fontSize: 15, letterSpacing: 1, flexShrink: 0 }}>
+                          {'★'.repeat(r.rating)}
+                          <span style={{ color: 'var(--cream-deep)' }}>{'★'.repeat(5 - r.rating)}</span>
+                        </span>
+                      </div>
+                      {r.comment ? (
+                        <p style={{ fontSize: 14.5, lineHeight: 1.65, margin: 0, whiteSpace: 'pre-line' }}>“{r.comment}”</p>
+                      ) : (
+                        <p style={{ fontSize: 13, color: 'var(--muted)', margin: 0 }}>{tr(lang, 'ให้ดาวอย่างเดียว ไม่ได้เขียนรีวิว', 'Stars only, no comment')}</p>
+                      )}
+                      <time dateTime={r.created_at} className="tdb-bar-n" style={{ marginTop: 'auto' }}>{fmtReviewedAt(r.created_at)}</time>
+                    </article>
+                  );
+                })}
+              </div>
+              <TdbPager page={current} pageCount={pageCount} onChange={setPage} />
+            </>
           )}
         </>
       )}
@@ -292,23 +241,6 @@ function ReviewsSkeleton() {
     </div>
   );
 }
-
-const LABEL: React.CSSProperties = {
-  fontSize: 10.5,
-  letterSpacing: '.12em',
-  textTransform: 'uppercase',
-  color: 'var(--muted)',
-  marginBottom: 8,
-};
-
-const BIG: React.CSSProperties = {
-  fontFamily: 'var(--font-display-th)',
-  fontWeight: 600,
-  fontSize: 27,
-  lineHeight: 1.05,
-  color: 'var(--ink)',
-  letterSpacing: '-.02em',
-};
 
 /** SQLite writes UTC as "YYYY-MM-DD HH:MM:SS" — no T, no Z — which Safari reads
  *  as NaN and Chrome reads as local time. Normalise before parsing. */

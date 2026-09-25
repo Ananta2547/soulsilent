@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLang, T, tr } from '@/lib/i18n';
 import { computePayout } from '@/lib/workshop-utils';
 import { sqliteToMs } from '@/lib/datetime';
-import { Pager } from '@/components/teacher/Pager';
+import { TdbPager } from '@/components/teacher/tdb';
 
 type Totals = { workshops: number; participants: number; gross: number; net: number };
 type MonthTotal = { month: string; total: number; count: number };
@@ -67,6 +67,9 @@ export default function TeacherOverviewPage() {
   // answer for the same slice of time, so one filter drives both.
   const [rangeKey, setRangeKey] = useState('1y');
   const range = RANGES.find((r) => r.key === rangeKey) || RANGES[RANGES.length - 1];
+  // The moment the window is measured back from, fixed at mount so a
+  // re-render never shifts it.
+  const [now] = useState(() => Date.now());
 
   // Not handed to the loading tracker: the dashboard's frame — rail, headings —
   // is already on screen, and a full-screen loader over it would hide a page
@@ -88,7 +91,7 @@ export default function TeacherOverviewPage() {
   // payments the chart draws — so "6 workshops" always means "6 in this window".
   const scoped = useMemo(() => {
     const points = data?.paidPoints || [];
-    const cutoff = Date.now() - range.days * 86400000;
+    const cutoff = now - range.days * 86400000;
     const inWindow = points.filter((p) => (sqliteToMs(p.at) || 0) >= cutoff);
     const grossByWorkshop = new Map<string, number>();
     const ageByPerson = new Map<string, number>();
@@ -108,7 +111,7 @@ export default function TeacherOverviewPage() {
       net,
       ages: [...ageByPerson.values()],
     };
-  }, [data, range.days]);
+  }, [data, range.days, now]);
 
   // A cancelled booking is the opposite of what this table is read for, so it
   // is dropped here.
@@ -134,119 +137,62 @@ export default function TeacherOverviewPage() {
 
   return (
     <div>
-      <span className="eyebrow">
-        <T th="ภาพรวม · รายได้" en="overview · revenue" />
-      </span>
-      <h1 className="display-th" style={{ fontSize: 'clamp(24px,3vw,32px)', margin: '8px 0 4px' }}>
-        <T th="ภาพรวมของคุณ" en="Your overview" />
-      </h1>
-      <p style={{ fontSize: 14, color: 'var(--muted)', margin: '0 0 18px' }}>
-        <T
-          th="ตัวเลขทั้งหมดนับเฉพาะเวิร์กชอปที่คุณเป็นผู้นำกิจกรรม"
-          en="Every figure here counts only the workshops you lead."
-        />
-      </p>
+      <div className="tdb-head">
+        <div>
+          <span className="tdb-eyebrow">02 — ภาพรวม / รายได้</span>
+          <h1 className="tdb-h1">ภาพรวม.</h1>
+          <p className="tdb-lead">
+            <T th="ตัวเลขทั้งหมดนับเฉพาะเวิร์กชอปที่คุณเป็นผู้นำกิจกรรม" en="Every figure here counts only the workshops you lead." />
+          </p>
+        </div>
+        <RangePicker lang={lang} rangeKey={rangeKey} onRange={setRangeKey} />
+      </div>
 
-      {/* Four figures across the full width, squaring up with the chart and the
-          table below them: capping the row left a band of empty page down each
-          side while everything under it ran edge to edge. Each figure stays
-          centred inside its own card. */}
-      <section
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
-          gap: 14,
-          marginBottom: 14,
-        }}
-      >
+      <div className="tdb-stats four">
         <StatCard label={tr(lang, 'เวิร์กชอป', 'Workshops')} value={String(scoped.workshops)} note={windowLabel} />
         <StatCard label={tr(lang, 'ผู้เข้าร่วม', 'Participants')} value={String(scoped.participants)} note={windowLabel} />
-        <StatCard label={tr(lang, 'รายได้สุทธิ', 'Net revenue')} value={baht(scoped.net)} note={windowLabel} />
+        <StatCard label={tr(lang, 'รายได้สุทธิ', 'Net revenue')} value={baht(scoped.net)} note={windowLabel} accent />
         <StatCard label={tr(lang, 'อายุเฉลี่ยผู้เข้าร่วม', 'Average age')} value={ages} note={windowLabel} />
-      </section>
+      </div>
 
-      <RevenueChart
-        points={data.paidPoints || []}
-        lang={lang}
-        rangeKey={rangeKey}
-        onRange={setRangeKey}
-      />
+      <RevenueChart points={data.paidPoints || []} lang={lang} rangeKey={rangeKey} />
 
       {/* Recent bookings */}
-      <section className="card card-static" style={{ padding: 0, overflow: 'hidden', marginTop: 14 }}>
-        <div
-          style={{
-            padding: '16px 18px',
-            borderBottom: '1px solid var(--cream-deep)',
-            display: 'flex',
-            alignItems: 'baseline',
-            justifyContent: 'space-between',
-            gap: 12,
-            flexWrap: 'wrap',
-          }}
-        >
-          <h2 className="display-th" style={{ fontSize: 17, margin: 0 }}>
+      <section className="tdb-panel" style={{ marginTop: 22 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
+          <h2 style={{ fontFamily: "'Mitr', sans-serif", fontWeight: 500, fontSize: 19, margin: 0 }}>
             <T th="การจองล่าสุด" en="Recent bookings" />
           </h2>
-          <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-            {tr(lang, `${live.length} รายการ`, `${live.length} rows`)}
-          </span>
+          <span className="tdb-mono-label">{tr(lang, `${live.length} รายการ`, `${live.length} rows`)}</span>
         </div>
 
         {shown.length === 0 ? (
-          <p style={{ padding: '36px 18px', textAlign: 'center', color: 'var(--muted)', fontSize: 14, margin: 0 }}>
+          <div className="tdb-dashed" style={{ marginTop: 8 }}>
             <T th="ยังไม่มีการจอง" en="No bookings yet" />
-          </p>
+          </div>
         ) : (
-          <>
-            {/* Fixed layout: a long workshop title clips to one line with an
-                ellipsis rather than widening the table into a sideways scroll,
-                which on a phone hides the columns to its right. */}
-            <div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5, tableLayout: 'fixed' }}>
-                <colgroup>
-                  <col style={{ width: '34%' }} />
-                  <col style={{ width: '26%' }} />
-                  <col style={{ width: '16%' }} />
-                  <col style={{ width: '24%' }} />
-                </colgroup>
-                <thead>
-                  <tr style={{ background: 'var(--cream)' }}>
-                    <Th>{tr(lang, 'เวิร์กชอป', 'Workshop')}</Th>
-                    <Th>{tr(lang, 'ชื่อผู้เข้าร่วม', 'Participant')}</Th>
-                    <Th align="right">{tr(lang, 'ราคา', 'Amount')}</Th>
-                    <Th align="right">{tr(lang, 'วันเวลาจอง', 'Booked at')}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {shown.map((b) => (
-                    <tr key={b.id} style={{ borderTop: '1px solid var(--cream-deep)' }}>
-                      <Td title={b.workshop_title || undefined}>
-                        <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{b.workshop_title || '—'}</span>
-                      </Td>
-                      <Td title={b.applicant_name || b.user_name || undefined}>
-                        {b.applicant_name || b.user_name || '—'}
-                      </Td>
-                      <Td align="right">
-                        <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{baht(b.amount || 0)}</span>
-                      </Td>
-                      <Td align="right">
-                        <span className="mono" style={{ fontSize: 11.5, color: 'var(--muted)' }}>
-                          {fmtDayTime(b.created_at)}
-                        </span>
-                      </Td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {pageCount > 1 && (
-              <div style={{ padding: '6px 18px 12px', borderTop: '1px solid var(--cream-deep)' }}>
-                <Pager page={current} pageCount={pageCount} onChange={setPage} label="หน้าการจอง" />
-              </div>
-            )}
-          </>
+          <div className="tdb-book-list">
+            {shown.map((b) => {
+              const who = b.applicant_name || b.user_name || '—';
+              return (
+                <div key={b.id} className="tdb-book-row">
+                  <span className="tdb-av in" style={{ width: 38, height: 38, fontSize: 14, background: '#eaf6f4', color: 'var(--teal-deep)' }}>
+                    {(who.trim()[0] || '?').toUpperCase()}
+                  </span>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span className="tdb-book-who">{who}</span>
+                    <span className="tdb-book-ws" title={b.workshop_title || undefined}>{b.workshop_title || '—'}</span>
+                  </span>
+                  <span style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <span style={{ display: 'block', fontFamily: "'Mitr', sans-serif", fontSize: 16 }}>{baht(b.amount || 0)}</span>
+                    <span className="tdb-bar-n" style={{ fontSize: 11 }}>{fmtDayTime(b.created_at)}</span>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         )}
+        <TdbPager page={current} pageCount={pageCount} onChange={setPage} />
       </section>
     </div>
   );
@@ -304,40 +250,26 @@ function OverviewSkeleton() {
   );
 }
 
-/** A label and the number under it, both centred. No third line: the caption
- *  under every figure turned the row into four paragraphs. */
-function StatCard({ label, value, note }: { label: string; value: string; note?: string }) {
+/** One cell of the stat strip: label, figure, and the window it covers. */
+function StatCard({ label, value, note, accent }: { label: string; value: string; note?: string; accent?: boolean }) {
   return (
-    <div className="card card-static" style={{ padding: '14px 14px', textAlign: 'center' }}>
-      <div
-        className="mono"
-        style={{
-          fontSize: 10.5,
-          letterSpacing: '.12em',
-          textTransform: 'uppercase',
-          color: 'var(--muted)',
-          marginBottom: 10,
-        }}
-      >
-        {label}
-      </div>
-      <div
-        style={{
-          fontFamily: 'var(--font-display-th)',
-          fontWeight: 600,
-          fontSize: 30,
-          lineHeight: 1.05,
-          color: 'var(--ink)',
-          letterSpacing: '-.02em',
-        }}
-      >
-        {value}
-      </div>
-      {note && (
-        <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 6, letterSpacing: '.06em' }}>
-          {note}
-        </div>
-      )}
+    <div>
+      <span className="tdb-mono-label">{label}</span>
+      <b style={accent ? { color: 'var(--teal)' } : undefined}>{value}</b>
+      {note && <span style={{ fontSize: 12, color: 'var(--muted)' }}>{note}</span>}
+    </div>
+  );
+}
+
+/** The window the figures and the chart cover (1 วัน … 1 ปี). */
+function RangePicker({ lang, rangeKey, onRange }: { lang: 'th' | 'en'; rangeKey: string; onRange: (key: string) => void }) {
+  return (
+    <div className="tdb-seg tdb-range" role="group" aria-label={tr(lang, 'ช่วงเวลา', 'Time range')}>
+      {RANGES.map((r) => (
+        <button key={r.key} type="button" className={r.key === rangeKey ? 'on' : ''} aria-pressed={r.key === rangeKey} onClick={() => onRange(r.key)}>
+          {tr(lang, r.th, r.en)}
+        </button>
+      ))}
     </div>
   );
 }
@@ -353,17 +285,7 @@ function StatCard({ label, value, note }: { label: string; value: string; note?:
  * as the span: a day is read in hours, a year in months. Empty slices are still
  * drawn — a gap has to look like "nothing came in", not a missing period.
  */
-function RevenueChart({
-  points,
-  lang,
-  rangeKey,
-  onRange,
-}: {
-  points: PaidPoint[];
-  lang: 'th' | 'en';
-  rangeKey: string;
-  onRange: (key: string) => void;
-}) {
+function RevenueChart({ points, lang, rangeKey }: { points: PaidPoint[]; lang: 'th' | 'en'; rangeKey: string }) {
   const [hover, setHover] = useState<number | null>(null);
   const range = RANGES.find((r) => r.key === rangeKey) || RANGES[RANGES.length - 1];
 
@@ -372,83 +294,28 @@ function RevenueChart({
   const windowTotal = data.reduce((a, d) => a + d.total, 0);
 
   return (
-    <section className="card card-static" style={{ padding: 0, overflow: 'hidden' }}>
-      <div
-        style={{
-          padding: '14px 18px',
-          borderBottom: '1px solid var(--cream-deep)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-          flexWrap: 'wrap',
-        }}
-      >
+    <section className="tdb-panel">
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 18 }}>
         <div style={{ minWidth: 0 }}>
-          <h2 className="display-th" style={{ fontSize: 17, margin: 0 }}>
+          <h2 style={{ fontFamily: "'Mitr', sans-serif", fontWeight: 500, fontSize: 24, lineHeight: 1, margin: 0 }}>
             <T th="รายได้" en="Revenue" />
           </h2>
-          <p style={{ fontSize: 12, color: 'var(--muted)', margin: '3px 0 0' }}>
+          <p style={{ fontSize: 13, color: 'var(--muted)', margin: '6px 0 0' }}>
             {hover != null
               ? `${data[hover].label} · ${baht(data[hover].total)} · ${data[hover].count} ${tr(lang, 'รายการ', 'bookings')}`
               : tr(lang, `รวม ${baht(windowTotal)} ในช่วงนี้`, `${baht(windowTotal)} in this window`)}
           </p>
         </div>
 
-        {/* Range filter, in the corner of the chart's own box. */}
-        <div
-          role="group"
-          aria-label={tr(lang, 'ช่วงเวลาของกราฟ', 'Chart time range')}
-          style={{ display: 'inline-flex', background: 'var(--cream)', borderRadius: 999, padding: 3, gap: 2 }}
-        >
-          {RANGES.map((r) => (
-            <button
-              key={r.key}
-              type="button"
-              onClick={() => {
-                onRange(r.key);
-                setHover(null);
-              }}
-              aria-pressed={r.key === rangeKey}
-              style={{
-                border: 0,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                fontSize: 12,
-                fontWeight: 600,
-                borderRadius: 999,
-                padding: '5px 10px',
-                whiteSpace: 'nowrap',
-                background: r.key === rangeKey ? 'var(--paper)' : 'transparent',
-                color: r.key === rangeKey ? 'var(--ink)' : 'var(--muted)',
-                boxShadow: r.key === rangeKey ? '0 1px 4px rgba(13,30,29,.12)' : 'none',
-              }}
-            >
-              {tr(lang, r.th, r.en)}
-            </button>
-          ))}
-        </div>
+        <span className="tdb-mono-label">{tr(lang, `สูงสุด ${baht(peak)}`, `peak ${baht(peak)}`)}</span>
       </div>
 
-      <div style={{ padding: '14px 18px 16px' }}>
-        <div
-          className="mono"
-          style={{
-            fontSize: 10.5,
-            letterSpacing: '.12em',
-            textTransform: 'uppercase',
-            color: 'var(--muted)',
-            marginBottom: 8,
-          }}
-        >
-          {tr(lang, `สูงสุด ${baht(peak)}`, `peak ${baht(peak)}`)}
-        </div>
-
+      <div>
         {/* The tooltip lives over the bars rather than in a `title`, which a
             phone never shows: there is no hover on a touch screen, so tapping a
             bar has to be what opens it. */}
         <div
-          style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: 2, height: 92 }}
+          style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: 4, height: 180 }}
           onMouseLeave={() => setHover(null)}
         >
           {hover != null && data[hover] && (
@@ -502,8 +369,8 @@ function RevenueChart({
                   // An empty slice still gets a hairline, so a gap reads as "no
                   // money came in" and not as a slice that went missing.
                   height: `${Math.max(2, (d.total / peak) * 100)}%`,
-                  borderRadius: '4px 4px 0 0',
-                  background: hover === i ? 'var(--teal-deep)' : 'var(--teal)',
+                  borderRadius: '8px 8px 3px 3px',
+                  background: hover === i ? 'var(--teal-deep)' : d.total ? 'var(--teal)' : 'var(--cream-deep)',
                   transition: 'background .18s cubic-bezier(.2,.7,.2,1)',
                 }}
               />
@@ -512,7 +379,7 @@ function RevenueChart({
         </div>
 
         {/* A handful of ticks only: one label per bar collides at any width. */}
-        <div style={{ display: 'flex', gap: 2, marginTop: 6 }}>
+        <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
           {data.map((d, i) => {
             const step = Math.max(1, Math.ceil(data.length / 6));
             const show = i % step === 0 || i === data.length - 1;
@@ -605,53 +472,6 @@ function buildSeries(points: PaidPoint[], range: (typeof RANGES)[number], lang: 
   }
 
   return bars;
-}
-
-function Th({ children, align = 'left' }: { children: React.ReactNode; align?: 'left' | 'right' }) {
-  return (
-    <th
-      style={{
-        textAlign: align,
-        padding: '10px 16px',
-        fontSize: 12,
-        fontWeight: 500,
-        color: 'var(--muted)',
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-      }}
-    >
-      {children}
-    </th>
-  );
-}
-
-/** One line, clipped with an ellipsis. `title` carries the full text for anyone
- *  who needs it — the row height stays put however long a workshop is named. */
-function Td({
-  children,
-  align = 'left',
-  title,
-}: {
-  children: React.ReactNode;
-  align?: 'left' | 'right';
-  title?: string;
-}) {
-  return (
-    <td
-      title={title}
-      style={{
-        textAlign: align,
-        padding: '11px 16px',
-        color: 'var(--muted)',
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-      }}
-    >
-      {children}
-    </td>
-  );
 }
 
 /* ---------------- helpers ---------------- */
