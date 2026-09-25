@@ -108,8 +108,9 @@ export default function ArticleDetailPage() {
       <header>
         {/* Cover first, edge to edge and low — a band across the top of the
             page (ASPECTS.ARTICLE_HERO, 3:1) rather than a tall framed picture. */}
-        <Reveal variant="reveal-zoom">
-          <div
+        {/* No reveal animation: it sits above the fold, and a zoom that never
+            fires leaves it at 95% with gaps at the edges. */}
+        <div
             className={`ph ${swatchClass(article.cover_swatch)}`}
             style={{
               width: '100%',
@@ -125,7 +126,6 @@ export default function ArticleDetailPage() {
               <img src={article.cover_image_url} alt={article.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
             )}
           </div>
-        </Reveal>
         <div className="container" style={{ maxWidth: 960, paddingTop: 40 }}>
           <Reveal>
             <Link
