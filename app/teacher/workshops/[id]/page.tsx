@@ -3,7 +3,7 @@
 import { PageLoader } from '@/components/design/PageLoader';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useLang, T, tr } from '@/lib/i18n';
 import type { Workshop } from '@/lib/types';
@@ -79,6 +79,11 @@ function chipStyle(active: boolean, tone: 'green' | 'red'): React.CSSProperties 
 export default function TeacherWorkshopDetail() {
   const { id } = useParams<{ id: string }>();
   const { lang } = useLang();
+  const router = useRouter();
+  // A round's roster lives under the session manager so the rail lights
+  // "จัดรอบสอน"; a one-day workshop's under "Workshop เดี่ยว".
+  const underSessions = usePathname().startsWith('/teacher/sessions/');
+  const base = underSessions ? `/teacher/sessions/round/${id}` : `/teacher/workshops/${id}`;
   const [data, setData] = useState<Data | null>(null);
   // Several applications can stay open at once: comparing two answers means
   // reading them side by side, and one-at-a-time made that impossible.
@@ -135,6 +140,13 @@ export default function TeacherWorkshopDetail() {
       }
     })();
   }, [id]);
+
+  // Old links (and bookmarks) open a round under /teacher/workshops — move it
+  // to the session manager's path so the rail shows where the teacher is.
+  const isRound = data?.workshop?.master_kind === 'round';
+  useEffect(() => {
+    if (isRound && !underSessions) router.replace(`/teacher/sessions/round/${id}`);
+  }, [isRound, underSessions, router, id]);
 
   if (!data) {
     return (
@@ -340,7 +352,7 @@ export default function TeacherWorkshopDetail() {
       )}
 
       {/* AAR survey — questions + QR live on their own page. */}
-      <Link href={`/teacher/workshops/${id}/survey`} className="card card-static svy-entry">
+      <Link href={`${base}/survey`} className="card card-static svy-entry">
         <span aria-hidden className="svy-entry-ic">
           ▦
         </span>

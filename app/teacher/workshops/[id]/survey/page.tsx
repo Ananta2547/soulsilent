@@ -6,7 +6,7 @@
  * rating is always the last part of the form and is not edited here. */
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import QRCode from 'qrcode';
 import { PageLoader } from '@/components/design/PageLoader';
@@ -40,6 +40,8 @@ const blank = (type: SurveyQuestionType): SurveyQuestion => ({
 
 export default function TeacherSurveyPage() {
   const { id } = useParams<{ id: string }>();
+  // Back to whichever roster this was opened from (round or one-day).
+  const rosterHref = usePathname().startsWith('/teacher/sessions/') ? `/teacher/sessions/round/${id}` : `/teacher/workshops/${id}`;
   const { lang } = useLang();
   const [data, setData] = useState<Data | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -153,7 +155,7 @@ export default function TeacherSurveyPage() {
 
   return (
     <div style={{ maxWidth: 860 }}>
-      <Link href={`/teacher/workshops/${id}`} className="mono" style={{ fontSize: 12, color: 'var(--muted)', textDecoration: 'none' }}>
+      <Link href={rosterHref} className="mono" style={{ fontSize: 12, color: 'var(--muted)', textDecoration: 'none' }}>
         ← {tr(lang, 'กลับไปหน้าผู้เข้าร่วม', 'Back to participants')}
       </Link>
       <span className="eyebrow" style={{ display: 'block', marginTop: 14 }}>

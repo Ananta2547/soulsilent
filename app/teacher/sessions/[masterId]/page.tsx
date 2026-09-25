@@ -315,7 +315,7 @@ export default function TeacherMasterSessionsPage() {
                           {tr(lang, 'ยกเลิก', 'Cancel')}
                         </button>
                       )}
-                      <Link href={`/teacher/workshops/${r.id}`} className="btn btn-teal btn-sm">{tr(lang, 'เช็คชื่อ', 'Check-in')} →</Link>
+                      <Link href={`/teacher/sessions/round/${r.id}`} className="btn btn-teal btn-sm">{tr(lang, 'เช็คชื่อ', 'Check-in')} →</Link>
                     </div>
                   ))}
                 </div>
