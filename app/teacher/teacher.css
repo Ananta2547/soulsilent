@@ -566,3 +566,33 @@ a.tdb-round:hover { color: var(--ink); background: #eaf6f4; }
   .tdb-q { padding: 14px 16px 16px; }
   .tdb-savebar { bottom: 12px; }
 }
+
+/* add-round sheet on phones — two steps, "Teacher Mobile App" add / add2 */
+.tdb-sheet-back { position: fixed; inset: 0; z-index: 100; background: rgba(13,30,29,.55); animation: tdbFade .2s ease; }
+.tdb-sheet {
+  position: absolute; left: 0; right: 0; top: 54px; bottom: 0; background: #fff; border-radius: 28px 28px 0 0;
+  display: flex; flex-direction: column; animation: tdbSheetUp .35s cubic-bezier(.2,.7,.2,1);
+}
+.tdb-sheet-grab { width: 40px; height: 5px; border-radius: 99px; background: var(--cream-deep); margin: 10px auto 0; flex-shrink: 0; }
+.tdb-sheet-head { padding: 14px 20px 10px; display: flex; gap: 12px; align-items: flex-start; }
+.tdb-sheet-eyebrow { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .2em; color: var(--teal); }
+.tdb-sheet-body { flex: 1; overflow-y: auto; padding: 0 20px 16px; }
+.tdb-sheet-repeat { display: flex; margin: 0 0 14px; }
+.tdb-sheet-repeat button { flex: 1; padding: 9px 0; font-size: 13px; }
+.tdb-sheet-dow { flex-wrap: nowrap; margin-bottom: 14px; }
+.tdb-sheet-dow button { flex: 1; width: auto; height: 42px; font-size: 13px; }
+.tdb-sheet-box { background: var(--cream); border-radius: 14px; padding: 10px 12px; display: block; }
+.tdb-sheet-foot { padding: 14px 20px calc(18px + env(safe-area-inset-bottom)); box-shadow: 0 -1px 0 rgba(13,30,29,.08); display: flex; align-items: center; gap: 12px; }
+.tdb-sheet-preset {
+  flex: 1; border: 0; font: inherit; border-radius: 16px; padding: 9px 4px; display: flex; flex-direction: column; gap: 1px;
+  align-items: center; cursor: pointer; background: var(--cream); color: var(--ink);
+}
+.tdb-sheet-preset b { font-size: 13px; }
+.tdb-sheet-preset span { font-family: var(--font-mono); font-size: 10px; opacity: .85; }
+.tdb-sheet-preset.on { background: var(--teal); color: #fff; }
+.tdb-sheet-slot { gap: 6px; padding: 8px 10px; border-radius: 14px; }
+.tdb-sheet-slot select { padding: 7px 4px; }
+.tdb-sheet-sum {
+  padding: 14px 20px calc(18px + env(safe-area-inset-bottom)); background: var(--cream); border-radius: 24px 24px 0 0;
+  display: flex; flex-direction: column; gap: 10px;
+}

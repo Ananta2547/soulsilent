@@ -67,6 +67,8 @@ export default function TeacherMasterSessionsPage() {
   const [month, setMonth] = useState<Month>(monthOf(today));
   // The add / edit popup.
   const [formOpen, setFormOpen] = useState(false);
+  // Phones walk the popup in two sheets: 1 days, 2 time / venue / seats.
+  const [mstep, setMstep] = useState<1 | 2>(1);
   const [editing, setEditing] = useState<Round | null>(null);
   const [repeat, setRepeat] = useState<Repeat>('once');
   const [dates, setDates] = useState<string[]>([]);
@@ -156,6 +158,7 @@ export default function TeacherMasterSessionsPage() {
     setSeats(String(master.default_max_participants || 20));
     setPopMonth(monthOf(onDate || today));
     setError(null);
+    setMstep(1);
     setFormOpen(true);
   }
 
@@ -169,6 +172,8 @@ export default function TeacherMasterSessionsPage() {
     setSeats(String(r.max_participants));
     setPopMonth(monthOf(r.date));
     setError(null);
+    // A booked round keeps its day, so its sheet opens straight on step 2.
+    setMstep(r.booked > 0 ? 2 : 1);
     setFormOpen(true);
   }
 
@@ -272,6 +277,15 @@ export default function TeacherMasterSessionsPage() {
     setToast(res.ok ? 'ยกเลิกรอบแล้ว' : d.error || 'ยกเลิกไม่สำเร็จ');
     if (res.ok) await load();
   }
+
+  const togglePreset = (p: { ts: string; te: string }, on: boolean) =>
+    setSlots((x) =>
+      on
+        ? x.length > 1
+          ? x.filter((s) => !(s.time_start === p.ts && s.time_end === p.te))
+          : x
+        : [...x, { time_start: p.ts, time_end: p.te }].sort((a, b) => a.time_start.localeCompare(b.time_start)),
+    );
 
   const setSlot = (i: number, key: keyof Slot, part: 'h' | 'm', v: string) =>
     setSlots((x) =>
@@ -469,9 +483,9 @@ export default function TeacherMasterSessionsPage() {
         </section>
       </div>
 
-      {/* ============ add / edit popup ============ */}
+      {/* ============ add / edit popup (desktop) ============ */}
       {formOpen && (
-        <div className="tdb-backdrop" onMouseDown={(e) => e.target === e.currentTarget && closeForm()}>
+        <div className="tdb-backdrop tdb-hide-phone" onMouseDown={(e) => e.target === e.currentTarget && closeForm()}>
           <section className="tdb-modal tdb-add" role="dialog" aria-modal="true" aria-label={master.title}>
             <div className="tdb-add-form">
               <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 6 }}>
@@ -801,6 +815,253 @@ export default function TeacherMasterSessionsPage() {
                 </button>
               </div>
             </aside>
+          </section>
+        </div>
+      )}
+
+
+      {/* ============ add / edit sheet (phone, 2 steps) ============ */}
+      {formOpen && (
+        <div className="tdb-sheet-back tdb-phone-only" onMouseDown={(e) => e.target === e.currentTarget && closeForm()}>
+          <section className="tdb-sheet" role="dialog" aria-modal="true" aria-label={master.title}>
+            <div className="tdb-sheet-grab" />
+            {mstep === 1 ? (
+              <>
+                <div className="tdb-sheet-head">
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span className="tdb-sheet-eyebrow">{editing ? 'แก้ไขรอบ' : 'เพิ่มรอบใหม่'} · 1/2</span>
+                    <div style={{ fontFamily: "'Mitr', sans-serif", fontSize: 19, lineHeight: 1.2, marginTop: 4 }}>{master.title}</div>
+                  </div>
+                  <button type="button" className="tdb-x" style={{ width: 36, height: 36, fontSize: 19 }} onClick={closeForm} aria-label="ปิด">
+                    ×
+                  </button>
+                </div>
+                <div className="tdb-sheet-body">
+                  {!editing && (
+                    <div className="tdb-repeat tdb-sheet-repeat" role="radiogroup">
+                      {(
+                        [
+                          ['once', 'เลือกวันเอง'],
+                          ['daily', 'ทุกวัน'],
+                          ['weekly', 'ทุกสัปดาห์'],
+                        ] as const
+                      ).map(([k, label]) => (
+                        <button
+                          key={k}
+                          type="button"
+                          role="radio"
+                          aria-checked={repeat === k}
+                          className={repeat === k ? 'on' : ''}
+                          onClick={() => {
+                            setRepeat(k);
+                            setPopMonth(monthOf(k === 'once' ? dates[0] || today : date || today));
+                          }}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {repeat === 'weekly' && (
+                    <>
+                      <div className="tdb-mono-label" style={{ fontSize: 10, marginBottom: 8 }}>ทุกวัน</div>
+                      <div className="tdb-dowbtns tdb-sheet-dow">
+                        {DOW_TH.map((d, i) => (
+                          <button
+                            key={d}
+                            type="button"
+                            aria-pressed={weekdays.includes(i)}
+                            className={weekdays.includes(i) ? 'on' : ''}
+                            onClick={() => setWeekdays((w) => (w.includes(i) ? w.filter((x) => x !== i) : [...w, i].sort()))}
+                          >
+                            {d}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {repeat !== 'once' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+                      <div className="tdb-sheet-box">
+                        <div className="tdb-mono-label" style={{ fontSize: 9.5 }}>เริ่ม · จิ้มในปฏิทิน</div>
+                        <div style={{ fontSize: 14, fontWeight: 600, marginTop: 2, color: date ? 'var(--teal-deep)' : 'var(--muted)' }}>{date ? fmtShort(date) : '—'}</div>
+                      </div>
+                      <label className="tdb-sheet-box">
+                        <div className="tdb-mono-label" style={{ fontSize: 9.5 }}>ถึงวันที่</div>
+                        <input type="date" value={endDate} min={date || today} onChange={(e) => setEndDate(e.target.value)} style={{ border: 0, background: 'transparent', font: 'inherit', fontSize: 14, fontWeight: 600, padding: 0, marginTop: 2, width: '100%', color: 'var(--ink)', outline: 'none' }} />
+                      </label>
+                    </div>
+                  )}
+                  <TdbCalendar
+                    small
+                    month={popMonth}
+                    onMonth={setPopMonth}
+                    selected={repeat === 'once' ? dates : date ? [date] : []}
+                    preview={repeat === 'once' ? undefined : new Set(pDays)}
+                    marks={marks}
+                    floor={today}
+                    onPick={(d) => {
+                      if (repeat !== 'once') setDate(d);
+                      else if (editing) setDates([d]);
+                      else setDates((x) => (x.includes(d) ? x.filter((v) => v !== d) : [...x, d].sort()));
+                    }}
+                  />
+                  {repeat === 'once' && (
+                    <>
+                      <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 12 }}>
+                        {editing ? 'จิ้มวันใหม่ในปฏิทินเพื่อย้ายรอบ' : dates.length ? 'จิ้มซ้ำเพื่อเอาวันออก' : 'จิ้มวันในปฏิทิน เลือกได้หลายวันพร้อมกัน'}
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                        {dates.map((d) => (
+                          <span key={d} className="tdb-datetag" style={{ fontSize: 13, padding: '6px 6px 6px 13px' }}>
+                            {fmtShort(d)}
+                            {!editing && (
+                              <button type="button" aria-label="เอาออก" style={{ width: 22, height: 22 }} onClick={() => setDates((x) => x.filter((v) => v !== d))}>
+                                ×
+                              </button>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+                <div className="tdb-sheet-foot">
+                  <div style={{ flex: 1 }}>
+                    <div className="tdb-mono-label" style={{ fontSize: 10 }}>เลือกแล้ว</div>
+                    <div style={{ fontFamily: "'Mitr', sans-serif", fontSize: 18 }}>{daysOk ? `${days.length} วัน` : '—'}</div>
+                  </div>
+                  <button type="button" className="btn btn-teal" style={{ padding: '15px 22px', opacity: daysOk ? 1 : 0.45 }} disabled={!daysOk} onClick={() => setMstep(2)}>
+                    ถัดไป · เวลา →
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="tdb-sheet-head" style={{ alignItems: 'center' }}>
+                  {!editLocked && (
+                    <button type="button" className="tdb-x" style={{ width: 36, height: 36, fontSize: 18 }} onClick={() => setMstep(1)} aria-label="ย้อนกลับ">
+                      ‹
+                    </button>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span className="tdb-sheet-eyebrow">{editing ? 'แก้ไขรอบ' : 'เพิ่มรอบใหม่'} · 2/2</span>
+                    <div style={{ fontFamily: "'Mitr', sans-serif", fontSize: 17, lineHeight: 1.2, marginTop: 2 }}>เวลา สถานที่ และที่นั่ง</div>
+                  </div>
+                  <button type="button" className="tdb-x" style={{ width: 36, height: 36, fontSize: 19 }} onClick={closeForm} aria-label="ปิด">
+                    ×
+                  </button>
+                </div>
+                <div className="tdb-sheet-body" style={{ paddingTop: 4, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  {editLocked && <div className="tdb-note-warn">🔒 รอบนี้มีผู้จองแล้ว {editing?.booked} คน — เปลี่ยนวันและเวลาไม่ได้ แก้ได้เฉพาะสถานที่และจำนวนที่นั่ง</div>}
+                  <div>
+                    <div className="tdb-step-head" style={{ marginBottom: 10 }}>
+                      <span className={`tdb-step-n ${slotsOk ? 'ok' : ''}`} style={{ width: 24, height: 24, fontSize: 11 }}>{slotsOk ? '✓' : '1'}</span>
+                      <span className="tdb-step-t" style={{ fontSize: 16 }}>ช่วงเวลา</span>
+                    </div>
+                    {!editing && (
+                      <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                        {PRESETS.map((p) => {
+                          const on = slots.some((x) => x.time_start === p.ts && x.time_end === p.te);
+                          return (
+                            <button key={p.label} type="button" className={`tdb-sheet-preset ${on ? 'on' : ''}`} onClick={() => togglePreset(p, on)}>
+                              <b>{p.label}</b>
+                              <span>
+                                {p.ts}–{p.te}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {slots.map((sl, i) => {
+                        const pr = PRESETS.find((p) => p.ts === sl.time_start && p.te === sl.time_end);
+                        return (
+                          <div key={i} className="tdb-slot tdb-sheet-slot">
+                            <span className="tdb-slot-label" style={{ width: 38, fontSize: 10 }}>{pr ? pr.label : `ช่วง ${i + 1}`}</span>
+                            <select aria-label="ชั่วโมงเริ่ม" value={sl.time_start.slice(0, 2)} disabled={editLocked} onChange={(e) => setSlot(i, 'time_start', 'h', e.target.value)}>
+                              {HOURS.map((h) => <option key={h} value={h}>{h}</option>)}
+                            </select>
+                            <select aria-label="นาทีเริ่ม" value={sl.time_start.slice(3)} disabled={editLocked} onChange={(e) => setSlot(i, 'time_start', 'm', e.target.value)}>
+                              {MINUTES.map((m) => <option key={m} value={m}>{m}</option>)}
+                            </select>
+                            <span style={{ color: 'var(--muted)' }}>→</span>
+                            <select aria-label="ชั่วโมงจบ" value={sl.time_end.slice(0, 2)} disabled={editLocked} onChange={(e) => setSlot(i, 'time_end', 'h', e.target.value)}>
+                              {HOURS.map((h) => <option key={h} value={h}>{h}</option>)}
+                            </select>
+                            <select aria-label="นาทีจบ" value={sl.time_end.slice(3)} disabled={editLocked} onChange={(e) => setSlot(i, 'time_end', 'm', e.target.value)}>
+                              {MINUTES.map((m) => <option key={m} value={m}>{m}</option>)}
+                            </select>
+                            {!editing && slots.length > 1 && (
+                              <button type="button" className="tdb-slot-x" aria-label="ลบช่วงเวลา" onClick={() => setSlots((x) => x.filter((_, j) => j !== i))}>
+                                ✕
+                              </button>
+                            )}
+                            {sl.time_end <= sl.time_start && <span style={{ width: '100%', fontSize: 11.5, color: '#a04a14', paddingLeft: 44 }}>เวลาจบต้องหลังเวลาเริ่ม</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {!editing && (
+                      <button type="button" className="tdb-textlink" style={{ padding: '8px 0 0' }} onClick={() => setSlots((x) => [...x, { time_start: '10:00', time_end: '12:00' }])}>
+                        + กำหนดช่วงเวลาเอง
+                      </button>
+                    )}
+                  </div>
+                  <div>
+                    <div className="tdb-step-head" style={{ marginBottom: 10 }}>
+                      <span className={`tdb-step-n ${locationId ? 'ok' : ''}`} style={{ width: 24, height: 24, fontSize: 11 }}>{locationId ? '✓' : '2'}</span>
+                      <span className="tdb-step-t" style={{ fontSize: 16 }}>สถานที่</span>
+                      {allowedLocs.length < data.locations.length && <span style={{ fontSize: 12, color: 'var(--muted)' }}>Admin อนุญาต {allowedLocs.length} แห่ง</span>}
+                    </div>
+                    {allowedLocs.length === 0 ? (
+                      <div className="tdb-note-warn">ยังไม่มีสถานที่ให้เลือกสำหรับ Workshop นี้ — ติดต่อ Admin ให้เพิ่มสถานที่</div>
+                    ) : (
+                      <div className="tdb-locs" style={{ gap: 6 }}>
+                        {allowedLocs.map((l) => (
+                          <button key={l.id} type="button" aria-pressed={locationId === l.id} className={`tdb-loc ${locationId === l.id ? 'on' : ''}`} onClick={() => setLocationId(l.id)}>
+                            <span className="dot">
+                              <i />
+                            </span>
+                            <span style={{ minWidth: 0 }}>
+                              <b>{l.name}</b>
+                              {l.province && <small>{l.province}</small>}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontFamily: "'Mitr', sans-serif", fontSize: 16, flex: 1 }}>ที่นั่งต่อรอบ</span>
+                    <div className="tdb-stepper" style={{ marginLeft: 0 }}>
+                      <button type="button" aria-label="ลด" style={{ width: 38, height: 38 }} onClick={() => setSeats(String(Math.max(minSeats, seatsNum - 1)))}>
+                        −
+                      </button>
+                      <input type="number" value={seats} min={minSeats} onChange={(e) => setSeats(e.target.value)} aria-label="จำนวนที่นั่ง" style={{ width: 44 }} />
+                      <button type="button" aria-label="เพิ่ม" style={{ width: 38, height: 38 }} onClick={() => setSeats(String(seatsNum + 1))}>
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="tdb-sheet-sum">
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontFamily: "'Mitr', sans-serif", fontSize: 36, color: 'var(--teal)', lineHeight: 1 }}>{Math.max(0, total)}</span>
+                    <span style={{ fontFamily: "'Mitr', sans-serif", fontSize: 16 }}>รอบ</span>
+                    <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>{editing ? 'แก้ไขรอบเดียว' : `${days.length} วัน × ${slots.length} ช่วงเวลา`}{skip ? ` · ข้าม ${skip}` : ''}</span>
+                  </div>
+                  {!slotsOk && <div className="tdb-check bad"><i>!</i><span>เวลาเริ่มต้องอยู่ก่อนเวลาจบ</span></div>}
+                  {!locationId && <div className="tdb-check bad"><i>!</i><span>{allowedLocs.length ? 'ยังไม่ได้เลือกสถานที่' : 'ยังไม่มีสถานที่ — ติดต่อ Admin'}</span></div>}
+                  {!priced && <div className="tdb-check bad"><i>!</i><span>Admin ยังไม่ได้ตั้งราคา — ติดต่อ Admin ก่อนเปิดรอบ</span></div>}
+                  {error && <div className="tdb-note-warn">{error}</div>}
+                  <button type="button" className="btn btn-teal" onClick={submit} disabled={!ready || saving} style={{ justifyContent: 'center', padding: 16, opacity: ready ? 1 : 0.45 }}>
+                    {saving ? 'กำลังบันทึก…' : editing ? 'บันทึกการแก้ไข' : total > 0 ? `เปิด ${total} รอบ` : 'เปิดรอบ'} →
+                  </button>
+                </div>
+              </>
+            )}
           </section>
         </div>
       )}
