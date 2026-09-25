@@ -1,5 +1,6 @@
 'use client';
 
+import { ASPECTS } from '@/lib/image-aspects';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -104,8 +105,28 @@ export default function ArticleDetailPage() {
   return (
     <article>
       {/* Hero */}
-      <header style={{ paddingTop: 48 }}>
-        <div className="container" style={{ maxWidth: 960 }}>
+      <header>
+        {/* Cover first, edge to edge and low — a band across the top of the
+            page (ASPECTS.ARTICLE_HERO, 3:1) rather than a tall framed picture. */}
+        <Reveal variant="reveal-zoom">
+          <div
+            className={`ph ${swatchClass(article.cover_swatch)}`}
+            style={{
+              width: '100%',
+              aspectRatio: String(ASPECTS.ARTICLE_HERO.ratio),
+              maxHeight: 460,
+              minHeight: 180,
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            {article.cover_image_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={article.cover_image_url} alt={article.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            )}
+          </div>
+        </Reveal>
+        <div className="container" style={{ maxWidth: 960, paddingTop: 40 }}>
           <Reveal>
             <Link
               href="/articles"
@@ -191,28 +212,6 @@ export default function ArticleDetailPage() {
           )}
         </div>
 
-        <Reveal variant="reveal-zoom" delay={120}>
-          <div className="container" style={{ maxWidth: 1200 }}>
-            <div
-              className={`ph ${swatchClass(article.cover_swatch)}`}
-              style={{
-                aspectRatio: '16/9',
-                borderRadius: 24,
-                marginBottom: 64,
-                position: 'relative',
-                overflow: 'hidden',
-              }}
-            >
-              {article.cover_image_url && (
-                <img
-                  src={article.cover_image_url}
-                  alt={article.title}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-              )}
-            </div>
-          </div>
-        </Reveal>
       </header>
 
       {/* Body */}

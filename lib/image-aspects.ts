@@ -23,7 +23,7 @@ export const ASPECTS = {
   WORKSHOP_MASTER: { ratio: 297 / 420, label: 'A3 · โปสเตอร์ (ปกข้อมูล Workshop)' },
 
   ARTICLE_COVER: { ratio: 16 / 9, label: '16:9 · article card' },
-  ARTICLE_HERO: { ratio: 21 / 9, label: '21:9 · article header' },
+  ARTICLE_HERO: { ratio: 3, label: '3:1 · article header (full width)' },
   ARTICLE_BODY_16_9: { ratio: 16 / 9, label: '16:9 · body image' },
   ARTICLE_BODY_4_3: { ratio: 4 / 3, label: '4:3 · body image' },
   ARTICLE_BODY_1_1: { ratio: 1, label: '1:1 · body image' },
