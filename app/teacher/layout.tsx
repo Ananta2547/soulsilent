@@ -1,5 +1,7 @@
 'use client';
 
+import './teacher.css';
+
 import { hasAnyRole } from '@/lib/roles';
 
 import { PageLoader } from '@/components/design/PageLoader';
@@ -46,23 +48,14 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
   }
 
   return (
-    // Column on phones — the rail collapses to a top bar there and only slides
-    // over the page when asked for; a row from 1024px, where it is a fixed rail.
-    //
-    // From 1024px the shell is exactly one viewport tall and the window itself
-    // never scrolls: each page pages its own long lists rather than growing.
-    // The content column keeps overflow-auto as a safety valve for a short
-    // desktop window — a page that cannot be reached at all is worse than a
-    // scrollbar. Phones keep normal page scroll: a dashboard does not fit a
-    // phone screen, and trapping it in 100vh would hide the bottom of it.
-    <div className="flex flex-col lg:flex-row min-h-screen lg:h-screen lg:overflow-hidden bg-surface">
+    // Design "Teacher Dashboard": a dark rail beside a scrolling page on
+    // desktop; on phones the rail becomes a top bar with a slide-in menu
+    // (styles in ./teacher.css).
+    <div className="tdb-shell">
       <TeacherSidebar />
-      {/* min-h-0 is load-bearing: without it a flex child refuses to shrink
-          below its content, so instead of scrolling it overflows and the
-          shell's overflow-hidden cuts the bottom of the page off. */}
-      <div className="flex-1 min-w-0 lg:h-screen lg:min-h-0 lg:overflow-y-auto">
-        <div className="p-4 sm:p-6 lg:p-8">{children}</div>
-      </div>
+      <main className="tdb-main">
+        <div className="tdb-page">{children}</div>
+      </main>
     </div>
   );
 }

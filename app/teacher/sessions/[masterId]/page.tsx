@@ -1,22 +1,20 @@
 'use client';
 
-/* One activity in the session manager: a big month calendar of the days it
- * already runs (a count under each day), the rounds of the chosen day with
- * their venue, seats taken and a way into the roster, and an "add rounds"
- * popup to pick days (several at once, or a daily / weekly pattern), time
- * ranges, a venue and the seat count — every day × time becomes a bookable
- * round. Editing a round uses the same popup. */
+/* One activity in the session manager — design "Teacher Sessions v2" (screen
+ * 02 ปฏิทินรอบ): its prices, a stat strip, a month calendar of the days it
+ * runs, the rounds of the picked day with a way into their roster, and the
+ * next few rounds. "+ เพิ่มรอบ" opens the add popup: pick days (several at
+ * once, or a daily / weekly pattern), time ranges, a venue and seats, with a
+ * live summary of how many rounds that makes. Editing a round uses the same
+ * popup; a round somebody booked keeps its day and time. */
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { useLang, T, tr } from '@/lib/i18n';
-import { Btn } from '@/components/design/RippleButton';
-import { MonthPicker, todayYmd } from '@/components/calendar/MonthPicker';
-import { TimeField24 } from '@/components/admin/TimeField24';
-import { fmtDate } from '@/lib/datetime';
 import type { WorkshopMaster } from '@/lib/types';
 import { bookableTiers, parseTiers, tierDesc } from '@/lib/pricing';
+import { useLang } from '@/lib/i18n';
+import { DOW_TH, IcoPin, SeatBar, TdbCalendar, baht, dateOf, fmtLong, fmtMed, fmtShort, monShort, monthOf, todayYmd, type Month } from '@/components/teacher/tdb';
 
 type Round = {
   id: string;
@@ -34,43 +32,65 @@ type Round = {
 type Loc = { id: string; name: string; province: string | null; district: string | null };
 type Data = { masters: WorkshopMaster[]; rounds: Round[]; locations: Loc[] };
 type Slot = { time_start: string; time_end: string };
+type Repeat = 'once' | 'daily' | 'weekly';
 
-const baht = (n: number | null | undefined) => (n == null ? '—' : '฿' + Math.round(n).toLocaleString());
 const EMPTY: Data = { masters: [], rounds: [], locations: [] };
+const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+const MINUTES = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
+const PRESETS = [
+  { label: 'เช้า', ts: '09:00', te: '12:00' },
+  { label: 'บ่าย', ts: '13:00', te: '16:00' },
+  { label: 'เย็น', ts: '18:00', te: '21:00' },
+];
+
+/** Every day a daily / weekly pattern lands on, capped like the API (92). */
+function patternDays(repeat: Repeat, start: string | null, end: string, weekdays: number[]): string[] {
+  if (repeat === 'once' || !start || !end || end < start) return [];
+  const out: string[] = [];
+  const d = dateOf(start);
+  const stop = dateOf(end);
+  while (d <= stop && out.length < 92) {
+    if (repeat === 'daily' || weekdays.includes(d.getDay())) {
+      out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+    }
+    d.setDate(d.getDate() + 1);
+  }
+  return out;
+}
 
 export default function TeacherMasterSessionsPage() {
   const { masterId } = useParams<{ masterId: string }>();
   const { lang } = useLang();
+  const today = todayYmd();
   const [data, setData] = useState<Data | null>(null);
-  // The add / edit popup, and the day picked on the page calendar.
+  const [day, setDay] = useState(today);
+  const [month, setMonth] = useState<Month>(monthOf(today));
+  // The add / edit popup.
   const [formOpen, setFormOpen] = useState(false);
-  const [day, setDay] = useState<string | null>(null);
-  // Days: hand-picked (repeat 'once') or a pattern from `date` to `endDate`.
-  const [repeat, setRepeat] = useState<'once' | 'daily' | 'weekly'>('once');
+  const [editing, setEditing] = useState<Round | null>(null);
+  const [repeat, setRepeat] = useState<Repeat>('once');
   const [dates, setDates] = useState<string[]>([]);
   const [date, setDate] = useState<string | null>(null);
   const [endDate, setEndDate] = useState('');
   const [weekdays, setWeekdays] = useState<number[]>([]);
-  // Time ranges — a morning and an evening round on every picked day.
   const [slots, setSlots] = useState<Slot[]>([{ time_start: '09:00', time_end: '12:00' }]);
   const [locationId, setLocationId] = useState('');
   const [seats, setSeats] = useState('');
+  const [popMonth, setPopMonth] = useState<Month>(monthOf(today));
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  // What the last save did, shown on the page once the popup has closed.
-  const [notice, setNotice] = useState<string | null>(null);
-  // A round being edited: the form shows that one round's fields.
-  const [editing, setEditing] = useState<Round | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [confirmR, setConfirmR] = useState<Round | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
-  function load(): Promise<Data> {
-    return fetch('/api/teacher/sessions')
+  const load = () =>
+    fetch('/api/teacher/sessions')
       .then((res) => (res.ok ? (res.json() as Promise<Data>) : EMPTY))
       .catch(() => EMPTY)
       .then((d) => {
         setData(d);
         return d;
       });
-  }
+
   useEffect(() => {
     let alive = true;
     fetch('/api/teacher/sessions')
@@ -82,14 +102,33 @@ export default function TeacherMasterSessionsPage() {
         // Open on the nearest day with a round from today, else the latest.
         const mine = d.rounds.filter((r) => r.master_id === masterId && r.status !== 'cancelled');
         const next = mine.find((r) => r.date >= todayYmd()) || mine[mine.length - 1];
-        setDay(next ? next.date : todayYmd());
+        const first = next ? next.date : todayYmd();
+        setDay(first);
+        setMonth(monthOf(first));
       });
     return () => {
       alive = false;
     };
   }, [masterId]);
 
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3200);
+    return () => clearTimeout(t);
+  }, [toast]);
+
   const master = data?.masters.find((m) => m.id === masterId) || null;
+  const mine = useMemo(
+    () => (data?.rounds || []).filter((r) => r.status !== 'cancelled' && r.master_id === masterId).sort((a, b) => a.date.localeCompare(b.date) || a.time_start.localeCompare(b.time_start)),
+    [data, masterId],
+  );
+  const marks = useMemo(() => {
+    const m: Record<string, number> = {};
+    mine.forEach((r) => (m[r.date] = (m[r.date] || 0) + 1));
+    return m;
+  }, [mine]);
+  const upcoming = mine.filter((r) => r.date >= today);
+  const onDay = mine.filter((r) => r.date === day);
 
   // Venues the admin allowed for this activity; none listed = every venue.
   const allowedLocs = useMemo(() => {
@@ -104,63 +143,69 @@ export default function TeacherMasterSessionsPage() {
     return ids.length ? data.locations.filter((l) => ids.includes(l.id)) : data.locations;
   }, [data, master]);
 
-  // Days this activity already runs on — counts under the day while picking.
-  const marks = useMemo(() => {
-    const m: Record<string, number> = {};
-    (data?.rounds || [])
-      .filter((r) => r.status !== 'cancelled' && r.master_id === masterId)
-      .forEach((r) => {
-        m[r.date] = (m[r.date] || 0) + 1;
-      });
-    return m;
-  }, [data, masterId]);
-
-  // Rounds of this activity: every live one, and those on the picked day.
-  const mine = useMemo(() => (data?.rounds || []).filter((r) => r.status !== 'cancelled' && r.master_id === masterId), [data, masterId]);
-  const upcoming = useMemo(() => mine.filter((r) => r.date >= todayYmd()), [mine]);
-  const onDay = useMemo(() => (day ? mine.filter((r) => r.date === day) : []), [mine, day]);
-
-  function resetForm() {
+  function openAdd(onDate?: string) {
+    if (!master) return;
     setEditing(null);
-    setDates([]);
-    setDate(null);
-    setMsg(null);
-  }
-
-  function closeForm() {
-    resetForm();
-    setFormOpen(false);
-  }
-
-  function openAdd(m: WorkshopMaster) {
-    resetForm();
-    setNotice(null);
-    setFormOpen(true);
     setRepeat('once');
-    setWeekdays([]);
+    setDates(onDate ? [onDate] : []);
+    setDate(null);
     setEndDate('');
+    setWeekdays([]);
     setSlots([{ time_start: '09:00', time_end: '12:00' }]);
-    setLocationId('');
-    setSeats(m.default_max_participants ? String(m.default_max_participants) : '');
+    setLocationId(allowedLocs.length === 1 ? allowedLocs[0].id : '');
+    setSeats(String(master.default_max_participants || 20));
+    setPopMonth(monthOf(onDate || today));
+    setError(null);
+    setFormOpen(true);
   }
 
   function startEdit(r: Round) {
-    setNotice(null);
     setEditing(r);
-    setFormOpen(true);
     setRepeat('once');
     setDates([r.date]);
     setDate(r.date);
     setSlots([{ time_start: r.time_start, time_end: r.time_end }]);
     setLocationId(r.location_id || '');
     setSeats(String(r.max_participants));
-    setMsg(null);
+    setPopMonth(monthOf(r.date));
+    setError(null);
+    setFormOpen(true);
   }
 
+  const closeForm = () => {
+    if (saving) return;
+    setFormOpen(false);
+    setEditing(null);
+  };
+
+  const pDays = patternDays(repeat, date, endDate, weekdays);
+  const days = repeat === 'once' ? dates : pDays;
+  const slotsOk = slots.length > 0 && slots.every((s) => s.time_start < s.time_end);
+  const daysOk = days.length > 0;
+  const priced = !!master && (master.price_group != null || parseTiers(master.price_tiers_json).length > 0);
+  const ready = !!master && daysOk && slotsOk && !!locationId && priced;
+  const editLocked = !!editing && editing.booked > 0;
+  let skip = 0;
+  if (!editing) days.forEach((d) => slots.forEach((s) => mine.some((r) => r.date === d && r.time_start === s.time_start) && skip++));
+  const total = editing ? 1 : days.length * slots.length - skip;
+  const minSeats = editing ? Math.max(1, editing.booked) : 1;
+  const seatsNum = Number(seats) || 0;
+
+  let dayMsg = `เลือกแล้ว ${days.length} วัน`;
+  if (!daysOk) {
+    if (repeat === 'once') dayMsg = 'ยังไม่ได้เลือกวันจากปฏิทิน';
+    else if (!date) dayMsg = 'จิ้มวันเริ่มในปฏิทิน';
+    else if (!endDate) dayMsg = 'ใส่วันสิ้นสุด';
+    else if (endDate < date) dayMsg = 'วันสิ้นสุดอยู่ก่อนวันเริ่ม';
+    else dayMsg = 'เลือกวันในสัปดาห์อย่างน้อย 1 วัน';
+  }
+  const loc = allowedLocs.find((l) => l.id === locationId) || data?.locations.find((l) => l.id === locationId) || null;
+  const dayList = days.length ? (days.length <= 4 ? days.map(fmtShort).join(', ') : `${days.slice(0, 3).map(fmtShort).join(', ')} และอีก ${days.length - 3} วัน`) : '—';
+
   async function submit() {
-    if (!master) return;
+    if (!master || !ready || saving) return;
     setSaving(true);
-    setMsg(null);
+    setError(null);
     try {
       if (editing) {
         const res = await fetch(`/api/teacher/sessions/${editing.id}`, {
@@ -171,16 +216,17 @@ export default function TeacherMasterSessionsPage() {
             time_start: slots[0].time_start,
             time_end: slots[0].time_end,
             location_id: locationId || undefined,
-            max_participants: seats ? Number(seats) : undefined,
+            max_participants: seatsNum || undefined,
           }),
         });
         const d = (await res.json()) as { error?: string };
         if (!res.ok) {
-          setMsg({ ok: false, text: d.error || tr(lang, 'แก้ไขไม่สำเร็จ', 'Could not save') });
+          setError(d.error || 'แก้ไขไม่สำเร็จ');
           return;
         }
-        setNotice(tr(lang, 'บันทึกการแก้ไขแล้ว', 'Round updated'));
-        closeForm();
+        setFormOpen(false);
+        setEditing(null);
+        setToast('บันทึกการแก้ไขแล้ว');
         await load();
         return;
       }
@@ -196,348 +242,606 @@ export default function TeacherMasterSessionsPage() {
           weekdays: repeat === 'weekly' ? weekdays : undefined,
           slots,
           location_id: locationId,
-          max_participants: seats ? Number(seats) : undefined,
+          max_participants: seatsNum || undefined,
         }),
       });
       const d = (await res.json()) as { error?: string; created?: number; skipped?: number };
       if (!res.ok) {
-        setMsg({ ok: false, text: d.error || tr(lang, 'เปิดรอบไม่สำเร็จ', 'Could not open the round') });
+        setError(d.error || 'เปิดรอบไม่สำเร็จ');
         return;
       }
-      const n = d.created || 1;
-      const skipped = d.skipped ? tr(lang, ` (ข้าม ${d.skipped} รอบที่มีอยู่แล้ว)`, ` (${d.skipped} already-open rounds skipped)`) : '';
-      setNotice(n === 1 ? tr(lang, `เปิดรอบแล้ว${skipped}`, `Round opened${skipped}`) : tr(lang, `เปิด ${n} รอบแล้ว${skipped}`, `${n} rounds opened${skipped}`));
-      const first = repeat === 'once' ? dates[0] : date;
-      if (first) setDay(first);
-      closeForm();
+      const first = days[0];
+      setFormOpen(false);
+      setToast(`เปิด ${d.created || 1} รอบแล้ว${d.skipped ? ` · ข้าม ${d.skipped} รอบที่มีอยู่` : ''}`);
+      if (first) {
+        setDay(first);
+        setMonth(monthOf(first));
+      }
       await load();
     } finally {
       setSaving(false);
     }
   }
 
-  async function cancel(r: Round) {
-    if (!confirm(tr(lang, `ยกเลิกรอบ ${fmtDate(r.date, lang)} ${r.time_start}–${r.time_end}?`, `Cancel the ${fmtDate(r.date, lang)} ${r.time_start}–${r.time_end} round?`))) return;
+  async function doCancel() {
+    if (!confirmR) return;
+    const r = confirmR;
+    setConfirmR(null);
     const res = await fetch(`/api/teacher/sessions/${r.id}`, { method: 'DELETE' });
     const d = (await res.json()) as { error?: string };
-    if (!res.ok) {
-      setMsg({ ok: false, text: d.error || tr(lang, 'ยกเลิกไม่สำเร็จ', 'Could not cancel') });
-      return;
-    }
-    if (editing?.id === r.id) closeForm();
-    await load();
+    setToast(res.ok ? 'ยกเลิกรอบแล้ว' : d.error || 'ยกเลิกไม่สำเร็จ');
+    if (res.ok) await load();
   }
 
-  const slotsOk = slots.every((s) => s.time_start && s.time_end && s.time_start < s.time_end);
-  const daysOk = repeat === 'once' ? dates.length > 0 : !!date && !!endDate && endDate >= date && (repeat === 'daily' || weekdays.length > 0);
-  const priced = !!master && (master.price_group != null || parseTiers(master.price_tiers_json).length > 0);
-  const ready = !!master && daysOk && slotsOk && !!locationId && priced;
-  // Why the open button is greyed out, spelled out under it — one line per
-  // step still missing, in the order the form asks for them.
-  const blockers: string[] = [];
-  if (master && !priced) blockers.push(tr(lang, 'Admin ยังไม่ได้ตั้งราคาให้ Workshop นี้ — ติดต่อ Admin', 'No price set for this workshop yet — ask an admin'));
-  if (!daysOk) {
-    if (repeat === 'once') blockers.push(tr(lang, 'ยังไม่ได้เลือกวันจากปฏิทิน (ข้อ 1)', 'Pick at least one day on the calendar (step 1)'));
-    else if (!date || !endDate) blockers.push(tr(lang, 'ยังไม่ได้ใส่วันเริ่มและวันสิ้นสุด (ข้อ 1)', 'Set a start and an end date (step 1)'));
-    else if (endDate < date) blockers.push(tr(lang, 'วันสิ้นสุดอยู่ก่อนวันเริ่ม (ข้อ 1)', 'The end date is before the start date (step 1)'));
-    else blockers.push(tr(lang, 'ยังไม่ได้เลือกวันในสัปดาห์ (ข้อ 1)', 'Pick the weekdays (step 1)'));
-  }
-  if (!slotsOk) blockers.push(tr(lang, 'เวลาเริ่มต้องอยู่ก่อนเวลาจบทุกช่วง (ข้อ 2)', 'Every time slot must start before it ends (step 2)'));
-  if (!locationId)
-    blockers.push(
-      master && allowedLocs.length === 0
-        ? tr(lang, 'ยังไม่มีสถานที่ให้เลือกสำหรับ Workshop นี้ — ติดต่อ Admin ให้เพิ่มสถานที่', 'No venue is available for this workshop — ask an admin to add one')
-        : tr(lang, 'ยังไม่ได้เลือกสถานที่ (ข้อ 3)', 'Pick a venue (step 3)'),
+  const setSlot = (i: number, key: keyof Slot, part: 'h' | 'm', v: string) =>
+    setSlots((x) =>
+      x.map((sl, j) => {
+        if (j !== i) return sl;
+        const [h, mi] = sl[key].split(':');
+        return { ...sl, [key]: part === 'h' ? `${v}:${mi}` : `${h}:${v}` };
+      }),
     );
-  const DOW = lang === 'th' ? ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'] : ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-  const editLocked = !!editing && editing.booked > 0;
+
+  if (data === null) return null;
+  if (!master) {
+    return (
+      <div>
+        <Link href="/teacher/sessions" className="tdb-back">← Workshop ทั้งหมด</Link>
+        <div className="tdb-empty" style={{ marginTop: 18 }}>
+          <p>ไม่พบ Workshop นี้ หรือไม่ได้อยู่ในความดูแลของคุณ</p>
+        </div>
+      </div>
+    );
+  }
+
+  const nx = upcoming[0];
+  const bookedUp = upcoming.reduce((a, r) => a + r.booked, 0);
+  const capUp = upcoming.reduce((a, r) => a + r.max_participants, 0);
 
   return (
     <div>
-      <Link href="/teacher/sessions" style={{ fontSize: 13, color: 'var(--muted)' }}>← {tr(lang, 'จัดรอบสอนทั้งหมด', 'All workshops')}</Link>
+      <Link href="/teacher/sessions" className="tdb-back">← Workshop ทั้งหมด</Link>
 
-      {data === null ? null : !master ? (
-        <div className="card card-static" style={{ textAlign: 'center', padding: '48px 24px', marginTop: 16 }}>
-          <p style={{ color: 'var(--muted)', margin: 0 }}>
-            <T th="ไม่พบ Workshop นี้ หรือไม่ได้อยู่ในความดูแลของคุณ" en="This workshop was not found, or isn't yours." />
-          </p>
+      <div className="tdb-head" style={{ margin: '18px 0 24px' }}>
+        <div style={{ flex: 1, minWidth: 280, maxWidth: 'none' }}>
+          <h1 className="tdb-h1 sm">{master.title}</h1>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {bookableTiers(master).map((t) => (
+              <span key={t.id} className="tdb-tier">
+                {t.label} <b>{baht(t.price)}</b> <span style={{ fontSize: 12 }}>{tierDesc(t, lang)}</span>
+              </span>
+            ))}
+            {!priced && <span className="tdb-warn-pill">⚠ Admin ยังไม่ได้ตั้งราคา</span>}
+          </div>
         </div>
-      ) : (
-        <>
-          <div className="tsm-head">
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <h1 className="display-th" style={{ fontSize: 'clamp(24px,3vw,34px)', margin: '10px 0 4px' }}>{master.title}</h1>
-              <div style={{ fontSize: 13.5, color: 'var(--muted)' }}>
-                {tr(lang, `เปิดอยู่ ${upcoming.length} รอบ · จิ้มวันในปฏิทินเพื่อดูรอบและเช็คชื่อ`, `${upcoming.length} open · tap a day to see its rounds and check people in`)}
-              </div>
-              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 6, fontSize: 12.5, color: 'var(--muted)' }}>
-                {bookableTiers(master).map((t) => (
-                  <span key={t.id}>{t.label} <b style={{ color: 'var(--ink)' }}>{baht(t.price)}</b> · {tierDesc(t, lang)}</span>
-                ))}
-              </div>
+        <button type="button" className="btn btn-teal" onClick={() => openAdd()}>
+          <span style={{ fontSize: 18, lineHeight: 1 }}>+</span> เพิ่มรอบ
+        </button>
+      </div>
+
+      <div className="tdb-stats">
+        <div>
+          <span className="tdb-mono-label">รอบที่เปิดอยู่</span>
+          <b>
+            {upcoming.length} <small>รอบ</small>
+          </b>
+        </div>
+        <div>
+          <span className="tdb-mono-label">จองแล้ว</span>
+          <b>
+            {bookedUp}/{capUp} <small>ที่นั่ง</small>
+          </b>
+        </div>
+        <div>
+          <span className="tdb-mono-label">รอบถัดไป</span>
+          <b>
+            {nx ? fmtShort(nx.date) : '—'} <small>{nx ? `${nx.time_start} น.` : ''}</small>
+          </b>
+        </div>
+      </div>
+
+      <div className="tdb-split">
+        <section className="tdb-cal">
+          <TdbCalendar
+            month={month}
+            onMonth={setMonth}
+            selected={[day]}
+            marks={marks}
+            onPick={setDay}
+            onToday={() => {
+              setDay(today);
+              setMonth(monthOf(today));
+            }}
+          >
+            <div className="tdb-legend">
+              <span>
+                <i style={{ background: '#eaf6f4' }} />
+                มีรอบ
+              </span>
+              <span>
+                <i style={{ background: 'var(--teal)' }} />
+                วันที่เลือก
+              </span>
+              <span>
+                <i style={{ width: 6, height: 6, borderRadius: 99, background: 'var(--accent)' }} />
+                วันนี้
+              </span>
             </div>
-            <Btn kind="teal" onClick={() => openAdd(master)}>+ {tr(lang, 'เพิ่มรอบ', 'Add rounds')}</Btn>
+          </TdbCalendar>
+        </section>
+
+        <section className="tdb-side">
+          <div className="tdb-dayhead">
+            <div>
+              <small>{onDay.length} รอบในวันนี้</small>
+              <h2>{fmtLong(day)}</h2>
+            </div>
+            {day >= today && (
+              <button type="button" className="btn btn-paper btn-sm" onClick={() => openAdd(day)}>
+                + เพิ่มรอบวันนี้
+              </button>
+            )}
           </div>
 
-          {notice && (
-            <div style={{ margin: '16px 0 0', padding: '10px 14px', borderRadius: 12, fontSize: 13.5, background: 'var(--teal-50)', color: 'var(--teal-deep)', fontWeight: 600 }}>✓ {notice}</div>
+          {onDay.length === 0 && (
+            <div className="tdb-dashed" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontFamily: "'Mitr', sans-serif", fontWeight: 500, fontSize: 17, color: 'var(--ink)' }}>วันนี้ยังว่างอยู่</span>
+              <span style={{ fontSize: 13 }}>{day < today ? 'วันนี้ผ่านไปแล้ว' : 'กด "+ เพิ่มรอบวันนี้" เพื่อเปิดรอบในวันนี้'}</span>
+            </div>
           )}
 
-          <div className="tsm-view">
-            <section className="card card-static tsm-view-cal">
-              <MonthPicker value={day} onChange={setDay} marks={marks} min="" initialMonth={day || undefined} />
-              <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 10 }}>
-                {tr(lang, 'ตัวเลขใต้วัน = จำนวนรอบในวันนั้น', 'The number under a day is how many rounds run that day')}
-              </div>
-            </section>
-
-            <section>
-              <h2 className="display-th" style={{ fontSize: 19, margin: '0 0 12px' }}>
-                {day ? fmtDate(day, lang, 'long') : tr(lang, 'เลือกวัน', 'Pick a day')}{' '}
-                <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 400 }}>· {tr(lang, `${onDay.length} รอบ`, `${onDay.length} rounds`)}</span>
-              </h2>
-              {onDay.length === 0 ? (
-                <div className="card card-static" style={{ color: 'var(--muted)', fontSize: 13.5, textAlign: 'center', padding: 28 }}>
-                  {tr(lang, 'วันนี้ยังไม่มีรอบ — กด "+ เพิ่มรอบ" เพื่อเปิด', 'No rounds this day — press "+ Add rounds" to open one')}
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {onDay.map((r) => (
-                    <div key={r.id} className="card card-static tsm-round">
-                      <div style={{ flex: 1, minWidth: 160 }}>
-                        <div className="mono" style={{ fontSize: 17, fontWeight: 700 }}>{r.time_start}–{r.time_end}</div>
-                        <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>{r.loc_name || tr(lang, 'ยังไม่ระบุสถานที่', 'No venue')}</div>
+          {onDay.map((r) => {
+            const full = r.booked >= r.max_participants;
+            return (
+              <div key={r.id} className="tdb-round">
+                <div className="tdb-round-top">
+                  <div className="tdb-round-time">
+                    <b>{r.time_start}</b>
+                    <span>– {r.time_end}</span>
+                  </div>
+                  <div className="tdb-round-info">
+                    <span className="tdb-round-loc">
+                      <IcoPin />
+                      {r.loc_name || 'ยังไม่ระบุสถานที่'}
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ flex: 1 }}>
+                        <SeatBar booked={r.booked} max={r.max_participants} soft />
                       </div>
-                      <span className="tag" style={{ fontSize: 11.5 }}>{r.booked}/{r.max_participants} {tr(lang, 'ที่นั่ง', 'seats')}</span>
-                      <button type="button" onClick={() => startEdit(r)} className="btn btn-paper btn-sm">{tr(lang, 'แก้ไข', 'Edit')}</button>
-                      {r.booked === 0 && (
-                        <button type="button" onClick={() => cancel(r)} className="btn btn-paper btn-sm" style={{ color: '#a04a14' }}>
-                          {tr(lang, 'ยกเลิก', 'Cancel')}
-                        </button>
+                      {full && (
+                        <span className="tag tag-accent" style={{ padding: '3px 9px', fontSize: 10 }}>
+                          เต็ม
+                        </span>
                       )}
-                      <Link href={`/teacher/sessions/round/${r.id}`} className="btn btn-teal btn-sm">{tr(lang, 'เช็คชื่อ', 'Check-in')} →</Link>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-          </div>
-
-          {/* Popup: pick days, times, venue for the chosen workshop */}
-          {formOpen && (
-            <div
-              className="tsm-pop-backdrop"
-              onMouseDown={(e) => {
-                if (e.target === e.currentTarget && !saving) closeForm();
-              }}
-            >
-              <section className="tsm-pop" role="dialog" aria-modal="true" aria-label={master.title}>
-                <div className="tsm-pop-head">
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="eyebrow" style={{ fontSize: 11 }}>{editing ? tr(lang, 'แก้ไขรอบ', 'Edit a round') : tr(lang, 'เพิ่มรอบ', 'Add rounds')}</div>
-                    <h2 className="display-th" style={{ fontSize: 22, margin: '4px 0 0' }}>{master.title}</h2>
-                    {editing && (
-                      <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>
-                        {tr(lang, `${fmtDate(editing.date, lang)} · ${editing.time_start}–${editing.time_end} — เปลี่ยนวัน เวลา สถานที่ หรือที่นั่ง แล้วกดบันทึก`, `${fmtDate(editing.date, lang)} · ${editing.time_start}–${editing.time_end} — change the day, time, venue or seats, then save`)}
-                      </div>
-                    )}
-                    <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8, fontSize: 12.5, color: 'var(--muted)' }}>
-                      {bookableTiers(master).map((t) => (
-                        <span key={t.id}>{t.label} <b style={{ color: 'var(--ink)' }}>{baht(t.price)}</b> · {tierDesc(t, lang)}</span>
-                      ))}
-                      {!priced && <span style={{ color: '#a04a14' }}>⚠ {tr(lang, 'Admin ยังไม่ตั้งราคา — เปิดรอบไม่ได้', 'No price set yet — cannot open')}</span>}
                     </div>
                   </div>
-                  <button type="button" className="tsm-pop-close" onClick={closeForm} disabled={saving} aria-label={tr(lang, 'ปิด', 'Close')}>×</button>
                 </div>
+                <div className="tdb-round-actions">
+                  <Link href={`/teacher/sessions/round/${r.id}`} className="btn btn-teal btn-sm">
+                    เช็คชื่อ →
+                  </Link>
+                  <button type="button" className="tdb-soft-btn" style={{ padding: '9px 16px', fontSize: 13 }} onClick={() => startEdit(r)}>
+                    แก้ไข
+                  </button>
+                  {r.booked === 0 ? (
+                    <button type="button" className="tdb-link-danger" onClick={() => setConfirmR(r)}>
+                      ยกเลิกรอบ
+                    </button>
+                  ) : r.date >= today ? (
+                    <span className="tdb-hide-phone" style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--muted)' }}>
+                      มีผู้จองแล้ว · ยกเลิกไม่ได้
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
 
-            {/* Days */}
-            <label className="tsm-label" style={{ marginTop: 20 }}>
-              <T th="1 · วันที่" en="1 · Days" />
-            </label>
-            {!editing && (
-              <div className="tsm-repeat" role="radiogroup">
-                {(
-                  [
-                    ['once', tr(lang, 'เลือกวันเอง', 'Pick days')],
-                    ['daily', tr(lang, 'ทุกวัน', 'Every day')],
-                    ['weekly', tr(lang, 'ทุกสัปดาห์', 'Weekly')],
-                  ] as const
-                ).map(([k, label]) => (
-                  <button key={k} type="button" role="radio" aria-checked={repeat === k} className={repeat === k ? 'on' : ''} onClick={() => { setRepeat(k); setMsg(null); }}>
-                    {label}
+          {upcoming.length > 0 && (
+            <div className="tdb-upcoming">
+              <span className="tdb-mono-label">รอบถัดไป</span>
+              <div style={{ display: 'flex', flexDirection: 'column', marginTop: 8 }}>
+                {upcoming.slice(0, 5).map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    className={r.date === day ? 'on' : ''}
+                    onClick={() => {
+                      setDay(r.date);
+                      setMonth(monthOf(r.date));
+                    }}
+                  >
+                    <span className="dd">
+                      <b>{dateOf(r.date).getDate()}</b>
+                      <span>{monShort(r.date)}</span>
+                    </span>
+                    <span style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+                      {r.time_start}–{r.time_end}
+                    </span>
+                    <span className="tdb-bar-n">
+                      {r.booked}/{r.max_participants}
+                    </span>
                   </button>
                 ))}
               </div>
-            )}
-            {editLocked ? (
-              <div style={{ fontSize: 13, color: '#a04a14', background: '#fde7d3', borderRadius: 12, padding: '10px 14px' }}>
-                {tr(lang, `รอบนี้มีผู้จองแล้ว ${editing?.booked} คน — เปลี่ยนวันและเวลาไม่ได้ แก้ได้เฉพาะสถานที่กับที่นั่ง`, `${editing?.booked} people hold seats — day and time are fixed; venue and seats can still change`)}
-              </div>
-            ) : repeat === 'once' ? (
-              <>
-                <MonthPicker
-                  value={null}
-                  multi={dates}
-                  onChange={(d) => {
-                    setMsg(null);
-                    if (editing) setDates([d]);
-                    else setDates((x) => (x.includes(d) ? x.filter((v) => v !== d) : [...x, d].sort()));
-                  }}
-                  marks={marks}
-                />
-                <div style={{ fontSize: 13, marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                  {dates.length === 0 ? (
-                    <span style={{ color: 'var(--muted)' }}>{tr(lang, editing ? 'จิ้มวันใหม่' : 'จิ้มวันในปฏิทิน จิ้มซ้ำเพื่อเอาออก', editing ? 'Tap the new day' : 'Tap days on the calendar; tap again to remove')}</span>
-                  ) : (
-                    dates.map((d) => (
-                      <span key={d} className="tag" style={{ background: 'var(--teal-50)', color: 'var(--teal-deep)' }}>
-                        {fmtDate(d, lang)}
-                      </span>
-                    ))
-                  )}
-                  {!editing && dates.length > 1 && (
-                    <button type="button" onClick={() => setDates([])} className="btn btn-paper btn-sm" style={{ fontSize: 12 }}>
-                      {tr(lang, 'ล้าง', 'Clear')}
-                    </button>
-                  )}
+            </div>
+          )}
+        </section>
+      </div>
+
+      {/* ============ add / edit popup ============ */}
+      {formOpen && (
+        <div className="tdb-backdrop" onMouseDown={(e) => e.target === e.currentTarget && closeForm()}>
+          <section className="tdb-modal tdb-add" role="dialog" aria-modal="true" aria-label={master.title}>
+            <div className="tdb-add-form">
+              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 6 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span className="tdb-eyebrow" style={{ fontSize: 11 }}>{editing ? 'แก้ไขรอบ' : 'เพิ่มรอบใหม่'}</span>
+                  <h2 style={{ fontFamily: "'Mitr', sans-serif", fontWeight: 500, fontSize: 24, lineHeight: 1.2, margin: '8px 0 0' }}>{master.title}</h2>
                 </div>
-              </>
-            ) : (
-              <>
-                <MonthPicker value={date} onChange={(d) => { setDate(d); setMsg(null); }} marks={marks} />
-                {date && <div style={{ fontSize: 13, color: 'var(--teal-deep)', marginTop: 8, fontWeight: 600 }}>{tr(lang, `เริ่ม ${fmtDate(date, lang)}`, `From ${fmtDate(date, lang)}`)}</div>}
-                <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {repeat === 'weekly' && (
-                    <div className="tsm-dow">
-                      {DOW.map((d, i) => (
+                <button type="button" className="tdb-x" onClick={closeForm} aria-label="ปิด">
+                  ×
+                </button>
+              </div>
+
+              {editLocked && (
+                <div className="tdb-note-warn" style={{ marginTop: 16 }}>
+                  <span style={{ fontWeight: 700 }}>🔒</span>
+                  <span>รอบนี้มีผู้จองแล้ว {editing?.booked} คน — เปลี่ยนวันและเวลาไม่ได้ แก้ได้เฉพาะสถานที่และจำนวนที่นั่ง</span>
+                </div>
+              )}
+
+              {/* Step 1 — days */}
+              <div className="tdb-step">
+                <div className="tdb-step-head">
+                  <span className={`tdb-step-n ${daysOk ? 'ok' : ''}`}>{daysOk ? '✓' : '1'}</span>
+                  <span className="tdb-step-t">เลือกวัน</span>
+                  {!editing && (
+                    <div className="tdb-repeat" role="radiogroup">
+                      {(
+                        [
+                          ['once', 'เลือกวันเอง'],
+                          ['daily', 'ทุกวัน'],
+                          ['weekly', 'ทุกสัปดาห์'],
+                        ] as const
+                      ).map(([k, label]) => (
                         <button
-                          key={i}
+                          key={k}
                           type="button"
-                          aria-pressed={weekdays.includes(i)}
-                          className={weekdays.includes(i) ? 'on' : ''}
-                          onClick={() => setWeekdays((w) => (w.includes(i) ? w.filter((x) => x !== i) : [...w, i].sort()))}
+                          role="radio"
+                          aria-checked={repeat === k}
+                          className={repeat === k ? 'on' : ''}
+                          onClick={() => {
+                            setRepeat(k);
+                            setPopMonth(monthOf(k === 'once' ? dates[0] || today : date || today));
+                          }}
                         >
-                          {d}
+                          {label}
                         </button>
                       ))}
                     </div>
                   )}
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
-                    <span style={{ color: 'var(--muted)' }}>{tr(lang, 'ถึงวันที่', 'Until')}</span>
-                    <input type="date" value={endDate} min={date || undefined} onChange={(e) => setEndDate(e.target.value)} className="field" style={{ width: 170 }} />
-                  </label>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                    <T th="ระบบจะเปิดรอบให้ทุกวันที่ตรงเงื่อนไข (สูงสุด 92 วันต่อครั้ง) วันและเวลาที่มีรอบอยู่แล้วจะถูกข้าม" en="A round opens on every matching day (up to 92 per run); days and times already open are skipped." />
-                  </div>
                 </div>
-              </>
-            )}
 
-            {/* Time ranges */}
-            <label className="tsm-label" style={{ marginTop: 20 }}>
-              <T th="2 · ช่วงเวลา" en="2 · Time ranges" />
-            </label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {slots.map((sl, i) => (
-                <div key={i} className="tsm-slot" style={{ display: 'flex', gap: 14, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                  {/* Hour and minute dropdowns, 24-hour, whatever the device
-                      locale — the same field the admin forms use. */}
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>{tr(lang, 'เวลาเริ่ม (24 ชม.)', 'Start (24h)')}</div>
-                    <fieldset disabled={editLocked} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
-                      <TimeField24 className="field" value={sl.time_start} onChange={(v) => setSlots((x) => x.map((s, j) => (j === i ? { ...s, time_start: v } : s)))} />
-                    </fieldset>
+                {!editLocked && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'flex-start' }}>
+                    <div style={{ flex: '1 1 320px', minWidth: 0, userSelect: 'none' }}>
+                      <TdbCalendar
+                        small
+                        month={popMonth}
+                        onMonth={setPopMonth}
+                        selected={repeat === 'once' ? dates : date ? [date] : []}
+                        preview={repeat === 'once' ? undefined : new Set(pDays)}
+                        marks={marks}
+                        floor={today}
+                        onPick={(d) => {
+                          if (repeat !== 'once') setDate(d);
+                          else if (editing) setDates([d]);
+                          else setDates((x) => (x.includes(d) ? x.filter((v) => v !== d) : [...x, d].sort()));
+                        }}
+                      />
+                    </div>
+                    <div style={{ flex: '1 1 180px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {repeat === 'once' ? (
+                        <>
+                          <span style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.55 }}>
+                            {editing ? 'จิ้มวันใหม่ในปฏิทินเพื่อย้ายรอบ' : dates.length ? 'จิ้มซ้ำเพื่อเอาวันออก' : 'จิ้มวันในปฏิทิน เลือกได้หลายวันพร้อมกัน'}
+                          </span>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                            {dates.map((d) => (
+                              <span key={d} className="tdb-datetag">
+                                {fmtShort(d)}
+                                {!editing && (
+                                  <button type="button" aria-label="เอาออก" onClick={() => setDates((x) => x.filter((v) => v !== d))}>
+                                    ×
+                                  </button>
+                                )}
+                              </span>
+                            ))}
+                          </div>
+                          {!editing && dates.length > 1 && (
+                            <button type="button" onClick={() => setDates([])} style={{ alignSelf: 'flex-start', border: 0, background: 'transparent', padding: 0, font: 'inherit', fontSize: 12.5, color: 'var(--muted)', cursor: 'pointer', textDecoration: 'underline' }}>
+                              ล้างทั้งหมด
+                            </button>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <span className="tdb-mono-label" style={{ fontSize: 10 }}>เริ่ม</span>
+                            <span style={{ fontSize: 14, fontWeight: 600, color: date ? 'var(--teal-deep)' : 'var(--muted)' }}>{date ? fmtMed(date) : 'จิ้มวันในปฏิทิน'}</span>
+                          </div>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <span className="tdb-mono-label" style={{ fontSize: 10 }}>ถึงวันที่</span>
+                            <input type="date" value={endDate} min={date || today} onChange={(e) => setEndDate(e.target.value)} className="field" style={{ padding: '11px 14px', fontSize: 14 }} />
+                          </label>
+                          {repeat === 'weekly' && (
+                            <>
+                              <span className="tdb-mono-label" style={{ fontSize: 10 }}>ทุกวัน</span>
+                              <div className="tdb-dowbtns">
+                                {DOW_TH.map((d, i) => (
+                                  <button
+                                    key={d}
+                                    type="button"
+                                    aria-pressed={weekdays.includes(i)}
+                                    className={weekdays.includes(i) ? 'on' : ''}
+                                    onClick={() => setWeekdays((w) => (w.includes(i) ? w.filter((x) => x !== i) : [...w, i].sort()))}
+                                  >
+                                    {d}
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          )}
+                          <span style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.55 }}>วันที่จะเปิดรอบแสดงเป็นสีเขียวอ่อนในปฏิทิน · สูงสุด 92 วันต่อครั้ง</span>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>{tr(lang, 'เวลาจบ (24 ชม.)', 'End (24h)')}</div>
-                    <fieldset disabled={editLocked} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
-                      <TimeField24 className="field" value={sl.time_end} onChange={(v) => setSlots((x) => x.map((s, j) => (j === i ? { ...s, time_end: v } : s)))} />
-                    </fieldset>
+                )}
+              </div>
+
+              {/* Step 2 — time */}
+              <div className="tdb-step">
+                <div className="tdb-step-head">
+                  <span className={`tdb-step-n ${slotsOk ? 'ok' : ''}`}>{slotsOk ? '✓' : '2'}</span>
+                  <span className="tdb-step-t">ช่วงเวลา</span>
+                  <span className="tdb-step-hint">เลือกได้หลายช่วงต่อวัน</span>
+                </div>
+                {!editing && (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                    {PRESETS.map((p) => {
+                      const on = slots.some((s) => s.time_start === p.ts && s.time_end === p.te);
+                      return (
+                        <button
+                          key={p.label}
+                          type="button"
+                          className={`tdb-preset ${on ? 'on' : ''}`}
+                          onClick={() =>
+                            setSlots((x) =>
+                              on
+                                ? x.length > 1
+                                  ? x.filter((s) => !(s.time_start === p.ts && s.time_end === p.te))
+                                  : x
+                                : [...x, { time_start: p.ts, time_end: p.te }].sort((a, b) => a.time_start.localeCompare(b.time_start)),
+                            )
+                          }
+                        >
+                          <b>{p.label}</b>
+                          <span>
+                            {p.ts}–{p.te}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
-                  {!editing && slots.length > 1 && (
-                    <button type="button" onClick={() => setSlots((x) => x.filter((_, j) => j !== i))} className="btn btn-paper btn-sm" aria-label={tr(lang, 'ลบช่วงเวลา', 'Remove range')} style={{ color: '#a04a14' }}>
-                      ✕
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {slots.map((sl, i) => {
+                    const pr = PRESETS.find((p) => p.ts === sl.time_start && p.te === sl.time_end);
+                    return (
+                      <div key={i} className="tdb-slot">
+                        <span className="tdb-slot-label">{pr ? pr.label : `ช่วง ${i + 1}`}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <select aria-label="ชั่วโมงเริ่ม" value={sl.time_start.slice(0, 2)} disabled={editLocked} onChange={(e) => setSlot(i, 'time_start', 'h', e.target.value)}>
+                            {HOURS.map((h) => <option key={h} value={h}>{h}</option>)}
+                          </select>
+                          <b>:</b>
+                          <select aria-label="นาทีเริ่ม" value={sl.time_start.slice(3)} disabled={editLocked} onChange={(e) => setSlot(i, 'time_start', 'm', e.target.value)}>
+                            {MINUTES.map((m) => <option key={m} value={m}>{m}</option>)}
+                          </select>
+                        </div>
+                        <span style={{ color: 'var(--muted)' }}>→</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <select aria-label="ชั่วโมงจบ" value={sl.time_end.slice(0, 2)} disabled={editLocked} onChange={(e) => setSlot(i, 'time_end', 'h', e.target.value)}>
+                            {HOURS.map((h) => <option key={h} value={h}>{h}</option>)}
+                          </select>
+                          <b>:</b>
+                          <select aria-label="นาทีจบ" value={sl.time_end.slice(3)} disabled={editLocked} onChange={(e) => setSlot(i, 'time_end', 'm', e.target.value)}>
+                            {MINUTES.map((m) => <option key={m} value={m}>{m}</option>)}
+                          </select>
+                          <span style={{ fontSize: 12, color: 'var(--muted)', marginLeft: 2 }}>น.</span>
+                        </div>
+                        {sl.time_end <= sl.time_start && <span style={{ fontSize: 12, color: '#a04a14', fontWeight: 500 }}>เวลาจบต้องหลังเวลาเริ่ม</span>}
+                        {!editing && slots.length > 1 && (
+                          <button type="button" className="tdb-slot-x" aria-label="ลบช่วงเวลา" onClick={() => setSlots((x) => x.filter((_, j) => j !== i))}>
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {!editing && (
+                    <button type="button" className="tdb-textlink" onClick={() => setSlots((x) => [...x, { time_start: '10:00', time_end: '12:00' }])}>
+                      + กำหนดช่วงเวลาเอง
                     </button>
                   )}
-                  {sl.time_start && sl.time_end && sl.time_end <= sl.time_start && (
-                    <span style={{ fontSize: 12, color: '#a04a14' }}>{tr(lang, 'เวลาจบต้องหลังเวลาเริ่ม', 'End must be after start')}</span>
-                  )}
                 </div>
-              ))}
-              {!editing && (
+              </div>
+
+              {/* Step 3 — venue */}
+              <div className="tdb-step">
+                <div className="tdb-step-head">
+                  <span className={`tdb-step-n ${locationId ? 'ok' : ''}`}>{locationId ? '✓' : '3'}</span>
+                  <span className="tdb-step-t">สถานที่</span>
+                  {allowedLocs.length < data.locations.length && <span className="tdb-step-hint">Admin อนุญาต {allowedLocs.length} แห่ง</span>}
+                </div>
+                {allowedLocs.length === 0 ? (
+                  <div className="tdb-note-warn">ยังไม่มีสถานที่ให้เลือกสำหรับ Workshop นี้ — ติดต่อ Admin ให้เพิ่มสถานที่</div>
+                ) : (
+                  <div className="tdb-locs">
+                    {allowedLocs.map((l) => (
+                      <button key={l.id} type="button" aria-pressed={locationId === l.id} className={`tdb-loc ${locationId === l.id ? 'on' : ''}`} onClick={() => setLocationId(l.id)}>
+                        <span className="dot">
+                          <i />
+                        </span>
+                        <span style={{ minWidth: 0 }}>
+                          <b>{l.name}</b>
+                          {l.province && <small>{l.province}</small>}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Step 4 — seats */}
+              <div className="tdb-step">
+                <div className="tdb-step-head" style={{ marginBottom: 0 }}>
+                  <span className="tdb-step-n ok">✓</span>
+                  <span className="tdb-step-t">จำนวนที่นั่งต่อรอบ</span>
+                  <div className="tdb-stepper">
+                    <button type="button" aria-label="ลด" onClick={() => setSeats(String(Math.max(minSeats, seatsNum - 1)))}>
+                      −
+                    </button>
+                    <input type="number" value={seats} min={minSeats} onChange={(e) => setSeats(e.target.value)} aria-label="จำนวนที่นั่ง" />
+                    <button type="button" aria-label="เพิ่ม" onClick={() => setSeats(String(seatsNum + 1))}>
+                      +
+                    </button>
+                  </div>
+                </div>
+                <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 8 }}>
+                  {editing && editing.booked ? `จองแล้ว ${editing.booked} ที่ — ลดต่ำกว่านี้ไม่ได้` : `ค่าเริ่มต้นจาก Admin ${master.default_max_participants ?? 20} ที่นั่ง`}
+                </div>
+              </div>
+            </div>
+
+            {/* Summary */}
+            <aside className="tdb-add-sum">
+              <span className="tdb-mono-label" style={{ letterSpacing: '.16em' }}>{editing ? 'สรุปการแก้ไข' : 'สรุปก่อนเปิดรอบ'}</span>
+              <div>
+                <div className="tdb-sum-big">
+                  <b>{Math.max(0, total)}</b>
+                  <span>รอบ</span>
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 8 }}>
+                  {editing ? 'แก้ไขรอบเดียว' : repeat === 'once' ? `${days.length} วัน × ${slots.length} ช่วงเวลา` : `${repeat === 'daily' ? 'ทุกวัน' : 'ทุกสัปดาห์'} · ${days.length} วัน × ${slots.length} ช่วงเวลา`}
+                </div>
+              </div>
+              <div className="tdb-sum-rows">
+                {editing && (
+                  <div>
+                    <span className="k">เดิม</span>
+                    <span className="v" style={{ color: 'var(--muted)' }}>
+                      {fmtShort(editing.date)} · {editing.time_start}–{editing.time_end}
+                    </span>
+                  </div>
+                )}
+                <div>
+                  <span className="k">วันที่</span>
+                  <span className="v" style={{ color: days.length ? 'var(--ink)' : 'var(--muted)' }}>{dayList}</span>
+                </div>
+                <div>
+                  <span className="k">เวลา</span>
+                  <span className="v">{slots.map((s) => `${s.time_start}–${s.time_end}`).join(' · ')}</span>
+                </div>
+                <div>
+                  <span className="k">สถานที่</span>
+                  <span className="v" style={{ color: loc ? 'var(--ink)' : 'var(--muted)' }}>{loc ? loc.name : '—'}</span>
+                </div>
+                <div>
+                  <span className="k">ที่นั่ง</span>
+                  <span className="v">{seatsNum} ที่ / รอบ</span>
+                </div>
+              </div>
+              {skip > 0 && <div className="tdb-note-ok">ข้าม {skip} รอบที่มีอยู่แล้วในวันและเวลาเดียวกัน</div>}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                <div className={`tdb-check ${daysOk ? 'ok' : ''}`}>
+                  <i>{daysOk ? '✓' : ''}</i>
+                  <span>{dayMsg}</span>
+                </div>
+                <div className={`tdb-check ${slotsOk ? 'ok' : ''}`}>
+                  <i>{slotsOk ? '✓' : ''}</i>
+                  <span>{slotsOk ? 'ช่วงเวลาถูกต้อง' : 'เวลาเริ่มต้องอยู่ก่อนเวลาจบ'}</span>
+                </div>
+                <div className={`tdb-check ${locationId ? 'ok' : ''}`}>
+                  <i>{locationId ? '✓' : ''}</i>
+                  <span>{locationId ? 'เลือกสถานที่แล้ว' : allowedLocs.length ? 'ยังไม่ได้เลือกสถานที่' : 'ยังไม่มีสถานที่ — ติดต่อ Admin'}</span>
+                </div>
+                {!priced && (
+                  <div className="tdb-check bad">
+                    <i>!</i>
+                    <span>Admin ยังไม่ได้ตั้งราคา — ติดต่อ Admin ก่อนเปิดรอบ</span>
+                  </div>
+                )}
+              </div>
+              {error && <div className="tdb-note-warn">{error}</div>}
+              <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 4 }}>
                 <button
                   type="button"
-                  onClick={() => setSlots((x) => [...x, { time_start: '13:00', time_end: '16:00' }])}
-                  className="btn btn-paper btn-sm"
-                  style={{ alignSelf: 'flex-start' }}
+                  className="btn btn-teal"
+                  onClick={submit}
+                  disabled={!ready || saving}
+                  style={{ justifyContent: 'center', width: '100%', padding: '16px 22px', fontSize: 15.5, opacity: ready ? 1 : 0.45, cursor: ready ? 'pointer' : 'not-allowed' }}
                 >
-                  + {tr(lang, 'เพิ่มช่วงเวลา (เช่น รอบเย็น)', 'Add a time range (e.g. evening)')}
+                  {saving ? 'กำลังบันทึก…' : editing ? 'บันทึกการแก้ไข' : total > 0 ? `เปิด ${total} รอบ` : 'เปิดรอบ'} <span className="mono">→</span>
                 </button>
-              )}
+                <button type="button" onClick={closeForm} style={{ border: 0, background: 'transparent', padding: 10, font: 'inherit', fontSize: 13.5, fontWeight: 500, color: 'var(--muted)', cursor: 'pointer' }}>
+                  ยกเลิก
+                </button>
+              </div>
+            </aside>
+          </section>
+        </div>
+      )}
+
+      {/* ============ confirm cancel ============ */}
+      {confirmR && (
+        <div className="tdb-backdrop center" style={{ zIndex: 120 }} onMouseDown={(e) => e.target === e.currentTarget && setConfirmR(null)}>
+          <section className="tdb-modal" role="alertdialog" aria-modal="true" style={{ maxWidth: 420, padding: 28, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ width: 52, height: 52, borderRadius: 99, background: '#fde7d3', color: '#a04a14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <rect x="3.5" y="5" width="17" height="15" rx="2" strokeWidth="1.8" />
+                <path strokeLinecap="round" strokeWidth="1.8" d="M8 3v4M16 3v4M3.5 10h17M10 13.5l4 4M14 13.5l-4 4" />
+              </svg>
             </div>
-            {!editing && slots.length > 1 && (
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
-                {tr(lang, `แต่ละวันจะเปิด ${slots.length} รอบ ผู้เรียนเลือกเวลาได้ตอนจอง`, `Each day opens ${slots.length} rounds; learners pick the time when booking`)}
-              </div>
-            )}
-
-            {/* Venue */}
-            <label className="tsm-label" style={{ marginTop: 20 }}>
-              <T th="3 · สถานที่" en="3 · Venue" />
-            </label>
-            <select value={locationId} onChange={(e) => setLocationId(e.target.value)} className="field">
-              <option value="">{tr(lang, '— เลือกสถานที่ —', '— choose a venue —')}</option>
-              {allowedLocs.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}{l.province ? ` · ${l.province}` : ''}
-                </option>
-              ))}
-            </select>
-            {master && allowedLocs.length < data.locations.length && (
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
-                {tr(lang, `Admin กำหนดให้เปิดได้ ${allowedLocs.length} สถานที่`, `Admin allows ${allowedLocs.length} venues for this activity`)}
-              </div>
-            )}
-
-            {/* Seats */}
-            <label className="tsm-label" style={{ marginTop: 20 }}>
-              <T th="4 · จำนวนที่นั่ง" en="4 · Seats" />
-            </label>
-            <input type="number" min={editing?.booked || 1} value={seats} onChange={(e) => setSeats(e.target.value)} className="field" style={{ width: 130 }} placeholder={String(master?.default_max_participants ?? 20)} />
-
-            {msg && (
-              <div style={{ marginTop: 16, padding: '10px 14px', borderRadius: 12, fontSize: 13, background: msg.ok ? 'var(--teal-50)' : '#fde7d3', color: msg.ok ? 'var(--teal-deep)' : '#a04a14' }}>
-                {msg.ok ? '✓ ' : ''}{msg.text}
-              </div>
-            )}
-
-            <div style={{ marginTop: 20, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-              <Btn kind="teal" onClick={submit} disabled={!ready || saving} style={{ opacity: ready ? 1 : 0.5 }}>
-                {saving
-                  ? tr(lang, 'กำลังบันทึก…', 'Saving…')
-                  : editing
-                    ? tr(lang, 'บันทึกการแก้ไข', 'Save changes')
-                    : tr(lang, `เปิดรอบ${repeat === 'once' && dates.length * slots.length > 1 ? ` ${dates.length * slots.length} รอบ` : ''}`, `Open ${repeat === 'once' && dates.length * slots.length > 1 ? `${dates.length * slots.length} rounds` : 'round'}`)}{' '}
-                <span className="mono">→</span>
-              </Btn>
-              <button type="button" onClick={closeForm} disabled={saving} className="btn btn-paper btn-sm">
-                {tr(lang, 'ยกเลิก', 'Cancel')}
+            <div>
+              <h3 style={{ fontFamily: "'Mitr', sans-serif", fontWeight: 500, fontSize: 22, margin: '0 0 6px' }}>ยกเลิกรอบนี้?</h3>
+              <p style={{ margin: 0, fontSize: 14, color: 'var(--muted)', lineHeight: 1.6 }}>รอบนี้ยังไม่มีผู้จอง ยกเลิกแล้วจะหายจากหน้าจองทันที</p>
+            </div>
+            <div style={{ background: 'var(--cream)', borderRadius: 16, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700 }}>
+                {confirmR.time_start}–{confirmR.time_end}
+              </span>
+              <span style={{ fontSize: 13.5 }}>{fmtLong(confirmR.date)}</span>
+              {confirmR.loc_name && <span style={{ fontSize: 13, color: 'var(--muted)' }}>{confirmR.loc_name}</span>}
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              <button type="button" className="tdb-soft-btn" style={{ padding: '12px 20px', fontSize: 14 }} onClick={() => setConfirmR(null)}>
+                เก็บรอบไว้
+              </button>
+              <button type="button" className="btn" style={{ background: '#a04a14', color: '#fff', padding: '12px 20px', fontSize: 14 }} onClick={doCancel}>
+                ยกเลิกรอบ
               </button>
             </div>
-            {!ready && !saving && blockers.length > 0 && (
-              <div role="alert" style={{ marginTop: 12, padding: '10px 14px', borderRadius: 12, fontSize: 13, lineHeight: 1.6, background: '#fde7d3', color: '#a04a14' }}>
-                <div style={{ fontWeight: 700 }}>{tr(lang, 'ยังเปิดรอบไม่ได้ เพราะ', 'Can’t open yet:')}</div>
-                {blockers.map((b) => (
-                  <div key={b}>⚠ {b}</div>
-                ))}
-              </div>
-            )}
-              </section>
-            </div>
-          )}
+          </section>
+        </div>
+      )}
 
-        </>
+      {toast && (
+        <div className="toast" style={{ zIndex: 200 }}>
+          <span style={{ color: 'var(--accent)' }}>✓</span> {toast}
+        </div>
       )}
     </div>
   );

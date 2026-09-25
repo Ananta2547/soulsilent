@@ -1,11 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { RailToggleIcon, useRailCollapsed } from './useRailCollapsed';
+import { useRailCollapsed } from './useRailCollapsed';
 import { hasAnyRole } from '@/lib/roles';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Logo } from './Logo';
 
 /**
  * The teacher dashboard's section rail — the admin sidebar's twin, carrying the
@@ -31,7 +30,7 @@ const NAV: NavItem[] = [
     href: '/teacher/workshops',
     label: 'Workshop เดี่ยว',
     icon: (
-      <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -45,7 +44,7 @@ const NAV: NavItem[] = [
     href: '/teacher/sessions',
     label: 'จัดรอบสอน',
     icon: (
-      <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <rect x="3.5" y="5" width="17" height="15" rx="2" strokeWidth={1.5} />
         <path strokeLinecap="round" strokeWidth={1.5} d="M8 3v4M16 3v4M3.5 10h17M12 13v4M10 15h4" />
       </svg>
@@ -55,7 +54,7 @@ const NAV: NavItem[] = [
     href: '/teacher/overview',
     label: 'ภาพรวม / รายได้',
     icon: (
-      <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 19V9m5 10V5m5 14v-7m5 7V8" />
       </svg>
     ),
@@ -64,7 +63,7 @@ const NAV: NavItem[] = [
     href: '/teacher/reviews',
     label: 'รีวิว',
     icon: (
-      <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -90,6 +89,8 @@ export function TeacherSidebar() {
       .catch(() => {});
   }, []);
   const nav = NAV.filter((item) => item.href !== '/teacher/sessions' || hasAnyRole(roles, ['session_host']));
+  // The phone top bar names the section the page belongs to.
+  const here = NAV.find((item) => pathname.startsWith(item.href));
 
   useEffect(() => {
     if (!open) return;
@@ -102,70 +103,55 @@ export function TeacherSidebar() {
 
   return (
     <>
-      {/* Phone header. The rail is off-screen until it is asked for. */}
-      <header className="lg:hidden sticky top-0 z-40 flex items-center gap-3 bg-dark px-4 py-3">
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          aria-label="เปิดเมนูผู้สอน"
-          aria-expanded={open}
-          className="w-10 h-10 -ml-2 flex items-center justify-center rounded-xl text-gray-light hover:text-white hover:bg-white/5"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeWidth={1.5} d="M4 7h16M4 12h16M4 17h16" />
+      {/* Phone top bar — the rail stays off-screen until the menu is opened. */}
+      <header className="tdb-topbar">
+        <button type="button" className="tdb-topbar-btn" onClick={() => setOpen(true)} aria-label="เปิดเมนูผู้สอน" aria-expanded={open}>
+          <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeWidth={1.8} d="M4 7h16M4 12h16M4 17h16" />
           </svg>
         </button>
-        <Logo size="sm" markOnly />
-        <span className="ml-auto text-[11px] text-gray font-mono tracking-wider">TEACHER</span>
+        <span className="tdb-topbar-title">{here?.label || 'Teacher'}</span>
+        <span className="tdb-brand-mark" aria-hidden>a</span>
       </header>
 
-      {/* Scrim. Only ever present on phones, where the rail floats over the page. */}
-      {open && (
-        <div
-          className="lg:hidden fixed inset-0 z-40 bg-ink/45"
-          aria-hidden
-          onClick={() => setOpen(false)}
-        />
-      )}
+      {open && <div className="tdb-scrim" aria-hidden onClick={() => setOpen(false)} />}
 
-      <aside
-        className={`w-64 ${collapsed ? 'lg:w-[76px]' : ''} bg-dark min-h-screen flex flex-col shrink-0 transition-[width] duration-200 ${
-          open
-            ? 'fixed inset-y-0 left-0 z-50 shadow-2xl lg:static lg:shadow-none'
-            : 'hidden lg:flex'
-        }`}
-      >
-        <div className={`p-6 border-b border-white/10 flex items-start gap-3 ${collapsed ? 'lg:flex-col lg:items-center lg:px-3 lg:py-5' : ''}`}>
-          <div className="min-w-0">
-            <Logo size="sm" markOnly />
-            <p className={`text-xs text-gray mt-1 font-mono tracking-wider ${collapsed ? 'lg:hidden' : ''}`}>TEACHER</p>
-          </div>
-          <button
-            type="button"
-            onClick={toggleRail}
-            aria-label={collapsed ? 'ขยายเมนู' : 'ย่อเมนู'}
-            title={collapsed ? 'ขยายเมนู' : 'ย่อเมนู'}
-            aria-expanded={!collapsed}
-            className={`hidden lg:flex w-9 h-9 items-center justify-center rounded-xl text-gray-light hover:text-white hover:bg-white/5 shrink-0 ${collapsed ? '' : 'ml-auto -mt-1 -mr-1'}`}
-          >
-            <RailToggleIcon collapsed={collapsed} />
-          </button>
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            aria-label="ปิดเมนู"
-            className="lg:hidden ml-auto -mt-1 -mr-1 w-9 h-9 flex items-center justify-center rounded-xl text-gray-light hover:text-white hover:bg-white/5"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeWidth={1.5} d="M6 6l12 12M18 6L6 18" />
-            </svg>
-          </button>
+      <aside className={`tdb-rail ${collapsed ? 'folded' : ''} ${open ? 'open' : ''}`}>
+        <div className="tdb-rail-head">
+          <Link href="/" className="tdb-brand" onClick={() => setOpen(false)}>
+            <span className="tdb-brand-mark">a</span>
+            <span className="tdb-brand-text">
+              <span className="tdb-brand-name">
+                allsoullearn<b>.</b>
+              </span>
+              <span className="tdb-brand-role">TEACHER</span>
+            </span>
+          </Link>
+          {open ? (
+            <button type="button" className="tdb-rail-toggle" onClick={() => setOpen(false)} aria-label="ปิดเมนู" style={{ color: '#fff', fontSize: 18 }}>
+              ×
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="tdb-rail-toggle"
+              onClick={toggleRail}
+              aria-label={collapsed ? 'ขยายเมนู' : 'ย่อเมนู'}
+              title={collapsed ? 'ขยายเมนู' : 'ย่อเมนู'}
+              aria-expanded={!collapsed}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3.5" y="4.5" width="17" height="15" rx="3" />
+                <path d="M9 4.5v15M15.5 10l-2 2 2 2" />
+              </svg>
+            </button>
+          )}
         </div>
 
-        <nav className={`flex-1 p-4 space-y-1 ${collapsed ? 'lg:px-3' : ''}`}>
+        <nav className="tdb-nav">
           {nav.map((item) => {
-            // Each section owns its subtree, so the workshop detail page keeps
-            // "Workshop ของฉัน" lit.
+            // Each section owns its subtree, so a round's check-in page keeps
+            // "จัดรอบสอน" lit.
             const active = pathname.startsWith(item.href);
             return (
               <Link
@@ -176,30 +162,21 @@ export function TeacherSidebar() {
                 // changed, and a menu left over it hides what was asked for.
                 onClick={() => setOpen(false)}
                 title={collapsed ? item.label : undefined}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${collapsed ? 'lg:justify-center lg:px-0' : ''} ${
-                  active ? 'bg-primary text-white' : 'text-gray-light hover:text-white hover:bg-white/5'
-                }`}
+                className={`tdb-nav-item ${active ? 'on' : ''}`}
               >
                 {item.icon}
-                <span className={collapsed ? 'lg:hidden' : ''}>{item.label}</span>
+                <span>{item.label}</span>
               </Link>
             );
           })}
         </nav>
 
-        <div className={`p-4 border-t border-white/10 ${collapsed ? 'lg:px-3' : ''}`}>
-          <Link
-            href="/"
-            onClick={() => setOpen(false)}
-            title={collapsed ? 'กลับหน้าเว็บ' : undefined}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-gray-light hover:text-white hover:bg-white/5 transition-colors ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}
-          >
-            <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 17l-5-5m0 0l5-5m-5 5h12" />
-            </svg>
-            <span className={collapsed ? 'lg:hidden' : ''}>กลับหน้าเว็บ</span>
-          </Link>
-        </div>
+        <Link href="/" onClick={() => setOpen(false)} title={collapsed ? 'กลับหน้าเว็บ' : undefined} className="tdb-nav-item tdb-nav-back">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 17l-5-5m0 0l5-5m-5 5h12" />
+          </svg>
+          <span>กลับหน้าเว็บ</span>
+        </Link>
       </aside>
     </>
   );
