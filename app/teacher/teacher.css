@@ -137,7 +137,8 @@
 .tdb-pill i { width: 6px; height: 6px; border-radius: 99px; display: inline-block; }
 
 /* ---------- workshop cards (horizontal: poster + info) ---------- */
-.tdb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); gap: 20px; }
+/* Two cards a row on desktop (asked for); one on phones. */
+.tdb-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
 .tdb-card {
   display: flex; gap: 18px; padding: 16px; background: #fff; border-radius: 22px; color: var(--ink); text-decoration: none;
   border: 0; font: inherit; text-align: left; cursor: pointer; transition: transform .2s cubic-bezier(.2,.7,.2,1), box-shadow .2s;
