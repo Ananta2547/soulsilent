@@ -545,10 +545,13 @@ export default function AttendancePage() {
       {showAdd && (
         <AddParticipantModal
           workshopId={id}
-          existingEmails={new Set(bookings.map((b) => (b.user_email || '').toLowerCase()).filter(Boolean))}
+          // Only live rows block: someone whose booking was cancelled can be
+          // added back (the API revives that same booking).
+          existingEmails={new Set(bookings.filter((b) => b.status !== 'cancelled').map((b) => (b.user_email || '').toLowerCase()).filter(Boolean))}
           onClose={() => setShowAdd(false)}
           onAdded={(booking) => {
-            setBookings((rows) => [booking, ...rows]);
+            // A revived booking comes back with its old id — replace that row.
+            setBookings((rows) => [booking, ...rows.filter((r) => r.id !== booking.id)]);
             setShowAdd(false);
           }}
         />

@@ -39,9 +39,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     // Reuse an existing row: a live (non-cancelled) booking means they're
     // already on the list; a cancelled one gets revived instead of duplicated.
+    // Any live booking wins over a newer cancelled one, so a person with
+    // both is reported as already listed instead of getting a second row.
     const existing = await db
       .prepare(
-        'SELECT id, status FROM bookings WHERE workshop_id = ? AND user_id = ? ORDER BY created_at DESC LIMIT 1',
+        "SELECT id, status FROM bookings WHERE workshop_id = ? AND user_id = ? ORDER BY (status != 'cancelled') DESC, created_at DESC LIMIT 1",
       )
       .bind(workshopId, user_id)
       .first<{ id: string; status: string }>();
