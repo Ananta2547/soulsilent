@@ -11,9 +11,11 @@ import { getWorkshopDays } from '@/lib/workshop-utils';
 import { PdpaBadge } from '@/components/workshops/PdpaBadge';
 import { FacilitatorNote } from '@/components/admin/FacilitatorNote';
 import { applicantName } from '@/lib/applicant';
+import { answerText, type Survey, type SurveyResponse } from '@/lib/survey';
 
 type Row = {
   id: string;
+  user_id: string;
   amount: number;
   attendance_json: string | null;
   application_json: string | null;
@@ -86,6 +88,31 @@ export default function TeacherWorkshopDetail() {
   /** The payout slip opens in a lightbox on demand — never printed into the page. */
   const [slipOpen, setSlipOpen] = useState(false);
   const [nickDraft, setNickDraft] = useState('');
+  /** AAR survey (migration 059) and its answers, keyed by participant. */
+  const [survey, setSurvey] = useState<{ survey: Survey | null; responses: SurveyResponse[] } | null>(null);
+  const [reviewOf, setReviewOf] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/teacher/workshops/${id}/survey`)
+      .then((r) => (r.ok ? (r.json() as Promise<{ survey: Survey | null; responses: SurveyResponse[] }>) : null))
+      .catch(() => null)
+      .then((d) => {
+        if (alive) setSurvey(d ? { survey: d.survey, responses: d.responses || [] } : null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
+  useEffect(() => {
+    if (!reviewOf) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setReviewOf(null);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [reviewOf]);
 
   useEffect(() => {
     if (!slipOpen) return;
@@ -171,6 +198,9 @@ export default function TeacherWorkshopDetail() {
   }
 
   const payoutPaid = w.payout_status === 'paid';
+  const responseOf = (userId: string) => survey?.responses.find((r) => r.user_id === userId) || null;
+  const reviewRow = reviewOf ? bookings.find((b) => b.id === reviewOf) || null : null;
+  const reviewResp = reviewRow ? responseOf(reviewRow.user_id) : null;
 
   return (
     <div>
@@ -309,6 +339,28 @@ export default function TeacherWorkshopDetail() {
         </div>
       )}
 
+      {/* AAR survey — questions + QR live on their own page. */}
+      <Link href={`/teacher/workshops/${id}/survey`} className="card card-static svy-entry">
+        <span aria-hidden className="svy-entry-ic">
+          ▦
+        </span>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: 'block', fontWeight: 700, fontSize: 16 }}>{tr(lang, 'แบบสอบถาม AAR + QR', 'AAR survey + QR')}</span>
+          <span style={{ display: 'block', fontSize: 12.5, color: 'var(--muted)', marginTop: 2 }}>
+            {!survey?.survey
+              ? tr(lang, 'ยังไม่ได้สร้าง — สร้างคำถามแล้วให้ผู้เข้าร่วมสแกน QR ตอบหลังจบกิจกรรม', 'Not created yet — write questions, then participants scan the QR after the session')
+              : tr(
+                  lang,
+                  `${survey.survey.is_open ? 'เปิดรับคำตอบ' : 'ปิดรับคำตอบ'} · ตอบแล้ว ${survey.responses.length} คน`,
+                  `${survey.survey.is_open ? 'Open' : 'Closed'} · ${survey.responses.length} answered`,
+                )}
+          </span>
+        </span>
+        <span aria-hidden className="mono" style={{ color: 'var(--teal-deep)', fontSize: 18 }}>
+          →
+        </span>
+      </Link>
+
       {/* PART 2 — Participants */}
       <section>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
@@ -337,6 +389,21 @@ export default function TeacherWorkshopDetail() {
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontWeight: 700, color: 'var(--ink)', fontSize: 15, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         {applicantName(b.application_json, b.user_name)}
+                        {Object.values(map).some((v) => v === 1) &&
+                          (() => {
+                            const r = responseOf(b.user_id);
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => setReviewOf(b.id)}
+                                className={`svy-rv ${r ? 'on' : ''}`}
+                                title={r ? tr(lang, 'ดูคำตอบแบบสอบถามและรีวิว', 'See survey answers and review') : tr(lang, 'ยังไม่ได้ตอบแบบสอบถาม', 'Has not answered yet')}
+                              >
+                                {tr(lang, 'รีวิว', 'Review')}
+                                {r ? ` ★${r.rating}` : tr(lang, ' · ยังไม่ตอบ', ' · not yet')}
+                              </button>
+                            );
+                          })()}
                         {b.teacher_nickname && (
                           <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--teal-deep)', background: 'var(--teal-50)', borderRadius: 999, padding: '2px 10px' }}>
                             “{b.teacher_nickname}”
@@ -458,6 +525,63 @@ export default function TeacherWorkshopDetail() {
           </div>
         )}
       </section>
+
+      {/* One participant's survey answers + stars. */}
+      {reviewRow && (
+        <div
+          className="tc-slip-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label={tr(lang, 'คำตอบแบบสอบถาม', 'Survey answers')}
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setReviewOf(null);
+          }}
+        >
+          <div className="tc-slip-box svy-rv-box">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <h2 className="display-th" style={{ fontSize: 18, margin: 0 }}>
+                {applicantName(reviewRow.application_json, reviewRow.user_name)}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setReviewOf(null)}
+                aria-label={tr(lang, 'ปิด', 'Close')}
+                style={{ marginLeft: 'auto', background: 'none', border: 0, fontSize: 22, lineHeight: 1, color: 'var(--muted)', cursor: 'pointer' }}
+              >
+                ×
+              </button>
+            </div>
+            {!reviewResp ? (
+              <p style={{ color: 'var(--muted)', fontSize: 14, margin: 0 }}>
+                {survey?.survey
+                  ? tr(lang, 'ผู้เข้าร่วมคนนี้ยังไม่ได้ตอบแบบสอบถาม', 'This participant has not answered yet.')
+                  : tr(lang, 'ยังไม่ได้สร้างแบบสอบถาม AAR สำหรับกิจกรรมนี้', 'No AAR survey has been created for this workshop yet.')}
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ background: 'var(--cream)', borderRadius: 12, padding: '12px 14px' }}>
+                  <div style={{ fontSize: 22, color: '#e0a526', letterSpacing: 2 }} aria-label={`${reviewResp.rating} / 5`}>
+                    {'★'.repeat(reviewResp.rating)}
+                    <span style={{ color: 'var(--cream-deep)' }}>{'★'.repeat(5 - reviewResp.rating)}</span>
+                  </div>
+                  {reviewResp.comment && <div style={{ fontSize: 14, marginTop: 6, whiteSpace: 'pre-line' }}>{reviewResp.comment}</div>}
+                </div>
+                {(survey?.survey?.questions || []).map((q, qi) => (
+                  <div key={q.id}>
+                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                      {qi + 1}. {q.label}
+                    </div>
+                    <div style={{ fontSize: 14, color: 'var(--ink)', whiteSpace: 'pre-line', wordBreak: 'break-word' }}>{answerText(q, reviewResp.answers[q.id]) || '—'}</div>
+                  </div>
+                ))}
+                <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>
+                  {tr(lang, 'ตอบเมื่อ', 'Answered')} {reviewResp.created_at}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
