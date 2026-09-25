@@ -272,6 +272,7 @@ function ArticleBodyView({ blocks }: { blocks: ArticleBlock[] }) {
                   fontSize: 'clamp(24px,3vw,32px)',
                   margin: '48px 0 18px',
                   lineHeight: 1.2,
+                  whiteSpace: 'pre-line',
                 }}
               >
                 {b.text}
@@ -283,7 +284,7 @@ function ArticleBodyView({ blocks }: { blocks: ArticleBlock[] }) {
               <h3
                 key={i}
                 className="display-th"
-                style={{ fontSize: 20, margin: '32px 0 12px' }}
+                style={{ fontSize: 20, margin: '32px 0 12px', whiteSpace: 'pre-line' }}
               >
                 {b.text}
               </h3>
@@ -298,6 +299,8 @@ function ArticleBodyView({ blocks }: { blocks: ArticleBlock[] }) {
                   lineHeight: 1.85,
                   color: 'var(--ink)',
                   margin: '0 0 22px',
+                  // Keep the spaces and line breaks the writer typed in admin.
+                  whiteSpace: 'pre-wrap',
                 }}
               >
                 {b.text}
@@ -324,6 +327,7 @@ function ArticleBodyView({ blocks }: { blocks: ArticleBlock[] }) {
                     fontSize: 'clamp(18px,2vw,22px)',
                     lineHeight: 1.5,
                     color: 'var(--ink)',
+                    whiteSpace: 'pre-wrap',
                   }}
                 >
                   &ldquo;{b.text}&rdquo;
@@ -355,6 +359,7 @@ function ArticleBodyView({ blocks }: { blocks: ArticleBlock[] }) {
                   color: 'var(--muted)',
                   fontStyle: 'italic',
                   margin: '0 0 32px',
+                  whiteSpace: 'pre-wrap',
                 }}
               >
                 {b.text}
