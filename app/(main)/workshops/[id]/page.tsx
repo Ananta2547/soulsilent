@@ -35,6 +35,7 @@ import {
 import { learnServerClock } from '@/lib/server-clock';
 import { visibleAppStatus } from '@/lib/selection-status';
 import { GiftModal } from '@/components/workshops/GiftModal';
+import { PosterZoom } from '@/components/workshops/PosterZoom';
 import { TransferLinkModal } from '@/components/workshops/TransferLinkModal';
 import { platformStyle, platformLabel } from '@/lib/online-platform';
 
@@ -514,12 +515,7 @@ function WorkshopDetailInner() {
 
         <div className="ph ph-teal-100" style={{ aspectRatio: '297 / 420', position: 'relative', overflow: 'hidden' }}>
           {workshop.image_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={workshop.image_url}
-              alt={workshop.title}
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            />
+            <PosterZoom src={workshop.image_url} alt={workshop.title} />
           ) : (
             <>
               {/* animate={false} because the draw-on stroke only runs inside a
@@ -993,11 +989,7 @@ function WorkshopDetailInner() {
                 style={{ aspectRatio: '297 / 420', borderRadius: 22, overflow: 'hidden', position: 'relative' }}
               >
                 {workshop.image_url ? (
-                  <img
-                    src={workshop.image_url}
-                    alt={workshop.title}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
+                  <PosterZoom src={workshop.image_url} alt={workshop.title} />
                 ) : (
                   <>
                     <Cloud
