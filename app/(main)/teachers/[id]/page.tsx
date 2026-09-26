@@ -80,6 +80,7 @@ export default function TeacherProfilePage() {
   const [teacher, setTeacher] = useState<TeacherPublic | null>(null);
   const [rounds, setRounds] = useState<Round[]>([]);
   const [canEdit, setCanEdit] = useState(false);
+  const [fromDash, setFromDash] = useState(false);
   const [loading, setLoading] = useState(true);
   const [day, setDay] = useState<string | null>(null);
   const [cursor, setCursor] = useState<{ y: number; m: number } | null>(null);
@@ -102,6 +103,13 @@ export default function TeacherProfilePage() {
             setTeacher(d.teacher);
             setRounds(d.rounds || []);
             setCanEdit(!!d.can_edit);
+            // The teacher dashboard's "หน้าโปรไฟล์ของฉัน" lands here with
+            // ?edit=1 and opens straight into the editor.
+            if (d.can_edit && new URLSearchParams(window.location.search).get('edit') === '1') {
+              setFromDash(true);
+              const p = d.teacher.profile;
+              setDraft({ ...p, takeaways: p.takeaways.map((t) => ({ ...t })), journey: p.journey.map((t) => ({ ...t })), socials: p.socials.map((t) => ({ ...t })) });
+            }
             // Open on the first day they teach, so the page never starts blank.
             const first = d.rounds?.[0]?.date || todayTH();
             setDay(d.rounds?.length ? first : null);
@@ -261,7 +269,11 @@ export default function TeacherProfilePage() {
 
         <div className="tp2-wrap">
           <div className="tp2-topline">
-            <Link href="/teachers" className="tp2-back">← {th ? 'ผู้สอนทั้งหมด' : 'All teachers'}</Link>
+            {fromDash ? (
+              <Link href="/teacher/workshops" className="tp2-back">← Teacher Dashboard</Link>
+            ) : (
+              <Link href="/teachers" className="tp2-back">← {th ? 'ผู้สอนทั้งหมด' : 'All teachers'}</Link>
+            )}
             {canEdit && !editing && (
               <button type="button" className="tp2-edit-btn" onClick={startEdit}>
                 ✎ {th ? 'แก้ไขหน้านี้' : 'Edit this page'}

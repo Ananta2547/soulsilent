@@ -73,6 +73,17 @@ const NAV: NavItem[] = [
       </svg>
     ),
   },
+  {
+    // Opens the public teacher page with its in-place editor switched on.
+    href: '/teacher/profile',
+    label: 'หน้าโปรไฟล์ของฉัน',
+    icon: (
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <circle cx="12" cy="8.5" r="3.5" strokeWidth={1.5} />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5" />
+      </svg>
+    ),
+  },
 ];
 
 export function TeacherSidebar() {
