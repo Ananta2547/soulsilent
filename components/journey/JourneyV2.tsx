@@ -104,7 +104,8 @@ export function JourneyMap({ items, onOpen }: { items: JourneyItem[]; onOpen: (i
   useEffect(() => {
     const el = wrap.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setScale(Math.min(1, el.clientWidth / 1180)));
+    // Fills the screen width: the 1180px canvas scales up on wide screens too.
+    const ro = new ResizeObserver(() => setScale(el.clientWidth / 1180 || 1));
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -178,7 +179,7 @@ export function JourneyMap({ items, onOpen }: { items: JourneyItem[]; onOpen: (i
 
   return (
     <div ref={wrap} style={{ width: '100%', height: H * scale, marginTop: 10 }}>
-      <div ref={canvas} className="jd-anim" style={{ position: 'relative', width: 1180, height: H, margin: scale < 1 ? 0 : '0 auto', transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+      <div ref={canvas} className="jd-anim" style={{ position: 'relative', width: 1180, height: H, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
         <svg viewBox={`0 0 1180 ${H}`} width="1180" height={H} style={css('position:absolute;inset:0;pointer-events:none')} fill="none" stroke="var(--teal-deep)" strokeOpacity=".32" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M850 560 L882 514 L900 538 L922 502 L960 560" />
           <path d="M910 520 L922 502 L932 516" />

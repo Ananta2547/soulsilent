@@ -164,12 +164,14 @@ export default function MyJourneyPage() {
 
   return (
     <div className="jd-page">
-      <div style={css('max-width:1280px;margin:0 auto;padding:16px 20px 0')}>{tabs}</div>
+      {/* The MY JOURNEY / DIARY switch only shows in the diary; the journey
+          page reaches the diary through its "เปิดสมุดไดอารี่" button. */}
+      {view === 'diary' && <div style={css('max-width:1280px;margin:0 auto;padding:16px 20px 0')}>{tabs}</div>}
 
       {view === 'journey' && full && stopProps && <StopFull {...stopProps} onBack={() => setFull(false)} />}
 
       {view === 'journey' && !full && (
-        <div style={css('position:relative;overflow:hidden;background-color:var(--cream);background-image:radial-gradient(rgba(13,138,126,.14) 1.2px,transparent 1.4px);background-size:28px 28px;margin-top:14px')}>
+        <div style={css('position:relative;overflow:hidden;background-color:var(--cream);background-image:radial-gradient(rgba(13,138,126,.14) 1.2px,transparent 1.4px);background-size:28px 28px')}>
           <div style={css('position:relative;max-width:1180px;margin:0 auto;padding:' + (phone ? '24px 16px 48px' : '40px 0 0'))}>
             {phone ? (
               <>
@@ -226,9 +228,7 @@ export default function MyJourneyPage() {
                     </div>
                   </div>
                 </div>
-                {items.length ? (
-                  <JourneyMap items={items} onOpen={setOpenIdx} />
-                ) : (
+                {!items.length && (
                   <div style={{ padding: '40px 32px 80px' }}>
                     <EmptyJourney />
                   </div>
@@ -236,6 +236,8 @@ export default function MyJourneyPage() {
               </>
             )}
           </div>
+          {/* The map spans the whole screen width, outside the hero's column. */}
+          {!phone && items.length > 0 && <JourneyMap items={items} onOpen={setOpenIdx} />}
         </div>
       )}
 
