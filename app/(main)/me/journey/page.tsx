@@ -1,96 +1,134 @@
 'use client';
 
-/* ============================================================
-   My Journey — port of Design Composer
-   "AllSoulLearn Journey + Diary.dc.html" (journey view only; the
-   diary half of that file is deliberately not brought over).
+/* My Journey + Diary — design "AllSoulLearn Journey + Diary v2" (the site's
+ * own navbar stays; the design's top bar is not brought over).
+ *
+ * MY JOURNEY: a life map of every attended workshop (a dashed rail on
+ * phones). DIARY: a paper book to write in every day, a mood calendar, and a
+ * month in review. A workshop's "memory of the day" is that day's diary page,
+ * so both halves read and write the same entries (/api/me/diary). */
 
-   Every attended workshop is a stop on one dashed path: alternating
-   sides of a centre line on desktop, a single left-hand rail on a
-   phone. The path ends at the start of the story, and begins with an
-   invitation to add the next stop.
-   ============================================================ */
-
-import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { useLang, T, tr } from '@/lib/i18n';
+import './journey.css';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLang, tr } from '@/lib/i18n';
 import { Btn } from '@/components/design/RippleButton';
-import { Icon } from '@/components/design/Icon';
 import { useLoadingTracker } from '@/components/design/DataLoading';
-import { JourneyModal } from '@/components/journey/JourneyModal';
-import { getWorkshopDays } from '@/lib/workshop-utils';
-import { type JourneyItem, fmtJourneyDate } from '@/lib/journey';
+import type { JourneyItem } from '@/lib/journey';
+import { cleanNotes, css, todayIso, FAM, type DiaryEntry, type Mood } from '@/lib/diary';
+import { DiaryBook, type BookWorkshop, type MonthSummary } from '@/components/diary/DiaryBook';
+import { MoodTab, SummaryTab, monthStats, type DayWorkshop } from '@/components/diary/DiaryTabs';
+import { JourneyMap, JourneyRail, StopFull, StopModal, itemHours } from '@/components/journey/JourneyV2';
 
-/** Whole hours spent in one workshop — per-day length × number of days. */
-function itemHours(it: JourneyItem): number {
-  const toMin = (t: string | null) => {
-    const [h, m] = (t || '').split(':').map(Number);
-    return Number.isFinite(h) ? h * 60 + (Number.isFinite(m) ? m : 0) : null;
-  };
-  const start = toMin(it.time_start);
-  const end = toMin(it.time_end);
-  if (start == null || end == null || end <= start) return 0;
-  const days = getWorkshopDays({
-    workshop_type: it.workshop_type as 'one_day',
-    date: it.date,
-    end_date: it.end_date,
-    dates_json: it.dates_json,
-    time_end: it.time_end,
-  }).length;
-  return ((end - start) / 60) * Math.max(1, days);
-}
+type View = 'journey' | 'diary';
+type DiaryTab = 'book' | 'mood' | 'sum';
 
 export default function MyJourneyPage() {
   const { lang } = useLang();
+  const track = useLoadingTracker();
   const [items, setItems] = useState<JourneyItem[]>([]);
+  const [entries, setEntries] = useState<DiaryEntry[]>([]);
+  const [months, setMonths] = useState<string[]>([]);
+  const [owner, setOwner] = useState('');
   const [loading, setLoading] = useState(true);
   const [unauthorized, setUnauthorized] = useState(false);
-  /** booking_id of the stop opened in the popup, or null. */
-  const [openId, setOpenId] = useState<string | null>(null);
+  // ?view=diary opens the diary straight away.
+  const [view, setView] = useState<View>(() => (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('view') === 'diary' ? 'diary' : 'journey'));
+  const [tab, setTab] = useState<DiaryTab>('book');
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
+  const [full, setFull] = useState(false);
+  const [writeNonce, setWriteNonce] = useState(0);
+  const [jump, setJump] = useState<{ day: string | null; n: number }>({ day: null, n: 0 });
+  const [phone, setPhone] = useState(false);
+  const today = todayIso();
 
-  const track = useLoadingTracker();
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 760px)');
+    const on = () => setPhone(mq.matches);
+    on();
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
 
   useEffect(() => {
     track(
-      fetch('/api/me/journey')
-        .then((r) => {
+      Promise.all([
+        fetch('/api/me/journey').then((r) => {
           if (r.status === 401) {
             setUnauthorized(true);
             return null;
           }
           return r.json() as Promise<{ items: JourneyItem[] }>;
-        })
-        .then((d) => {
-          if (d) setItems(d.items || []);
+        }),
+        fetch('/api/me/diary').then((r) => (r.ok ? (r.json() as Promise<{ entries: DiaryEntry[]; months: string[] }>) : null)),
+        fetch('/api/auth/me').then((r) => r.json() as Promise<{ user?: { name?: string | null } | null }>),
+      ])
+        .then(([j, d, me]) => {
+          if (j) setItems(j.items || []);
+          if (d) {
+            setEntries(d.entries || []);
+            setMonths(d.months || []);
+          }
+          setOwner(me?.user?.name || '');
         })
         .catch(() => {})
         .finally(() => setLoading(false)),
     );
   }, [track]);
 
-  const stats = useMemo(() => {
-    const hours = items.reduce((sum, it) => sum + itemHours(it), 0);
-    const notes = items.filter((it) => (it.journey_note || '').trim()).length;
-    // The path is drawn newest-first, so the oldest stop is where it started.
-    const firstYear = items.length ? (items[items.length - 1].date || '').slice(0, 4) : '';
-    return { hours: Math.round(hours), notes, firstYear };
+  /** Writes one day and keeps the page's copy in step. */
+  const saveDay = useCallback(async (day: string, patch: { notes?: string[]; moods?: Mood[] }) => {
+    setEntries((list) => {
+      const cur = list.find((e) => e.day === day) || { day, moods: [], notes: [''] };
+      const next = { ...cur, ...patch };
+      const rest = list.filter((e) => e.day !== day);
+      const has = next.moods.length > 0 || next.notes.some((t) => t.trim());
+      return (has ? [...rest, next] : rest).sort((a, b) => a.day.localeCompare(b.day));
+    });
+    await fetch('/api/me/diary', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ day, ...patch }) }).catch(() => {});
+  }, []);
+
+  const keepMonth = useCallback(async (month: string, keep: boolean) => {
+    setMonths((m) => (keep ? [...new Set([...m, month])] : m.filter((x) => x !== month)));
+    await fetch('/api/me/diary', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ month, keep }) }).catch(() => {});
+  }, []);
+
+  const dayWorkshops: DayWorkshop[] = useMemo(() => items.map((it) => ({ day: it.date, title: it.title, time: `${it.time_start}–${it.time_end}`, poster: it.image_url })), [items]);
+  const bookWorkshops = useMemo(() => {
+    const m: Record<string, BookWorkshop> = {};
+    items.forEach((it) => {
+      if (!m[it.date]) m[it.date] = { title: it.title, time: `${it.time_start}–${it.time_end}`, poster: it.image_url, drive: it.photos_drive_url };
+    });
+    return m;
   }, [items]);
+  const summaries: MonthSummary[] = useMemo(
+    () =>
+      months.map((month) => {
+        const s = monthStats(entries, dayWorkshops, month);
+        return { month, top: s.top ? FAM[s.top].label : '', logged: s.logged, workshops: s.workshops.length, pages: s.pages };
+      }),
+    [months, entries, dayWorkshops],
+  );
 
-  /* The stop shown in the popup. Items arrive newest-first, so the stop number
-     the design prints ("จุดที่ 03") counts up from the oldest. */
-  const openIdx = items.findIndex((x) => x.booking_id === openId);
-  const openStop = openIdx >= 0 ? { item: items[openIdx], index: items.length - openIdx } : null;
+  const stats = useMemo(() => {
+    const hours = Math.round(items.reduce((s, it) => s + itemHours(it), 0));
+    const pages = entries.filter((e) => e.notes.some((t) => t.trim())).length;
+    return { hours, pages };
+  }, [items, entries]);
 
-  // Nothing to draw while this page's requests are open — the loading screen is
-  // over it already (components/design/DataLoading.tsx).
+  const openDiaryAt = (day?: string) => {
+    setOpenIdx(null);
+    setFull(false);
+    setView('diary');
+    setTab('book');
+    if (day) setJump((j) => ({ day, n: j.n + 1 }));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   if (loading) return null;
-
   if (unauthorized) {
     return (
       <section className="section" style={{ padding: '80px 0', textAlign: 'center' }}>
-        <p style={{ color: 'var(--muted)', marginBottom: 16 }}>
-          {tr(lang, 'กรุณาเข้าสู่ระบบเพื่อดู My Journey', 'Please sign in to view My Journey')}
-        </p>
+        <p style={{ color: 'var(--muted)', marginBottom: 16 }}>{tr(lang, 'กรุณาเข้าสู่ระบบเพื่อดู My Journey', 'Please sign in to view My Journey')}</p>
         <Btn kind="teal" href="/auth/login?redirect=/me/journey">
           {tr(lang, 'เข้าสู่ระบบ', 'Sign in')}
         </Btn>
@@ -98,138 +136,186 @@ export default function MyJourneyPage() {
     );
   }
 
+  const open = openIdx != null ? items[openIdx] : null;
+  const stopProps = open
+    ? {
+        it: open,
+        index: items.length - (openIdx as number),
+        memo: entries.find((e) => e.day === open.date)?.notes[0] || '',
+        onSaveMemo: (text: string) => {
+          const cur = entries.find((e) => e.day === open.date);
+          return saveDay(open.date, { notes: cleanNotes([text, ...(cur?.notes.slice(1) || [])]) });
+        },
+        onReviewed: (rating: number, comment: string | null) => setItems((list) => list.map((x) => (x.booking_id === open.booking_id ? { ...x, review_rating: rating, review_comment: comment } : x))),
+        onOpenDiary: () => openDiaryAt(open.date),
+      }
+    : null;
+
+  const tabs = (
+    <div className="jd-tabs" role="tablist" style={phone ? { display: 'flex', width: '100%' } : undefined}>
+      <button type="button" role="tab" aria-selected={view === 'journey'} className={view === 'journey' ? 'on' : ''} style={phone ? { flex: 1 } : undefined} onClick={() => { setView('journey'); setFull(false); }}>
+        MY JOURNEY
+      </button>
+      <button type="button" role="tab" aria-selected={view === 'diary'} className={view === 'diary' ? 'on' : ''} style={phone ? { flex: 1 } : undefined} onClick={() => { setView('diary'); setFull(false); setOpenIdx(null); }}>
+        DIARY
+      </button>
+    </div>
+  );
+
   return (
-    <section className="section jn-page" style={{ paddingTop: 44, paddingBottom: 72 }}>
-      <div className="container">
-        <div className="jn-head">
-          <div style={{ maxWidth: 520 }}>
-            <h1 className="jn-title">MY JOURNEY</h1>
-            <p style={{ fontSize: 15, lineHeight: 1.6, color: 'var(--muted)', margin: 0 }}>
-              {tr(
-                lang,
-                'เก็บบันทึกทุกความทรงจำ จากทุกประสบการณ์',
-                'Every memory kept, from every experience.',
-              )}
-            </p>
-          </div>
-          <div className="jn-stats">
-            <Stat n={String(items.length).padStart(2, '0')} icon="date" label="WORKSHOPS" teal />
-            <Stat n={String(stats.hours)} icon="time" label={tr(lang, 'ชั่วโมงเรียนรู้', 'hours')} />
-            <Stat n={String(stats.notes)} icon="notes" label={tr(lang, 'บันทึกความทรงจำ', 'memory notes')} />
-          </div>
-        </div>
+    <div className="jd-page">
+      <div style={css('max-width:1280px;margin:0 auto;padding:16px 20px 0')}>{tabs}</div>
 
-        {items.length === 0 ? (
-          <div style={{ padding: 48, borderRadius: 22, background: 'var(--cream)', textAlign: 'center', color: 'var(--muted)' }}>
-            <p style={{ marginBottom: 14 }}>
-              {tr(lang, 'ยังไม่มีกิจกรรมในเส้นทางของคุณ — เริ่มจากลองดู workshop ดูสิ', 'No workshops in your journey yet — explore upcoming ones')}
-            </p>
-            <Btn kind="teal" href="/workshops">
-              {tr(lang, 'ดูกิจกรรมทั้งหมด', 'Browse workshops')} →
-            </Btn>
-          </div>
-        ) : (
-          <div className="jn-path">
-            {/* The invitation sits at the head of the path — the next stop is
-                the one that hasn't happened yet. */}
-            <div className="jn-node jn-node-next">
-              <div className="jn-dot jn-dot-open" aria-hidden />
-              <div className="jn-next">
-                <div style={{ fontFamily: 'Mitr, sans-serif', fontWeight: 500, fontSize: 20, lineHeight: 1.35, margin: '0 0 18px' }}>
-                  <T
-                    th={<>เส้นทางยังไม่จบ<br />หา workshop ถัดไปกันไหม</>}
-                    en={<>The path isn&apos;t over<br />shall we find the next one?</>}
-                  />
-                </div>
-                <Link href="/workshops" className="btn btn-teal">
-                  {tr(lang, 'ดูกิจกรรมทั้งหมด', 'Browse workshops')} <span className="mono">→</span>
-                </Link>
-              </div>
-            </div>
+      {view === 'journey' && full && stopProps && <StopFull {...stopProps} onBack={() => setFull(false)} />}
 
-            {items.map((it) => (
-              <div className="jn-node" key={it.booking_id}>
-                <div className="jn-dot" aria-hidden />
-                <button
-                  type="button"
-                  onClick={() => setOpenId(it.booking_id)}
-                  className="card jn-card"
-                  aria-haspopup="dialog"
-                >
-                  <div className="jn-poster">
-                    {it.image_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={it.image_url} alt={it.title} />
-                    ) : (
-                      <span className="mono" style={{ fontSize: 10, letterSpacing: '.1em', color: 'var(--muted)' }}>
-                        {tr(lang, 'ไม่มีรูป', 'No image')}
-                      </span>
-                    )}
+      {view === 'journey' && !full && (
+        <div style={css('position:relative;overflow:hidden;background-color:var(--cream);background-image:radial-gradient(rgba(13,138,126,.14) 1.2px,transparent 1.4px);background-size:28px 28px;margin-top:14px')}>
+          <div style={css('position:relative;max-width:1180px;margin:0 auto;padding:' + (phone ? '24px 16px 48px' : '40px 0 0'))}>
+            {phone ? (
+              <>
+                <h2 style={css("font-family:'Archivo Black','Mitr',sans-serif;font-size:34px;line-height:.95;margin:4px 0 6px")}>
+                  MY
+                  <br />
+                  JOURNEY
+                </h2>
+                <p style={css('margin:0 0 20px;font-size:13px;color:var(--muted)')}>
+                  {items.length} workshops · {stats.hours} ชั่วโมง
+                </p>
+                {items.length ? <JourneyRail items={items} onOpen={setOpenIdx} /> : <EmptyJourney />}
+                <button type="button" onClick={() => openDiaryAt()} style={css('margin-top:26px;width:100%;display:flex;align-items:center;gap:14px;border:0;cursor:pointer;text-align:left;font-family:inherit;background:var(--ink);color:#fff;border-radius:22px;padding:14px 20px 14px 14px')}>
+                  <DiaryBookIcon />
+                  <span style={css('display:flex;flex-direction:column;gap:5px')}>
+                    <span style={css('font-family:Mitr,sans-serif;font-weight:500;font-size:17px;line-height:1.1')}>เปิดสมุดไดอารี่</span>
+                    <span style={css('font-size:13px;font-weight:600;color:var(--accent)')}>ไปที่ Diary →</span>
+                  </span>
+                </button>
+              </>
+            ) : (
+              <>
+                <div style={css('display:flex;align-items:center;justify-content:space-between;gap:28px;flex-wrap:wrap;padding:0 32px')}>
+                  <div style={css('display:flex;flex-direction:column;gap:12px;flex:1;min-width:280px')}>
+                    <span className="eyebrow" style={{ color: 'var(--teal)' }}>LIFE MAP · แผนที่ชีวิตของฉัน</span>
+                    <h1 style={css("font-family:'Archivo Black','Mitr',sans-serif;font-size:58px;line-height:.88;letter-spacing:-.03em;margin:0;white-space:nowrap")}>MY JOURNEY</h1>
+                    <p style={css('font-size:15px;line-height:1.6;color:var(--muted);margin:0;text-wrap:pretty')}>ทุก workshop คือหมุดหนึ่งบนแผนที่ เดินย้อนลงไปดูว่าเราผ่านอะไรมาบ้าง — แตะที่การ์ดเพื่อเปิดความทรงจำของวันนั้น</p>
                   </div>
-                  <div className="jn-card-body">
-                    <div className="jn-card-title">{it.title}</div>
-                    <div className="jn-card-foot">
-                      <span className="mono jn-card-date">
-                        <Icon name="date" size={13} /> {fmtJourneyDate(it.date)}
+                  <div style={css('flex:none;display:flex;align-items:stretch;flex-wrap:nowrap;background:#fff;border-radius:22px;box-shadow:0 20px 40px -30px rgba(13,30,29,.4);overflow:hidden')}>
+                    <button type="button" onClick={() => openDiaryAt()} style={css('position:relative;flex:none;display:flex;align-items:center;gap:16px;border:0;cursor:pointer;text-align:left;font-family:inherit;background:var(--ink);color:#fff;border-radius:22px;padding:14px 20px 14px 14px')}>
+                      <DiaryBookIcon />
+                      <span style={css('display:flex;flex-direction:column;gap:5px')}>
+                        <span style={css('font-family:Mitr,sans-serif;font-weight:500;font-size:18px;line-height:1.1')}>เปิดสมุดไดอารี่</span>
+                        <span style={css('font-size:12.5px;line-height:1.3;color:#cfdcda;white-space:nowrap')}>{stats.pages} หน้า · อารมณ์ · สรุปเดือน</span>
+                        <span style={css('font-size:13px;font-weight:600;color:var(--accent)')}>ไปที่ Diary →</span>
                       </span>
-                      <span className="jn-card-note">
-                        <Icon name="notes" size={13} />
-                        {(it.journey_note || '').trim()
-                          ? tr(lang, 'อ่านบันทึก', 'Read note')
-                          : tr(lang, 'จดบันทึกความทรงจำ', 'Add a memory')}
-                      </span>
+                    </button>
+                    <div style={css('display:flex;align-items:center;padding:16px 8px')}>
+                      {(
+                        [
+                          [String(items.length).padStart(2, '0'), 'จุดที่เดินผ่าน', true],
+                          [String(stats.hours), 'ชั่วโมงเรียนรู้', false],
+                          [String(stats.pages), 'บันทึกในไดอารี่', false],
+                        ] as const
+                      ).map(([n, l, teal], i) => (
+                        <div key={l} style={{ display: 'flex', alignItems: 'stretch' }}>
+                          {i > 0 && <div style={css('width:1px;align-self:stretch;margin:6px 0;background:rgba(13,30,29,.08)')} />}
+                          <div style={css('display:flex;flex-direction:column;gap:6px;padding:0 18px')}>
+                            <span style={css("font-family:'Archivo Black','Mitr',sans-serif;font-size:32px;line-height:1;color:" + (teal ? 'var(--teal)' : 'var(--ink)'))}>{n}</span>
+                            <span style={css('font-size:13px;color:var(--muted);white-space:nowrap')}>{l}</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                </button>
-              </div>
-            ))}
+                </div>
+                {items.length ? (
+                  <JourneyMap items={items} onOpen={setOpenIdx} />
+                ) : (
+                  <div style={{ padding: '40px 32px 80px' }}>
+                    <EmptyJourney />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
-            <div className="jn-start">
-              <span className="jn-start-dot" aria-hidden />
-              <span className="eyebrow" style={{ color: 'var(--muted)' }}>
-                {tr(lang, 'จุดเริ่มต้น', 'the beginning')}
-                {stats.firstYear ? ` · ${stats.firstYear}` : ''}
-              </span>
+      {view === 'diary' && (
+        <div style={css('position:relative;isolation:isolate;overflow:hidden;background:var(--cream);min-height:calc(100vh - 70px);padding:' + (phone ? '14px 12px 40px' : '18px 32px 40px') + ';margin-top:14px')}>
+          <div style={css('max-width:1180px;margin:0 auto;display:flex;align-items:flex-end;justify-content:space-between;gap:16px 24px;flex-wrap:wrap')}>
+            <div style={css('display:flex;align-items:baseline;gap:14px;flex-wrap:wrap')}>
+              <h1 style={css("font-family:'Archivo Black','Mitr',sans-serif;font-size:34px;line-height:1;letter-spacing:-.02em;margin:0")}>DIARY</h1>
+              <span style={css('color:var(--muted);font-size:13.5px')}>เขียนได้ทุกวัน · workshop ที่เข้าร่วมจะเข้ามาอยู่ในหน้าของวันนั้นเอง</span>
+            </div>
+            <div style={css('display:flex;align-items:center;gap:12px;flex-wrap:wrap')}>
+              <div className="jd-soft" role="tablist">
+                {(
+                  [
+                    ['book', 'สมุดบันทึก'],
+                    ['mood', 'อารมณ์'],
+                    ['sum', 'สรุปเดือน'],
+                  ] as const
+                ).map(([k, l]) => (
+                  <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="btn btn-teal btn-sm"
+                style={css('display:inline-flex;align-items:center;gap:7px')}
+                onClick={() => {
+                  setTab('book');
+                  setWriteNonce((n) => n + 1);
+                }}
+              >
+                ✎ เขียนวันนี้
+              </button>
             </div>
           </div>
-        )}
-      </div>
 
-      {openStop && (
-        <JourneyModal
-          item={openStop.item}
-          index={openStop.index}
-          onClose={() => setOpenId(null)}
-          onChange={(next) =>
-            setItems((prev) => prev.map((x) => (x.booking_id === next.booking_id ? next : x)))
-          }
-        />
+          {tab === 'book' && (
+            <div style={css('max-width:1180px;margin:14px auto 0')}>
+              <DiaryBook
+                owner={owner || 'ฉัน'}
+                today={today}
+                entries={entries}
+                workshops={bookWorkshops}
+                summaries={summaries}
+                writeNonce={writeNonce}
+                jumpNonce={jump.n}
+                jumpTo={jump.day}
+                onSave={(day, data) => saveDay(day, { notes: data.notes, moods: data.moods })}
+              />
+            </div>
+          )}
+          {tab === 'mood' && <MoodTab entries={entries} today={today} workshops={dayWorkshops} onSaveMoods={(day, moods) => saveDay(day, { moods })} />}
+          {tab === 'sum' && <SummaryTab entries={entries} today={today} workshops={dayWorkshops} savedMonths={months} onKeepMonth={keepMonth} onOpenBook={(day) => openDiaryAt(day)} />}
+        </div>
       )}
-    </section>
+
+      {view === 'journey' && !full && stopProps && <StopModal {...stopProps} onClose={() => setOpenIdx(null)} onFull={() => setFull(true)} />}
+    </div>
   );
 }
 
-/** One figure in the header strip: the number, its icon, and what it counts. */
-function Stat({
-  n,
-  label,
-  icon,
-  teal = false,
-}: {
-  n: string;
-  label: string;
-  icon: 'date' | 'time' | 'notes';
-  teal?: boolean;
-}) {
+function DiaryBookIcon() {
   return (
-    <div>
-      <div className="jn-stat-row">
-        <span className="jn-stat-n" style={teal ? { color: 'var(--teal)' } : undefined}>{n}</span>
-        <Icon name={icon} size={26} style={{ color: teal ? 'var(--teal)' : 'var(--ink)' }} />
-      </div>
-      <div style={{ marginTop: 8 }}>
-        <span className="eyebrow" style={{ color: 'var(--muted)' }}>{label}</span>
-      </div>
+    <span style={css('position:relative;flex:none;width:52px;height:70px;border-radius:4px 10px 10px 4px;background:var(--teal);box-shadow:inset 6px 0 0 rgba(0,0,0,.2),3px 3px 0 #efe7d6,5px 5px 0 #e6dcc6;transform:rotate(-5deg)')}>
+      <span style={css('position:absolute;top:0;bottom:0;right:10px;width:7px;background:var(--accent)')} />
+      <span style={css('position:absolute;left:12px;top:14px;width:30px;height:20px;border-radius:3px;background:var(--cream)')} />
+    </span>
+  );
+}
+
+function EmptyJourney() {
+  return (
+    <div style={css('background:#fff;border-radius:22px;padding:48px 24px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px')}>
+      <span style={css('font-family:Mitr,sans-serif;font-weight:500;font-size:22px')}>เส้นทางเริ่มที่หมุดแรก</span>
+      <span style={css('font-size:14px;color:var(--muted);max-width:420px')}>เมื่อเข้าร่วม workshop และถูกเช็คชื่อแล้ว หมุดจะขึ้นบนแผนที่ให้อัตโนมัติ</span>
+      <Btn kind="teal" href="/workshops">
+        ดูกิจกรรมทั้งหมด →
+      </Btn>
     </div>
   );
 }

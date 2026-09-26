@@ -1,0 +1,54 @@
+/* My Journey + Diary — design "AllSoulLearn Journey + Diary v2".
+ * Keyframes the design uses, plus the few layout rules inline styles cannot
+ * express (breakpoints, placeholder colour). Everything is jd-* / db-*. */
+
+@keyframes jPulse { 0% { transform: scale(.7); opacity: .9 } 100% { transform: scale(1.9); opacity: 0 } }
+@keyframes jDrift { 0%, 100% { transform: translate(0, 0) } 50% { transform: translate(18px, -12px) } }
+@keyframes dash { from { stroke-dashoffset: 2600 } to { stroke-dashoffset: 0 } }
+@keyframes riseIn { from { opacity: 0; transform: translateY(26px) } to { opacity: 1; transform: none } }
+@keyframes dbIn { from { opacity: 0; transform: translateY(22px) scale(.98) } to { opacity: 1; transform: none } }
+@keyframes dbFloat { 0%, 100% { transform: translate(0, 0) rotate(0) } 50% { transform: translate(14px, -22px) rotate(8deg) } }
+@keyframes dbBlob {
+  0%, 100% { transform: translate(0, 0) scale(1); border-radius: 46% 54% 60% 40%/50% 42% 58% 50% }
+  50% { transform: translate(30px, -18px) scale(1.08); border-radius: 58% 42% 44% 56%/42% 60% 40% 58% }
+}
+@keyframes dbSpin { to { transform: rotate(360deg) } }
+@keyframes dbDots { from { background-position: 0 0 } to { background-position: 44px 44px } }
+@keyframes dbRise { 0% { transform: translateY(0); opacity: 0 } 15% { opacity: .9 } 85% { opacity: .9 } 100% { transform: translateY(-260px); opacity: 0 } }
+@keyframes dbDash { to { stroke-dashoffset: -120 } }
+@media (prefers-reduced-motion: reduce) { .db-bg *, .jd-anim * { animation: none !important } }
+.db-ta::placeholder { color: #9aa7a5 }
+
+.jd-page { background: var(--paper); color: var(--ink); }
+.jd-tabs { display: inline-flex; background: var(--cream); border-radius: 999px; padding: 4px; gap: 2px; }
+.jd-tabs button {
+  border: 0; padding: 7px 14px; border-radius: 999px; font-family: var(--font-mono), ui-monospace, monospace; font-size: 10.5px;
+  font-weight: 600; letter-spacing: .1em; cursor: pointer; background: transparent; color: var(--muted); transition: .25s cubic-bezier(.2,.7,.2,1);
+}
+.jd-tabs button.on { background: var(--teal); color: #fff; }
+.jd-soft { display: inline-flex; background: #fff; border-radius: 999px; padding: 4px; gap: 2px; }
+.jd-soft button { border: 0; padding: 8px 16px; border-radius: 999px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; background: transparent; color: var(--muted); transition: .25s; }
+.jd-soft button.on { background: var(--ink); color: #fff; }
+
+/* Responsive grids for the diary's mood and summary tabs. */
+.jd-grid-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+.jd-grid-13 { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 22px; }
+.jd-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; align-items: stretch; }
+.jd-grid-125 { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+.jd-dark-split { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 28px; align-items: center; }
+@media (max-width: 900px) {
+  .jd-grid-2, .jd-grid-13, .jd-grid-3, .jd-grid-125, .jd-dark-split { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .jd-hide-sm { display: none !important; }
+}
+@media (min-width: 901px) { .jd-only-sm { display: none !important; } }
+
+/* Journey stop popup: two columns on desktop, a sheet on phones. */
+.jd-modal { position: relative; background: var(--paper); border-radius: 28px; width: 1000px; max-width: 100%; max-height: 90vh; overflow: auto; display: grid; grid-template-columns: 360px minmax(0, 1fr); box-shadow: 0 40px 90px -30px rgba(13,30,29,.6); animation: riseIn .5s cubic-bezier(.2,.7,.2,1) both; }
+.jd-full { display: grid; grid-template-columns: 420px 1fr; gap: 52px; margin-top: 22px; align-items: start; }
+@media (max-width: 900px) {
+  .jd-modal-back { align-items: flex-end !important; padding: 40px 0 0 !important; }
+  .jd-modal { grid-template-columns: 1fr; border-radius: 28px 28px 0 0; max-height: calc(100dvh - 40px); }
+  .jd-full { grid-template-columns: 1fr; gap: 26px; }
+  .jd-full-poster { position: static !important; width: min(420px, 100%) !important; margin: 0 auto; }
+  .jd-2col { grid-template-columns: 1fr !important; }
+}
