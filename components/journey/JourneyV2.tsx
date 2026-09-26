@@ -88,6 +88,7 @@ function smooth(pts: { x: number; y: number }[]): string {
 }
 
 const SPACING = 425;
+const MAX_SCALE = 1;
 
 /** The desktop life map. `items` newest first. */
 export function JourneyMap({ items, onOpen }: { items: JourneyItem[]; onOpen: (i: number) => void }) {
@@ -96,6 +97,7 @@ export function JourneyMap({ items, onOpen }: { items: JourneyItem[]; onOpen: (i
   const pathEl = useRef<SVGPathElement>(null);
   const mark = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
+  const [width, setWidth] = useState(1180);
   const pins = useMemo(() => items.map((_, i) => ({ x: i % 2 === 0 ? 560 : 620, y: 400 + i * SPACING })), [items]);
   const H = 400 + Math.max(0, items.length - 1) * SPACING + 360;
   const start = { x: 600, y: H - 60 };
@@ -104,8 +106,12 @@ export function JourneyMap({ items, onOpen }: { items: JourneyItem[]; onOpen: (i
   useEffect(() => {
     const el = wrap.current;
     if (!el) return;
-    // Fills the screen width: the 1180px canvas scales up on wide screens too.
-    const ro = new ResizeObserver(() => setScale(el.clientWidth / 1180 || 1));
+    // Design size (1180px) on wide screens, shrinks to fit narrow ones; the
+    // canvas is centred in the full-width band.
+    const ro = new ResizeObserver(() => {
+      setScale(Math.min(MAX_SCALE, el.clientWidth / 1180 || 1));
+      setWidth(el.clientWidth);
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -179,7 +185,7 @@ export function JourneyMap({ items, onOpen }: { items: JourneyItem[]; onOpen: (i
 
   return (
     <div ref={wrap} style={{ width: '100%', height: H * scale, marginTop: 10 }}>
-      <div ref={canvas} className="jd-anim" style={{ position: 'relative', width: 1180, height: H, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+      <div ref={canvas} className="jd-anim" style={{ position: 'relative', width: 1180, height: H, marginLeft: Math.max(0, (width - 1180 * scale) / 2), transform: `scale(${scale})`, transformOrigin: 'top left' }}>
         <svg viewBox={`0 0 1180 ${H}`} width="1180" height={H} style={css('position:absolute;inset:0;pointer-events:none')} fill="none" stroke="var(--teal-deep)" strokeOpacity=".32" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M850 560 L882 514 L900 538 L922 502 L960 560" />
           <path d="M910 520 L922 502 L932 516" />
