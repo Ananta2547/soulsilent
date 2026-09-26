@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { Article, ArticleCategory } from '@/lib/types';
 import { DEFAULT_CATEGORIES, categoryLabel, formatArticleDate, parseTags } from '@/lib/article-utils';
@@ -13,6 +13,11 @@ import { useLoadingTracker } from '@/components/design/DataLoading';
    data via /api/articles + /api/article-categories, Thai-only.
    ============================================================ */
 
+/** Featured articles the lead card cycles through with its arrows. */
+const LEAD_MAX = 3;
+/** Grid cards per page; the page numbers below swap the cards in place. */
+const PAGE_SIZE = 6;
+
 const swatchClass = (s: string) =>
   s === 'cream' ? 'ph-cream' : s === 'ink' ? 'ph-ink' : s === 'accent' ? 'ph-accent' : 'ph-teal';
 
@@ -23,6 +28,11 @@ export default function ArticlesPage() {
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState('all');
   const [query, setQuery] = useState('');
+  // Both reset whenever the filter or search changes: each remembers the
+  // filter it was set under and falls back to 0 for any other.
+  const [leadAt, setLeadAt] = useState({ key: '', i: 0 });
+  const [pageAt, setPageAt] = useState({ key: '', n: 0 });
+  const gridTop = useRef<HTMLDivElement>(null);
 
   const track = useLoadingTracker();
 
@@ -53,8 +63,21 @@ export default function ArticlesPage() {
     });
   }, [articles, active, query]);
 
-  const lead = filtered.find((a) => a.featured) || filtered[0];
-  const rest = filtered.filter((a) => a.id !== lead?.id);
+  // Up to three articles take turns in the lead card — featured ones first,
+  // then the newest — and the grid below holds everything else.
+  const filterKey = active + '|' + query.trim().toLowerCase();
+  const leads = useMemo(() => [...filtered.filter((a) => a.featured), ...filtered.filter((a) => !a.featured)].slice(0, LEAD_MAX), [filtered]);
+  const leadIdx = leadAt.key === filterKey ? Math.min(leadAt.i, Math.max(0, leads.length - 1)) : 0;
+  const lead = leads[leadIdx];
+  const rest = filtered.filter((a) => !leads.some((l) => l.id === a.id));
+  const pages = Math.max(1, Math.ceil(rest.length / PAGE_SIZE));
+  const page = pageAt.key === filterKey ? Math.min(pageAt.n, pages - 1) : 0;
+  const shown = rest.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const stepLead = (d: number) => setLeadAt({ key: filterKey, i: (leadIdx + d + leads.length) % leads.length });
+  const goPage = (n: number) => {
+    setPageAt({ key: filterKey, n });
+    gridTop.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   return (
     <>
@@ -122,8 +145,9 @@ export default function ArticlesPage() {
             <div style={{ textAlign: 'center', padding: '56px 0', color: 'var(--muted)' }}>ไม่พบบทความที่ตรงกับตัวกรอง</div>
           ) : (
             <>
-              {/* Featured (lead) */}
-              <Link href={`/articles/${lead.slug}`} className="art-featured card" style={{ padding: 0, marginBottom: 24, color: 'var(--ink)', textDecoration: 'none' }}>
+              {/* Featured (lead) — arrows step through up to three articles */}
+              <div className="art-lead-wrap">
+              <Link key={lead.id} href={`/articles/${lead.slug}`} className="art-featured card art-lead-fade" style={{ padding: 0, color: 'var(--ink)', textDecoration: 'none' }}>
                 <div className={`ph ${swatchClass(lead.cover_swatch)}`} style={{ aspectRatio: '16/11', position: 'relative', overflow: 'hidden' }}>
                   {lead.cover_image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -141,11 +165,28 @@ export default function ArticlesPage() {
                   <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--teal)' }}>อ่านบทความเต็ม <span className="mono">→</span></span>
                 </div>
               </Link>
+              {leads.length > 1 && (
+                <>
+                  <button type="button" className="art-lead-arrow prev" aria-label="บทความก่อนหน้า" onClick={() => stepLead(-1)}>
+                    ←
+                  </button>
+                  <button type="button" className="art-lead-arrow next" aria-label="บทความถัดไป" onClick={() => stepLead(1)}>
+                    →
+                  </button>
+                  <div className="art-lead-dots">
+                    {leads.map((l, i) => (
+                      <button key={l.id} type="button" aria-label={`บทความเด่น ${i + 1}`} aria-current={i === leadIdx} className={i === leadIdx ? 'on' : ''} onClick={() => setLeadAt({ key: filterKey, i })} />
+                    ))}
+                  </div>
+                </>
+              )}
+              </div>
 
-              {/* Grid (rest) */}
-              {rest.length > 0 && (
-                <div className="art-grid">
-                  {rest.map((a) => {
+              {/* Grid (rest) — paged in place, the URL never changes */}
+              <div ref={gridTop} style={{ scrollMarginTop: 90 }} />
+              {shown.length > 0 && (
+                <div className="art-grid" key={page}>
+                  {shown.map((a) => {
                     const dark = a.cover_swatch === 'ink';
                     return (
                       <Link key={a.id} href={`/articles/${a.slug}`} className="card" style={{ padding: 0, overflow: 'hidden', textDecoration: 'none', color: dark ? '#fff' : 'var(--ink)', background: dark ? 'var(--ink)' : undefined }}>
@@ -168,6 +209,15 @@ export default function ArticlesPage() {
                     );
                   })}
                 </div>
+              )}
+              {pages > 1 && (
+                <nav className="art-pager" aria-label="หน้าบทความ">
+                  {Array.from({ length: pages }, (_, n) => (
+                    <button key={n} type="button" className={n === page ? 'on' : ''} aria-current={n === page ? 'page' : undefined} onClick={() => goPage(n)}>
+                      {n + 1}
+                    </button>
+                  ))}
+                </nav>
               )}
             </>
           )}

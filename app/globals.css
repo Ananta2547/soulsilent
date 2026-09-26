@@ -2740,6 +2740,37 @@ body {
 .art-hero { display: grid; grid-template-columns: 1.4fr 1fr; gap: 32px; align-items: end; }
 .art-featured { display: grid; grid-template-columns: 1fr 1fr; gap: 0; overflow: hidden; }
 .art-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.art-grid > * { animation: art-in .35s cubic-bezier(.2,.7,.2,1) both; }
+/* Lead card carousel (up to 3) and the grid's in-place page numbers. */
+.art-lead-wrap { position: relative; margin-bottom: 24px; }
+.art-lead-fade { animation: art-in .35s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes art-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.art-lead-arrow {
+  position: absolute; top: 50%; z-index: 2; width: 44px; height: 44px; margin-top: -22px; border: 0; border-radius: 50%;
+  background: var(--paper); color: var(--ink); font-family: var(--font-mono), ui-monospace, monospace; font-size: 18px; cursor: pointer;
+  box-shadow: 0 10px 24px -12px rgba(13,30,29,.55); transition: background .2s, color .2s, transform .2s;
+}
+.art-lead-arrow:hover { background: var(--ink); color: #fff; transform: scale(1.06); }
+.art-lead-arrow.prev { left: -22px; }
+.art-lead-arrow.next { right: -22px; }
+.art-lead-dots { display: flex; justify-content: center; gap: 8px; margin-top: 14px; }
+.art-lead-dots button { width: 8px; height: 8px; padding: 0; border: 0; border-radius: 999px; background: rgba(13,30,29,.2); cursor: pointer; transition: width .25s, background .25s; }
+.art-lead-dots button.on { width: 24px; background: var(--teal); }
+.art-pager { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 32px; }
+.art-pager button {
+  min-width: 40px; height: 40px; padding: 0 12px; border: 0; border-radius: 999px; background: var(--paper); color: var(--ink);
+  font-family: var(--font-mono), ui-monospace, monospace; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .2s, color .2s;
+}
+.art-pager button:hover { background: var(--cream); }
+.art-pager button.on { background: var(--ink); color: #fff; }
+@media (max-width: 860px) {
+  /* The lead card stacks (cover on top, 16:11); arrows sit inside the edges,
+     level with the middle of the cover. */
+  .art-lead-arrow { top: 0; margin-top: calc(34.4vw - 31px); width: 38px; height: 38px; font-size: 16px; }
+  .art-lead-arrow.prev { left: 8px; }
+  .art-lead-arrow.next { right: 8px; }
+}
+@media (prefers-reduced-motion: reduce) { .art-grid > *, .art-lead-fade { animation: none; } }
 
 @media (max-width: 860px) {
   .art-hero { grid-template-columns: 1fr; }
