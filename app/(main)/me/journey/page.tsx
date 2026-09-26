@@ -166,13 +166,13 @@ export default function MyJourneyPage() {
     <div className="jd-page">
       {/* The MY JOURNEY / DIARY switch only shows in the diary; the journey
           page reaches the diary through its "เปิดสมุดไดอารี่" button. */}
-      {view === 'diary' && <div style={css('max-width:1280px;margin:0 auto;padding:16px 20px 0')}>{tabs}</div>}
+      {view === 'diary' && <div style={css('max-width:1664px;margin:0 auto;padding:16px 32px 0')}>{tabs}</div>}
 
       {view === 'journey' && full && stopProps && <StopFull {...stopProps} onBack={() => setFull(false)} />}
 
       {view === 'journey' && !full && (
         <div style={css('position:relative;overflow:hidden;background-color:var(--cream);background-image:radial-gradient(rgba(13,138,126,.14) 1.2px,transparent 1.4px);background-size:28px 28px')}>
-          <div style={css('position:relative;max-width:1180px;margin:0 auto;padding:' + (phone ? '24px 16px 48px' : '40px 0 0'))}>
+          <div style={css('position:relative;margin:0 auto;padding:' + (phone ? '24px 16px 48px' : '40px 3vw 0'))}>
             {phone ? (
               <>
                 <h2 style={css("font-family:'Archivo Black','Mitr',sans-serif;font-size:34px;line-height:.95;margin:4px 0 6px")}>
@@ -243,7 +243,7 @@ export default function MyJourneyPage() {
 
       {view === 'diary' && (
         <div style={css('position:relative;isolation:isolate;overflow:hidden;background:var(--cream);min-height:calc(100vh - 70px);padding:' + (phone ? '14px 12px 40px' : '18px 32px 40px') + ';margin-top:14px')}>
-          <div style={css('max-width:1180px;margin:0 auto;display:flex;align-items:flex-end;justify-content:space-between;gap:16px 24px;flex-wrap:wrap')}>
+          <div style={css('max-width:1600px;margin:0 auto;display:flex;align-items:flex-end;justify-content:space-between;gap:16px 24px;flex-wrap:wrap')}>
             <div style={css('display:flex;align-items:baseline;gap:14px;flex-wrap:wrap')}>
               <h1 style={css("font-family:'Archivo Black','Mitr',sans-serif;font-size:34px;line-height:1;letter-spacing:-.02em;margin:0")}>DIARY</h1>
               <span style={css('color:var(--muted);font-size:13.5px')}>เขียนได้ทุกวัน · workshop ที่เข้าร่วมจะเข้ามาอยู่ในหน้าของวันนั้นเอง</span>
@@ -277,7 +277,7 @@ export default function MyJourneyPage() {
           </div>
 
           {tab === 'book' && (
-            <div style={css('max-width:1180px;margin:14px auto 0')}>
+            <div style={css('max-width:1600px;margin:14px auto 0')}>
               <DiaryBook
                 owner={owner || 'ฉัน'}
                 today={today}

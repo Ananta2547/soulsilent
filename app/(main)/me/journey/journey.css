@@ -20,6 +20,8 @@
 .db-ta::placeholder { color: #9aa7a5 }
 
 .jd-page { background: var(--paper); color: var(--ink); }
+/* The /me layout boxes pages into a 1180px column; Journey + Diary run edge to edge. */
+.page-main:has(> .jd-page) { max-width: none; padding: 0; }
 .jd-tabs { display: inline-flex; background: var(--cream); border-radius: 999px; padding: 4px; gap: 2px; }
 .jd-tabs button {
   border: 0; padding: 7px 14px; border-radius: 999px; font-family: var(--font-mono), ui-monospace, monospace; font-size: 10.5px;

@@ -155,7 +155,7 @@ export function MoodTab({ entries, today, workshops, onSaveMoods }: { entries: D
 
   return (
     <div style={{ position: 'relative' }}>
-      <div className="jd-grid-2" style={{ maxWidth: 1180, margin: '22px auto 0' }}>
+      <div className="jd-grid-2" style={{ maxWidth: 1600, margin: '22px auto 0' }}>
         <div style={css('background:#fff;border-radius:22px;padding:26px 28px')}>
           <div style={css('display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap')}>
             <div style={css('display:flex;flex-direction:column;gap:4px')}>
@@ -357,7 +357,7 @@ export function SummaryTab({
   const yearLogged = yearEntries.filter((e) => e.moods.length).length;
 
   return (
-    <div style={css('max-width:1180px;margin:22px auto 0;display:flex;flex-direction:column;gap:22px')}>
+    <div style={css('max-width:1600px;margin:22px auto 0;display:flex;flex-direction:column;gap:22px')}>
       <div style={css('position:relative;overflow:hidden;background:var(--teal);color:#fff;border-radius:22px;padding:34px 38px;display:flex;align-items:flex-end;justify-content:space-between;gap:28px;flex-wrap:wrap')}>
         <span style={css("position:absolute;right:-30px;top:-60px;font-family:'Archivo Black','Mitr',sans-serif;font-size:260px;line-height:1;color:rgba(255,255,255,.06);pointer-events:none")}>{pad(m)}</span>
         <div style={css('position:relative;display:flex;flex-direction:column;gap:10px')}>
