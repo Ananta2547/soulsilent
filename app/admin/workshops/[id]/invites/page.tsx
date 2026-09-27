@@ -14,6 +14,7 @@ import { fmtDate, fmtDateTime } from '@/lib/datetime';
 import { getEffectivePrice, getWorkshopDays } from '@/lib/workshop-utils';
 import { COMP_KINDS, COMP_LABEL, type CompKind } from '@/lib/comp';
 import type { InviteRow } from '@/app/api/admin/workshops/[id]/invites/route';
+import { renderInviteCard } from '@/components/admin/inviteCard';
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
 
@@ -28,6 +29,7 @@ export default function WorkshopInvitesPage() {
   const [error, setError] = useState<string | null>(null);
   const [qr, setQr] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState<string | null>(null);
+  const [drawing, setDrawing] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -93,6 +95,29 @@ export default function WorkshopInvitesPage() {
     setWorkshop((w) => (w ? { ...w, held: Math.max(0, (w.held || 0) - 1) } : w));
   }
 
+  /** Saves the invitation as a card image (title, date, place, QR). */
+  async function downloadCard(i: InviteRow, when: string) {
+    if (!workshop) return;
+    setDrawing(i.token);
+    try {
+      const png = await renderInviteCard({
+        title: workshop.title,
+        when,
+        place: workshop.is_online ? 'ออนไลน์' : workshop.location || null,
+        url: i.url,
+        code: i.token.slice(0, 8).toUpperCase(),
+      });
+      const a = document.createElement('a');
+      a.href = png;
+      a.download = `บัตรเชิญ-${workshop.title.slice(0, 40)}-${i.token.slice(0, 6)}.png`;
+      a.click();
+    } catch {
+      setError('สร้างรูปบัตรไม่สำเร็จ');
+    } finally {
+      setDrawing(null);
+    }
+  }
+
   async function copy(url: string, token: string) {
     try {
       await navigator.clipboard.writeText(url);
@@ -113,7 +138,7 @@ export default function WorkshopInvitesPage() {
   }
 
   const days = getWorkshopDays(workshop);
-  const when = `${fmtDate(days[0] || workshop.date, 'th', 'medium')} · ${workshop.time_start}`;
+  const when = `${fmtDate(days[0] || workshop.date, 'th', 'medium')} · ${workshop.time_start}–${workshop.time_end}`;
   const pending = invites.filter((i) => i.status === 'pending');
   const done = invites.filter((i) => i.status !== 'pending');
   const aslTotal = invites.filter((i) => i.status !== 'cancelled').reduce((s, i) => s + i.host_credit, 0);
@@ -195,9 +220,17 @@ export default function WorkshopInvitesPage() {
               รายได้ Host {baht(i.host_credit)} · ถือโดย {i.issued_by || 'admin'} จนกว่าจะมีคนรับ
             </span>
             <div className="flex flex-wrap justify-center gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() => downloadCard(i, when)}
+                disabled={drawing === i.token}
+                className="rounded-full bg-primary text-white px-3 py-1.5 font-semibold disabled:opacity-60"
+              >
+                {drawing === i.token ? 'กำลังสร้างรูป…' : 'ดาวน์โหลดบัตร'}
+              </button>
               {qr[i.token] && (
-                <a href={qr[i.token]} download={`invite-${i.token.slice(0, 8)}.png`} className="rounded-full border border-primary text-primary px-3 py-1.5 font-semibold">
-                  ดาวน์โหลด QR
+                <a href={qr[i.token]} download={`invite-qr-${i.token.slice(0, 8)}.png`} className="rounded-full border border-primary text-primary px-3 py-1.5 font-semibold">
+                  เฉพาะ QR
                 </a>
               )}
               <button type="button" onClick={() => copy(i.url, i.token)} className="rounded-full border border-gray-lighter px-3 py-1.5 font-semibold text-dark">
