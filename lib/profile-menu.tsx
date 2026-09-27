@@ -66,6 +66,19 @@ export const PROFILE_MENU: ProfileMenuItem[] = [
     ),
   },
   {
+    key: 'diary',
+    href: '/me/journey?view=diary',
+    th: 'Diary',
+    en: 'Diary',
+    external: true,
+    icon: (
+      <svg className={iconCls} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M6 3h11a1 1 0 011 1v16a1 1 0 01-1 1H6a2 2 0 01-2-2V5a2 2 0 012-2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M8 3v18M11 8h4M11 12h4" />
+      </svg>
+    ),
+  },
+  {
     key: 'help',
     href: '/help',
     th: 'ช่วยเหลือ',

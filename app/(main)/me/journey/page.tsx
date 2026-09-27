@@ -9,7 +9,8 @@
  * so both halves read and write the same entries (/api/me/diary). */
 
 import './journey.css';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useLang, tr } from '@/lib/i18n';
 import { Btn } from '@/components/design/RippleButton';
 import { useLoadingTracker } from '@/components/design/DataLoading';
@@ -22,7 +23,16 @@ import { JourneyMap, JourneyRail, StopFull, StopModal, itemHours } from '@/compo
 type View = 'journey' | 'diary';
 type DiaryTab = 'book' | 'mood' | 'sum';
 
+// useSearchParams needs a Suspense boundary to build.
 export default function MyJourneyPage() {
+  return (
+    <Suspense fallback={null}>
+      <JourneyAndDiary />
+    </Suspense>
+  );
+}
+
+function JourneyAndDiary() {
   const { lang } = useLang();
   const track = useLoadingTracker();
   const [items, setItems] = useState<JourneyItem[]>([]);
@@ -31,8 +41,10 @@ export default function MyJourneyPage() {
   const [owner, setOwner] = useState('');
   const [loading, setLoading] = useState(true);
   const [unauthorized, setUnauthorized] = useState(false);
-  // ?view=diary opens the diary straight away.
-  const [view, setView] = useState<View>(() => (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('view') === 'diary' ? 'diary' : 'journey'));
+  // The URL decides the view: ?view=diary is the diary (the profile menu's
+  // "Diary" link lands there, even from the map), anything else the map.
+  const router = useRouter();
+  const view: View = useSearchParams().get('view') === 'diary' ? 'diary' : 'journey';
   const [tab, setTab] = useState<DiaryTab>('book');
   const [openIdx, setOpenIdx] = useState<number | null>(null);
   const [full, setFull] = useState(false);
@@ -40,15 +52,6 @@ export default function MyJourneyPage() {
   const [jump, setJump] = useState<{ day: string | null; n: number }>({ day: null, n: 0 });
   const [phone, setPhone] = useState(false);
   const today = todayIso();
-
-  useEffect(() => {
-    const onPop = () => {
-      setView(new URLSearchParams(window.location.search).get('view') === 'diary' ? 'diary' : 'journey');
-      setFull(false);
-    };
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
-  }, []);
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 760px)');
@@ -127,11 +130,10 @@ export default function MyJourneyPage() {
   const openDiaryAt = (day?: string) => {
     setOpenIdx(null);
     setFull(false);
-    setView('diary');
     setTab('book');
-    // The diary has no switch back; it gets its own history entry so the
-    // browser's back button returns to the map.
-    if (view !== 'diary') window.history.pushState(null, '', '?view=diary');
+    // The diary gets its own history entry so the browser's back button
+    // returns to the map.
+    if (view !== 'diary') router.push('/me/journey?view=diary', { scroll: false });
     if (day) setJump((j) => ({ day, n: j.n + 1 }));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
