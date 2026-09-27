@@ -16,6 +16,10 @@ export type TeacherCard = {
   crafts: string[];
   upcoming: number;
   next_date: string | null;
+  /** Start time of that next round, so ties on a date order by the hour. */
+  next_time: string | null;
+  /** When someone last signed up for any of this teacher's workshops. */
+  last_booked_at: string | null;
   /** Rounds already held (past, active). */
   hosted: number;
   /** Capacity and whether it is full — never how many are booked. */
@@ -100,6 +104,23 @@ export async function GET() {
       )
       .all<{ comment: string; title: string; instructor_id: string | null; instructor_ids_json: string | null; organizer: string | null }>();
 
+    // Newest sign-ups first; the first one seen per teacher is their latest.
+    const recentRes = await db
+      .prepare(
+        `SELECT b.created_at, w.instructor_id, w.instructor_ids_json, m.organizer
+           FROM bookings b
+           JOIN workshops w ON w.id = b.workshop_id
+           LEFT JOIN workshop_masters m ON m.id = w.master_id
+          WHERE b.status != 'cancelled'
+          ORDER BY b.created_at DESC
+          LIMIT 500`,
+      )
+      .all<{ created_at: string; instructor_id: string | null; instructor_ids_json: string | null; organizer: string | null }>();
+    const lastBooked = new Map<string, string>();
+    for (const r of recentRes.results || []) {
+      for (const tid of teachersOf(r)) if (!lastBooked.has(tid)) lastBooked.set(tid, r.created_at);
+    }
+
     const people = await db
       .prepare(
         `SELECT COALESCE(SUM(${seatsOfRowSql('b', 'w.max_participants')}), 0) AS n
@@ -145,6 +166,8 @@ export async function GET() {
         crafts: [...craftCount.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c),
         upcoming: open.length,
         next_date: open[0]?.date || null,
+        next_time: open[0]?.time_start || null,
+        last_booked_at: lastBooked.get(t.id) || null,
         hosted: past.length,
         rounds: open.slice(0, 6).map((w) => ({ id: w.id, date: w.date, time_start: w.time_start, title: w.title, max: w.max_participants, full: (Number(w.booked) || 0) >= w.max_participants })),
         works,

@@ -16,6 +16,8 @@ import type { TeacherCard } from '@/app/api/teachers/route';
 type Stats = { makers: number; rounds: number; people: number };
 
 const SPOT_MS = 7000;
+/** How many hosts take turns in "คนที่เราอยากให้รู้จัก". */
+const SPOT_MAX = 5;
 const PH_CLASS = ['ph-teal', 'ph-cream', 'ph-teal-100', 'ph-accent', 'ph-teal'];
 
 /** First syllable of a Thai display name (or first two letters) for the avatar. */
@@ -38,6 +40,7 @@ export default function TeachersPage() {
   const [spot, setSpot] = useState(0);
   const [prog, setProg] = useState(0);
   const [poster, setPoster] = useState<string | null>(null);
+  const [meId, setMeId] = useState<string | null>(null);
   const railRef = useRef<HTMLDivElement>(null);
   const track = useLoadingTracker();
 
@@ -51,11 +54,24 @@ export default function TeachersPage() {
         })
         .catch(() => setTeachers([])),
     );
+    fetch('/api/auth/me')
+      .then((r) => (r.ok ? (r.json() as Promise<{ user?: { id?: string } | null }>) : null))
+      .then((d) => setMeId(d?.user?.id || null))
+      .catch(() => {});
   }, [track]);
+
+  // "คนที่เราอยากให้รู้จัก": five hosts, the ones people signed up with most
+  // recently first. A host looking at the page sees their own card first.
+  const spotList = useMemo(() => {
+    const all = teachers || [];
+    const byRecent = [...all].sort((a, b) => (b.last_booked_at || '').localeCompare(a.last_booked_at || '') || b.upcoming - a.upcoming);
+    const me = meId ? all.find((t) => t.id === meId) : undefined;
+    return (me ? [me, ...byRecent.filter((t) => t.id !== me.id)] : byRecent).slice(0, SPOT_MAX);
+  }, [teachers, meId]);
 
   // The maker in focus moves on by itself; the thin bar under the arrows
   // shows how long until it does.
-  const count = teachers?.length || 0;
+  const count = spotList.length;
   useEffect(() => {
     if (count < 2) return;
     const id = setInterval(() => {
@@ -80,7 +96,16 @@ export default function TeachersPage() {
 
   const list = useMemo(() => {
     const l = (teachers || []).filter((t) => filter === 'all' || t.crafts.includes(filter));
-    return l.sort((a, b) => (sort === 'soon' ? b.upcoming - a.upcoming || a.name.localeCompare(b.name, 'th') : a.name.localeCompare(b.name, 'th')));
+    // "มีรอบเปิดรับ": whoever teaches soonest comes first; hosts with no
+    // round coming up follow, by name.
+    const soonKey = (t: TeacherCard) => (t.next_date ? `${t.next_date} ${t.next_time || ''}` : '');
+    return l.sort((a, b) => {
+      if (sort === 'name') return a.name.localeCompare(b.name, 'th');
+      const ka = soonKey(a), kb = soonKey(b);
+      if (ka && kb && ka !== kb) return ka.localeCompare(kb);
+      if (!ka !== !kb) return ka ? -1 : 1;
+      return a.name.localeCompare(b.name, 'th');
+    });
   }, [teachers, filter, sort]);
 
   if (teachers === null) return null;
@@ -95,7 +120,7 @@ export default function TeachersPage() {
     if (el) el.scrollBy({ left: dir * Math.max(220, el.clientWidth * 0.8), behavior: 'smooth' });
   };
 
-  const s = count ? teachers[spot % count] : null;
+  const s = count ? spotList[spot % count] : null;
   const sDisplay = s ? s.nickname || s.name : '';
   const shortDate = (d: string) => fmtDate(d, lang, 'medium');
 
