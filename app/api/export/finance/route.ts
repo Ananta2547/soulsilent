@@ -65,7 +65,9 @@ function teacherIds(instructorId: string | null, json: string | null): string[] 
 }
 
 /** Which rail the money came in on. */
-function channel(b: { amount: number; beam_payment_link_id: string | null; beam_qr_charge_id: string | null; beam_charge_id: string | null; stripe_payment_id: string | null; payment_status: string }): string {
+function channel(b: { comp_kind?: string | null; amount: number; beam_payment_link_id: string | null; beam_qr_charge_id: string | null; beam_charge_id: string | null; stripe_payment_id: string | null; payment_status: string }): string {
+  // Free-seat invitation issued by admin (lib/comp.ts).
+  if (b.comp_kind) return 'invite';
   if (Number(b.amount) === 0) return 'free';
   if (b.beam_qr_charge_id) return 'beam_promptpay';
   if (b.beam_payment_link_id || b.beam_charge_id) return 'beam_card';
@@ -123,6 +125,8 @@ type BookingRow = {
   app_status: string | null;
   cancel_reason: string | null;
   amount: number;
+  comp_kind: string | null;
+  host_credit: number;
   collected: number;
   refunded: number;
   beam_payment_link_id: string | null;
@@ -177,6 +181,7 @@ export async function GET(request: Request) {
                   b.booking_kind, b.booking_tier_label, b.group_size, b.parent_booking_id,
                   ${seatsOfRowSql('b', 'w.max_participants')} AS seats,
                   b.status, b.payment_status, b.app_status, b.cancel_reason, b.amount,
+                  b.comp_kind, COALESCE(b.host_credit, 0) AS host_credit,
                   CASE WHEN ${COLLECTED} THEN 1 ELSE 0 END AS collected,
                   CASE WHEN ${REFUNDED} THEN 1 ELSE 0 END AS refunded,
                   b.beam_payment_link_id, b.beam_qr_charge_id, b.beam_charge_id, b.stripe_payment_id,
@@ -225,6 +230,10 @@ export async function GET(request: Request) {
           collected: b.collected === 1,
           refunded: b.refunded === 1,
           net_amount: b.collected === 1 ? Number(b.amount) || 0 : 0,
+          // Invitation seats: who covers it, and what ASL pays the host for it
+          // (not money the participant paid — kept out of amount/net_amount).
+          comp_kind: b.comp_kind,
+          asl_paid: b.collected === 1 ? Number(b.host_credit) || 0 : 0,
           transferred: Number(b.transferred) === 1,
         })),
       );
@@ -246,6 +255,7 @@ export async function GET(request: Request) {
                   (SELECT COUNT(*) FROM bookings b WHERE b.workshop_id = w.id AND ${COLLECTED}) AS bookings,
                   (SELECT COALESCE(SUM(${seatsOfRowSql('b', 'w.max_participants')}), 0) FROM bookings b WHERE b.workshop_id = w.id AND ${COLLECTED}) AS seats_sold,
                   (SELECT COALESCE(SUM(b.amount), 0) FROM bookings b WHERE b.workshop_id = w.id AND ${COLLECTED}) AS gross,
+                  (SELECT COALESCE(SUM(b.host_credit), 0) FROM bookings b WHERE b.workshop_id = w.id AND ${COLLECTED}) AS asl_paid,
                   (SELECT COALESCE(SUM(b.amount), 0) FROM bookings b WHERE b.workshop_id = w.id AND ${REFUNDED}) AS refunded,
                   (SELECT COUNT(*) FROM bookings b WHERE b.workshop_id = w.id AND ${REFUNDED}) AS refunds,
                   (SELECT COUNT(*) FROM bookings b WHERE b.workshop_id = w.id AND b.status = 'cancelled') AS cancelled
@@ -263,11 +273,14 @@ export async function GET(request: Request) {
           instructor_id: string | null; instructor_ids_json: string | null;
           payout_deduction_type: 'none' | 'fixed' | 'percent'; payout_deduction_value: number;
           payout_status: string | null; payout_remark: string | null; payout_slip: number;
-          bookings: number; seats_sold: number; gross: number; refunded: number; refunds: number; cancelled: number;
+          bookings: number; seats_sold: number; gross: number; asl_paid: number; refunded: number; refunds: number; cancelled: number;
         }>();
       const rows = (res.results || []).map((w) => {
         const gross = Number(w.gross) || 0;
-        const p = computePayout(gross, w.payout_deduction_type || 'none', Number(w.payout_deduction_value) || 0);
+        const aslPaid = Number(w.asl_paid) || 0;
+        // The host is paid on participants' money plus what ASL covers for
+        // invitation seats, both before the payout deduction.
+        const p = computePayout(gross + aslPaid, w.payout_deduction_type || 'none', Number(w.payout_deduction_value) || 0);
         return {
           workshop_id: w.id,
           title: w.title,
@@ -291,6 +304,8 @@ export async function GET(request: Request) {
           cancelled: Number(w.cancelled) || 0,
           refunds: Number(w.refunds) || 0,
           gross,
+          asl_paid: aslPaid,
+          host_gross: gross + aslPaid,
           refunded: Number(w.refunded) || 0,
           payout_deduction_type: w.payout_deduction_type || 'none',
           payout_deduction_value: Number(w.payout_deduction_value) || 0,
@@ -315,6 +330,7 @@ export async function GET(request: Request) {
                   SUM(CASE WHEN ${COLLECTED} THEN 1 ELSE 0 END) AS bookings,
                   SUM(CASE WHEN ${COLLECTED} THEN ${seatsOfRowSql('b', 'w.max_participants')} ELSE 0 END) AS seats,
                   SUM(CASE WHEN ${COLLECTED} THEN b.amount ELSE 0 END) AS gross,
+                  SUM(CASE WHEN ${COLLECTED} THEN COALESCE(b.host_credit, 0) ELSE 0 END) AS asl_paid,
                   SUM(CASE WHEN ${REFUNDED} THEN b.amount ELSE 0 END) AS refunded,
                   SUM(CASE WHEN ${REFUNDED} THEN 1 ELSE 0 END) AS refunds,
                   SUM(CASE WHEN b.status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,
@@ -324,20 +340,21 @@ export async function GET(request: Request) {
             GROUP BY month ORDER BY month ASC`,
         )
         .bind(...args)
-        .all<{ month: string; bookings: number; seats: number; gross: number; refunded: number; refunds: number; cancelled: number; customers: number }>();
+        .all<{ month: string; bookings: number; seats: number; gross: number; asl_paid: number; refunded: number; refunds: number; cancelled: number; customers: number }>();
       const rows = (res.results || []).map((r) => ({
         month: r.month,
         bookings: Number(r.bookings) || 0,
         seats: Number(r.seats) || 0,
         customers: Number(r.customers) || 0,
         gross: Number(r.gross) || 0,
+        asl_paid: Number(r.asl_paid) || 0,
         refunded: Number(r.refunded) || 0,
         refunds: Number(r.refunds) || 0,
         cancelled: Number(r.cancelled) || 0,
       }));
       const totals = rows.reduce(
-        (t, r) => ({ bookings: t.bookings + r.bookings, seats: t.seats + r.seats, gross: t.gross + r.gross, refunded: t.refunded + r.refunded }),
-        { bookings: 0, seats: 0, gross: 0, refunded: 0 },
+        (t, r) => ({ bookings: t.bookings + r.bookings, seats: t.seats + r.seats, gross: t.gross + r.gross, asl_paid: t.asl_paid + r.asl_paid, refunded: t.refunded + r.refunded }),
+        { bookings: 0, seats: 0, gross: 0, asl_paid: 0, refunded: 0 },
       );
       return respond(rows, format, 'summary', { totals });
     }

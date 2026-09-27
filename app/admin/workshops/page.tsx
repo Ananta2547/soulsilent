@@ -328,6 +328,12 @@ export default function AdminWorkshopsPage() {
                         >
                           เช็คชื่อ
                         </Link>
+                        <Link
+                          href={`/admin/workshops/${ws.id}/invites`}
+                          className="text-dark text-xs font-medium hover:text-primary hover:underline"
+                        >
+                          บัตรเชิญ
+                        </Link>
                         <button
                           type="button"
                           onClick={() =>

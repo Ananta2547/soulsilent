@@ -15,7 +15,7 @@ import type { Workshop } from '@/lib/types';
 
 type Info = {
   transfer: {
-    kind: 'gift' | 'transfer';
+    kind: 'gift' | 'transfer' | 'invite';
     status: 'pending' | 'claimed' | 'cancelled';
     from_name: string | null;
     to_name: string | null;
@@ -102,6 +102,7 @@ export default function ClaimPage() {
   const { workshop, transfer } = info;
   const days = getWorkshopDays(workshop);
   const isGift = transfer.kind === 'gift';
+  const isInvite = transfer.kind === 'invite';
   const claimHref = `/claim/${token}`;
 
   // Everything that stops the claim, in the order the receiver would meet it.
@@ -126,13 +127,19 @@ export default function ClaimPage() {
     <>
       <Shell>
         <span className="mono" style={{ fontSize: 11, color: 'var(--teal)', letterSpacing: '.14em', textTransform: 'uppercase' }}>
-          {isGift ? tr(lang, 'ของขวัญสำหรับคุณ', 'A gift for you') : tr(lang, 'โอนสิทธิ์เข้าร่วม', 'A seat passed to you')}
+          {isInvite ? tr(lang, 'บัตรเชิญเข้าร่วมฟรี', 'A free invitation') : isGift ? tr(lang, 'ของขวัญสำหรับคุณ', 'A gift for you') : tr(lang, 'โอนสิทธิ์เข้าร่วม', 'A seat passed to you')}
         </span>
         <h1 className="display-th" style={{ fontSize: 'clamp(26px,4vw,34px)', margin: '10px 0 6px', lineHeight: 1.25 }}>
           {workshop.title}
         </h1>
         <p style={{ color: 'var(--muted)', fontSize: 14.5, lineHeight: 1.65, margin: '0 0 22px' }}>
-          {transfer.from_name
+          {isInvite
+            ? tr(
+                lang,
+                'AllSoulLearn เชิญคุณเข้าร่วมกิจกรรมนี้ฟรี — ที่นั่งถูกกันไว้ให้แล้ว เหลือเพียงกรอกใบสมัครของคุณเอง',
+                'AllSoulLearn invites you to join this workshop for free — your seat is held. All that is left is your own application.',
+              )
+            : transfer.from_name
             ? tr(
                 lang,
                 `${transfer.from_name} ${isGift ? 'ซื้อที่นั่งนี้เป็นของขวัญให้คุณ' : 'โอนที่นั่งของกิจกรรมนี้ให้คุณ'} — ที่นั่งชำระเงินเรียบร้อยแล้ว เหลือเพียงกรอกใบสมัครของคุณเอง`,

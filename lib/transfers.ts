@@ -5,11 +5,13 @@
  * A "handover" is one row in `ticket_transfers`. Two kinds start it:
  *   gift     — someone pays for a seat they never intend to use
  *   transfer — a ticket holder passes on the seat they already own
- * Both end the same way: the receiver opens the link, fills the application
+ *   invite   — admin issues a free seat (บัตรเชิญ), held in their name until
+ *              claimed; see lib/comp.ts
+ * All end the same way: the receiver opens the link, fills the application
  * form, and the booking's user_id becomes theirs.
  */
 
-export type TransferKind = 'gift' | 'transfer';
+export type TransferKind = 'gift' | 'transfer' | 'invite';
 export type TransferStatus = 'pending' | 'claimed' | 'cancelled';
 
 export type TicketTransfer = {

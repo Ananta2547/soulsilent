@@ -54,7 +54,9 @@ Header: x-export-key: <FINANCE_EXPORT_KEY>
 | `collected` | เงินเข้าจริงและยังอยู่กับเรา (จ่ายแล้ว/ยืนยันแล้ว, ไม่ยกเลิก, ไม่คืน) |
 | `refunded` | คืนเงินแล้ว (ผ่าน Beam หรือแนบสลิปคืนเงิน) |
 | `net_amount` | `amount` ถ้า `collected` ไม่งั้น 0 — **ใช้ตัวนี้รวมรายได้** |
-| `channel` | `beam_promptpay` / `beam_card` / `stripe` (เก่า) / `free` / `none` (ยังไม่จ่าย) / `unknown` |
+| `channel` | `beam_promptpay` / `beam_card` / `stripe` (เก่า) / `free` / `invite` (บัตรเชิญที่นั่งฟรีจาก admin) / `none` (ยังไม่จ่าย) / `unknown` |
+| `comp_kind` | บัตรเชิญ: `teacher` (Host ให้ฟรี) / `asl` (ASL จ่ายเต็มราคา) / `special` (ASL จ่ายราคาพิเศษ) — ที่นั่งปกติเป็น null |
+| `asl_paid` | ยอดที่ ASL จ่ายให้ Host แทนผู้เข้าร่วมสำหรับที่นั่งบัตรเชิญ (บาท) — ไม่ใช่เงินที่ลูกค้าจ่าย จึงไม่อยู่ใน `net_amount` |
 | `booking_kind` | `group` (ปกติ) / `private` (เหมารอบ) / `member` |
 | `parent_booking_id` | ไม่ว่าง = แถวนี้เป็นสมาชิกกลุ่มของการจองนั้น |
 | `payment_type` | `paid` / `deposit` (มัดจำ คืนวันงาน — ไม่ใช่รายได้) / `free` |
@@ -69,12 +71,14 @@ Header: x-export-key: <FINANCE_EXPORT_KEY>
 | field | ความหมาย |
 |---|---|
 | `bookings` / `seats_sold` | จำนวนการจอง / ที่นั่ง ที่ `collected` |
-| `gross` | รายได้รวมของรอบ (บาท) |
+| `gross` | เงินที่ผู้เข้าร่วมจ่ายจริงของรอบ (บาท) |
+| `asl_paid` | ยอดที่ ASL ออกให้ Host สำหรับที่นั่งบัตรเชิญ (บาท) |
+| `host_gross` | รายได้ของ Host ก่อนหักค่าธรรมเนียม = `gross + asl_paid` |
 | `refunded` / `refunds` | ยอดคืน / จำนวนครั้งที่คืน |
 | `cancelled` | จำนวนการจองที่ยกเลิก |
 | `payout_deduction_type` / `_value` | วิธีหักจากผู้สอน `none` / `fixed` (บาท) / `percent` |
 | `payout_deduction` | ส่วนที่เว็บหักไว้ (คำนวณแล้ว, ปัดเป็นบาท) |
-| `payout_net` | ยอดที่ต้องจ่ายผู้สอน = `gross − payout_deduction` |
+| `payout_net` | ยอดที่ต้องจ่ายผู้สอน = `host_gross − payout_deduction` |
 | `payout_status` / `payout_slip` | สถานะโอนให้ผู้สอน / มีสลิปแล้วหรือยัง |
 | `teacher_ids` | id ผู้สอนทุกคนของรอบ |
 
@@ -83,7 +87,7 @@ Header: x-export-key: <FINANCE_EXPORT_KEY>
 กรองด้วย `created_at` ของการจอง กลุ่มตามเดือน `YYYY-MM` (UTC)
 ผลลัพธ์มี `totals` รวมทั้งช่วงด้วย
 
-`month, bookings, seats, customers (ลูกค้าไม่ซ้ำ), gross, refunded, refunds, cancelled`
+`month, bookings, seats, customers (ลูกค้าไม่ซ้ำ), gross, asl_paid, refunded, refunds, cancelled`
 
 ### `orphans` — เงินเข้าที่ไม่ตรงกับการจอง
 

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { hostGrossSql } from '@/lib/comp';
 import { getDB } from '@/lib/db';
 import { getCurrentUserWithRoles } from '@/lib/auth';
 import { hasAnyRole } from '@/lib/roles';
@@ -50,7 +51,7 @@ export async function GET() {
   const wsRes = await db
     .prepare(
       `SELECT w.id, w.payout_deduction_type, w.payout_deduction_value,
-              (SELECT COALESCE(SUM(b.amount), 0) FROM bookings b
+              (SELECT COALESCE(SUM(${hostGrossSql('b')}), 0) FROM bookings b
                 WHERE b.workshop_id = w.id AND ${COLLECTED}) AS gross,
               (SELECT COUNT(*) FROM bookings b
                 WHERE b.workshop_id = w.id AND ${COLLECTED}) AS booked
@@ -79,7 +80,7 @@ export async function GET() {
   const monthlyRes = await db
     .prepare(
       `SELECT strftime('%Y-%m', b.created_at) AS month,
-              COALESCE(SUM(b.amount), 0) AS total,
+              COALESCE(SUM(${hostGrossSql('b')}), 0) AS total,
               COUNT(*) AS count
          FROM bookings b
          JOIN workshops w ON w.id = b.workshop_id
@@ -97,7 +98,7 @@ export async function GET() {
   // chart are worked out from the same rows, so they follow the same window.
   const paidRes = await db
     .prepare(
-      `SELECT b.created_at AS at, b.amount AS amount, b.workshop_id AS workshop_id,
+      `SELECT b.created_at AS at, ${hostGrossSql('b')} AS amount, b.workshop_id AS workshop_id,
               COALESCE(b.user_id, b.id) AS person, b.application_json AS application_json
          FROM bookings b
          JOIN workshops w ON w.id = b.workshop_id

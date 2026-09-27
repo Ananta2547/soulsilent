@@ -12,7 +12,7 @@ type Row = {
   id: string;
   booking_id: string;
   workshop_id: string;
-  kind: 'gift' | 'transfer';
+  kind: 'gift' | 'transfer' | 'invite';
   status: 'pending' | 'claimed' | 'cancelled';
   created_at: string;
   claimed_at: string | null;
@@ -146,7 +146,7 @@ export default function AdminTransfersPage() {
                           r.kind === 'gift' ? 'bg-amber-100 text-amber-700' : 'bg-primary/15 text-primary'
                         }`}
                       >
-                        {r.kind === 'gift' ? 'ของขวัญ' : 'โอนสิทธิ์'}
+                        {r.kind === 'gift' ? 'ของขวัญ' : r.kind === 'invite' ? 'บัตรเชิญ' : 'โอนสิทธิ์'}
                       </span>
                       <span
                         className={`text-[11px] font-medium rounded-full px-2.5 py-1 ${

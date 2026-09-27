@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ImageMeta, Workshop } from '@/lib/types';
 import { computePayout } from '@/lib/workshop-utils';
+import { hostGrossOf } from '@/lib/comp';
 import { parseImageMeta } from '@/lib/image-meta';
 import { ImageUploader } from '@/components/admin/image/ImageUploader';
 import { ASPECTS } from '@/lib/image-aspects';
@@ -35,10 +36,11 @@ export function PayoutManager({
     (async () => {
       try {
         const res = await fetch(`/api/bookings?workshop_id=${workshop.id}`);
-        const data = (await res.json()) as { bookings?: { amount: number; payment_status: string; status: string }[] };
+        const data = (await res.json()) as { bookings?: { amount: number; host_credit?: number; payment_status: string; status: string }[] };
         const paid = (data.bookings || []).filter((b) => b.payment_status === 'paid' || b.status === 'confirmed');
         setPaidCount(paid.length);
-        setGross(paid.reduce((s, b) => s + (b.amount || 0), 0));
+        // Includes what ASL covers for invitation seats (lib/comp.ts).
+        setGross(paid.reduce((s, b) => s + hostGrossOf(b), 0));
       } catch {
         setGross(0);
       }

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { hostGrossOf } from '@/lib/comp';
 import { getDB } from '@/lib/db';
 import { getCurrentUserWithRoles } from '@/lib/auth';
 import { hasAnyRole } from '@/lib/roles';
@@ -38,7 +39,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   // applications (not just paid). For direct workshops, only paid participants.
   const bookingsRes = await db
     .prepare(
-      `SELECT b.id, b.user_id, b.amount, b.payment_status, b.status, b.attended,
+      `SELECT b.id, b.user_id, b.amount, b.host_credit, b.comp_kind, b.payment_status, b.status, b.attended,
               b.attendance_json, b.application_json, b.facilitator_note, b.created_at,
               b.app_status, b.waitlist_rank, b.confirmed_at,
               b.group_size, b.parent_booking_id, b.booking_tier_label,
@@ -76,7 +77,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       const r = b as { payment_status?: string; status?: string };
       return r.payment_status === 'paid' || r.status === 'confirmed';
     })
-    .reduce((s, b) => s + (((b as { amount?: number }).amount) || 0), 0);
+    .reduce((s, b) => s + hostGrossOf(b as { amount?: number; host_credit?: number }), 0);
   const { deduction, net } = computePayout(gross, workshop.payout_deduction_type, workshop.payout_deduction_value);
 
   return NextResponse.json({ workshop, bookings, finance: { gross, deduction, net } });
