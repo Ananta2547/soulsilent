@@ -1,0 +1,39 @@
+/* Calendar v2 — design "Calendar Redesign" (Claude Design). Keyframes and
+ * the hover/focus states inline styles cannot express. Everything is c2-*. */
+
+@keyframes v2Up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes v2Fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes v2Float { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-9px) rotate(3deg); } }
+@keyframes v2Twinkle { 0%, 100% { transform: scale(.55) rotate(0deg); opacity: .35; } 50% { transform: scale(1.1) rotate(45deg); opacity: 1; } }
+@keyframes v2Draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes v2Bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes v2Spin { to { transform: rotate(360deg); } }
+@keyframes v2Burst {
+  0% { transform: translate(-50%, -50%) scale(.3); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1) rotate(160deg); opacity: 0; }
+}
+@keyframes v2Pop {
+  0% { transform: translate(-50%, -50%) scale(.6); opacity: 0; }
+  30% { transform: translate(-50%, -50%) scale(1.08); opacity: 1; }
+  75% { opacity: 1; }
+  100% { transform: translate(-50%, -62%) scale(1); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .c2 [data-anim], .c2 [data-anim] * { animation: none !important; stroke-dashoffset: 0 !important; } }
+
+.c2 { color: #0d1e1d; font-family: 'IBM Plex Sans Thai', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+.c2 input::placeholder, .c2 textarea::placeholder { color: #9aa8a6; }
+.c2 button { font-family: inherit; }
+
+.c2-ghost:hover { background: #f6f1e6 !important; color: #0d8a7e !important; }
+.c2-soft:hover { background: #f6f1e6 !important; }
+.c2-dark:hover { background: #0d8a7e !important; }
+.c2-bar:hover { filter: brightness(.96); }
+.c2-lift { transition: transform .18s cubic-bezier(.2,.7,.2,1), box-shadow .18s ease; }
+.c2-lift:hover { transform: translateY(-2px); box-shadow: 0 12px 26px -16px rgba(13,30,29,.3); }
+.c2-link:hover { color: #0d8a7e !important; }
+.c2-round:hover { color: #0d8a7e !important; transform: scale(1.08); }
+.c2-qm span.c2-dot { transition: transform .18s cubic-bezier(.2,.7,.2,1); }
+.c2-qm:hover span.c2-dot { transform: scale(1.15); }
+.c2-field:focus { box-shadow: inset 0 0 0 2px #0d8a7e; }
+.c2 .btn { justify-content: center; }
