@@ -159,9 +159,11 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     if (tr.status !== 'pending') return NextResponse.json({ error: 'บัตรเชิญนี้ถูกรับไปแล้วหรือยกเลิกแล้ว' }, { status: 400 });
     await db.batch([
       db.prepare(`UPDATE ticket_transfers SET status = 'cancelled' WHERE token = ? AND status = 'pending'`).bind(token),
-      // host_credit goes to 0 too: some payout sums count paid-then-cancelled
-      // rows, and a withdrawn invitation must never reach the host's revenue.
-      db.prepare(`UPDATE bookings SET status = 'cancelled', cancel_reason = 'invite_withdrawn', host_credit = 0 WHERE id = ?`).bind(tr.booking_id),
+      // The held seat leaves the rosters too: they list paid-or-confirmed rows
+      // (a paid seat stays after cancelling so refunds can be attached), and
+      // this one never took money — 'expired' is what lapsed holds use.
+      // host_credit goes to 0 so it can never reach the host's revenue.
+      db.prepare(`UPDATE bookings SET status = 'cancelled', payment_status = 'expired', cancel_reason = 'invite_withdrawn', host_credit = 0 WHERE id = ?`).bind(tr.booking_id),
     ]);
     return NextResponse.json({ ok: true });
   } catch (error) {
