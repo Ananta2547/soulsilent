@@ -13,6 +13,8 @@ import { Component, createElement as h, type CSSProperties, type ReactNode } fro
 import { CAP_FIRST, CAP_REST, FAMILIES, FAM, MAX_MOODS, MAX_PAGES, TH_MON, TH_MONTHS, TH_WEEKDAY, TH_DOW, TONE_LABEL, addDays, css, dateOf, type DiaryEntry, type Mood, type MoodKey } from '@/lib/diary';
 
 export type BookWorkshop = { title: string; time: string; poster: string | null; drive: string | null };
+/** A personal event (ลงกิจกรรม on /calendar) shown on its day's page. */
+export type BookEvent = { title: string; time: string; color: string };
 export type MonthSummary = { month: string; top: string; logged: number; workshops: number; pages: number };
 
 type Props = {
@@ -21,6 +23,8 @@ type Props = {
   entries: DiaryEntry[];
   /** Workshops attended, by their first day. */
   workshops: Record<string, BookWorkshop>;
+  /** The user's own calendar events, by every day they cover. */
+  events?: Record<string, BookEvent[]>;
   /** Kept monthly summaries, drawn as a page after that month's last day. */
   summaries?: MonthSummary[];
   /** Bumped to jump to today and start writing. */
@@ -193,8 +197,8 @@ export class DiaryBook extends Component<Props, State> {
       const o = this.state.over[iso];
       map[iso] = { iso, ws: this.wsFor(iso), notes: o.notes.slice(), moods: this.resolve(o.moods) };
     });
-    // Workshop days show up in the book even before anything is written.
-    Object.keys(this.props.workshops).forEach((iso) => {
+    // Workshop and event days show up in the book even before anything is written.
+    [...Object.keys(this.props.workshops), ...Object.keys(this.props.events || {})].forEach((iso) => {
       if (!map[iso] && iso <= this.props.today) map[iso] = { iso, ws: this.wsFor(iso), notes: [''], moods: [] };
     });
     return Object.keys(map).sort().map((k) => map[k]);
@@ -814,6 +818,7 @@ export class DiaryBook extends Component<Props, State> {
       const e = p.e;
       const tray = this.state.tray;
       const open = !!(tray && tray.iso === iso);
+      const evs = (this.props.events && this.props.events[iso]) || [];
       const cap = p.sub === 0 ? CAP_FIRST : CAP_REST;
       const len = (p.tx || '').length;
       const status = this.state.saved[iso] === false ? 'กำลังบันทึก…' : this.state.saved[iso] ? '✓ บันทึกแล้ว' : '';
@@ -900,12 +905,34 @@ export class DiaryBook extends Component<Props, State> {
                         )}
                       </div>
                     </div>
-                  ) : (
+                  ) : evs.length ? null : (
                     <div style={css('display:flex;flex:none;align-items:center;gap:8px;margin-top:12px')}>
                       <span style={css('width:7px;height:7px;border-radius:50%;background:var(--cream-deep)')} />
                       <span style={css('font-size:12.5px;color:var(--muted)')}>ไม่มีกิจกรรมในวันนี้ · เขียนอิสระได้เลย</span>
                     </div>
                   ))}
+                {/* The day's own events from the calendar: a short list, or one
+                    line when a workshop card already takes the room. */}
+                {!open && evs.length > 0 && (
+                  e.ws ? (
+                    <div style={css('display:flex;flex:none;align-items:center;gap:7px;margin-top:8px;min-width:0;font-size:12px;color:var(--muted)')}>
+                      <span style={{ width: 7, height: 7, borderRadius: '50%', flex: 'none', background: evs[0].color }} />
+                      <span style={css('overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{'กิจกรรมของฉัน · ' + evs.map((x) => x.title).join(' · ')}</span>
+                    </div>
+                  ) : (
+                    <div style={css('display:flex;flex:none;flex-direction:column;gap:6px;margin-top:12px;padding:10px 12px;border-radius:12px;background:rgba(246,241,230,.9)')}>
+                      <span className="eyebrow" style={{ color: 'var(--teal)' }}>กิจกรรมของฉัน</span>
+                      {evs.slice(0, 2).map((x, i) => (
+                        <span key={i} style={css('display:flex;align-items:center;gap:8px;min-width:0;font-size:13px')}>
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', flex: 'none', background: x.color }} />
+                          <span style={css("flex:none;font-family:var(--font-mono),ui-monospace,monospace;font-size:10.5px;color:var(--muted)")}>{x.time}</span>
+                          <span style={css('font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{x.title}</span>
+                        </span>
+                      ))}
+                      {evs.length > 2 && <span style={css('font-size:11.5px;color:var(--muted)')}>{'+ อีก ' + (evs.length - 2) + ' กิจกรรม'}</span>}
+                    </div>
+                  )
+                )}
               </div>
             ) : (
               <div style={css('display:flex;flex:none;align-items:center;gap:10px;min-height:34px')}>

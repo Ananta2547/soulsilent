@@ -16,7 +16,8 @@ import { Btn } from '@/components/design/RippleButton';
 import { useLoadingTracker } from '@/components/design/DataLoading';
 import type { JourneyItem } from '@/lib/journey';
 import { cleanNotes, css, todayIso, FAM, type DiaryEntry, type Mood } from '@/lib/diary';
-import { DiaryBook, type BookWorkshop, type MonthSummary } from '@/components/diary/DiaryBook';
+import { DiaryBook, type BookEvent, type BookWorkshop, type MonthSummary } from '@/components/diary/DiaryBook';
+import { EVENT_KIND, type UserEvent } from '@/lib/user-events';
 import { MoodTab, SummaryTab, monthStats, type DayWorkshop } from '@/components/diary/DiaryTabs';
 import { JourneyMap, JourneyRail, StopFull, StopModal, itemHours } from '@/components/journey/JourneyV2';
 
@@ -38,6 +39,7 @@ function JourneyAndDiary() {
   const [items, setItems] = useState<JourneyItem[]>([]);
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [months, setMonths] = useState<string[]>([]);
+  const [events, setEvents] = useState<UserEvent[]>([]);
   const [owner, setOwner] = useState('');
   const [loading, setLoading] = useState(true);
   const [unauthorized, setUnauthorized] = useState(false);
@@ -73,8 +75,11 @@ function JourneyAndDiary() {
         }),
         fetch('/api/me/diary').then((r) => (r.ok ? (r.json() as Promise<{ entries: DiaryEntry[]; months: string[] }>) : null)),
         fetch('/api/auth/me').then((r) => r.json() as Promise<{ user?: { name?: string | null } | null }>),
+        // The user's own events from /calendar, drawn on their diary pages.
+        fetch('/api/me/events').then((r) => (r.ok ? (r.json() as Promise<{ events: UserEvent[] }>) : null)),
       ])
-        .then(([j, d, me]) => {
+        .then(([j, d, me, ev]) => {
+          if (ev) setEvents(ev.events || []);
           if (j) setItems(j.items || []);
           if (d) {
             setEntries(d.entries || []);
@@ -112,6 +117,21 @@ function JourneyAndDiary() {
     });
     return m;
   }, [items]);
+  // Every day an event covers gets it, ordered by start time (all-day first).
+  const bookEvents = useMemo(() => {
+    const m: Record<string, BookEvent[]> = {};
+    [...events]
+      .sort((a, b) => (a.allDay ? '' : a.ts).localeCompare(b.allDay ? '' : b.ts))
+      .forEach((e) => {
+        for (let d = e.start, n = 0; d <= e.end && n < 62; n++) {
+          (m[d] ||= []).push({ title: e.title, time: e.allDay ? 'ทั้งวัน' : e.ts, color: EVENT_KIND[e.kind].c });
+          const t = new Date(d + 'T00:00:00Z');
+          t.setUTCDate(t.getUTCDate() + 1);
+          d = t.toISOString().slice(0, 10);
+        }
+      });
+    return m;
+  }, [events]);
   const summaries: MonthSummary[] = useMemo(
     () =>
       months.map((month) => {
@@ -283,6 +303,7 @@ function JourneyAndDiary() {
                 today={today}
                 entries={entries}
                 workshops={bookWorkshops}
+                events={bookEvents}
                 summaries={summaries}
                 writeNonce={writeNonce}
                 jumpNonce={jump.n}
