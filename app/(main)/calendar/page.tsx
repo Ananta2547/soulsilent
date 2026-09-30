@@ -36,7 +36,7 @@ const TINT: Record<St, { bg: string; fg: string }> = {
 };
 const STATUS: Record<St, [string, string, string]> = { available: ['#0d8a7e', '#fff', 'เปิดรับ'], applied: ['#f2b705', '#3f3100', 'จองแล้ว'], full: ['#d94b46', '#fff', 'เต็มแล้ว'], past: ['#cbcbc4', '#5f5f59', 'จบแล้ว'] };
 const BANNER: Record<St, string> = { available: '#0d1e1d', applied: '#0d8a7e', full: '#d94b46', past: '#6a7a78' };
-const FILTERS: [Filter, string][] = [['all', 'ทั้งหมด'], ['ws', 'Workshop'], ['mine', 'ของฉัน'], ['diary', 'Diary']];
+const FILTERS: [Filter, string][] = [['all', 'ทั้งหมด'], ['ws', 'Journey'], ['mine', 'ของฉัน'], ['diary', 'Diary']];
 /** Longest diary text the book holds (first page + five more). */
 const MAX_DIARY = 220 + 5 * 520;
 
@@ -547,7 +547,7 @@ export default function CalendarPage() {
               <div style={css('display:flex;flex-direction:column;gap:4px;margin-right:auto')}>
                 <span style={css("font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:#0d8a7e;font-weight:500;display:inline-flex;align-items:center;gap:10px")}>
                   <span style={css('width:22px;height:1.5px;background:#0d8a7e;border-radius:2px')} />
-                  workshop · diary calendar
+                  journey · diary calendar
                 </span>
                 <div style={css('display:flex;align-items:baseline;gap:10px')}>
                   <span style={css("font-family:'Mitr',sans-serif;font-weight:500;font-size:30px;line-height:1.05")}>{TH_MONTHS[mo]}</span>
@@ -569,7 +569,7 @@ export default function CalendarPage() {
                   <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.8" />
                   <path d="M11 11 L14 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                 </svg>
-                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหา workshop, สถานที่" style={css('flex:1;min-width:0;border:0;background:transparent;padding:9px 12px 9px 8px;font-family:inherit;font-size:13.5px;color:#0d1e1d;outline:none')} />
+                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหากิจกรรม, สถานที่" style={css('flex:1;min-width:0;border:0;background:transparent;padding:9px 12px 9px 8px;font-family:inherit;font-size:13.5px;color:#0d1e1d;outline:none')} />
               </div>
               <div style={css('display:flex;align-items:center;gap:2px')}>
                 <button type="button" className="c2-ghost" onClick={() => setMonth(new Date(y, mo - 1, 1))} aria-label="เดือนก่อน" style={css('width:36px;height:36px;border-radius:50%;border:0;background:transparent;color:#0d1e1d;cursor:pointer;display:inline-flex;align-items:center;justify-content:center')}>
@@ -864,7 +864,7 @@ export default function CalendarPage() {
               {items.length === 0 && (
                 <div style={css('background:#fff;border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:8px')}>
                   <span style={css("font-family:'Caveat',cursive;font-weight:700;font-size:22px;color:#0d8a7e;line-height:1.1")}>วันนี้ยังว่างอยู่ — it can be fun! ✺</span>
-                  {upcoming.length > 0 && <span style={mono(10)}>workshop ที่เปิดรับอยู่</span>}
+                  {upcoming.length > 0 && <span style={mono(10)}>กิจกรรมที่เปิดรับอยู่</span>}
                   {upcoming.map((w) => {
                     const p = getEffectivePrice(w).price;
                     return (
@@ -1006,7 +1006,7 @@ export default function CalendarPage() {
               <Chev dir="l" />
             </button>
             <div style={css('display:flex;flex-direction:column;gap:3px;min-width:0;flex:1')}>
-              <span style={css("font-family:'Mitr',sans-serif;font-weight:500;font-size:20px;line-height:1.1;white-space:nowrap")}>{mode === 'event' ? (ev?.id ? 'แก้กิจกรรม' : 'ลงกิจกรรม') : mode === 'diary' ? 'Diary' : 'รายละเอียด workshop'}</span>
+              <span style={css("font-family:'Mitr',sans-serif;font-weight:500;font-size:20px;line-height:1.1;white-space:nowrap")}>{mode === 'event' ? (ev?.id ? 'แก้กิจกรรม' : 'ลงกิจกรรม') : mode === 'diary' ? 'Diary' : 'รายละเอียดกิจกรรม'}</span>
               <span style={mono(10.5)}>{mode === 'event' && ev ? (ev.start === ev.end ? longD(ev.start) : `${short(ev.start)} – ${longD(ev.end)}`) : mode === 'diary' ? `${TH_WD[sd0.getDay()]} · ${longD(sel)}` : ws ? STATUS[statusOf(ws)][2] : ''}</span>
             </div>
           </div>
@@ -1080,7 +1080,7 @@ export default function CalendarPage() {
                   <div style={css('display:flex;align-items:center;gap:10px;background:#0d1e1d;color:#fff;border-radius:14px;padding:11px 14px')}>
                     <StarIco c="#f5c243" size={15} />
                     <span style={css('font-size:13px;line-height:1.4;min-width:0')}>
-                      หน้านี้จะแนบ workshop <b>{bookedToday.title}</b> ไว้ด้านบน
+                      หน้านี้จะแนบกิจกรรม <b>{bookedToday.title}</b> ไว้ด้านบน
                     </span>
                   </div>
                 )}
@@ -1240,7 +1240,7 @@ function WsSheet({ w, st, booked, seatsTaken, today, now, onMemo, btnFull }: { w
           </svg>
           เพิ่มลง Google Calendar
         </a>
-        <Btn kind="teal" href={`/workshops/${w.id}`} style={btnFull}>
+        <Btn kind="teal" href={`/journeys/${w.id}`} style={btnFull}>
           ดูรายละเอียดเต็ม <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>→</span>
         </Btn>
       </div>

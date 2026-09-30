@@ -99,7 +99,7 @@ export default function AdminDashboard() {
 
   const statCards = [
     { label: 'ผู้ใช้งาน', value: stats?.totalUsers || 0, suffix: 'คน', icon: UsersIcon, tint: 'bg-blue-50 text-blue-600' },
-    { label: 'Workshop', value: stats?.totalWorkshops || 0, suffix: 'รายการ', icon: WorkshopIcon, tint: 'bg-primary/10 text-primary' },
+    { label: 'กิจกรรม', value: stats?.totalWorkshops || 0, suffix: 'รายการ', icon: WorkshopIcon, tint: 'bg-primary/10 text-primary' },
     { label: 'รายรับรวม', value: totalRevenue, suffix: 'บาท', icon: MoneyIcon, tint: 'bg-emerald-50 text-emerald-600', money: true },
   ];
 
@@ -150,7 +150,7 @@ export default function AdminDashboard() {
             <table className="w-full text-sm">
               <thead className="bg-surface">
                 <tr>
-                  <th className="text-left py-3 px-5 text-gray font-medium">Workshop</th>
+                  <th className="text-left py-3 px-5 text-gray font-medium">กิจกรรม</th>
                   <th className="text-left py-3 px-5 text-gray font-medium">ผู้จอง</th>
                   <th className="text-right py-3 px-5 text-gray font-medium">จำนวน</th>
                   <th className="text-left py-3 px-5 text-gray font-medium">สถานะ</th>

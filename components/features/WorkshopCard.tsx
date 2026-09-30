@@ -5,7 +5,7 @@ export function WorkshopCard({ workshop }: { workshop: Workshop }) {
   const spotsLeft = workshop.max_participants;
 
   return (
-    <Link href={`/workshops/${workshop.id}`} className="card group block">
+    <Link href={`/journeys/${workshop.id}`} className="card group block">
       {workshop.image_url ? (
         <div className="aspect-[297/420] rounded-xl overflow-hidden mb-4 bg-surface">
           <img

@@ -126,7 +126,7 @@ export default function ApplicantsPage() {
   return (
     <div className="max-w-5xl mx-auto p-6">
       <Link href="/admin/workshops" className="text-sm text-gray hover:text-primary hover:underline">
-        ← กลับไปจัดการ Workshop
+        ← กลับไปจัดการกิจกรรม
       </Link>
       <h1 className="text-2xl font-bold text-dark mt-2 mb-1">ผู้สมัคร — {workshop?.title}</h1>
       <p className="text-sm text-gray mb-4">

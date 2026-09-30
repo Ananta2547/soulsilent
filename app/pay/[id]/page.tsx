@@ -155,7 +155,7 @@ function PosterTile({
       ) : (
         // Not every workshop has a poster. Naming the empty tile beats a blank
         // rectangle that reads like an image failed to load.
-        <T th="โปสเตอร์กิจกรรม" en="workshop poster" />
+        <T th="โปสเตอร์กิจกรรม" en="journey poster" />
       )}
     </div>
   );
@@ -271,7 +271,7 @@ function GiftLinkPanel({ url }: { url: string }) {
       <span style={{ fontSize: 12, color: '#8a5a00', background: '#fcefcf', border: '1px solid #f0dfae', borderRadius: 12, padding: '10px 13px', lineHeight: 1.6 }}>
         <T
           th="ลิงก์นี้ใช้ได้ครั้งเดียว — ใครก็ตามที่เปิดและกดรับสิทธิ์จะได้ที่นั่งนี้ไป เปิดดูอีกครั้งได้จากหน้ากิจกรรม"
-          en="This link works once — whoever opens it and claims takes the seat. You can find it again on the workshop page."
+          en="This link works once — whoever opens it and claims takes the seat. You can find it again on the journey page."
         />
       </span>
       <Link href="/me/bookings" className="btn btn-paper" style={{ justifyContent: 'center' }}>

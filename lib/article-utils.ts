@@ -8,7 +8,7 @@ import type { Article, ArticleBlock, ArticleCategory } from './types';
 export const DEFAULT_CATEGORIES: { key: string; th: string; en: string }[] = [
   { key: 'all', th: 'ทั้งหมด', en: 'All' },
   { key: 'slow', th: 'การเรียนรู้แบบช้า', en: 'Slow Learning' },
-  { key: 'diary', th: 'ไดอารี่เวิร์กชอป', en: 'Workshop Diary' },
+  { key: 'diary', th: 'ไดอารี่กิจกรรม', en: 'Journey Diary' },
   { key: 'howto', th: 'วิธีทำ', en: 'How-to' },
   { key: 'conversation', th: 'บทสนทนา', en: 'Conversation' },
   { key: 'reflection', th: 'บทสะท้อน', en: 'Reflection' },

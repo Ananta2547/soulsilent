@@ -275,10 +275,10 @@ export function MoodTab({ entries, today, workshops, onSaveMoods }: { entries: D
             <p style={css('margin:0;font-size:14.5px;line-height:1.65')}>
               {wsPair ? (
                 <>
-                  วันที่คุณเข้าร่วม workshop มักมี <span className="mark">{FAM[wsPair[0]].label}</span> ปนกับ <span className="mark">{FAM[wsPair[1]].label}</span> — หลายความรู้สึกมาพร้อมกันได้
+                  วันที่คุณเข้าร่วมกิจกรรมมักมี <span className="mark">{FAM[wsPair[0]].label}</span> ปนกับ <span className="mark">{FAM[wsPair[1]].label}</span> — หลายความรู้สึกมาพร้อมกันได้
                 </>
               ) : (
-                'บันทึกอารมณ์ในวันที่มี workshop ไว้ แล้วจะเห็นว่าวันแบบนั้นมักพาความรู้สึกแบบไหนมาด้วย'
+                'บันทึกอารมณ์ในวันที่มีกิจกรรมไว้ แล้วจะเห็นว่าวันแบบนั้นมักพาความรู้สึกแบบไหนมาด้วย'
               )}
             </p>
             <span style={css("font-family:Caveat,'Mitr',cursive;font-size:22px;color:var(--teal)")}>— บันทึกไว้ให้ตัวเองในอนาคต</span>
@@ -375,7 +375,7 @@ export function SummaryTab({
         </div>
         <div style={css('position:relative;display:flex;flex-wrap:wrap;row-gap:16px')}>
           {[
-            [pad(s.workshops.length), 'workshop ที่เข้าร่วม'],
+            [pad(s.workshops.length), 'กิจกรรมที่เข้าร่วม'],
             [String(s.logged), 'วันที่บันทึกอารมณ์'],
             [String(s.pages), 'หน้าไดอารี่'],
             [String(s.multi), 'วันที่มีหลายอารมณ์'],
@@ -413,7 +413,7 @@ export function SummaryTab({
         </div>
 
         <div style={css('border-radius:22px;padding:24px 26px;display:flex;flex-direction:column;gap:16px;background:#fff')}>
-          <span className="eyebrow" style={{ color: 'var(--teal-deep)' }}>WORKSHOPS</span>
+          <span className="eyebrow" style={{ color: 'var(--teal-deep)' }}>JOURNEYS</span>
           {s.workshops.length ? (
             <div style={css('display:grid;grid-template-columns:1fr 1fr;gap:16px')}>
               {s.workshops.slice(0, 4).map((w, i) => (
@@ -430,7 +430,7 @@ export function SummaryTab({
               ))}
             </div>
           ) : (
-            <span style={css('font-size:14px;color:var(--muted)')}>เดือนนี้ยังไม่ได้เข้าร่วม workshop</span>
+            <span style={css('font-size:14px;color:var(--muted)')}>เดือนนี้ยังไม่ได้เข้าร่วมกิจกรรม</span>
           )}
         </div>
 
@@ -483,7 +483,7 @@ export function SummaryTab({
             <div style={css('display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap')}>
               <span className="eyebrow" style={{ color: 'var(--teal)' }}>YEAR {y}</span>
               <span style={css('font-size:13px;color:var(--muted)')}>
-                {yearWs} workshop · {yearLogged} วันที่บันทึก
+                {yearWs} กิจกรรม · {yearLogged} วันที่บันทึก
               </span>
             </div>
             <div style={css('display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px 8px')}>

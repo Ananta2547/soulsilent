@@ -130,7 +130,7 @@ export default function SurveyPage() {
     );
   }
   if (!info.eligible) {
-    return note('แบบสอบถามนี้ตอบได้เฉพาะผู้ที่ถูกเช็คชื่อว่ามาเข้าร่วมกิจกรรมนี้ ถ้าคุณมาแล้วแต่ยังตอบไม่ได้ แจ้งผู้สอนให้เช็คชื่อให้ก่อน แล้วสแกนใหม่อีกครั้ง');
+    return note('แบบสอบถามนี้ตอบได้เฉพาะผู้ที่ถูกเช็คชื่อว่ามาเข้าร่วมกิจกรรมนี้ ถ้าคุณมาแล้วแต่ยังตอบไม่ได้ แจ้งผู้จัดให้เช็คชื่อให้ก่อน แล้วสแกนใหม่อีกครั้ง');
   }
   if (!info.is_open) return note('แบบสอบถามนี้ปิดรับคำตอบแล้ว');
 
@@ -194,7 +194,7 @@ export default function SurveyPage() {
       {/* Always last: stars + review. */}
       <section className="card card-static svy-ans svy-rate">
         <div className="svy-ans-q">
-          {tr(lang, 'ให้คะแนนกิจกรรมนี้', 'Rate this workshop')}
+          {tr(lang, 'ให้คะแนนกิจกรรมนี้', 'Rate this journey')}
           <span style={{ color: '#b42318' }}> *</span>
         </div>
         <div className="svy-stars" onMouseLeave={() => setHover(0)} role="radiogroup" aria-label={tr(lang, 'คะแนน', 'Rating')}>

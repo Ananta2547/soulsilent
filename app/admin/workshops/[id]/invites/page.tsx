@@ -147,12 +147,12 @@ export default function WorkshopInvitesPage() {
   return (
     <div className="max-w-5xl mx-auto p-6">
       <Link href="/admin/workshops" className="text-sm text-gray hover:text-primary hover:underline">
-        ← กลับไปจัดการ Workshop
+        ← กลับไปจัดการกิจกรรม
       </Link>
       <h1 className="text-2xl font-bold text-dark mt-2 mb-1">บัตรเชิญที่นั่งฟรี — {workshop.title}</h1>
       <p className="text-sm text-gray mb-5">
         {when} · ที่นั่งว่าง {seatsLeft}/{workshop.max_participants} · ราคาบัตรที่แสดงตอนนี้ {baht(price)}
-        {aslTotal > 0 && <> · ASL ออกให้ Host รวม {baht(aslTotal)}</>}
+        {aslTotal > 0 && <> · ASL ออกให้ผู้จัดรวม {baht(aslTotal)}</>}
       </p>
 
       {/* Issue */}
@@ -172,7 +172,7 @@ export default function WorkshopInvitesPage() {
         </div>
         {kind === 'special' && (
           <label className="block mb-4 text-sm">
-            <span className="text-dark font-medium">ราคาพิเศษที่ ASL จ่ายให้ Host (บาท)</span>
+            <span className="text-dark font-medium">ราคาพิเศษที่ ASL จ่ายให้ผู้จัด (บาท)</span>
             <input
               type="number"
               min={1}
@@ -194,7 +194,7 @@ export default function WorkshopInvitesPage() {
             {busy ? 'กำลังออกบัตร…' : 'เจน QR บัตรเชิญ'}
           </button>
           <span className="text-sm text-gray">
-            รายได้ Host จากที่นั่งนี้: <b className="text-dark">{baht(credit)}</b> (ก่อนหักค่าธรรมเนียม)
+            รายได้ผู้จัดจากที่นั่งนี้: <b className="text-dark">{baht(credit)}</b> (ก่อนหักค่าธรรมเนียม)
           </span>
           {seatsLeft <= 0 && <span className="text-sm text-red-600">ที่นั่งเต็มแล้ว</span>}
         </div>
@@ -217,7 +217,7 @@ export default function WorkshopInvitesPage() {
               <div className="w-48 h-48 my-3 bg-gray-lighter rounded" />
             )}
             <span className="text-xs text-gray mb-3">
-              รายได้ Host {baht(i.host_credit)} · ถือโดย {i.issued_by || 'admin'} จนกว่าจะมีคนรับ
+              รายได้ผู้จัด {baht(i.host_credit)} · ถือโดย {i.issued_by || 'admin'} จนกว่าจะมีคนรับ
             </span>
             <div className="flex flex-wrap justify-center gap-2 text-xs">
               <button

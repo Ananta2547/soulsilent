@@ -53,7 +53,7 @@ export function credentialView(node: PNode, lang: Lang) {
   return (
     <div className={`pb-credential-card tone-${tone}`}>
       <div>
-        <div className="pb-cred-num">workshop</div>
+        <div className="pb-cred-num">journey</div>
         <div className="pb-cred-title">{title}</div>
       </div>
       <div className="pb-cred-foot">

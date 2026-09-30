@@ -531,10 +531,10 @@ export default function MyBookingsPage() {
             return (
               <div style={{ padding: 48, borderRadius: 22, background: 'var(--cream)', textAlign: 'center', color: 'var(--muted)' }}>
                 <p style={{ marginBottom: 14 }}>
-                  {tr(lang, 'ยังไม่มีการจอง — ลองดู workshop เร็ว ๆ นี้ดูสิ', 'No bookings yet — explore upcoming workshops')}
+                  {tr(lang, 'ยังไม่มีการจอง — ลองดูกิจกรรมเร็ว ๆ นี้ดูสิ', 'No bookings yet — explore upcoming journeys')}
                 </p>
-                <Btn kind="teal" href="/workshops">
-                  {tr(lang, 'ดูกิจกรรมทั้งหมด', 'Browse workshops')} →
+                <Btn kind="teal" href="/journeys">
+                  {tr(lang, 'ดูกิจกรรมทั้งหมด', 'Browse journeys')} →
                 </Btn>
               </div>
             );
@@ -585,7 +585,7 @@ export default function MyBookingsPage() {
                     opacity: showExpired || (b.status === 'cancelled' && !isSelection) ? 0.6 : 1,
                   }}
                 >
-                  <Link href={`/workshops/${b.workshop_id}`} style={{ flex: 1, minWidth: 220, textDecoration: 'none', color: 'var(--ink)' }}>
+                  <Link href={`/journeys/${b.workshop_id}`} style={{ flex: 1, minWidth: 220, textDecoration: 'none', color: 'var(--ink)' }}>
                     <h3 className="display-th" style={{ fontSize: 18, margin: '0 0 4px' }}>
                       {b.workshop_title}
                     </h3>

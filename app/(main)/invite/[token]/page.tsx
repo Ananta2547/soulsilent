@@ -94,8 +94,8 @@ export default function InvitePage() {
         <p style={{ color: 'var(--muted)', fontSize: 14.5, lineHeight: 1.65, margin: '0 0 24px' }}>
           {error || tr(lang, 'ลิงก์อาจถูกใช้ครบแล้วหรือถูกยกเลิก', 'It may already be used up, or cancelled.')}
         </p>
-        <Btn kind="teal" href="/workshops">
-          {tr(lang, 'ดูกิจกรรมทั้งหมด', 'Browse workshops')}
+        <Btn kind="teal" href="/journeys">
+          {tr(lang, 'ดูกิจกรรมทั้งหมด', 'Browse journeys')}
         </Btn>
       </Shell>
     );
@@ -118,11 +118,11 @@ export default function InvitePage() {
               'You booked this group — pass the link to your friends.',
             )
           : info.isMember
-            ? tr(lang, 'คุณมีที่นั่งของกิจกรรมนี้อยู่แล้ว', 'You already have a seat in this workshop.')
+            ? tr(lang, 'คุณมีที่นั่งของกิจกรรมนี้อยู่แล้ว', 'You already have a seat in this journey.')
             : invite.status === 'full'
               ? tr(lang, 'ลิงก์นี้ถูกใช้ครบตามจำนวนแล้ว', 'Every seat on this link has been taken.')
               : !info.claimable
-                ? tr(lang, 'กิจกรรมนี้ปิดรับแล้ว จึงไม่สามารถรับสิทธิ์ได้', 'This workshop is closed, so the seat cannot be claimed.')
+                ? tr(lang, 'กิจกรรมนี้ปิดรับแล้ว จึงไม่สามารถรับสิทธิ์ได้', 'This journey is closed, so the seat cannot be claimed.')
                 : null;
 
   return (
@@ -139,7 +139,7 @@ export default function InvitePage() {
             ? tr(
                 lang,
                 `${invite.from_name} จองกิจกรรมนี้เป็นกลุ่มและชวนคุณเข้าร่วม — ที่นั่งชำระเงินเรียบร้อยแล้ว เหลือเพียงกรอกใบสมัครของคุณเอง`,
-                `${invite.from_name} booked this workshop for a group and is inviting you — the seat is already paid for. All that is left is your own application.`,
+                `${invite.from_name} booked this journey for a group and is inviting you — the seat is already paid for. All that is left is your own application.`,
               )
             : tr(
                 lang,
@@ -170,8 +170,8 @@ export default function InvitePage() {
             <div style={{ background: '#fdeceb', border: '1px solid #f3c9c5', color: '#b3261e', borderRadius: 14, padding: '14px 16px', fontSize: 14, lineHeight: 1.6, marginBottom: 20 }}>
               {blocked}
             </div>
-            <Btn kind="teal" href={`/workshops/${workshop.id}`}>
-              {tr(lang, 'ดูรายละเอียดกิจกรรม', 'View the workshop')}
+            <Btn kind="teal" href={`/journeys/${workshop.id}`}>
+              {tr(lang, 'ดูรายละเอียดกิจกรรม', 'View the journey')}
             </Btn>
           </>
         ) : info.signedIn ? (

@@ -36,6 +36,21 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Renamed sections (Workshop → Journey, Teacher → Host). Old links, QR codes
+  // and bookmarks keep working. The most specific paths come first.
+  async redirects() {
+    return [
+      { source: "/teacher/workshops", destination: "/host/journeys", permanent: true },
+      { source: "/teacher/workshops/:path*", destination: "/host/journeys/:path*", permanent: true },
+      { source: "/teacher", destination: "/host", permanent: true },
+      { source: "/teacher/:path*", destination: "/host/:path*", permanent: true },
+      { source: "/teachers", destination: "/hosts", permanent: true },
+      { source: "/teachers/:path*", destination: "/hosts/:path*", permanent: true },
+      { source: "/workshops", destination: "/journeys", permanent: true },
+      { source: "/workshops/:path*", destination: "/journeys/:path*", permanent: true },
+      { source: "/workshop-info/:path*", destination: "/journey-info/:path*", permanent: true },
+    ];
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

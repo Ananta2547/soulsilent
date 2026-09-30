@@ -159,7 +159,7 @@ export default function AdminUsersPage() {
         </p>
         <h1 className="font-heading text-3xl text-dark">จัดการผู้ใช้งาน</h1>
         <p className="text-sm text-gray mt-1">
-          ทั้งหมด {users.length} คน · กด แก้ไข แล้วติ๊ก role ได้หลายอัน (admin / ผู้สอน / ผู้จัดรอบ)
+          ทั้งหมด {users.length} คน · กด แก้ไข แล้วติ๊ก role ได้หลายอัน (admin / ผู้จัด / ผู้จัดรอบ)
         </p>
       </header>
 
@@ -239,7 +239,7 @@ export default function AdminUsersPage() {
                           options={ROLE_OPTIONS}
                           value={editRoles}
                           onChange={setEditRoles}
-                          placeholder="user (ไม่มี role พิเศษ)"
+                          placeholder="ผู้เข้าร่วม (ไม่มี role พิเศษ)"
                           summary={(c) => c.map((o) => o.label).join(' · ')}
                         />
                         <button onClick={() => handleUpdateRole(user.id)} className="text-primary text-xs font-medium whitespace-nowrap">บันทึก</button>

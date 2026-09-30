@@ -60,10 +60,10 @@ export function FacilitatorNote({
     <div className="mt-3 rounded-lg border border-gray-lighter bg-surface/40 p-3">
       <div className="flex items-center justify-between gap-2 mb-1.5">
         <label className="text-xs font-medium text-dark">
-          <Icon name="notes" size={16} /> {t('หมายเหตุสำหรับผู้สอน', 'Facilitator note')}
+          <Icon name="notes" size={16} /> {t('หมายเหตุสำหรับผู้จัด', 'Facilitator note')}
         </label>
         <span className="text-[11px] text-gray">
-          {t('เห็นเฉพาะทีมงาน ผู้เข้าร่วมไม่เห็น', 'Staff only — not shown to the participant')}
+          {t('เห็นเฉพาะทีมงาน ผู้เข้าร่วมไม่เห็น', 'Staff only — not shown to the seeker')}
         </span>
       </div>
 

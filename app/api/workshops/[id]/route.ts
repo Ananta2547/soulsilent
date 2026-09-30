@@ -30,7 +30,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       .first<Workshop>();
 
     if (!workshop) {
-      return NextResponse.json({ error: 'ไม่พบ Workshop' }, { status: 404 });
+      return NextResponse.json({ error: 'ไม่พบกิจกรรม' }, { status: 404 });
     }
 
     // Public location fields — explicitly exclude internal_note (admin-only)
@@ -375,7 +375,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .bind(featured, id)
       .run();
     if (!res.meta.changes) {
-      return NextResponse.json({ error: 'ไม่พบ Workshop' }, { status: 404 });
+      return NextResponse.json({ error: 'ไม่พบกิจกรรม' }, { status: 404 });
     }
     return NextResponse.json({ ok: true, featured });
   } catch (error) {

@@ -993,7 +993,7 @@ export function AutofillPanel({
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 18px', borderRadius: 16, background: 'var(--teal-50)' }}>
         <ShieldSvg color="var(--teal-deep)" size={20} />
         <p style={{ margin: 0, fontSize: 13, color: 'var(--teal-deep)', lineHeight: 1.6 }}>
-          <T th="ข้อมูลนี้จะถูกใช้กรอกแบบฟอร์มสมัครเวิร์กชอปให้อัตโนมัติ และเก็บไว้ในเครื่องของคุณ · แต่ละส่วนบันทึกแยกกันได้ · ส่วน “ตัวตน” แก้ไขได้เดือนละครั้ง" en="This vault auto-fills your workshop checkout forms. Stored on your device · each section saves independently · Identity can be changed once a month." />
+          <T th="ข้อมูลนี้จะถูกใช้กรอกแบบฟอร์มสมัครกิจกรรมให้อัตโนมัติ และเก็บไว้ในเครื่องของคุณ · แต่ละส่วนบันทึกแยกกันได้ · ส่วน “ตัวตน” แก้ไขได้เดือนละครั้ง" en="This vault auto-fills your journey checkout forms. Stored on your device · each section saves independently · Identity can be changed once a month." />
         </p>
       </div>
 
@@ -1163,7 +1163,7 @@ export function AutofillPanel({
       <SectionCard
         title={tr(lang, 'สุขภาพ & อาหาร', 'Health & dietary')}
         badge={statusBadge('health')}
-        desc={tr(lang, 'ช่วยให้ผู้จัดดูแลคุณได้ดีขึ้นในวันเวิร์กชอป (หากไม่มี ให้ระบุว่า "ไม่มี")', 'Helps facilitators care for you on the day. Put "None" if not applicable.')}
+        desc={tr(lang, 'ช่วยให้ผู้จัดดูแลคุณได้ดีขึ้นในวันกิจกรรม (หากไม่มี ให้ระบุว่า "ไม่มี")', 'Helps hosts care for you on the day. Put "None" if not applicable.')}
       >
         <div className="form-grid" style={{ gridTemplateColumns: '1fr' }}>
           <div>

@@ -27,7 +27,7 @@ export async function PUT(request: Request) {
     .first<Pick<User, 'id' | 'password_hash'>>();
 
   if (!user) {
-    return NextResponse.json({ error: 'ไม่พบผู้ใช้' }, { status: 404 });
+    return NextResponse.json({ error: 'ไม่พบผู้เข้าร่วม' }, { status: 404 });
   }
 
   // Users who set a password must prove they know the current one.

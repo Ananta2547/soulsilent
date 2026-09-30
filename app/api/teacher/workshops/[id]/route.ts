@@ -13,7 +13,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const u = await getCurrentUserWithRoles();
   if (!u) return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 });
   if (!hasAnyRole(u.roles, ['teacher'])) {
-    return NextResponse.json({ error: 'เฉพาะผู้สอน' }, { status: 403 });
+    return NextResponse.json({ error: 'เฉพาะผู้จัด' }, { status: 403 });
   }
   const { id } = await params;
   const db = await getDB();
@@ -24,7 +24,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     .prepare('SELECT w.*, m.kind AS master_kind FROM workshops w LEFT JOIN workshop_masters m ON m.id = w.master_id WHERE w.id = ?')
     .bind(id)
     .first<Workshop>();
-  if (!workshop) return NextResponse.json({ error: 'ไม่พบเวิร์กชอป' }, { status: 404 });
+  if (!workshop) return NextResponse.json({ error: 'ไม่พบกิจกรรม' }, { status: 404 });
   // Owner, or a co-facilitator the admin ticked (migration 046).
   if (!u.roles.includes('admin') && !canAccessTeacherDashboard(workshop, u.sub)) {
     return NextResponse.json({ error: 'ไม่มีสิทธิ์เข้าถึง' }, { status: 403 });

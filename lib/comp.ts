@@ -6,9 +6,9 @@
 export type CompKind = 'teacher' | 'asl' | 'special';
 
 export const COMP_KINDS: { key: CompKind; label: string; hint: string }[] = [
-  { key: 'teacher', label: 'ที่นั่งฟรีจาก Teacher', hint: 'ไม่รวมค่าสมัครในรายได้ Host — รายได้จากที่นั่งนี้เป็น ฿0' },
-  { key: 'asl', label: 'ที่นั่งฟรีจาก ASL (admin)', hint: 'ASL จ่ายให้ Host เต็มราคาบัตรที่แสดงอยู่ตอนออกบัตร — รวมในรายได้ก่อนหักค่าธรรมเนียม' },
-  { key: 'special', label: 'ที่นั่งฟรีเงื่อนไขพิเศษ', hint: 'ASL จ่ายให้ Host ตามราคาพิเศษที่กรอก — รวมในรายได้ก่อนหักค่าธรรมเนียม' },
+  { key: 'teacher', label: 'ที่นั่งฟรีจากผู้จัด', hint: 'ไม่รวมค่าสมัครในรายได้ผู้จัด — รายได้จากที่นั่งนี้เป็น ฿0' },
+  { key: 'asl', label: 'ที่นั่งฟรีจาก ASL (admin)', hint: 'ASL จ่ายให้ผู้จัดเต็มราคาบัตรที่แสดงอยู่ตอนออกบัตร — รวมในรายได้ก่อนหักค่าธรรมเนียม' },
+  { key: 'special', label: 'ที่นั่งฟรีเงื่อนไขพิเศษ', hint: 'ASL จ่ายให้ผู้จัดตามราคาพิเศษที่กรอก — รวมในรายได้ก่อนหักค่าธรรมเนียม' },
 ];
 
 export const COMP_LABEL: Record<CompKind, string> = Object.fromEntries(COMP_KINDS.map((k) => [k.key, k.label])) as Record<CompKind, string>;

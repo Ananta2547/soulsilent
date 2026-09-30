@@ -74,7 +74,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       allowed = [];
     }
     if (allowed.length > 0 && !allowed.includes(loc.id)) {
-      return NextResponse.json({ error: 'สถานที่นี้ไม่อยู่ในรายการที่ Admin กำหนดให้ Workshop นี้' }, { status: 400 });
+      return NextResponse.json({ error: 'สถานที่นี้ไม่อยู่ในรายการที่ Admin กำหนดให้กิจกรรมนี้' }, { status: 400 });
     }
   }
   let seats: number | null = null;

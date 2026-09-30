@@ -59,7 +59,7 @@ export function LocationDetail({ location }: { location: Location }) {
         {/* Heading */}
         <Reveal>
           <Link
-            href="/workshops"
+            href="/journeys"
             className="mono"
             style={{ fontSize: 11, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--muted)', textDecoration: 'none' }}
           >

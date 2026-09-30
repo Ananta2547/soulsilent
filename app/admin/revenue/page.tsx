@@ -57,13 +57,13 @@ export default function AdminRevenuePage() {
           revenue · summary
         </p>
         <h1 className="font-heading text-3xl text-dark">สรุปรายรับ</h1>
-        <p className="text-sm text-gray mt-1">รายรับจากการจอง Workshop</p>
+        <p className="text-sm text-gray mt-1">รายรับจากการจองกิจกรรม</p>
       </header>
 
       {/* Big totals */}
       <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <StatBig label="รายรับรวมทั้งหมด" value={data.soulsilent.total} meta={`${data.soulsilent.count} รายการ`} tone="dark" />
-        <StatBig label="soulsilent" sublabel="การจอง Workshop" value={data.soulsilent.total} meta={`${data.soulsilent.count} การจอง`} tone="primary" dot />
+        <StatBig label="soulsilent" sublabel="การจองกิจกรรม" value={data.soulsilent.total} meta={`${data.soulsilent.count} การจอง`} tone="primary" dot />
       </section>
 
       {/* Monthly bars */}
@@ -84,7 +84,7 @@ export default function AdminRevenuePage() {
                   </div>
                   <div className="flex h-3 bg-gray-lighter/60 rounded-full overflow-hidden">
                     {wsPct > 0 && (
-                      <div className="bg-primary h-full transition-all duration-500" style={{ width: `${wsPct}%` }} title={`Workshop ฿${wsTotal.toLocaleString()}`} />
+                      <div className="bg-primary h-full transition-all duration-500" style={{ width: `${wsPct}%` }} title={`กิจกรรม ฿${wsTotal.toLocaleString()}`} />
                     )}
                   </div>
                 </div>
@@ -104,7 +104,7 @@ export default function AdminRevenuePage() {
             <thead className="bg-surface">
               <tr>
                 <th className="text-left py-3 px-5 text-gray font-medium">เดือน</th>
-                <th className="text-right py-3 px-5 text-gray font-medium">Workshop</th>
+                <th className="text-right py-3 px-5 text-gray font-medium">กิจกรรม</th>
                 <th className="text-right py-3 px-5 text-gray font-medium">รวม</th>
               </tr>
             </thead>

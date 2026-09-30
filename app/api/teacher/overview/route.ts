@@ -41,7 +41,7 @@ export async function GET() {
   const u = await getCurrentUserWithRoles();
   if (!u) return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 });
   if (!hasAnyRole(u.roles, ['teacher'])) {
-    return NextResponse.json({ error: 'เฉพาะผู้สอน' }, { status: 403 });
+    return NextResponse.json({ error: 'เฉพาะผู้จัด' }, { status: 403 });
   }
 
   const db = await getDB();

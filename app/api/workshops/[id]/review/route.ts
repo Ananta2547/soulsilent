@@ -44,7 +44,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const db = await getDB();
     const workshop = await db.prepare('SELECT * FROM workshops WHERE id = ?').bind(id).first<Workshop>();
     if (!workshop) {
-      return NextResponse.json({ error: 'ไม่พบ Workshop' }, { status: 404 });
+      return NextResponse.json({ error: 'ไม่พบกิจกรรม' }, { status: 404 });
     }
     if (!hasWorkshopEnded(workshop)) {
       return NextResponse.json({ error: 'รีวิวได้หลังกิจกรรมจบเท่านั้น' }, { status: 400 });

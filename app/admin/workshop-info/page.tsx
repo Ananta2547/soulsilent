@@ -91,22 +91,22 @@ export default function WorkshopInfoAdminPage() {
     <div className="max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-dark">ข้อมูล Workshop</h1>
-          <p className="text-sm text-gray mt-1">Workshop รอบ = ผู้สอนเปิดรอบเองจากจัดรอบสอน · Workshop เดี่ยว = admin สร้างแต่ละครั้งที่จัดการ Workshop แล้วผูกกับข้อมูลนี้</p>
+          <h1 className="text-2xl font-bold text-dark">ข้อมูลกิจกรรม</h1>
+          <p className="text-sm text-gray mt-1">กิจกรรมแบบรอบ = ผู้จัดเปิดรอบเองจากจัดรอบกิจกรรม · กิจกรรมเดี่ยว = admin สร้างแต่ละครั้งที่จัดการกิจกรรม แล้วผูกกับข้อมูลนี้</p>
         </div>
         <button
           type="button"
           onClick={() => setModal({ mode: 'create', kind: tab })}
           className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90"
         >
-          {tab === 'single' ? '+ เพิ่ม Workshop เดี่ยว' : '+ เพิ่ม Workshop รอบ'}
+          {tab === 'single' ? '+ เพิ่มกิจกรรมเดี่ยว' : '+ เพิ่มกิจกรรมแบบรอบ'}
         </button>
       </div>
 
       <div className="flex items-center gap-1 rounded-lg border border-gray-lighter p-1 text-sm w-fit mb-5">
         {([
-          ['round', `Workshop รอบ · ${roundMasters.length}`],
-          ['single', `Workshop เดี่ยว · ${singleMasters.length}`],
+          ['round', `กิจกรรมแบบรอบ · ${roundMasters.length}`],
+          ['single', `กิจกรรมเดี่ยว · ${singleMasters.length}`],
         ] as const).map(([k, label]) => (
           <button
             key={k}
@@ -128,7 +128,7 @@ export default function WorkshopInfoAdminPage() {
         </p>
       ) : shownMasters.length === 0 ? (
         <div className="border border-dashed border-gray-lighter rounded-xl p-10 text-center text-gray text-sm">
-          {tab === 'single' ? 'ยังไม่มี Workshop เดี่ยว' : 'ยังไม่มี Workshop รอบ'} —{' '}
+          {tab === 'single' ? 'ยังไม่มีกิจกรรมเดี่ยว' : 'ยังไม่มีกิจกรรมแบบรอบ'} —{' '}
           <button type="button" onClick={() => setModal({ mode: 'create', kind: tab })} className="text-primary hover:underline">
             เพิ่มรายการแรก
           </button>
@@ -160,15 +160,15 @@ export default function WorkshopInfoAdminPage() {
                   className="mt-2 text-xs text-dark hover:text-primary"
                   aria-expanded={openMaster === m.id}
                 >
-                  {openMaster === m.id ? '▾' : '▸'} {m.kind === 'single' ? 'workshop' : 'รอบ'} · {roundsOf(m.id).length}
+                  {openMaster === m.id ? '▾' : '▸'} {m.kind === 'single' ? 'กิจกรรม' : 'รอบ'} · {roundsOf(m.id).length}
                 </button>
                 {openMaster === m.id && (
                   <ul className="mt-2 divide-y divide-gray-lighter border border-gray-lighter rounded-lg text-xs">
                     {roundsOf(m.id).length === 0 && (
                       <li className="p-2 text-gray">
                         {m.kind === 'single'
-                          ? <>ยังไม่มี workshop — สร้างที่ <Link href="/admin/workshops" className="text-primary hover:underline">จัดการ Workshop</Link> แล้วผูกกับข้อมูลนี้</>
-                          : 'ยังไม่มีรอบ — ผู้สอนเปิดได้ที่ Teacher Dashboard → จัดรอบสอน'}
+                          ? <>ยังไม่มีกิจกรรม — สร้างที่ <Link href="/admin/workshops" className="text-primary hover:underline">จัดการกิจกรรม</Link> แล้วผูกกับข้อมูลนี้</>
+                          : 'ยังไม่มีรอบ — ผู้จัดเปิดได้ที่ Host Dashboard → จัดรอบกิจกรรม'}
                       </li>
                     )}
                     {roundsOf(m.id).map((w) => (
@@ -185,7 +185,7 @@ export default function WorkshopInfoAdminPage() {
                   </ul>
                 )}
                 <div className="flex items-center gap-3 mt-3 text-xs">
-                  <Link href={`/workshop-info/${m.id}`} target="_blank" className="text-dark hover:text-primary hover:underline">
+                  <Link href={`/journey-info/${m.id}`} target="_blank" className="text-dark hover:text-primary hover:underline">
                     ดูหน้าจริง ↗
                   </Link>
                   <button type="button" onClick={() => setModal({ mode: 'edit', master: m })} className="text-primary hover:underline">
@@ -203,7 +203,7 @@ export default function WorkshopInfoAdminPage() {
 
       <AdminFormModal
         open={modal !== null}
-        title={modal?.mode === 'edit' ? 'แก้ไขข้อมูล Workshop' : modal?.kind === 'single' ? 'เพิ่ม Workshop เดี่ยว' : 'เพิ่ม Workshop รอบ'}
+        title={modal?.mode === 'edit' ? 'แก้ไขข้อมูลกิจกรรม' : modal?.kind === 'single' ? 'เพิ่มกิจกรรมเดี่ยว' : 'เพิ่มกิจกรรมแบบรอบ'}
         subtitle={modal?.mode === 'edit' ? modal.master.title : undefined}
         onClose={requestClose}
       >

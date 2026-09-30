@@ -176,7 +176,7 @@ export async function POST(request: Request) {
       .first<Workshop>();
 
     if (!workshop || workshop.status !== 'active') {
-      return NextResponse.json({ error: 'Workshop นี้ไม่สามารถจองได้' }, { status: 400 });
+      return NextResponse.json({ error: 'กิจกรรมนี้ไม่สามารถจองได้' }, { status: 400 });
     }
 
     // Registration closes the moment the event starts — a multi-day workshop

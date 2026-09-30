@@ -77,7 +77,7 @@ export function ApplicationFormBuilder({
   return (
     <div className="space-y-4 max-w-2xl">
       <p className="text-sm text-gray">
-        ตั้งคำถามเพิ่มเติมสำหรับผู้สมัครเวิร์กชอปนี้ — ผู้ใช้จะตอบในขั้นตอนก่อนชำระเงิน
+        ตั้งคำถามเพิ่มเติมสำหรับผู้สมัครกิจกรรมนี้ — ผู้เข้าร่วมจะตอบในขั้นตอนก่อนชำระเงิน
       </p>
 
       {error && (

@@ -2,7 +2,7 @@
 
 /* Building blocks of the teacher dashboard design ("Teacher Dashboard",
  * Claude Design): the month calendar every page uses, the pager, the seat bar
- * and the small line icons. Styles live in app/teacher/teacher.css (tdb-*). */
+ * and the small line icons. Styles live in app/host/teacher.css (tdb-*). */
 
 import type { ReactNode } from 'react';
 

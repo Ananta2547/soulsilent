@@ -32,7 +32,7 @@ const SOCIALS: { label: string; href?: string }[] = [
 ];
 
 const FOOTER_NAV = [
-  { label: 'กิจกรรมทั้งหมด', href: '/workshops' },
+  { label: 'กิจกรรมทั้งหมด', href: '/journeys' },
   { label: 'บทความ', href: '/articles' },
   { label: 'เกี่ยวกับเรา', href: '/about' },
   { label: 'ช่วยเหลือ', href: '/help' },

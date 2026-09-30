@@ -92,8 +92,8 @@ export default function ClaimPage() {
         <p style={{ color: 'var(--muted)', fontSize: 14.5, lineHeight: 1.65, margin: '0 0 24px' }}>
           {error || tr(lang, 'ลิงก์อาจถูกใช้ไปแล้วหรือถูกยกเลิก', 'It may already have been used, or cancelled.')}
         </p>
-        <Btn kind="teal" href="/workshops">
-          {tr(lang, 'ดูกิจกรรมทั้งหมด', 'Browse workshops')}
+        <Btn kind="teal" href="/journeys">
+          {tr(lang, 'ดูกิจกรรมทั้งหมด', 'Browse journeys')}
         </Btn>
       </Shell>
     );
@@ -120,7 +120,7 @@ export default function ClaimPage() {
                 'You sent this link — pass it to the person receiving the seat.',
               )
             : !info.claimable
-              ? tr(lang, 'กิจกรรมนี้ปิดรับแล้ว จึงไม่สามารถรับสิทธิ์ได้', 'This workshop is closed, so the seat cannot be claimed.')
+              ? tr(lang, 'กิจกรรมนี้ปิดรับแล้ว จึงไม่สามารถรับสิทธิ์ได้', 'This journey is closed, so the seat cannot be claimed.')
               : null;
 
   return (
@@ -137,7 +137,7 @@ export default function ClaimPage() {
             ? tr(
                 lang,
                 'AllSoulLearn เชิญคุณเข้าร่วมกิจกรรมนี้ฟรี — ที่นั่งถูกกันไว้ให้แล้ว เหลือเพียงกรอกใบสมัครของคุณเอง',
-                'AllSoulLearn invites you to join this workshop for free — your seat is held. All that is left is your own application.',
+                'AllSoulLearn invites you to join this journey for free — your seat is held. All that is left is your own application.',
               )
             : transfer.from_name
             ? tr(
@@ -169,8 +169,8 @@ export default function ClaimPage() {
             <div style={{ background: '#fdeceb', border: '1px solid #f3c9c5', color: '#b3261e', borderRadius: 14, padding: '14px 16px', fontSize: 14, lineHeight: 1.6, marginBottom: 20 }}>
               {blocked}
             </div>
-            <Btn kind="teal" href={`/workshops/${workshop.id}`}>
-              {tr(lang, 'ดูรายละเอียดกิจกรรม', 'View the workshop')}
+            <Btn kind="teal" href={`/journeys/${workshop.id}`}>
+              {tr(lang, 'ดูรายละเอียดกิจกรรม', 'View the journey')}
             </Btn>
           </>
         ) : info.signedIn ? (

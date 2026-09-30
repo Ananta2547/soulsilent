@@ -36,8 +36,8 @@ export function SiteHeader() {
   }
 
   const links = [
-    { href: '/workshops', th: 'กิจกรรม', en: 'Workshops' },
-    { href: '/teachers', th: 'ผู้สอน', en: 'Teachers' },
+    { href: '/journeys', th: 'กิจกรรม', en: 'Journeys' },
+    { href: '/hosts', th: 'ผู้จัด', en: 'Hosts' },
     { href: '/articles', th: 'บทความ', en: 'Articles' },
     { href: '/about', th: 'เกี่ยวกับเรา', en: 'About' },
   ];
@@ -75,7 +75,7 @@ export function SiteHeader() {
           <Link
             href="/calendar"
             aria-label={tr(lang, 'ปฏิทิน', 'Calendar')}
-            title={tr(lang, 'ปฏิทิน Workshop', 'Workshop Calendar')}
+            title={tr(lang, 'ปฏิทินกิจกรรม', 'Journey Calendar')}
             className="nav-icon-btn nav-cal"
           >
             <CalendarDaysIcon color="currentColor" size={18} />

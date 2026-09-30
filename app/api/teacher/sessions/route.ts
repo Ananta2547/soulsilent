@@ -148,7 +148,7 @@ export async function POST(request: Request) {
   const { u } = g;
   const body = (await request.json()) as Body;
 
-  if (!body.master_id) return NextResponse.json({ error: 'กรุณาเลือก Workshop' }, { status: 400 });
+  if (!body.master_id) return NextResponse.json({ error: 'กรุณาเลือกกิจกรรม' }, { status: 400 });
   const repeat = body.repeat || 'once';
   if (repeat !== 'once') {
     if (!DATE_RE.test(body.date || '')) return NextResponse.json({ error: 'กรุณาเลือกวันเริ่ม' }, { status: 400 });
@@ -179,17 +179,17 @@ export async function POST(request: Request) {
     .prepare('SELECT * FROM workshop_masters WHERE id = ?')
     .bind(body.master_id)
     .first<WorkshopMaster>();
-  if (!master) return NextResponse.json({ error: 'ไม่พบ Workshop' }, { status: 404 });
+  if (!master) return NextResponse.json({ error: 'ไม่พบกิจกรรม' }, { status: 404 });
   if (master.kind === 'single') {
-    return NextResponse.json({ error: 'Workshop เดี่ยว — Admin สร้างรอบให้ที่หน้าจัดการ Workshop' }, { status: 400 });
+    return NextResponse.json({ error: 'กิจกรรมเดี่ยว — Admin สร้างรอบให้ที่หน้าจัดการกิจกรรม' }, { status: 400 });
   }
   if (!u.roles.includes('admin') && master.organizer !== u.sub) {
-    return NextResponse.json({ error: 'คุณไม่ได้เป็นผู้สอนของ Workshop นี้' }, { status: 403 });
+    return NextResponse.json({ error: 'คุณไม่ได้เป็นผู้จัดของกิจกรรมนี้' }, { status: 403 });
   }
   // Any price will do — a round-only master carries the round price on
   // its cards and sells through its tiers.
   if (cardPrice(bookableTiers(master)) == null) {
-    return NextResponse.json({ error: 'Admin ยังไม่ได้ตั้งราคาให้ Workshop นี้' }, { status: 400 });
+    return NextResponse.json({ error: 'Admin ยังไม่ได้ตั้งราคาให้กิจกรรมนี้' }, { status: 400 });
   }
   const loc = await db
     .prepare('SELECT id, name, map_url FROM locations WHERE id = ?')
@@ -199,7 +199,7 @@ export async function POST(request: Request) {
   // The admin may have narrowed the venues this activity runs at.
   const allowed = parseIds(master.location_ids_json);
   if (allowed.length > 0 && !allowed.includes(loc.id)) {
-    return NextResponse.json({ error: 'สถานที่นี้ไม่อยู่ในรายการที่ Admin กำหนดให้ Workshop นี้' }, { status: 400 });
+    return NextResponse.json({ error: 'สถานที่นี้ไม่อยู่ในรายการที่ Admin กำหนดให้กิจกรรมนี้' }, { status: 400 });
   }
 
   const seats = Math.max(1, Math.round(Number(body.max_participants) || master.default_max_participants || 20));

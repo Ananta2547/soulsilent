@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     .bind(payload.sub)
     .first<{ id: string; reset_nonce: string | null }>();
   if (!user) {
-    return NextResponse.json({ error: 'ไม่พบผู้ใช้' }, { status: 404 });
+    return NextResponse.json({ error: 'ไม่พบผู้เข้าร่วม' }, { status: 404 });
   }
 
   // Reject links that were already used or superseded by a newer request.

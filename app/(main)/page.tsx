@@ -130,7 +130,7 @@ function ticketFromWorkshop(w: Workshop): Ticket {
   const eff = getEffectivePrice(w);
   const promo = eff.isPromo && eff.originalPrice > 0;
   return {
-    cat: w.category || 'WORKSHOP',
+    cat: w.category || 'JOURNEY',
     title: w.title,
     subtitle: w.short_description || 'เปิดรับสมัครแล้ว',
     date: shortDate(w.date),
@@ -187,7 +187,7 @@ function FanCard({ slot, index, ticket, onEnter }: { slot: (typeof FAN_SLOTS)[nu
         />
       )}
       {ticket.id && (
-        <Link href={`/workshops/${ticket.id}`} aria-label={ticket.title} style={{ position: 'absolute', inset: 0, zIndex: 6 }} />
+        <Link href={`/journeys/${ticket.id}`} aria-label={ticket.title} style={{ position: 'absolute', inset: 0, zIndex: 6 }} />
       )}
       {posterOnly ? null : (
         <>
@@ -324,7 +324,7 @@ function Hero({ workshops }: { workshops: Workshop[] }) {
       </p>
 
       <div style={{ display: 'flex', justifyContent: 'center', marginTop: 26 }}>
-        <Link href="/workshops" className="btn btn-ink">
+        <Link href="/journeys" className="btn btn-ink">
           สำรวจกิจกรรมทั้งหมด&nbsp;&nbsp;<span className="mono">→</span>
         </Link>
       </div>
@@ -352,7 +352,7 @@ function EventCard({ w }: { w: Workshop }) {
       ? Math.round((1 - eff.price / eff.originalPrice) * 100)
       : 0;
   return (
-    <Link href={`/workshops/${w.id}`} className="card reveal-up dc-event-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', textDecoration: 'none', color: 'var(--ink)' }}>
+    <Link href={`/journeys/${w.id}`} className="card reveal-up dc-event-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', textDecoration: 'none', color: 'var(--ink)' }}>
       <div className="ph ph-teal card-media dc-ev-media" style={{ aspectRatio: '3/4', borderRadius: 14, marginBottom: 14, position: 'relative', overflow: 'hidden' }}>
         {w.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -519,7 +519,7 @@ function UpcomingEvents({ workshops, rounds }: { workshops: Workshop[]; rounds?:
         )}
 
         <div style={{ display: 'flex', justifyContent: 'center', marginTop: 36 }}>
-          <Link href="/workshops?kind=single" className="btn btn-ghost">ดู Workshop เดี่ยวทั้งหมด <span className="mono">→</span></Link>
+          <Link href="/journeys?kind=single" className="btn btn-ghost">ดูกิจกรรมเดี่ยวทั้งหมด <span className="mono">→</span></Link>
         </div>
 
         {rounds}
@@ -554,13 +554,13 @@ function RoundsSection({ workshops }: { workshops: Workshop[] }) {
     <div className="home-rounds">
       <div className="home-rounds-head">
         <div>
-          <div className="mono" style={{ color: 'var(--muted)', letterSpacing: '.14em', fontSize: 11, textTransform: 'uppercase', marginBottom: 8 }}>— 02 · รอบสอน</div>
+          <div className="mono" style={{ color: 'var(--muted)', letterSpacing: '.14em', fontSize: 11, textTransform: 'uppercase', marginBottom: 8 }}>— 02 · รอบกิจกรรม</div>
           <h3 className="display-th" style={{ fontSize: 'clamp(22px,3vw,30px)', margin: 0, color: 'var(--ink)' }}>
             เลือกวันที่สะดวก แล้ว<span style={{ color: 'var(--teal)' }}>มาเจอกัน</span>
           </h3>
         </div>
         <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: 'var(--muted)', maxWidth: 380 }}>
-          กิจกรรมที่ผู้สอนเปิดเป็นรอบ ทุกวันหรือทุกสัปดาห์ — จิ้มวันในปฏิทินแล้วจองได้เลย
+          กิจกรรมที่ผู้จัดเปิดเป็นรอบ ทุกวันหรือทุกสัปดาห์ — จิ้มวันในปฏิทินแล้วจองได้เลย
         </p>
       </div>
 
@@ -581,7 +581,7 @@ function RoundsSection({ workshops }: { workshops: Workshop[] }) {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'center', marginTop: 36 }}>
-        <Link href="/workshops?kind=round" className="btn btn-ghost">ดู Workshop รอบทั้งหมด <span className="mono">→</span></Link>
+        <Link href="/journeys?kind=round" className="btn btn-ghost">ดูกิจกรรมแบบรอบทั้งหมด <span className="mono">→</span></Link>
       </div>
     </div>
   );
@@ -755,7 +755,7 @@ function ReviewsSection({ reviews }: { reviews: PublicReview[] }) {
                     {c.workshop &&
                       (c.workshopId ? (
                         <Link
-                          href={`/workshops/${c.workshopId}`}
+                          href={`/journeys/${c.workshopId}`}
                           className="mono"
                           title={c.workshop}
                           style={{ display: 'block', fontSize: 11, color: 'var(--teal-deep)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: 'none', transition: 'color .15s ease' }}

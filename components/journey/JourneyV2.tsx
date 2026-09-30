@@ -206,7 +206,7 @@ export function JourneyMap({ items, onOpen }: { items: JourneyItem[]; onOpen: (i
             <br />
             หมุดถัดไปจะอยู่ตรงไหนดี?
           </div>
-          <Link href="/workshops" className="btn" style={css('display:inline-flex;background:var(--accent);color:var(--ink)')}>
+          <Link href="/journeys" className="btn" style={css('display:inline-flex;background:var(--accent);color:var(--ink)')}>
             ดูกิจกรรมทั้งหมด →
           </Link>
           <span style={css("display:block;font-family:Caveat,'Mitr',cursive;font-size:24px;color:var(--accent);margin-top:14px;transform:rotate(-3deg)")}>it can be fun! ✺</span>

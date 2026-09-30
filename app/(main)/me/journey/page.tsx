@@ -211,7 +211,7 @@ function JourneyAndDiary() {
                   JOURNEY
                 </h2>
                 <p style={css('margin:0 0 20px;font-size:13px;color:var(--muted)')}>
-                  {items.length} workshops · {stats.hours} ชั่วโมง
+                  {items.length} กิจกรรม · {stats.hours} ชั่วโมง
                 </p>
                 {items.length ? <JourneyRail items={items} onOpen={setOpenIdx} /> : <EmptyJourney />}
                 <button type="button" onClick={() => openDiaryAt()} style={css('margin-top:26px;width:100%;display:flex;align-items:center;gap:14px;border:0;cursor:pointer;text-align:left;font-family:inherit;background:var(--ink);color:#fff;border-radius:22px;padding:14px 20px 14px 14px')}>
@@ -228,7 +228,7 @@ function JourneyAndDiary() {
                   <div style={css('display:flex;flex-direction:column;gap:12px;flex:1;min-width:280px')}>
                     <span className="eyebrow" style={{ color: 'var(--teal)' }}>LIFE MAP · แผนที่ชีวิตของฉัน</span>
                     <h1 style={css("font-family:'Archivo Black','Mitr',sans-serif;font-size:58px;line-height:.88;letter-spacing:-.03em;margin:0;white-space:nowrap")}>MY JOURNEY</h1>
-                    <p style={css('font-size:15px;line-height:1.6;color:var(--muted);margin:0;text-wrap:pretty')}>ทุก workshop คือหมุดหนึ่งบนแผนที่ เดินย้อนลงไปดูว่าเราผ่านอะไรมาบ้าง — แตะที่การ์ดเพื่อเปิดความทรงจำของวันนั้น</p>
+                    <p style={css('font-size:15px;line-height:1.6;color:var(--muted);margin:0;text-wrap:pretty')}>ทุกกิจกรรมคือหมุดหนึ่งบนแผนที่ เดินย้อนลงไปดูว่าเราผ่านอะไรมาบ้าง — แตะที่การ์ดเพื่อเปิดความทรงจำของวันนั้น</p>
                   </div>
                   <div style={css('flex:none;display:flex;align-items:stretch;flex-wrap:nowrap;background:#fff;border-radius:22px;box-shadow:0 20px 40px -30px rgba(13,30,29,.4);overflow:hidden')}>
                     <button type="button" onClick={() => openDiaryAt()} style={css('position:relative;flex:none;display:flex;align-items:center;gap:16px;border:0;cursor:pointer;text-align:left;font-family:inherit;background:var(--ink);color:#fff;border-radius:22px;padding:14px 20px 14px 14px')}>
@@ -276,7 +276,7 @@ function JourneyAndDiary() {
           <div style={css('max-width:1600px;margin:0 auto;display:flex;align-items:flex-end;justify-content:space-between;gap:16px 24px;flex-wrap:wrap')}>
             <div style={css('display:flex;align-items:baseline;gap:14px;flex-wrap:wrap')}>
               <h1 style={css("font-family:'Archivo Black','Mitr',sans-serif;font-size:34px;line-height:1;letter-spacing:-.02em;margin:0")}>DIARY</h1>
-              <span style={css('color:var(--muted);font-size:13.5px')}>เขียนได้ทุกวัน · workshop ที่เข้าร่วมจะเข้ามาอยู่ในหน้าของวันนั้นเอง</span>
+              <span style={css('color:var(--muted);font-size:13.5px')}>เขียนได้ทุกวัน · กิจกรรมที่เข้าร่วมจะเข้ามาอยู่ในหน้าของวันนั้นเอง</span>
             </div>
             <div style={css('display:flex;align-items:center;gap:12px;flex-wrap:wrap')}>
               <div className="jd-soft" role="tablist">
@@ -345,8 +345,8 @@ function EmptyJourney() {
   return (
     <div style={css('background:#fff;border-radius:22px;padding:48px 24px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px')}>
       <span style={css('font-family:Mitr,sans-serif;font-weight:500;font-size:22px')}>เส้นทางเริ่มที่หมุดแรก</span>
-      <span style={css('font-size:14px;color:var(--muted);max-width:420px')}>เมื่อเข้าร่วม workshop และถูกเช็คชื่อแล้ว หมุดจะขึ้นบนแผนที่ให้อัตโนมัติ</span>
-      <Btn kind="teal" href="/workshops">
+      <span style={css('font-size:14px;color:var(--muted);max-width:420px')}>เมื่อเข้าร่วมกิจกรรมและถูกเช็คชื่อแล้ว หมุดจะขึ้นบนแผนที่ให้อัตโนมัติ</span>
+      <Btn kind="teal" href="/journeys">
         ดูกิจกรรมทั้งหมด →
       </Btn>
     </div>

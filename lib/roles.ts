@@ -6,8 +6,8 @@ export type Role = 'user' | 'teacher' | 'admin' | 'session_host';
 
 /** Roles the admin can add on top of the primary one, with their Thai label. */
 export const EXTRA_ROLES: { value: Role; label: string; hint: string }[] = [
-  { value: 'teacher', label: 'ผู้สอน', hint: 'เห็น Teacher Dashboard และมีหน้าโปรไฟล์สาธารณะ' },
-  { value: 'session_host', label: 'ผู้จัดรอบ', hint: 'เปิดรอบสอนของ Workshop ที่ถูกผูกชื่อไว้ได้เอง' },
+  { value: 'teacher', label: 'ผู้จัด', hint: 'เห็น Host Dashboard และมีหน้าโปรไฟล์สาธารณะ' },
+  { value: 'session_host', label: 'ผู้จัดรอบ', hint: 'เปิดรอบของกิจกรรมที่ถูกผูกชื่อไว้ได้เอง' },
 ];
 
 export function parseRoles(json: string | null | undefined): Role[] {

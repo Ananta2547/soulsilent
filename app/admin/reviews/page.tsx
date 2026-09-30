@@ -68,7 +68,7 @@ export default function AdminReviewsPage() {
   async function create() {
     setErr(null);
     if (!wsId || !userId) {
-      setErr('กรุณาเลือก Workshop และผู้ใช้');
+      setErr('กรุณาเลือกกิจกรรมและผู้เข้าร่วม');
       return;
     }
     setSaving(true);
@@ -126,22 +126,22 @@ export default function AdminReviewsPage() {
 
       {/* Create form */}
       <div className="border border-gray-lighter rounded-xl bg-white p-5 mb-8">
-        <h2 className="font-semibold text-dark mb-4">เพิ่มรีวิว (แทนผู้ใช้)</h2>
+        <h2 className="font-semibold text-dark mb-4">เพิ่มรีวิว (แทนผู้เข้าร่วม)</h2>
         {err && <div className="mb-3 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{err}</div>}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-dark mb-1">Workshop</label>
+            <label className="block text-xs font-medium text-dark mb-1">กิจกรรม</label>
             <select value={wsId} onChange={(e) => setWsId(e.target.value)} className="input-field">
-              <option value="">— เลือก Workshop —</option>
+              <option value="">— เลือกกิจกรรม —</option>
               {workshops.map((w) => (
                 <option key={w.id} value={w.id}>{w.label}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-dark mb-1">ผู้ใช้</label>
+            <label className="block text-xs font-medium text-dark mb-1">ผู้เข้าร่วม</label>
             <select value={userId} onChange={(e) => setUserId(e.target.value)} className="input-field">
-              <option value="">— เลือกผู้ใช้ —</option>
+              <option value="">— เลือกผู้เข้าร่วม —</option>
               {users.map((u) => (
                 <option key={u.id} value={u.id}>{u.label}</option>
               ))}

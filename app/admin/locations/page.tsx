@@ -132,7 +132,7 @@ export default function AdminLocationsPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('ต้องการลบสถานที่นี้? Workshop ที่อ้างอิงจะถูกถอนการเชื่อม')) return;
+    if (!confirm('ต้องการลบสถานที่นี้? กิจกรรมที่อ้างอิงจะถูกถอนการเชื่อม')) return;
     await fetch(`/api/locations/${id}`, { method: 'DELETE' });
     fetchAll();
   }
@@ -325,7 +325,7 @@ export default function AdminLocationsPage() {
                   onChange={(e) => setForm({ ...form, internal_note: e.target.value })}
                   className="input-field"
                   rows={3}
-                  placeholder="เก็บข้อมูลภายในที่ผู้ใช้ทั่วไปไม่เห็น เช่น เบอร์ติดต่อเจ้าของ · ราคาเช่า · รหัสประตู"
+                  placeholder="เก็บข้อมูลภายในที่ผู้เข้าร่วมไม่เห็น เช่น เบอร์ติดต่อเจ้าของ · ราคาเช่า · รหัสประตู"
                 />
                 <p className="text-xs text-gray mt-1">เห็นเฉพาะใน Admin Dashboard</p>
               </div>

@@ -10,7 +10,7 @@ import { useEffect, useMemo, useState } from 'react';
 const TYPES = [
   { v: 'summary', label: 'summary — รายเดือน' },
   { v: 'bookings', label: 'bookings — รายการจอง' },
-  { v: 'workshops', label: 'workshops — สรุปต่อรอบ' },
+  { v: 'workshops', label: 'journeys — สรุปต่อรอบ' },
   { v: 'orphans', label: 'orphans — เงินเข้าผิดปกติ' },
 ] as const;
 

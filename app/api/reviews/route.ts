@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     };
     const r = Math.round(Number(rating));
     if (!workshop_id || !user_id) {
-      return NextResponse.json({ error: 'กรุณาเลือก Workshop และผู้ใช้' }, { status: 400 });
+      return NextResponse.json({ error: 'กรุณาเลือกกิจกรรมและผู้เข้าร่วม' }, { status: 400 });
     }
     if (!r || r < 1 || r > 5) {
       return NextResponse.json({ error: 'กรุณาให้คะแนน 1-5 ดาว' }, { status: 400 });
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     const ws = await db.prepare('SELECT id FROM workshops WHERE id = ?').bind(workshop_id).first();
     const us = await db.prepare('SELECT id FROM users WHERE id = ?').bind(user_id).first();
     if (!ws || !us) {
-      return NextResponse.json({ error: 'ไม่พบ Workshop หรือผู้ใช้' }, { status: 404 });
+      return NextResponse.json({ error: 'ไม่พบกิจกรรมหรือผู้เข้าร่วม' }, { status: 404 });
     }
 
     const text = (comment || '').trim() || null;

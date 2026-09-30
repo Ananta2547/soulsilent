@@ -69,7 +69,7 @@ export function ReviewModal({
         <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--cream-deep)', display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="mono" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '.1em', textTransform: 'uppercase' }}>
-              {tr(lang, 'รีวิวกิจกรรม', 'Workshop review')}
+              {tr(lang, 'รีวิวกิจกรรม', 'Journey review')}
             </div>
             <h2 className="display-th" style={{ fontSize: 20, margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {workshopTitle}
@@ -88,7 +88,7 @@ export function ReviewModal({
 
           <div style={{ textAlign: 'center', marginBottom: 20 }}>
             <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 10 }}>
-              <T th="ให้คะแนนกิจกรรมนี้" en="Rate this workshop" />
+              <T th="ให้คะแนนกิจกรรมนี้" en="Rate this journey" />
             </div>
             <div style={{ display: 'flex', justifyContent: 'center', gap: 6 }}>
               {[1, 2, 3, 4, 5].map((n) => (

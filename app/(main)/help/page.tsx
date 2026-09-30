@@ -42,7 +42,7 @@ const HELP_FAQ: { cat: L; items: { q: L; a: L }[] }[] = [
     ],
   },
   {
-    cat: { th: 'แนวทางการเข้าร่วมเวิร์กชอป', en: 'Workshop attendance' },
+    cat: { th: 'แนวทางการเข้าร่วมกิจกรรม', en: 'Journey attendance' },
     items: [
       {
         q: { th: 'ต้องไปถึงก่อนเวลาเท่าไร?', en: 'How early should I arrive?' },

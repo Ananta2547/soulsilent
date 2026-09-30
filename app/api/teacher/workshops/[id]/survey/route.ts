@@ -13,10 +13,10 @@ type SurveyRow = Parameters<typeof surveyFromRow>[0];
 async function load(id: string) {
   const u = await getCurrentUserWithRoles();
   if (!u) return { error: NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 }) };
-  if (!hasAnyRole(u.roles, ['teacher'])) return { error: NextResponse.json({ error: 'เฉพาะผู้สอน' }, { status: 403 }) };
+  if (!hasAnyRole(u.roles, ['teacher'])) return { error: NextResponse.json({ error: 'เฉพาะผู้จัด' }, { status: 403 }) };
   const db = await getDB();
   const workshop = await db.prepare('SELECT * FROM workshops WHERE id = ?').bind(id).first<Workshop>();
-  if (!workshop) return { error: NextResponse.json({ error: 'ไม่พบเวิร์กชอป' }, { status: 404 }) };
+  if (!workshop) return { error: NextResponse.json({ error: 'ไม่พบกิจกรรม' }, { status: 404 }) };
   if (!u.roles.includes('admin') && !canAccessTeacherDashboard(workshop, u.sub)) {
     return { error: NextResponse.json({ error: 'ไม่มีสิทธิ์เข้าถึง' }, { status: 403 }) };
   }

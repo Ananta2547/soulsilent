@@ -60,7 +60,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       )
       .bind(id)
       .first<{ id: string; name: string; nickname: string | null; avatar_url: string | null; bio: string | null; teacher_profile_json: string | null }>();
-    if (!row) return NextResponse.json({ error: 'ไม่พบผู้สอน' }, { status: 404 });
+    if (!row) return NextResponse.json({ error: 'ไม่พบผู้จัด' }, { status: 404 });
 
     const rounds = await db
       .prepare(

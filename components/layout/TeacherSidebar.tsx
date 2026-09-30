@@ -27,8 +27,8 @@ type NavItem = { href: string; label: string; icon: React.ReactNode };
 // money and the feedback are things they check *about* those workshops.
 const NAV: NavItem[] = [
   {
-    href: '/teacher/workshops',
-    label: 'Workshop เดี่ยว',
+    href: '/host/journeys',
+    label: 'กิจกรรมเดี่ยว',
     icon: (
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path
@@ -41,8 +41,8 @@ const NAV: NavItem[] = [
     ),
   },
   {
-    href: '/teacher/sessions',
-    label: 'จัดรอบสอน',
+    href: '/host/sessions',
+    label: 'จัดรอบกิจกรรม',
     icon: (
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <rect x="3.5" y="5" width="17" height="15" rx="2" strokeWidth={1.5} />
@@ -51,7 +51,7 @@ const NAV: NavItem[] = [
     ),
   },
   {
-    href: '/teacher/overview',
+    href: '/host/overview',
     label: 'ภาพรวม / รายได้',
     icon: (
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -60,7 +60,7 @@ const NAV: NavItem[] = [
     ),
   },
   {
-    href: '/teacher/reviews',
+    href: '/host/reviews',
     label: 'รีวิว',
     icon: (
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -75,7 +75,7 @@ const NAV: NavItem[] = [
   },
   {
     // Opens the public teacher page with its in-place editor switched on.
-    href: '/teacher/profile',
+    href: '/host/profile',
     label: 'หน้าโปรไฟล์ของฉัน',
     icon: (
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -91,7 +91,7 @@ export function TeacherSidebar() {
   const [open, setOpen] = useState(false);
   // Desktop only: fold the rail down to its icons.
   const [collapsed, toggleRail] = useRailCollapsed();
-  // "จัดรอบสอน" is for the ผู้จัดรอบ role (session_host); admin sees it too.
+  // "จัดรอบกิจกรรม" is for the ผู้จัดรอบ role (session_host); admin sees it too.
   const [roles, setRoles] = useState<string[]>([]);
   useEffect(() => {
     fetch('/api/auth/me')
@@ -99,7 +99,7 @@ export function TeacherSidebar() {
       .then((d) => setRoles(d.user?.roles || (d.user?.role ? [d.user.role] : [])))
       .catch(() => {});
   }, []);
-  const nav = NAV.filter((item) => item.href !== '/teacher/sessions' || hasAnyRole(roles, ['session_host']));
+  const nav = NAV.filter((item) => item.href !== '/host/sessions' || hasAnyRole(roles, ['session_host']));
   // The phone top bar names the section the page belongs to.
   const here = NAV.find((item) => pathname.startsWith(item.href));
 
@@ -116,12 +116,12 @@ export function TeacherSidebar() {
     <>
       {/* Phone top bar — the rail stays off-screen until the menu is opened. */}
       <header className="tdb-topbar">
-        <button type="button" className="tdb-topbar-btn" onClick={() => setOpen(true)} aria-label="เปิดเมนูผู้สอน" aria-expanded={open}>
+        <button type="button" className="tdb-topbar-btn" onClick={() => setOpen(true)} aria-label="เปิดเมนูผู้จัด" aria-expanded={open}>
           <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeWidth={1.8} d="M4 7h16M4 12h16M4 17h16" />
           </svg>
         </button>
-        <span className="tdb-topbar-title">{here?.label || 'Teacher'}</span>
+        <span className="tdb-topbar-title">{here?.label || 'Host'}</span>
         <span className="tdb-brand-mark" aria-hidden>a</span>
       </header>
 
@@ -135,7 +135,7 @@ export function TeacherSidebar() {
               <span className="tdb-brand-name">
                 allsoullearn<b>.</b>
               </span>
-              <span className="tdb-brand-role">TEACHER</span>
+              <span className="tdb-brand-role">HOST</span>
             </span>
           </Link>
           {open ? (
@@ -162,7 +162,7 @@ export function TeacherSidebar() {
         <nav className="tdb-nav">
           {nav.map((item) => {
             // Each section owns its subtree, so a round's check-in page keeps
-            // "จัดรอบสอน" lit.
+            // "จัดรอบกิจกรรม" lit.
             const active = pathname.startsWith(item.href);
             return (
               <Link

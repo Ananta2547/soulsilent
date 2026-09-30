@@ -21,7 +21,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       .prepare(`SELECT u.id FROM users u WHERE u.id = ? AND ${roleSql('u', 'teacher')}`)
       .bind(id)
       .first<{ id: string }>();
-    if (!target) return NextResponse.json({ error: 'ไม่พบผู้สอน' }, { status: 404 });
+    if (!target) return NextResponse.json({ error: 'ไม่พบผู้จัด' }, { status: 404 });
 
     const profile = parseTeacherProfile(await req.json().catch(() => null));
     await db

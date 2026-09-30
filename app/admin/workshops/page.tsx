@@ -72,7 +72,7 @@ export default function AdminWorkshopsPage() {
   }, []);
 
   async function handleDelete(id: string) {
-    if (!confirm('ต้องการลบ Workshop นี้?')) return;
+    if (!confirm('ต้องการลบกิจกรรมนี้?')) return;
     await fetch(`/api/workshops/${id}`, { method: 'DELETE' });
     fetchAll();
   }
@@ -98,7 +98,7 @@ export default function AdminWorkshopsPage() {
     try {
       const res = await fetch(`/api/workshops/${id}`);
       if (!res.ok) {
-        alert('โหลด Workshop ไม่สำเร็จ');
+        alert('โหลดกิจกรรมไม่สำเร็จ');
         return;
       }
       const data = (await res.json()) as {
@@ -202,7 +202,7 @@ export default function AdminWorkshopsPage() {
   const shownWorkshops = kindFilter === 'all' ? workshops : workshops.filter((w) => (kindFilter === 'round' ? isRound(w) : !isRound(w)));
   const KIND_TABS: { key: 'all' | 'single' | 'round'; label: string; n: number }[] = [
     { key: 'all', label: 'ทั้งหมด', n: workshops.length },
-    { key: 'single', label: 'Workshop เดี่ยว', n: workshops.length - roundCount },
+    { key: 'single', label: 'กิจกรรมเดี่ยว', n: workshops.length - roundCount },
     { key: 'round', label: 'แบบรอบ', n: roundCount },
   ];
 
@@ -213,7 +213,7 @@ export default function AdminWorkshopsPage() {
           <p className="text-xs font-mono text-primary tracking-[.2em] uppercase mb-2">
             admin · workshops · overview
           </p>
-          <h1 className="font-heading text-3xl text-dark">จัดการ Workshop</h1>
+          <h1 className="font-heading text-3xl text-dark">จัดการกิจกรรม</h1>
           <p className="text-sm text-gray mt-1">ทั้งหมด {workshops.length} รายการ</p>
         </div>
         <button
@@ -221,11 +221,11 @@ export default function AdminWorkshopsPage() {
           onClick={() => setModal({ mode: 'create' })}
           className="btn-primary text-sm"
         >
-          + เพิ่ม Workshop
+          + เพิ่มกิจกรรม
         </button>
       </header>
 
-      <div className="flex flex-wrap gap-2" role="tablist" aria-label="ประเภท Workshop">
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="ประเภทกิจกรรม">
         {KIND_TABS.map((t) => (
           <button
             key={t.key}
@@ -377,19 +377,19 @@ export default function AdminWorkshopsPage() {
               })}
               {workshops.length > 0 && shownWorkshops.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-gray">ไม่มี Workshop ในประเภทนี้</td>
+                  <td colSpan={8} className="py-8 text-center text-gray">ไม่มีกิจกรรมในประเภทนี้</td>
                 </tr>
               )}
               {workshops.length === 0 && (
                 <tr>
                   <td colSpan={8} className="py-8 text-center text-gray">
-                    ยังไม่มี Workshop —{' '}
+                    ยังไม่มีกิจกรรม —{' '}
                     <button
                       type="button"
                       onClick={() => setModal({ mode: 'create' })}
                       className="text-primary hover:underline"
                     >
-                      เพิ่ม Workshop แรก
+                      เพิ่มกิจกรรมแรก
                     </button>
                   </td>
                 </tr>
@@ -403,12 +403,12 @@ export default function AdminWorkshopsPage() {
         open={modal !== null}
         title={
           modal?.mode === 'application'
-            ? 'ฟอร์มสมัครเวิร์กชอป'
+            ? 'ฟอร์มสมัครกิจกรรม'
             : modal?.mode === 'payout'
               ? 'จัดการการโอนเงิน (Payout)'
               : modal?.mode === 'edit'
-                ? 'แก้ไข Workshop'
-                : 'เพิ่ม Workshop ใหม่'
+                ? 'แก้ไขกิจกรรม'
+                : 'เพิ่มกิจกรรมใหม่'
         }
         subtitle={modal && modal.mode !== 'create' ? modal.title : undefined}
         onClose={modal?.mode === 'edit' || modal?.mode === 'create' ? requestClose : () => setModal(null)}

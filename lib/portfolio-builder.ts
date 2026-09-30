@@ -167,7 +167,7 @@ export function tplParticipant() {
 
     /* credentials section */
     { id:nid(), type:'text', x:60, y:830, w:600, h:40, z:2,
-      content:{ text:'workshops attended ·', tag:'eyebrow' },
+      content:{ text:'journeys attended ·', tag:'eyebrow' },
       styles:{ fontFamily:'JetBrains Mono', fontSize:12, color:'#0d8a7e', letterSpacing:'.18em', align:'left' } },
     { id:nid(), type:'text', x:60, y:855, w:600, h:60, z:2,
       content:{ text:'สิ่งที่ฉันเรียนรู้', tag:'h2' },
@@ -224,7 +224,7 @@ export function tplStaff() {
       styles:{ fontFamily:'Mitr', fontSize:64, fontWeight:500, color:'#0d1e1d', align:'left', lineHeight:1 },
       animation:{ preset:'rise' } },
     { id:nid(), type:'text', x:520, y:240, w:200, h:40, z:3,
-      content:{ text:'workshop curator', tag:'p' },
+      content:{ text:'journey curator', tag:'p' },
       styles:{ fontFamily:'Caveat', fontSize:32, color:'#0d8a7e', align:'left' } },
     { id:nid(), type:'text', x:520, y:300, w:600, h:160, z:3,
       content:{ text:'ดูแลโปรแกรมการเรียนรู้ของ soul silent · เชื่อว่าห้องเรียนที่ดีที่สุดมักจะอยู่นอกห้องเรียน และความเงียบเป็นภาษาที่ทุกคนเข้าใจร่วมกัน', tag:'p' },
@@ -233,7 +233,7 @@ export function tplStaff() {
       content:{ key:'spiral' } },
 
     { id:nid(), type:'text', x:80, y:620, w:600, h:40, z:2,
-      content:{ text:'· เวิร์กชอปที่ดูแลอยู่', tag:'eyebrow' },
+      content:{ text:'· กิจกรรมที่ดูแลอยู่', tag:'eyebrow' },
       styles:{ fontFamily:'JetBrains Mono', fontSize:12, color:'#0d8a7e', letterSpacing:'.18em', align:'left' } },
     { id:nid(), type:'credential', x:80, y:670, w:340, h:170, z:2,
       content:{ credId:'c1' }, animation:{ preset:'rise' } },
@@ -275,7 +275,7 @@ export function tplOrganizer() {
       content:{ text:'· manifesto', tag:'eyebrow' },
       styles:{ fontFamily:'JetBrains Mono', fontSize:12, color:'#0d8a7e', letterSpacing:'.2em', align:'left' } },
     { id:nid(), type:'text', x:60, y:820, w:560, h:300, z:2,
-      content:{ text:'เราเชื่อในห้องเรียนกลางแจ้ง · ในตลาดเก่า ในเช้าที่ฝนเพิ่งหยุด · ทุกเวิร์กชอปของเราออกแบบมาเพื่อทำให้ "ความสนใจ" กลับมาเป็นสมบัติของคุณอีกครั้ง', tag:'p' },
+      content:{ text:'เราเชื่อในห้องเรียนกลางแจ้ง · ในตลาดเก่า ในเช้าที่ฝนเพิ่งหยุด · ทุกกิจกรรมของเราออกแบบมาเพื่อทำให้ "ความสนใจ" กลับมาเป็นสมบัติของคุณอีกครั้ง', tag:'p' },
       styles:{ fontFamily:'Mitr', fontSize:30, fontWeight:400, color:'#0d1e1d', align:'left', lineHeight:1.35 } },
 
     { id:nid(), type:'sticker', x:700, y:820, w:200, h:200, z:3, rot:-8,
@@ -307,9 +307,9 @@ export function tplOrganizer() {
 
 export const TEMPLATES = {
   empty:       { th:'เปล่า',       en:'Empty canvas',  build: tplEmpty,       canvasH: CANVAS_H_MIN },
-  participant: { th:'ผู้เข้าร่วม', en:'Participant',   build: tplParticipant, canvasH: 1760 },
+  participant: { th:'ผู้เข้าร่วม', en:'Seeker',   build: tplParticipant, canvasH: 1760 },
   staff:       { th:'ทีม SoulSilent', en:'SoulSilent staff', build: tplStaff, canvasH: 1080 },
-  organizer:   { th:'ผู้จัดเวิร์กชอป', en:'Workshop organizer', build: tplOrganizer, canvasH: 1720 },
+  organizer:   { th:'ผู้จัดกิจกรรม', en:'Journey host', build: tplOrganizer, canvasH: 1720 },
 };
 
 export const PALETTE = [
@@ -365,7 +365,7 @@ export const PALETTE = [
                styles:{ fill:'#f5c243', color:'#0d1e1d', radius:999, fontSize:15, fontWeight:600, align:'center' } } },
     { kind:'contact', sub:'panel', th:'การ์ดติดต่อ', en:'Contact card',
       preset:{ w:520, h:130, content:{ kind:'panel' } } },
-    { kind:'credential', sub:'badge', th:'เหรียญรับรองเวิร์กชอป', en:'Workshop credential',
+    { kind:'credential', sub:'badge', th:'เหรียญรับรองกิจกรรม', en:'Journey credential',
       preset:{ w:340, h:170, content:{ credId:'c2' } } },
   ]},
   { group:{th:'มีเดีย', en:'Media'}, items:[

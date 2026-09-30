@@ -440,7 +440,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
 
   async function handleDelete() {
     if (!editingId) return;
-    if (!confirm('ต้องการลบ Workshop นี้?')) return;
+    if (!confirm('ต้องการลบกิจกรรมนี้?')) return;
     setDeleting(true);
     try {
       await fetch(`/api/workshops/${editingId}`, { method: 'DELETE' });
@@ -609,7 +609,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
 
       <div>
         <label className="block text-sm font-medium text-dark mb-1">
-          ข้อมูล Workshop (Master) <span className="text-gray font-normal">— ผูกรอบนี้กับภาพรวมกิจกรรม</span>
+          ข้อมูลกิจกรรม (Master) <span className="text-gray font-normal">— ผูกรอบนี้กับภาพรวมกิจกรรม</span>
         </label>
         <select
           value={form.master_id}
@@ -627,7 +627,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-dark mb-1">ชื่อ Workshop</label>
+        <label className="block text-sm font-medium text-dark mb-1">ชื่อกิจกรรม</label>
         <input
           value={form.title}
           onChange={(e) => setForm({ ...form, title: e.target.value })}
@@ -1017,7 +1017,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
           resolve to that single person) and heads the public list. */}
       <div>
         <label className="block text-sm font-medium text-dark mb-1">
-          ผู้สอน / ผู้จัด <span className="text-gray font-normal">(เลือกได้หลายคน)</span>
+          ผู้จัด <span className="text-gray font-normal">(เลือกได้หลายคน)</span>
         </label>
 
         {form.instructor_ids.length > 0 && (
@@ -1046,7 +1046,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
                     }`}
                     title={
                       isOwner
-                        ? 'ผู้สอนหลักเข้าถึงแดชบอร์ดได้เสมอ'
+                        ? 'ผู้จัดหลักเข้าถึงแดชบอร์ดได้เสมอ'
                         : 'อนุญาตให้เข้าถึง Dashboard ของกิจกรรมนี้ได้'
                     }
                   >
@@ -1090,7 +1090,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
 
         <div className="border border-gray-lighter rounded-xl divide-y divide-gray-lighter max-h-56 overflow-y-auto bg-surface/40">
           {teachers.length === 0 ? (
-            <p className="text-sm text-gray p-3">ยังไม่มีผู้สอนในระบบ</p>
+            <p className="text-sm text-gray p-3">ยังไม่มีผู้จัดในระบบ</p>
           ) : (
             teachers.map((t) => {
               const checked = form.instructor_ids.includes(t.id);
@@ -1125,7 +1125,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
           )}
         </div>
         <p className="text-xs text-gray mt-1.5">
-          คนแรกที่เลือก = ผู้รับผิดชอบหลัก (เห็นกิจกรรมนี้ในแดชบอร์ดผู้สอน และเป็นผู้รับเงินโอน)
+          คนแรกที่เลือก = ผู้รับผิดชอบหลัก (เห็นกิจกรรมนี้ใน Host Dashboard และเป็นผู้รับเงินโอน)
         </p>
       </div>
 
@@ -1396,7 +1396,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
           )}
         </div>
         <ImageUploader
-          label="รูปปก Workshop (โปสเตอร์ A3 · 29.7×42)"
+          label="รูปปกกิจกรรม (โปสเตอร์ A3 · 29.7×42)"
           folder="workshop"
           primary={ASPECTS.WORKSHOP_HERO}
           value={form.image_url}
@@ -1592,7 +1592,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
 
       <div className="flex items-center gap-3 pt-4 border-t border-gray-lighter">
         <button type="submit" disabled={saving} className="btn-primary">
-          {saving ? 'กำลังบันทึก...' : editingId ? 'บันทึกการแก้ไข' : 'สร้าง Workshop'}
+          {saving ? 'กำลังบันทึก...' : editingId ? 'บันทึกการแก้ไข' : 'สร้างกิจกรรม'}
         </button>
         {onCancel || onAttemptClose ? (
           <button type="button" onClick={() => (onAttemptClose ? onAttemptClose() : onCancel?.())} className="btn-ghost">
@@ -1610,7 +1610,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
             disabled={deleting}
             className="ml-auto text-red-500 text-sm font-medium hover:underline disabled:opacity-50"
           >
-            {deleting ? 'กำลังลบ...' : 'ลบ Workshop นี้'}
+            {deleting ? 'กำลังลบ...' : 'ลบกิจกรรมนี้'}
           </button>
         )}
       </div>

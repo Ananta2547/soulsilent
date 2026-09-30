@@ -57,7 +57,7 @@ export function InviteLinkBox({ url }: { url: string }) {
       <span style={{ fontSize: 12, color: '#8a5a00', background: '#fcefcf', border: '1px solid #f0dfae', borderRadius: 12, padding: '10px 13px', lineHeight: 1.6 }}>
         <T
           th="ใครเปิดลิงก์และกดรับสิทธิ์จะได้ที่นั่งในกลุ่ม จนกว่าจะครบจำนวน — ส่งให้เฉพาะคนในกลุ่ม เปิดดูอีกครั้งได้จากหน้ากิจกรรม"
-          en="Whoever opens it and claims takes a seat in the group until they run out — send it only to your group. You can find it again on the workshop page."
+          en="Whoever opens it and claims takes a seat in the group until they run out — send it only to your group. You can find it again on the journey page."
         />
       </span>
     </div>

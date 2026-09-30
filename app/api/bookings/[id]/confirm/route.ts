@@ -32,7 +32,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       .bind(booking.workshop_id)
       .first<Workshop>();
     if (!workshop) {
-      return NextResponse.json({ error: 'ไม่พบ Workshop' }, { status: 404 });
+      return NextResponse.json({ error: 'ไม่พบกิจกรรม' }, { status: 404 });
     }
 
     // Only an announced, approved selection seat can be confirmed.

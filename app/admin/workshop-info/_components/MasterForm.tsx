@@ -235,9 +235,9 @@ export function MasterForm({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-dark mb-1">ผู้จัดกิจกรรม (Organizer · ผู้สอน)</label>
+        <label className="block text-sm font-medium text-dark mb-1">ผู้จัดกิจกรรม (Host)</label>
         <select value={organizer} onChange={(e) => setOrganizer(e.target.value)} className="input-field">
-          <option value="">— เลือกผู้สอน —</option>
+          <option value="">— เลือกผู้จัด —</option>
           {teachers.map((t) => (
             <option key={t.id} value={t.id}>{t.name}</option>
           ))}
@@ -253,7 +253,7 @@ export function MasterForm({
       <fieldset className="border border-gray-lighter rounded-lg p-3">
         <legend className="text-sm font-medium text-dark px-1">ที่นั่ง</legend>
         <div className="mt-1 max-w-[220px]">
-          <label className="block text-xs text-gray mb-1">ที่นั่งต่อรอบ (ค่าเริ่มต้นตอนผู้สอนเปิดรอบ)</label>
+          <label className="block text-xs text-gray mb-1">ที่นั่งต่อรอบ (ค่าเริ่มต้นตอนผู้จัดเปิดรอบ)</label>
           <input type="number" min={1} step="1" value={defaultSeats} onChange={(e) => setDefaultSeats(e.target.value)} className="input-field" />
         </div>
       </fieldset>
@@ -261,11 +261,11 @@ export function MasterForm({
 
       {(initial?.kind || kind) === 'round' && (
       <fieldset className="border border-gray-lighter rounded-lg p-3">
-        <legend className="text-sm font-medium text-dark px-1">ราคา (ใช้กับทุกรอบที่ผู้สอนเปิด)</legend>
+        <legend className="text-sm font-medium text-dark px-1">ราคา (ใช้กับทุกรอบที่ผู้จัดเปิด)</legend>
         <p className="text-xs text-gray mt-1">
           เพิ่มราคาเป็นแถว — ต่อคน / เหมาทั้งรอบ / แพ็กคงที่ / กลุ่มระบุจำนวน (ราคากลุ่มคิดต่อคน × จำนวน · ผู้จองนับเป็น 1 คน แล้วส่งลิงก์เชิญเพื่อนที่เหลือ) · การ์ดโชว์ราคาต่อคนแถวแรก ถ้าไม่มีก็โชว์ราคาเหมารอบ
         </p>
-        {tiers.length === 0 && <p className="text-xs mt-2" style={{ color: '#a04a14' }}>⚠ ยังไม่มีราคา — ผู้สอนเปิดรอบไม่ได้จนกว่าจะเพิ่มอย่างน้อย 1 แถว</p>}
+        {tiers.length === 0 && <p className="text-xs mt-2" style={{ color: '#a04a14' }}>⚠ ยังไม่มีราคา — ผู้จัดเปิดรอบไม่ได้จนกว่าจะเพิ่มอย่างน้อย 1 แถว</p>}
 
         {/* Tiers the admin adds: a name, a price, and whether one purchase
             buys a seat or the whole round. */}
@@ -365,7 +365,7 @@ export function MasterForm({
 
       {(initial?.kind || kind) === 'round' && (
         <fieldset className="border border-gray-lighter rounded-lg p-3">
-          <legend className="text-sm font-medium text-dark px-1">สถานที่ที่เปิดรอบได้ (ผู้สอนเลือกอีกครั้งตอนเปิดรอบ)</legend>
+          <legend className="text-sm font-medium text-dark px-1">สถานที่ที่เปิดรอบได้ (ผู้จัดเลือกอีกครั้งตอนเปิดรอบ)</legend>
           {locations.length === 0 ? (
             <p className="text-xs text-gray mt-1">ยังไม่มีสถานที่ในระบบ — เพิ่มได้ที่เมนู สถานที่</p>
           ) : (
@@ -384,7 +384,7 @@ export function MasterForm({
               ))}
             </div>
           )}
-          <p className="text-xs text-gray mt-2">ไม่เลือกเลย = ให้ผู้สอนเลือกได้ทุกสถานที่</p>
+          <p className="text-xs text-gray mt-2">ไม่เลือกเลย = ให้ผู้จัดเลือกได้ทุกสถานที่</p>
         </fieldset>
       )}
 

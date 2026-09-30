@@ -809,7 +809,7 @@ export class DiaryBook extends Component<Props, State> {
             <span style={css("font-family:Caveat,'Mitr',cursive;font-size:24px;color:var(--teal)")}>มาไกลกว่าที่คิดนะ ✺</span>
             <div style={css('display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px')}>
               {[
-                [String(s.workshops).padStart(2, '0'), 'workshop ที่เข้าร่วม'],
+                [String(s.workshops).padStart(2, '0'), 'กิจกรรมที่เข้าร่วม'],
                 [String(s.logged), 'วันที่บันทึกอารมณ์'],
                 [String(s.pages), 'หน้าไดอารี่'],
                 [s.top || '—', 'อารมณ์ที่พบบ่อย'],
@@ -913,7 +913,7 @@ export class DiaryBook extends Component<Props, State> {
                         )}
                       </div>
                       <div style={css('flex:1;min-width:0;display:flex;flex-direction:column;gap:7px')}>
-                        <span className="eyebrow" style={{ color: 'var(--teal)' }}>WORKSHOP</span>
+                        <span className="eyebrow" style={{ color: 'var(--teal)' }}>JOURNEY</span>
                         <span style={css('font-family:Mitr,sans-serif;font-weight:500;font-size:15px;line-height:1.3;max-height:2.6em;overflow:hidden')}>{e.ws.title}</span>
                         <span style={css("font-family:var(--font-mono),'IBM Plex Sans Thai',ui-monospace,monospace;font-size:10.5px;letter-spacing:.1em;color:var(--muted)")}>{e.ws.time}</span>
                         {e.ws.drive && (

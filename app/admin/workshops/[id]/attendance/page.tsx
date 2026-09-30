@@ -222,7 +222,7 @@ export default function AttendancePage() {
   }
 
   if (!workshop) {
-    return <p className="text-gray text-center py-12">ไม่พบ Workshop</p>;
+    return <p className="text-gray text-center py-12">ไม่พบกิจกรรม</p>;
   }
 
   const attended = bookings.filter((b) => b.attended === 1).length;
@@ -250,7 +250,7 @@ export default function AttendancePage() {
           href="/admin/workshops"
           className="text-xs font-mono text-gray hover:text-primary tracking-wider uppercase"
         >
-          ← กลับไป Workshops
+          ← กลับไปรายการกิจกรรม
         </Link>
         <p className="text-xs font-mono text-primary tracking-[.2em] uppercase mt-3 mb-2">
           admin · attendance
@@ -333,7 +333,7 @@ export default function AttendancePage() {
       {/* Table */}
       <div className="card !p-0 overflow-hidden">
         {bookings.length === 0 ? (
-          <p className="text-gray text-sm py-10 text-center">ยังไม่มีผู้ที่ชำระเงินสำหรับ workshop นี้</p>
+          <p className="text-gray text-sm py-10 text-center">ยังไม่มีผู้ที่ชำระเงินสำหรับกิจกรรมนี้</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -732,7 +732,7 @@ function AddParticipantModal({
               ) : q.trim().length < 2 ? (
                 <p className="text-sm text-gray text-center py-6">พิมพ์อย่างน้อย 2 ตัวอักษร</p>
               ) : results.length === 0 ? (
-                <p className="text-sm text-gray text-center py-6">ไม่พบผู้ใช้</p>
+                <p className="text-sm text-gray text-center py-6">ไม่พบผู้เข้าร่วม</p>
               ) : (
                 results.map((u) => {
                   const already = existingEmails.has((u.email || '').toLowerCase());

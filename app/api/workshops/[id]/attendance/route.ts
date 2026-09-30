@@ -17,7 +17,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const { id: workshopId } = await params;
     const { user_id } = (await request.json()) as { user_id?: string };
     if (!user_id) {
-      return NextResponse.json({ error: 'กรุณาเลือกผู้ใช้' }, { status: 400 });
+      return NextResponse.json({ error: 'กรุณาเลือกผู้เข้าร่วม' }, { status: 400 });
     }
     const db = await getDB();
 
@@ -26,7 +26,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       .bind(workshopId)
       .first<{ id: string }>();
     if (!workshop) {
-      return NextResponse.json({ error: 'ไม่พบ Workshop' }, { status: 404 });
+      return NextResponse.json({ error: 'ไม่พบกิจกรรม' }, { status: 404 });
     }
 
     const target = await db
@@ -34,7 +34,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       .bind(user_id)
       .first<{ id: string; name: string | null; email: string | null }>();
     if (!target) {
-      return NextResponse.json({ error: 'ไม่พบผู้ใช้' }, { status: 404 });
+      return NextResponse.json({ error: 'ไม่พบผู้เข้าร่วม' }, { status: 404 });
     }
 
     // Reuse an existing row: a live (non-cancelled) booking means they're
@@ -50,7 +50,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     let bookingId: string;
     if (existing && existing.status !== 'cancelled') {
-      return NextResponse.json({ error: 'ผู้ใช้นี้อยู่ในรายชื่อแล้ว' }, { status: 409 });
+      return NextResponse.json({ error: 'ผู้เข้าร่วมคนนี้อยู่ในรายชื่อแล้ว' }, { status: 409 });
     } else if (existing) {
       bookingId = existing.id;
       await db

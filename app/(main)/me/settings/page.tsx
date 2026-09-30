@@ -144,7 +144,7 @@ function SettingsHub() {
           <T th="ตั้งค่า" en="Settings" />
         </h1>
         <p style={{ margin: '10px 0 0', fontSize: 15, color: 'var(--muted)', lineHeight: 1.55, maxWidth: 560 }}>
-          <T th="จัดการโปรไฟล์ บัญชี และข้อมูลสำหรับสมัครเวิร์กชอป" en="Manage your profile, account and workshop checkout data." />
+          <T th="จัดการโปรไฟล์ บัญชี และข้อมูลสำหรับสมัครกิจกรรม" en="Manage your profile, account and journey checkout data." />
         </p>
       </div>
 

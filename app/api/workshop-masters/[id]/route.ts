@@ -29,7 +29,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       .bind(id)
       .first<WorkshopMaster>();
     if (!master) {
-      return NextResponse.json({ error: 'ไม่พบข้อมูล Workshop' }, { status: 404 });
+      return NextResponse.json({ error: 'ไม่พบข้อมูลกิจกรรม' }, { status: 404 });
     }
 
     const sessions = await db

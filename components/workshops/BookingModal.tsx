@@ -414,7 +414,7 @@ export function BookingModal({
               {at ? tr(lang, `อีก ${daysUntil(at)} วัน`, `in ${daysUntil(at)} days`) : tr(lang, 'ติดตามได้ที่หน้าการจอง', 'Watch your bookings page')}
             </p>
             <div style={{ background: 'var(--cream)', borderRadius: 18, padding: '14px 16px', marginBottom: 18, display: 'flex', flexDirection: 'column', gap: 9 }}>
-              <Numbered n="01" plain>{tr(lang, 'ผู้สอนอ่านใบสมัครทุกใบด้วยตัวเอง', 'The teacher reads every application.')}</Numbered>
+              <Numbered n="01" plain>{tr(lang, 'ผู้จัดอ่านใบสมัครทุกใบด้วยตัวเอง', 'The host reads every application.')}</Numbered>
               <Numbered n="02" plain>{tr(lang, 'แจ้งผลทางอีเมลและในหน้าการจอง', 'Results go out by email and on your bookings page.')}</Numbered>
               <Numbered n="03" plain>{tr(lang, 'ถ้าได้รับเลือก จึงค่อยชำระเงิน', 'You pay only if you are picked.')}</Numbered>
             </div>
@@ -495,7 +495,7 @@ export function BookingModal({
               <ShareButton url={result.inviteUrl} title={workshop.title} lang={lang} />
             </div>
             <p style={{ margin: '12px 0 0', textAlign: 'center', fontSize: 12, color: 'var(--muted)' }}>
-              {tr(lang, 'เปิดลิงก์นี้อีกครั้งได้จากหน้ากิจกรรม', 'You can open this link again from the workshop page.')}
+              {tr(lang, 'เปิดลิงก์นี้อีกครั้งได้จากหน้ากิจกรรม', 'You can open this link again from the journey page.')}
             </p>
           </div>
         </Shell>
@@ -535,11 +535,11 @@ export function BookingModal({
             <b className="display-th" style={{ fontSize: 20, color: 'var(--ink)', marginLeft: 'auto' }}>{tr(lang, `${age} ปี`, `${age}`)}</b>
           </div>
           <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.65, margin: '0 0 20px' }}>
-            {tr(lang, 'ผู้สอนกำหนดช่วงอายุไว้เพื่อให้เนื้อหาเหมาะกับกลุ่มผู้เรียน — ลองดูกิจกรรมอื่นที่เปิดรับทุกวัย', 'The teacher set an age range so the content fits the group — try another activity that is open to all ages.')}
+            {tr(lang, 'ผู้จัดกำหนดช่วงอายุไว้เพื่อให้เนื้อหาเหมาะกับกลุ่มผู้เข้าร่วม — ลองดูกิจกรรมอื่นที่เปิดรับทุกวัย', 'The host set an age range so the content fits the group — try another journey that is open to all ages.')}
           </p>
           <div style={{ display: 'flex', gap: 10 }}>
             <button type="button" onClick={onClose} className="btn btn-paper" style={{ flex: 1, justifyContent: 'center', background: 'var(--cream)' }}>{tr(lang, 'ปิด', 'Close')}</button>
-            <Link href="/workshops" className="btn btn-ink" style={{ flex: 1.2, justifyContent: 'center', boxSizing: 'border-box' }}>
+            <Link href="/journeys" className="btn btn-ink" style={{ flex: 1.2, justifyContent: 'center', boxSizing: 'border-box' }}>
               {tr(lang, 'ดูกิจกรรมอื่น', 'Other activities')} <span className="mono">→</span>
             </Link>
           </div>
@@ -707,7 +707,7 @@ export function BookingModal({
 
             {questions.length > 0 && (
               <Card pad="18px 20px">
-                <Eyebrow style={{ marginBottom: 14 }}>{isOnline ? '01' : '02'} — {tr(lang, 'คำถามจากผู้สอน', 'From the teacher')}</Eyebrow>
+                <Eyebrow style={{ marginBottom: 14 }}>{isOnline ? '01' : '02'} — {tr(lang, 'คำถามจากผู้จัด', 'From the host')}</Eyebrow>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
                   {questions.map((q) => (
                     <div key={q.id}>

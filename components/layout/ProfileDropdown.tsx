@@ -268,7 +268,7 @@ export function ProfileDropdown({
         {/* Teacher / organizer dashboard */}
         {hasAnyRole(user.roles || [user.role], ['teacher']) && (
           <Link
-            href="/teacher"
+            href="/host"
             role="menuitem"
             onClick={onClose}
             className="prof-item"
@@ -292,7 +292,7 @@ export function ProfileDropdown({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M8 9h8M8 12h5" />
               </svg>
             </span>
-            <span style={{ flex: 1 }}>{tr(lang, 'แดชบอร์ดผู้สอน', 'Teacher dashboard')}</span>
+            <span style={{ flex: 1 }}>{tr(lang, 'Host Dashboard', 'Host Dashboard')}</span>
           </Link>
         )}
 

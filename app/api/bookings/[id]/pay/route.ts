@@ -39,7 +39,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       .bind(booking.workshop_id)
       .first<Workshop>();
     if (!workshop || workshop.status !== 'active') {
-      return NextResponse.json({ error: 'Workshop นี้ไม่เปิดรับแล้ว' }, { status: 400 });
+      return NextResponse.json({ error: 'กิจกรรมนี้ไม่เปิดรับแล้ว' }, { status: 400 });
     }
 
     // Selection apps can only pay after being approved AND confirming their seat.

@@ -659,7 +659,7 @@ export function Inspector({
 
         {node.type === 'credential' && (
           <div className="pb-insp-group">
-            <div className="lbl">{tr(lang, 'เลือกเวิร์กชอปจริง', 'Pick a real workshop')}</div>
+            <div className="lbl">{tr(lang, 'เลือกกิจกรรมจริง', 'Pick a real journey')}</div>
             {credentials.length > 0 ? (
               <div className="pb-pill-row">
                 {credentials.map((c) => (
@@ -685,7 +685,7 @@ export function Inspector({
             ) : (
               <>
                 <p style={{ fontSize: 11, color: 'var(--muted)', margin: '0 0 8px' }}>
-                  {tr(lang, 'ยังไม่มีเวิร์กชอปที่เข้าร่วม — ใช้ตัวอย่างไปก่อน', 'No workshops yet — using samples')}
+                  {tr(lang, 'ยังไม่มีกิจกรรมที่เข้าร่วม — ใช้ตัวอย่างไปก่อน', 'No journeys yet — using samples')}
                 </p>
                 <div className="pb-pill-row">
                   {SAMPLE_CREDENTIALS.map((c) => (
