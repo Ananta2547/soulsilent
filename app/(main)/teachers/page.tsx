@@ -35,7 +35,7 @@ export default function TeachersPage() {
   const [teachers, setTeachers] = useState<TeacherCard[] | null>(null);
   const [stats, setStats] = useState<Stats>({ makers: 0, rounds: 0, people: 0 });
   const [filter, setFilter] = useState('all');
-  const [sort, setSort] = useState<'soon' | 'name'>('soon');
+  const [query, setQuery] = useState('');
   const [hover, setHover] = useState<string | null>(null);
   const [spot, setSpot] = useState(0);
   const [prog, setProg] = useState(0);
@@ -95,18 +95,23 @@ export default function TeachersPage() {
   }, [teachers]);
 
   const list = useMemo(() => {
-    const l = (teachers || []).filter((t) => filter === 'all' || t.crafts.includes(filter));
-    // "มีรอบเปิดรับ": whoever teaches soonest comes first; hosts with no
-    // round coming up follow, by name.
+    // Search reads the name, nickname, crafts, bio and what they teach.
+    const q = query.trim().toLowerCase();
+    const l = (teachers || []).filter(
+      (t) =>
+        (filter === 'all' || t.crafts.includes(filter)) &&
+        (!q || [t.name, t.nickname, t.bio, ...t.crafts, ...t.rounds.map((r) => r.title), ...t.works.map((w) => w.title)].some((x) => (x || '').toLowerCase().includes(q))),
+    );
+    // Whoever teaches soonest comes first; hosts with no round coming up
+    // follow, by name.
     const soonKey = (t: TeacherCard) => (t.next_date ? `${t.next_date} ${t.next_time || ''}` : '');
     return l.sort((a, b) => {
-      if (sort === 'name') return a.name.localeCompare(b.name, 'th');
       const ka = soonKey(a), kb = soonKey(b);
       if (ka && kb && ka !== kb) return ka.localeCompare(kb);
       if (!ka !== !kb) return ka ? -1 : 1;
       return a.name.localeCompare(b.name, 'th');
     });
-  }, [teachers, filter, sort]);
+  }, [teachers, filter, query]);
 
   if (teachers === null) return null;
 
@@ -287,10 +292,13 @@ export default function TeachersPage() {
               <span className="tm-eyebrow">{th ? '03 — ทุกคนในชุมชน' : '03 — Everyone here'}</span>
               <h2 className="tm-h2" style={{ fontSize: 'clamp(24px,3vw,32px)', margin: '10px 0 0' }}>{th ? 'เลือกจากสิ่งที่เขาถนัด' : 'Browse by craft'}</h2>
             </div>
-            <div className="tm-seg">
-              <button type="button" className={sort === 'soon' ? 'on' : ''} onClick={() => setSort('soon')}>{th ? 'มีรอบเปิดรับ' : 'Open rounds first'}</button>
-              <button type="button" className={sort === 'name' ? 'on' : ''} onClick={() => setSort('name')}>{th ? 'เรียงตามชื่อ' : 'A–Z'}</button>
-            </div>
+            <label className="tm-search">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="M21 21l-4.3-4.3" />
+              </svg>
+              <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={th ? 'ค้นหาผู้สอน หรือสิ่งที่สอน…' : 'Search makers or crafts…'} aria-label={th ? 'ค้นหาผู้สอน' : 'Search makers'} />
+            </label>
           </div>
 
           {crafts.length > 0 && (
@@ -306,7 +314,13 @@ export default function TeachersPage() {
           {list.length === 0 ? (
             <div className="tm-none">
               <div style={{ fontSize: 28, color: 'var(--accent)', marginBottom: 10 }}>✺</div>
-              {th ? 'ยังไม่มีผู้สอนในหมวดนี้ — ลองดูหมวดอื่น' : 'No makers in this craft yet — try another.'}
+              {query.trim()
+                ? th
+                  ? `ไม่พบผู้สอนที่ตรงกับ “${query.trim()}”`
+                  : `No makers match “${query.trim()}”`
+                : th
+                  ? 'ยังไม่มีผู้สอนในหมวดนี้ — ลองดูหมวดอื่น'
+                  : 'No makers in this craft yet — try another.'}
             </div>
           ) : (
             <div className="tm-grid">
