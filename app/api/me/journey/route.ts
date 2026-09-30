@@ -59,7 +59,30 @@ export async function GET() {
         photos_drive_url: (b.photos_drive_url as string | null) ?? null,
       }));
 
-    return NextResponse.json({ items });
+    // Seats bought for workshops that have not ended yet: the Diary book shows
+    // them on their day ahead of time (writing opens on the day itself).
+    const upcoming = (rows.results || [])
+      .filter((b) => {
+        const secured = b.payment_status === 'paid' || b.status === 'confirmed';
+        const ended = hasWorkshopEnded({
+          workshop_type: (b.workshop_type as 'one_day') || 'one_day',
+          date: (b.date as string) || '',
+          end_date: (b.end_date as string | null) ?? null,
+          dates_json: (b.dates_json as string) || '[]',
+          time_end: (b.time_end as string) || '23:59',
+        });
+        return secured && !ended;
+      })
+      .map((b) => ({
+        workshop_id: b.workshop_id as string,
+        title: b.title as string,
+        image_url: (b.image_url as string | null) ?? null,
+        date: b.date as string,
+        time_start: b.time_start as string,
+        time_end: b.time_end as string,
+      }));
+
+    return NextResponse.json({ items, upcoming });
   } catch (error) {
     const err = error as Error;
     if (err.message === 'Unauthorized') {

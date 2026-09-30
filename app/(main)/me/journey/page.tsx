@@ -22,6 +22,7 @@ import { MoodTab, SummaryTab, monthStats, type DayWorkshop } from '@/components/
 import { JourneyMap, JourneyRail, StopFull, StopModal, itemHours } from '@/components/journey/JourneyV2';
 
 type View = 'journey' | 'diary';
+type UpcomingSeat = { workshop_id: string; title: string; image_url: string | null; date: string; time_start: string; time_end: string };
 type DiaryTab = 'book' | 'mood' | 'sum';
 
 // useSearchParams needs a Suspense boundary to build.
@@ -40,6 +41,7 @@ function JourneyAndDiary() {
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [months, setMonths] = useState<string[]>([]);
   const [events, setEvents] = useState<UserEvent[]>([]);
+  const [upcoming, setUpcoming] = useState<UpcomingSeat[]>([]);
   const [owner, setOwner] = useState('');
   const [loading, setLoading] = useState(true);
   const [unauthorized, setUnauthorized] = useState(false);
@@ -71,7 +73,7 @@ function JourneyAndDiary() {
             setUnauthorized(true);
             return null;
           }
-          return r.json() as Promise<{ items: JourneyItem[] }>;
+          return r.json() as Promise<{ items: JourneyItem[]; upcoming?: UpcomingSeat[] }>;
         }),
         fetch('/api/me/diary').then((r) => (r.ok ? (r.json() as Promise<{ entries: DiaryEntry[]; months: string[] }>) : null)),
         fetch('/api/auth/me').then((r) => r.json() as Promise<{ user?: { name?: string | null } | null }>),
@@ -80,7 +82,10 @@ function JourneyAndDiary() {
       ])
         .then(([j, d, me, ev]) => {
           if (ev) setEvents(ev.events || []);
-          if (j) setItems(j.items || []);
+          if (j) {
+            setItems(j.items || []);
+            setUpcoming(j.upcoming || []);
+          }
           if (d) {
             setEntries(d.entries || []);
             setMonths(d.months || []);
@@ -115,8 +120,13 @@ function JourneyAndDiary() {
     items.forEach((it) => {
       if (!m[it.date]) m[it.date] = { title: it.title, time: `${it.time_start}–${it.time_end}`, poster: it.image_url, drive: it.photos_drive_url };
     });
+    // Seats already bought show on their day ahead of time (the page stays
+    // locked for writing until then).
+    upcoming.forEach((u) => {
+      if (!m[u.date]) m[u.date] = { title: u.title, time: `${u.time_start}–${u.time_end}`, poster: u.image_url, drive: null };
+    });
     return m;
-  }, [items]);
+  }, [items, upcoming]);
   // Every day an event covers gets it, ordered by start time (all-day first).
   const bookEvents = useMemo(() => {
     const m: Record<string, BookEvent[]> = {};

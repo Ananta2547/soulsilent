@@ -197,9 +197,11 @@ export class DiaryBook extends Component<Props, State> {
       const o = this.state.over[iso];
       map[iso] = { iso, ws: this.wsFor(iso), notes: o.notes.slice(), moods: this.resolve(o.moods) };
     });
-    // Workshop and event days show up in the book even before anything is written.
+    // Workshop and event days show up in the book even before anything is
+    // written — future ones too (booked seats, planned events), locked until
+    // the day comes.
     [...Object.keys(this.props.workshops), ...Object.keys(this.props.events || {})].forEach((iso) => {
-      if (!map[iso] && iso <= this.props.today) map[iso] = { iso, ws: this.wsFor(iso), notes: [''], moods: [] };
+      if (!map[iso]) map[iso] = { iso, ws: this.wsFor(iso), notes: [''], moods: [] };
     });
     return Object.keys(map).sort().map((k) => map[k]);
   }
@@ -467,11 +469,21 @@ export class DiaryBook extends Component<Props, State> {
     this.flipTo(i, this.build(this.state.ghost));
   }
 
+  /** The furthest day the strip and pickers reach: today, or a later day
+   *  that already has a booked workshop or a planned event. */
+  horizon(): string {
+    const es = this.entries();
+    const last = es.length ? es[es.length - 1].iso : this.props.today;
+    return last > this.props.today ? last : this.props.today;
+  }
+
   goDate(iso: string, focus?: boolean) {
     const st = this.state;
-    if (iso > this.props.today || st.flip) return;
-    this.flush();
+    if (st.flip) return;
     const has = this.entries().some((e) => e.iso === iso);
+    // Days ahead open only when something is on them (read-only pages).
+    if (iso > this.props.today && !has) return;
+    this.flush();
     const oldB = this.build(st.ghost);
     const focusKey = (oldB.P[st.at] || { key: '' }).key;
     const ng = has ? null : iso;
@@ -506,7 +518,7 @@ export class DiaryBook extends Component<Props, State> {
     const base = this.weekBase();
     const nb = addDays(base, 7 * dir);
     clearTimeout(this._st);
-    if (dir > 0 && nb > this.props.today) {
+    if (dir > 0 && nb > this.horizon()) {
       this.setState({ sAnim: 'back', sdx: 0 });
       this._st = setTimeout(() => this.setState({ sAnim: null }), 300);
       return;
@@ -519,10 +531,10 @@ export class DiaryBook extends Component<Props, State> {
   }
   pickMonth(y: number, m: number) {
     const first = y + '-' + String(m + 1).padStart(2, '0') + '-01';
-    if (first > this.props.today) { this.say('ยังไม่ถึงเดือนนี้'); return; }
+    if (first > this.horizon()) { this.say('ยังไม่ถึงเดือนนี้'); return; }
     let ws = weekStartOf(first);
     if (dateOf(ws).getMonth() !== m) ws = addDays(ws, 7);
-    if (ws > this.props.today) ws = weekStartOf(first);
+    if (ws > this.horizon()) ws = weekStartOf(first);
     this.setState({ weekStart: ws, vm: y + '-' + m });
   }
 
@@ -586,7 +598,7 @@ export class DiaryBook extends Component<Props, State> {
         if (s.touch && Math.abs(dy) > Math.abs(dx)) { this._sdrag = null; return; }
         s.moved = true;
       }
-      const canNext = addDays(this.weekBase(), 7) <= this.props.today;
+      const canNext = addDays(this.weekBase(), 7) <= this.horizon();
       this.setState({ sdx: dx < 0 && !canNext ? dx * 0.3 : dx });
       return;
     }
@@ -819,6 +831,8 @@ export class DiaryBook extends Component<Props, State> {
       const tray = this.state.tray;
       const open = !!(tray && tray.iso === iso);
       const evs = (this.props.events && this.props.events[iso]) || [];
+      // A day still ahead: its workshop and events show, the pen does not.
+      const locked = iso > this.props.today;
       const cap = p.sub === 0 ? CAP_FIRST : CAP_REST;
       const len = (p.tx || '').length;
       const status = this.state.saved[iso] === false ? 'กำลังบันทึก…' : this.state.saved[iso] ? '✓ บันทึกแล้ว' : '';
@@ -848,9 +862,13 @@ export class DiaryBook extends Component<Props, State> {
                       )}
                     </span>
                   ))}
-                  <button type="button" onPointerDown={this.stopPtr} onClick={() => this.toggleTray(iso)} style={css('border:0;cursor:pointer;border-radius:999px;padding:5px 12px;font-family:inherit;font-size:12.5px;font-weight:600;background:' + (open ? 'var(--ink)' : '#e6f4f2') + ';color:' + (open ? '#fff' : 'var(--teal-deep)'))}>
-                    {open ? 'เสร็จ' : e.moods.length ? '+ อารมณ์' : '+ อารมณ์วันนี้'}
-                  </button>
+                  {locked ? (
+                    <span style={css('display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:600;background:var(--cream);color:var(--muted)')}>🔒 เลือกอารมณ์ได้เมื่อถึงวันนั้น</span>
+                  ) : (
+                    <button type="button" onPointerDown={this.stopPtr} onClick={() => this.toggleTray(iso)} style={css('border:0;cursor:pointer;border-radius:999px;padding:5px 12px;font-family:inherit;font-size:12.5px;font-weight:600;background:' + (open ? 'var(--ink)' : '#e6f4f2') + ';color:' + (open ? '#fff' : 'var(--teal-deep)'))}>
+                      {open ? 'เสร็จ' : e.moods.length ? '+ อารมณ์' : '+ อารมณ์วันนี้'}
+                    </button>
+                  )}
                 </div>
                 {open && (
                   <div style={css('display:block;flex:none;margin-top:10px;padding:12px;border-radius:14px;background:var(--cream)')}>
@@ -944,8 +962,19 @@ export class DiaryBook extends Component<Props, State> {
             <div style={css('display:flex;flex:1;min-height:0;flex-direction:column;margin-top:' + (p.kind === 'day' ? '14px' : '10px'))}>
               <div style={css('display:flex;align-items:baseline;justify-content:space-between;gap:8px')}>
                 <span style={css('font-family:Mitr,sans-serif;font-weight:500;font-size:13.5px;color:var(--muted)')}>บันทึกของฉัน</span>
-                <span style={css('font-family:var(--font-mono),ui-monospace,monospace;font-size:10.5px;letter-spacing:.08em;color:' + (len >= cap * 0.9 ? '#c9503f' : 'var(--muted)'))}>{len + ' / ' + cap}</span>
+                <span style={css('font-family:var(--font-mono),ui-monospace,monospace;font-size:10.5px;letter-spacing:.08em;color:' + (len >= cap * 0.9 ? '#c9503f' : 'var(--muted)'))}>{locked ? '' : len + ' / ' + cap}</span>
               </div>
+              {locked ? (
+                <div style={css('flex:1;min-height:0;position:relative;margin-top:6px;overflow:hidden')}>
+                  <div style={css('position:absolute;inset:0;background:repeating-linear-gradient(180deg,transparent 0 29px,rgba(13,138,126,.1) 29px 30px);pointer-events:none')} />
+                  <div style={css('position:relative;margin-top:14px;padding:14px 16px;border-radius:14px;background:rgba(246,241,230,.95);box-shadow:inset 0 0 0 1px var(--cream-deep);display:flex;flex-direction:column;gap:6px')}>
+                    <span style={css('font-family:Mitr,sans-serif;font-weight:500;font-size:15px;color:var(--ink)')}>🔒 ยังเขียนบันทึกไม่ได้</span>
+                    <span style={css('font-size:13px;line-height:1.6;color:var(--muted)')}>
+                      {'หน้านี้จะเปิดให้จดบันทึกและเลือกอารมณ์ในวันที่ ' + d.getDate() + ' ' + TH_MON[d.getMonth()] + ' ' + d.getFullYear() + ' — ' + (e.ws || evs.length ? 'วันกิจกรรมที่คุณลงไว้' : 'เมื่อถึงวันนั้น')}
+                    </span>
+                  </div>
+                </div>
+              ) : (
               <div style={css('flex:1;min-height:0;position:relative;margin-top:6px;overflow:hidden')}>
                 <div style={css('position:absolute;inset:0;background:repeating-linear-gradient(180deg,transparent 0 29px,rgba(13,138,126,.18) 29px 30px);pointer-events:none')} />
                 <textarea
@@ -960,8 +989,9 @@ export class DiaryBook extends Component<Props, State> {
                   style={css("position:absolute;inset:0;width:100%;height:100%;box-sizing:border-box;border:0;outline:none;resize:none;background:transparent;font-size:16px;line-height:30px;padding:5px 4px 0;color:var(--ink);font-family:'IBM Plex Sans Thai',system-ui,sans-serif;cursor:text")}
                 />
               </div>
+              )}
               <div style={css('display:flex;align-items:center;gap:8px;min-height:34px;margin-top:6px;flex-wrap:wrap')}>
-                {p.sub === p.total - 1 && (
+                {p.sub === p.total - 1 && !locked && (
                   <button type="button" onPointerDown={this.stopPtr} onClick={() => this.addPage(iso)} style={css('border:0;cursor:pointer;border-radius:999px;padding:7px 14px;background:#e6f4f2;color:var(--teal-deep);font-family:inherit;font-size:12.5px;font-weight:600')}>
                     + เพิ่มหน้า
                   </button>
@@ -1125,7 +1155,9 @@ export class DiaryBook extends Component<Props, State> {
         const iso = addDays(ws, i);
         const d = dateOf(iso);
         const e = emap[iso];
-        const future = iso > today;
+        // A day ahead can be opened only when a booking or event is on it.
+        const future = iso > today && !e;
+        const ahead = iso > today && !!e;
         const sel = visible.indexOf(iso) >= 0;
         const isToday = iso === today;
         const hasTx = !!e && (e.notes.some((x) => x.trim()) || e.moods.length > 0);
@@ -1133,14 +1165,14 @@ export class DiaryBook extends Component<Props, State> {
           <button key={iso} type="button" disabled={future} onClick={() => { if (!this._stripMoved) this.goDate(iso); }} style={css('display:flex;flex-direction:column;align-items:center;gap:4px;border:0;border-radius:12px;padding:7px 0 6px;min-width:0;font-family:inherit;transition:background .25s cubic-bezier(.2,.7,.2,1),color .25s;cursor:' + (future ? 'default' : 'pointer') + ';opacity:' + (future ? 0.35 : 1) + ';background:' + (sel ? 'var(--ink)' : 'rgba(13,30,29,.05)') + ';color:' + (sel ? '#fff' : isToday ? 'var(--teal)' : 'var(--ink)'))}>
             <span style={css('font-size:10.5px;line-height:1;color:' + (sel ? 'rgba(255,255,255,.7)' : 'var(--muted)'))}>{TH_DOW[d.getDay()]}</span>
             <span style={css("font-family:'Archivo Black','Mitr',sans-serif;font-size:15px;line-height:1")}>{d.getDate()}</span>
-            <span style={css('width:6px;height:6px;border-radius:50%;background:' + (hasTx && e ? (e.moods.length ? dotBg(e.moods) : 'var(--teal)') : 'transparent'))} />
+            <span style={css('width:6px;height:6px;border-radius:50%;box-sizing:border-box;background:' + (hasTx && e ? (e.moods.length ? dotBg(e.moods) : 'var(--teal)') : 'transparent') + ';box-shadow:' + (ahead ? 'inset 0 0 0 1.5px ' + (sel ? '#fff' : 'var(--teal)') : 'none'))} />
           </button>,
         );
       }
       return days;
     };
     const weeks3 = [addDays(base, -7), base, addDays(base, 7)];
-    const canNext = addDays(base, 7) <= today;
+    const canNext = addDays(base, 7) <= this.horizon();
     const txv = st.sAnim === 'prev' ? '0%' : st.sAnim === 'next' ? '-66.6667%' : 'calc(-33.3333% + ' + st.sdx.toFixed(0) + 'px)';
     let vmY: number, vmM: number;
     if (st.vm) {
@@ -1154,7 +1186,7 @@ export class DiaryBook extends Component<Props, State> {
     }
     const firstYear = Math.min(+today.slice(0, 4), ...this.props.entries.map((e) => +e.day.slice(0, 4)), ...Object.keys(this.props.workshops).map((d) => +d.slice(0, 4)));
     const years: number[] = [];
-    for (let y = firstYear; y <= +today.slice(0, 4); y++) years.push(y);
+    for (let y = firstYear; y <= +this.horizon().slice(0, 4); y++) years.push(y);
 
     let posLabel: string;
     if (portrait) {
