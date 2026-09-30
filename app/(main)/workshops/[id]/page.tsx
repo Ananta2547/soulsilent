@@ -31,7 +31,9 @@ import {
   isWorkshopOngoing,
   getWorkshopDays,
   getWorkshopStatusBadge,
+  canAccessTeacherDashboard,
 } from '@/lib/workshop-utils';
+import { hasAnyRole } from '@/lib/roles';
 import { learnServerClock } from '@/lib/server-clock';
 import { visibleAppStatus } from '@/lib/selection-status';
 import { GiftModal } from '@/components/workshops/GiftModal';
@@ -132,6 +134,7 @@ function WorkshopDetailInner() {
   const [transferBusy, setTransferBusy] = useState(false);
   // null = still checking; true/false = known login state.
   const [authed, setAuthed] = useState<boolean | null>(null);
+  const [me, setMe] = useState<{ id: string; roles: string[] } | null>(null);
   const [openDays, setOpenDays] = useState<number[]>([0]);
 
   // Holds the loading screen until the workshop itself is here. Refreshes
@@ -199,8 +202,11 @@ function WorkshopDetailInner() {
     (async () => {
       try {
         const res = await fetch('/api/auth/me');
-        const data = (await res.json()) as { user: { id: string } | null };
-        if (!cancelled) setAuthed(!!data.user);
+        const data = (await res.json()) as { user: { id: string; role?: string; roles?: string[] } | null };
+        if (!cancelled) {
+          setAuthed(!!data.user);
+          setMe(data.user ? { id: data.user.id, roles: data.user.roles || (data.user.role ? [data.user.role] : []) } : null);
+        }
       } catch {
         if (!cancelled) setAuthed(false);
       }
@@ -379,6 +385,9 @@ function WorkshopDetailInner() {
   }
 
   const spotsLeft = workshop.max_participants - bookingCount;
+  // The workshop's own teacher (lead, or given dashboard access) manages it
+  // from the dashboard — same rule the dashboard itself enforces.
+  const manageHref = me && hasAnyRole(me.roles, ['teacher']) && canAccessTeacherDashboard(workshop, me.id) ? `/teacher/workshops/${workshop.id}` : null;
   const scheduleDays = parseSchedule(workshop.schedule_json);
   const learnItems = safeParseArray<string>(workshop.learn_json, []);
   const targetItems = safeParseArray<string>(workshop.target_json, []);
@@ -1029,6 +1038,7 @@ function WorkshopDetailInner() {
                   onResume={resumePayment}
                   onReview={() => setReviewOpen(true)}
                   onViewApplication={() => setConsentOpen(true)}
+                  manageHref={manageHref}
                   lang={lang}
                 />
               </div>
@@ -1215,6 +1225,7 @@ function BookingCardContent({
   onResume,
   onReview,
   onViewApplication,
+  manageHref,
   lang,
 }: {
   workshop: Workshop;
@@ -1235,6 +1246,8 @@ function BookingCardContent({
   onResume: () => void;
   onReview: () => void;
   onViewApplication: () => void;
+  /** Set when the viewer teaches this workshop: its Teacher Dashboard page. */
+  manageHref?: string | null;
   lang: 'th' | 'en';
 }) {
   const eff = getEffectivePrice(workshop);
@@ -1404,8 +1417,13 @@ function BookingCardContent({
         </div>
       )}
 
-      {/* Primary action */}
-      {cancelled ? (
+      {/* Primary action — the workshop's own teacher gets their dashboard
+          instead of a booking button. */}
+      {manageHref ? (
+        <Link href={manageHref} className="btn btn-ink" style={{ width: '100%', justifyContent: 'center', fontSize: 15, padding: '15px 22px', marginBottom: 10 }}>
+          {tr(lang, 'จัดการใน Teacher Dashboard', 'Manage in Teacher Dashboard')} <span className="mono">→</span>
+        </Link>
+      ) : cancelled ? (
         <div
           style={{ width: '100%', textAlign: 'center', fontSize: 14.5, fontWeight: 600, color: '#b3261e', background: '#fdeceb', border: '1px solid #f3c9c5', borderRadius: 14, padding: '15px 18px', lineHeight: 1.6 }}
         >

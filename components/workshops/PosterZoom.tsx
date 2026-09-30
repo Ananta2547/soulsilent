@@ -34,12 +34,6 @@ export function PosterZoom({ src, alt }: { src: string; alt: string }) {
       <button type="button" className="poster-zoom-btn" onClick={() => setOpen(true)} aria-label={`ดูโปสเตอร์เต็ม: ${alt}`}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={src} alt={alt} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-        <span className="poster-zoom-hint" aria-hidden>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-          </svg>
-          ดูโปสเตอร์เต็ม
-        </span>
       </button>
       {open &&
         createPortal(
