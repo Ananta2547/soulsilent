@@ -1056,7 +1056,7 @@ function CopyRow({ url, lang }: { url: string; lang: 'th' | 'en' }) {
   }
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--cream)', borderRadius: 16, padding: '8px 8px 8px 14px', marginBottom: 10 }}>
-      <input readOnly value={url} onFocus={(e) => e.currentTarget.select()} style={{ flex: 1, minWidth: 0, border: 0, background: 'transparent', fontSize: 12.5, color: 'var(--ink)', fontFamily: 'JetBrains Mono, monospace' }} />
+      <input readOnly value={url} onFocus={(e) => e.currentTarget.select()} style={{ flex: 1, minWidth: 0, border: 0, background: 'transparent', fontSize: 12.5, color: 'var(--ink)', fontFamily: 'JetBrains Mono,IBM Plex Sans Thai, monospace' }} />
       <button type="button" onClick={copy} className="btn btn-teal btn-sm" style={{ flexShrink: 0 }}>
         {copied ? tr(lang, 'คัดลอกแล้ว', 'Copied') : tr(lang, 'คัดลอก', 'Copy')}
       </button>

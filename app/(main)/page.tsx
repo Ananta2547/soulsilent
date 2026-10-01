@@ -192,7 +192,7 @@ function FanCard({ slot, index, ticket, onEnter }: { slot: (typeof FAN_SLOTS)[nu
       {posterOnly ? null : (
         <>
       {ticket.discountPct ? (
-        <span style={{ position: 'absolute', top: 10, right: 10, zIndex: 7, background: 'var(--accent)', color: 'var(--ink)', fontFamily: 'Archivo Black', fontSize: 12, borderRadius: 8, padding: '3px 8px', boxShadow: '0 4px 10px rgba(0,0,0,.25)' }}>
+        <span style={{ position: 'absolute', top: 10, right: 10, zIndex: 7, background: 'var(--accent)', color: 'var(--ink)', fontFamily: 'Archivo Black, Mitr', fontSize: 12, borderRadius: 8, padding: '3px 8px', boxShadow: '0 4px 10px rgba(0,0,0,.25)' }}>
           ลด {ticket.discountPct}%
         </span>
       ) : null}
@@ -221,7 +221,7 @@ function FanCard({ slot, index, ticket, onEnter }: { slot: (typeof FAN_SLOTS)[nu
               {ticket.originalPrice ? (
                 <span style={{ fontFamily: 'Mitr', fontSize: 11, color: 'rgba(255,255,255,.7)', textDecoration: 'line-through' }}>{ticket.originalPrice}</span>
               ) : null}
-              <span style={{ background: 'rgba(255,255,255,.2)', borderRadius: 999, padding: '4px 11px', fontFamily: 'Archivo Black', fontSize: 13 }}>{ticket.price}</span>
+              <span style={{ background: 'rgba(255,255,255,.2)', borderRadius: 999, padding: '4px 11px', fontFamily: 'Archivo Black, Mitr', fontSize: 13 }}>{ticket.price}</span>
             </span>
           </div>
         </div>
@@ -839,7 +839,7 @@ function StatsSection({ stats }: { stats: SiteStats }) {
         <div className="card card-cream stats-grid" style={{ padding: '40px 30px' }}>
           {numbers.map((s) => (
             <div key={s.label}>
-              <div style={{ fontFamily: 'Archivo Black', fontSize: 'clamp(34px,4.5vw,52px)', color: 'var(--ink)', lineHeight: 1 }}>
+              <div style={{ fontFamily: 'Archivo Black, Mitr', fontSize: 'clamp(34px,4.5vw,52px)', color: 'var(--ink)', lineHeight: 1 }}>
                 {s.n}
                 <span style={{ color: 'var(--accent)' }}>.</span>
               </div>

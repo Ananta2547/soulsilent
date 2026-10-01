@@ -37,8 +37,8 @@
   /* Fonts */
   --font-display-en: 'Archivo Black', 'Mitr', sans-serif;
   --font-display-th: 'Mitr', 'IBM Plex Sans Thai', sans-serif;
-  --font-hand: 'Caveat', cursive;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-hand: 'Caveat', 'Mitr', cursive;
+  --font-mono: 'JetBrains Mono', 'IBM Plex Sans Thai', monospace;
   --font-sans: 'IBM Plex Sans Thai', 'Archivo', 'Inter', system-ui, sans-serif;
   --font-heading: 'Mitr', sans-serif;
 }
@@ -125,7 +125,7 @@ body {
 }
 
 .giant-en {
-  font-family: 'Archivo Black', sans-serif;
+  font-family: 'Archivo Black',Mitr, sans-serif;
   font-size: clamp(48px, 11vw, 180px);
   line-height: 0.86;
   letter-spacing: -0.035em;
@@ -762,7 +762,7 @@ body {
 
 /* Stat */
 .stat-num {
-  font-family: 'Archivo Black', sans-serif;
+  font-family: 'Archivo Black',Mitr, sans-serif;
   font-size: clamp(56px, 7vw, 108px);
   line-height: 0.88;
   letter-spacing: -0.045em;
@@ -925,7 +925,7 @@ body {
 /* settings page scaffold */
 .page-main { max-width: 1180px; margin: 0 auto; padding: 40px 32px 80px; }
 .crumbs {
-  display: flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace;
+  display: flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono',IBM Plex Sans Thai, monospace;
   font-size: 11px; letter-spacing: .06em; color: var(--muted); text-transform: uppercase; margin-bottom: 16px;
 }
 .crumbs a { color: var(--muted); text-decoration: none; }
@@ -1164,7 +1164,7 @@ body {
 }
 .cal-weekdays > div {
   padding: 10px 12px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono',IBM Plex Sans Thai, monospace;
   font-size: 11px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1195,7 +1195,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono',IBM Plex Sans Thai, monospace;
   font-size: 11px;
   letter-spacing: 0.08em;
   color: var(--muted);
@@ -1208,7 +1208,7 @@ body {
   font-weight: 500;
 }
 .cal-day-first {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono',IBM Plex Sans Thai, monospace;
   font-size: 10px;
   letter-spacing: 0.06em;
   color: var(--teal);
@@ -1225,7 +1225,7 @@ body {
   pointer-events: none;
 }
 .cal-cell.today .cal-day-num {
-  font-family: 'Caveat', cursive;
+  font-family: 'Caveat',Mitr, cursive;
   font-size: 30px;
   color: var(--cal-today);
   font-weight: 700;
@@ -1312,7 +1312,7 @@ body {
 }
 .cal-wd.other .cal-day-num { color: #b6b29f; }
 .cal-wd.today .cal-day-num {
-  font-family: 'Caveat', cursive;
+  font-family: 'Caveat',Mitr, cursive;
   font-size: 26px;
   color: var(--cal-today);
   font-weight: 700;
@@ -1434,7 +1434,7 @@ body {
   color: #f5d033;
   border-radius: 10px;
   padding: 12px 18px;
-  font-family: 'Archivo Black', monospace;
+  font-family: 'Archivo Black',IBM Plex Sans Thai, monospace;
   font-size: 22px;
   letter-spacing: 0.04em;
   text-shadow: 0 0 12px rgba(245, 208, 51, 0.45);
@@ -1450,7 +1450,7 @@ body {
   pointer-events: none;
 }
 .cal-countdown .mini {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono',IBM Plex Sans Thai, monospace;
   font-size: 10.5px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -1469,7 +1469,7 @@ body {
 }
 .cal-meta-row + .cal-meta-row { border-top: 1px dashed var(--cal-line); }
 .cal-meta-row .lbl {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono',IBM Plex Sans Thai, monospace;
   font-size: 10.5px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -1614,7 +1614,7 @@ body {
 }
 .pb-logo .word .dot{ color:var(--teal); }
 .pb-logo .back{
-  font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--muted);
+  font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace; font-size:10.5px; color:var(--muted);
   letter-spacing:.05em;
 }
 
@@ -1623,7 +1623,7 @@ body {
   min-width:0;
 }
 .pb-proj .name{ font-family:'Mitr'; font-weight:500; font-size:14px; color:var(--ink); line-height:1.1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:180px; }
-.pb-proj .meta{ font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--muted); letter-spacing:.04em; }
+.pb-proj .meta{ font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace; font-size:10px; color:var(--muted); letter-spacing:.04em; }
 .pb-proj .meta .dot{ width:6px; height:6px; border-radius:50%; background:#3fb27f; display:inline-block; margin-right:5px; vertical-align:middle; }
 .pb-proj .meta .dot.draft{ background:#d98a2b; }
 
@@ -1631,7 +1631,7 @@ body {
   display:flex; align-items:center; gap:6px;
   background:var(--cream); border-radius:999px;
   padding:6px 4px 6px 12px;
-  font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--muted);
+  font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace; font-size:11.5px; color:var(--muted);
   max-width:340px; min-width:0;
 }
 .pb-share-input b{ color:var(--ink); font-weight:500; }
@@ -1651,7 +1651,7 @@ body {
   background:transparent; color:var(--ink); cursor:pointer;
   display:inline-flex; align-items:center; justify-content:center;
   transition: background .15s ease, color .15s ease, opacity .15s ease;
-  font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600;
+  font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace; font-size:12px; font-weight:600;
 }
 .pb-iconbtn:hover{ background:var(--cream); }
 .pb-iconbtn:disabled{ opacity:.3; cursor:not-allowed; }
@@ -1671,7 +1671,7 @@ body {
 .pb-status{
   display:inline-flex; align-items:center; gap:6px;
   padding:5px 11px; border-radius:999px;
-  font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:600;
+  font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace; font-size:10.5px; font-weight:600;
   letter-spacing:.08em; text-transform:uppercase;
   background:#fff4e0; color:#a06713;
   cursor:pointer; border:0;
@@ -1707,7 +1707,7 @@ body {
 }
 .pb-left-tabs button{
   flex:1; padding:9px 6px; border:0; background:transparent; cursor:pointer;
-  font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600;
+  font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace; font-size:11px; font-weight:600;
   letter-spacing:.08em; color:var(--muted); text-transform:uppercase;
   border-radius:10px;
   transition: background .15s ease, color .15s ease;
@@ -1723,7 +1723,7 @@ body {
 }
 .pb-group h4{
   margin:0 0 10px; padding:0 4px;
-  font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:600;
+  font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace; font-size:10.5px; font-weight:600;
   letter-spacing:.16em; color:var(--muted); text-transform:uppercase;
 }
 .pb-tile{
@@ -1742,7 +1742,7 @@ body {
   color:var(--teal-deep);
 }
 .pb-tile .lbl{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; line-height:1.1; }
-.pb-tile .sub{ font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--muted); margin-top:2px; }
+.pb-tile .sub{ font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace; font-size:10px; color:var(--muted); margin-top:2px; }
 
 .pb-sticker-grid{ display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:8px; }
 .pb-sticker{
@@ -1827,7 +1827,7 @@ body {
 .pb-ctx-item.danger:hover:not(:disabled){ background:#f4dad4; color:#9a4a3f; }
 .pb-ctx-item .ico{ width:18px; text-align:center; flex-shrink:0; font-size:13px; }
 .pb-ctx-item .lbl{ flex:1; }
-.pb-ctx-item .sc{ font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--muted); }
+.pb-ctx-item .sc{ font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace; font-size:10.5px; color:var(--muted); }
 .pb-ctx-divider{ height:1px; background:var(--cream-deep); margin:5px 8px; }
 
 /* collapse pull-tabs (when panels closed) */
@@ -1951,14 +1951,14 @@ body {
 .pb-credential-card.tone-teal{ background:var(--teal-50); }
 .pb-credential-card.tone-ink{ background:var(--ink); color:#fff; }
 .pb-credential-card.tone-ink .pb-cred-num{ color:#a5d9d1; }
-.pb-cred-num{ font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:.16em; color:var(--muted); text-transform:uppercase; }
+.pb-cred-num{ font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace; font-size:10.5px; letter-spacing:.16em; color:var(--muted); text-transform:uppercase; }
 .pb-cred-title{ font-family:'Mitr',sans-serif; font-weight:500; font-size:20px; line-height:1.2; margin:6px 0 0; }
 .pb-cred-foot{ display:flex; justify-content:space-between; align-items:flex-end; font-size:12px; color:inherit; opacity:.8; }
 .pb-cred-seal{
   position:absolute; right:12px; top:12px; width:42px; height:42px;
   border-radius:50%; border:1.5px dashed currentColor; opacity:.4;
   display:inline-flex; align-items:center; justify-content:center;
-  font-family:'Caveat',cursive; font-size:22px;
+  font-family:'Caveat',Mitr,cursive; font-size:22px;
 }
 
 .pb-contact-card{
@@ -1967,12 +1967,12 @@ body {
 }
 .pb-contact-card .av{ width:60px; height:60px; border-radius:50%; background:rgba(255,255,255,.15); display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; font-family:'Mitr'; font-weight:600; font-size:24px; }
 .pb-contact-card .who{ font-family:'Mitr'; font-weight:500; font-size:22px; line-height:1.1; }
-.pb-contact-card .meta{ display:flex; gap:14px; font-family:'JetBrains Mono',monospace; font-size:11px; opacity:.85; margin-top:6px; flex-wrap:wrap; }
+.pb-contact-card .meta{ display:flex; gap:14px; font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace; font-size:11px; opacity:.85; margin-top:6px; flex-wrap:wrap; }
 
 .pb-embed-frame{
   width:100%; height:100%; background:#0d1e1d; color:#a5d9d1;
   display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
-  font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.1em; text-transform:uppercase;
+  font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace; font-size:11px; letter-spacing:.1em; text-transform:uppercase;
   position:relative; overflow:hidden;
 }
 .pb-embed-frame::after{
@@ -1999,7 +1999,7 @@ body {
   padding:16px 18px 12px; border-bottom:1px solid rgba(13,30,29,.07); flex-shrink:0;
 }
 .pb-insp-head .ttl{
-  font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:600;
+  font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace; font-size:10.5px; font-weight:600;
   letter-spacing:.16em; color:var(--muted); text-transform:uppercase;
 }
 .pb-insp-head .sub{ font-family:'Mitr'; font-weight:500; font-size:18px; margin-top:4px; line-height:1.2; }
@@ -2011,7 +2011,7 @@ body {
 }
 .pb-insp-group{ display:flex; flex-direction:column; gap:10px; }
 .pb-insp-group > .lbl{
-  font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:600;
+  font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace; font-size:10.5px; font-weight:600;
   letter-spacing:.14em; color:var(--muted); text-transform:uppercase;
 }
 
@@ -2023,7 +2023,7 @@ body {
   font-size:12.5px;
 }
 .pb-fld:focus-within{ box-shadow: inset 0 0 0 2px var(--teal); background:#fff; }
-.pb-fld .label{ font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--muted); letter-spacing:.05em; }
+.pb-fld .label{ font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace; font-size:10px; color:var(--muted); letter-spacing:.05em; }
 .pb-fld input{
   flex:1; border:0; background:transparent; outline:none; font-family:inherit;
   font-size:13px; color:var(--ink); min-width:0;
@@ -2044,7 +2044,7 @@ body {
 .pb-pill-row{ display:flex; flex-wrap:wrap; gap:6px; }
 .pb-pill{
   border:0; padding:6px 11px; border-radius:999px; cursor:pointer;
-  font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:600;
+  font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace; font-size:10.5px; font-weight:600;
   color:var(--ink); background:var(--cream);
   letter-spacing:.04em;
 }
@@ -2053,7 +2053,7 @@ body {
 
 .pb-slider-row{ display:flex; align-items:center; gap:10px; }
 .pb-slider-row input[type=range]{ flex:1; accent-color: var(--teal); }
-.pb-slider-row .v{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); min-width:36px; text-align:right; }
+.pb-slider-row .v{ font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace; font-size:11px; color:var(--muted); min-width:36px; text-align:right; }
 
 .pb-insp-empty{
   text-align:center; padding:48px 24px; color:var(--muted);
@@ -2063,7 +2063,7 @@ body {
 .pb-insp-empty .glyph{ font-size:32px; opacity:.4; }
 .pb-insp-empty kbd{
   display:inline-block; padding:2px 7px; border-radius:6px;
-  background:var(--cream); font-family:'JetBrains Mono',monospace; font-size:11px;
+  background:var(--cream); font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace; font-size:11px;
   color:var(--ink); border:1px solid var(--cream-deep);
 }
 
@@ -2081,12 +2081,12 @@ body {
 .pb-zoom button{
   width:30px; height:30px; border:0; background:transparent; cursor:pointer;
   border-radius:999px; color:var(--ink);
-  font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:600;
+  font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace; font-size:14px; font-weight:600;
   display:inline-flex; align-items:center; justify-content:center;
 }
 .pb-zoom button:hover{ background:var(--cream); }
 .pb-zoom .v{
-  font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600;
+  font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace; font-size:11px; font-weight:600;
   padding:0 10px; min-width:46px; text-align:center; color:var(--ink);
 }
 
@@ -2097,7 +2097,7 @@ body {
   background:rgba(13,30,29,.85); color:#fff;
   backdrop-filter: blur(8px);
   border-radius:999px; padding:7px 14px;
-  font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.04em;
+  font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace; font-size:11px; letter-spacing:.04em;
   pointer-events:none; opacity:.65;
 }
 .pb-hint-bar kbd{
@@ -2192,7 +2192,7 @@ body {
   font-family:'Mitr'; font-weight:600; font-size:15px;
 }
 .pb-owner-nav .owner .name{ font-family:'Mitr'; font-weight:500; font-size:16px; }
-.pb-owner-nav .owner .url{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); }
+.pb-owner-nav .owner .url{ font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace; font-size:11px; color:var(--muted); }
 .pb-owner-nav .links{ display:flex; gap:6px; margin-left:24px; flex:1; }
 .pb-owner-nav .links a{
   color:var(--ink); text-decoration:none;
@@ -2214,7 +2214,7 @@ body {
 }
 .pb-device-toggle button{
   background:transparent; border:0; padding:6px 11px; border-radius:999px;
-  font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600;
+  font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace; font-size:11px; font-weight:600;
   cursor:pointer; color:var(--muted); letter-spacing:.05em;
   display:inline-flex; align-items:center; gap:6px;
 }
@@ -2489,7 +2489,7 @@ body {
 .hero__stat { display: flex; flex-direction: column; gap: 2px; }
 
 .hero__stat-num {
-  font-family: 'Archivo Black', sans-serif;
+  font-family: 'Archivo Black',Mitr, sans-serif;
   font-size: clamp(26px, 2.6vw, 34px);
   letter-spacing: -0.02em;
   line-height: 1;
@@ -3460,7 +3460,7 @@ body {
   margin-bottom: 46px;
 }
 .jn-title {
-  font-family: 'Archivo Black', sans-serif;
+  font-family: 'Archivo Black',Mitr, sans-serif;
   font-size: clamp(38px, 6vw, 64px);
   line-height: 0.92;
   letter-spacing: -0.03em;
@@ -3468,7 +3468,7 @@ body {
   color: var(--ink);
 }
 .jn-stats { display: flex; gap: 56px; padding-top: 6px; }
-.jn-stat-n { font-family: 'Archivo Black', sans-serif; font-size: 46px; line-height: 1; color: var(--ink); }
+.jn-stat-n { font-family: 'Archivo Black',Mitr, sans-serif; font-size: 46px; line-height: 1; color: var(--ink); }
 
 .jn-path { position: relative; }
 /* Mobile-first: one rail down the left, every stop hanging off it (the
@@ -3580,7 +3580,7 @@ body {
   background: var(--paper);
 }
 .jn-stat-row { display: flex; align-items: center; gap: 12px; }
-.jn-stat-n { font-family: 'Archivo Black', sans-serif; font-size: 46px; line-height: 1; }
+.jn-stat-n { font-family: 'Archivo Black',Mitr, sans-serif; font-size: 46px; line-height: 1; }
 
 .jn-modal-backdrop {
   position: fixed;
@@ -3851,7 +3851,7 @@ body {
 .tsm-pop .mp-day { aspect-ratio: auto; height: 54px; border-radius: 14px; }
 .tsm-pop-close { background: var(--cream); border: 0; width: 34px; height: 34px; border-radius: 50%; font-size: 20px; line-height: 1; color: var(--ink); cursor: pointer; flex-shrink: 0; }
 @media (max-width: 560px) { .tsm-pop-backdrop { padding: 12px; } .tsm-pop { padding: 18px 16px 20px; border-radius: 20px; } .tsm-pop .mp-day { height: 44px; } }
-.tsm-label { display: block; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; font-family: var(--mono, monospace); }
+.tsm-label { display: block; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; font-family: var(--font-mono); }
 @media (max-width: 900px) { .tsm-grid { grid-template-columns: 1fr; } }
 
 /* Teacher public profile (Teacher Profile v2). Shares .tm-* helpers with /teachers. */

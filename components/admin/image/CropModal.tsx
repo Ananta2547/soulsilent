@@ -255,7 +255,7 @@ function OverlayGuides({
                 position: 'absolute',
                 top: -22,
                 left: 0,
-                fontFamily: 'JetBrains Mono, monospace',
+                fontFamily: 'JetBrains Mono,IBM Plex Sans Thai, monospace',
                 fontSize: 10,
                 color: '#fff',
                 background: color,

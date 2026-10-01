@@ -95,11 +95,11 @@ export default function ArticlesPage() {
           </p>
           <div style={{ display: 'flex', gap: 28, justifyContent: 'flex-end' }}>
             <div>
-              <div style={{ fontFamily: 'Archivo Black', fontSize: 30, color: 'var(--ink)' }}>{String(articles.length).padStart(2, '0')}</div>
+              <div style={{ fontFamily: 'Archivo Black, Mitr', fontSize: 30, color: 'var(--ink)' }}>{String(articles.length).padStart(2, '0')}</div>
               <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '.1em' }}>บทความ</div>
             </div>
             <div>
-              <div style={{ fontFamily: 'Archivo Black', fontSize: 30, color: 'var(--teal)' }}>{String(categories.length).padStart(2, '0')}</div>
+              <div style={{ fontFamily: 'Archivo Black, Mitr', fontSize: 30, color: 'var(--teal)' }}>{String(categories.length).padStart(2, '0')}</div>
               <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '.1em' }}>หมวด</div>
             </div>
           </div>

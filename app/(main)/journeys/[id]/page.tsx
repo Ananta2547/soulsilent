@@ -1830,7 +1830,7 @@ function HoldCountdown({ expiresAt, lang }: { expiresAt: string; lang: 'th' | 'e
       </div>
       <div
         style={{
-          fontFamily: 'Archivo Black, monospace',
+          fontFamily: 'Archivo Black,IBM Plex Sans Thai, monospace',
           fontSize: 28,
           letterSpacing: '.06em',
           lineHeight: 1,

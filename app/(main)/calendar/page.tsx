@@ -65,7 +65,7 @@ const isMultiDay = (w: Workshop) => (w.workshop_type || 'one_day') === 'multi_da
 const segsOf = (w: Workshop) => (isMultiDay(w) ? [{ s: w.date, e: w.end_date as string }] : getWorkshopDays(w).map((d) => ({ s: d, e: d })));
 const onDay = (w: Workshop, day: string) => (isMultiDay(w) ? day >= w.date && day <= (w.end_date as string) : getWorkshopDays(w).includes(day));
 const toG = (d: Date) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
-const mono = (size: number, extra = ''): CSSProperties => css(`font-family:'JetBrains Mono',monospace;font-size:${size}px;letter-spacing:.14em;text-transform:uppercase;color:#6a7a78;${extra}`);
+const mono = (size: number, extra = ''): CSSProperties => css(`font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace;font-size:${size}px;letter-spacing:.14em;text-transform:uppercase;color:#6a7a78;${extra}`);
 
 const Chev = ({ dir, rot }: { dir: 'l' | 'r'; rot?: string }) => (
   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={rot ? { transform: `rotate(${rot})` } : undefined}>
@@ -545,7 +545,7 @@ export default function CalendarPage() {
           {desk ? (
             <div style={css('display:flex;align-items:center;gap:14px;padding:16px 18px 14px 22px;flex-wrap:wrap')}>
               <div style={css('display:flex;flex-direction:column;gap:4px;margin-right:auto')}>
-                <span style={css("font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:#0d8a7e;font-weight:500;display:inline-flex;align-items:center;gap:10px")}>
+                <span style={css("font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace;font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:#0d8a7e;font-weight:500;display:inline-flex;align-items:center;gap:10px")}>
                   <span style={css('width:22px;height:1.5px;background:#0d8a7e;border-radius:2px')} />
                   journey · diary calendar
                 </span>
@@ -669,7 +669,7 @@ export default function CalendarPage() {
                           <div key={day} style={css('padding:7px 9px 3px;display:flex;align-items:center;gap:6px;min-height:30px;min-width:0')}>
                             {day === T ? (
                               <>
-                                <span style={css("font-family:'Caveat',cursive;font-size:24px;color:#0d8a7e;font-weight:700;line-height:1")}>Today</span>
+                                <span style={css("font-family:'Caveat',Mitr,cursive;font-size:24px;color:#0d8a7e;font-weight:700;line-height:1")}>Today</span>
                                 <span data-anim="" style={css('color:#f5c243;font-size:13px;display:inline-block;animation:v2Spin 9s linear infinite')}>
                                   ✺
                                 </span>
@@ -677,7 +677,7 @@ export default function CalendarPage() {
                             ) : (
                               <span style={{ fontSize: 14, fontWeight: isSel ? 700 : 500, color: other ? '#b6b29f' : isSel ? '#0d8a7e' : '#0d1e1d' }}>{d.getDate()}</span>
                             )}
-                            {d.getDate() === 1 && day !== T && <span style={css("font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.06em;color:#0d8a7e")}>{TH_MON[d.getMonth()]}</span>}
+                            {d.getDate() === 1 && day !== T && <span style={css("font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace;font-size:10px;letter-spacing:.06em;color:#0d8a7e")}>{TH_MON[d.getMonth()]}</span>}
                             <span style={css('display:inline-flex;gap:3px;margin-left:auto')}>
                               {moodsOf(day).map((c, i) => (
                                 <span key={i} style={{ width: 9, height: 9, borderRadius: '50%', background: c, boxShadow: '0 0 0 1.5px #fff' }} />
@@ -699,9 +699,9 @@ export default function CalendarPage() {
                         >
                           {b.cl && <span style={css('font-weight:700;opacity:.55')}>‹</span>}
                           {b.star ? <StarIco c={b.accent} /> : b.rain ? <RainIco /> : <span style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: b.accent }} />}
-                          {b.time && <span style={css("font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;opacity:.7;flex-shrink:0")}>{b.time}</span>}
+                          {b.time && <span style={css("font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace;font-size:10px;font-weight:500;opacity:.7;flex-shrink:0")}>{b.time}</span>}
                           <span style={css('flex:1;min-width:0;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis')}>{b.title}</span>
-                          {b.tag && <span style={{ ...css("flex-shrink:0;font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:600;letter-spacing:.04em;padding:2px 6px;border-radius:999px"), background: b.full ? '#fbe6e4' : '#fff', color: b.full ? '#9c2f2b' : b.fg }}>{b.tag}</span>}
+                          {b.tag && <span style={{ ...css("flex-shrink:0;font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace;font-size:9.5px;font-weight:600;letter-spacing:.04em;padding:2px 6px;border-radius:999px"), background: b.full ? '#fbe6e4' : '#fff', color: b.full ? '#9c2f2b' : b.fg }}>{b.tag}</span>}
                           {b.cr && <span style={css('font-weight:700;opacity:.55')}>›</span>}
                         </button>
                       ))}
@@ -737,7 +737,7 @@ export default function CalendarPage() {
                     ))}
                   </span>
                 </span>
-                <span style={css("font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#9aa8a6;letter-spacing:.04em")}>← → ↑ ↓ เลือกวัน · N กิจกรรม · D diary · ] แผง</span>
+                <span style={css("font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace;font-size:10.5px;color:#9aa8a6;letter-spacing:.04em")}>← → ↑ ↓ เลือกวัน · N กิจกรรม · D diary · ] แผง</span>
               </div>
             </>
           ) : (
@@ -787,7 +787,7 @@ export default function CalendarPage() {
             <button type="button" onClick={() => setPanelOpen(true)} aria-label="ขยายแผงวัน" style={css('display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:8px 18px 6px;border:0;background:transparent;color:#0d1e1d;cursor:pointer;text-align:left')}>
               <span style={css('width:40px;height:4px;border-radius:4px;background:#cdc5b1;align-self:center')} />
               <span style={css('display:flex;align-items:center;gap:10px')}>
-                <span style={css("font-family:'Archivo Black',sans-serif;font-size:28px;line-height:.9;letter-spacing:-.04em;color:#0d8a7e")}>{sd0.getDate()}</span>
+                <span style={css("font-family:'Archivo Black',Mitr,sans-serif;font-size:28px;line-height:.9;letter-spacing:-.04em;color:#0d8a7e")}>{sd0.getDate()}</span>
                 <span style={css('display:flex;flex-direction:column;gap:2px;min-width:0;flex:1')}>
                   <span style={css("font-family:'Mitr',sans-serif;font-weight:500;font-size:15px;line-height:1.1")}>{TH_WD[sd0.getDay()]}</span>
                   <span style={css('font-size:12px;color:#6a7a78;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{[items.length ? items.length + ' กิจกรรม' : 'ว่าง', ent ? 'เขียน diary แล้ว' : future ? '' : 'ยังไม่ได้เขียน diary'].filter(Boolean).join(' · ')}</span>
@@ -821,7 +821,7 @@ export default function CalendarPage() {
             </div>
 
             <div style={css('display:flex;align-items:flex-end;gap:14px')}>
-              <div style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: ui.bigNum, lineHeight: 0.82, letterSpacing: '-.045em', color: '#0d8a7e' }}>{sd0.getDate()}</div>
+              <div style={{ fontFamily: "'Archivo Black',Mitr, sans-serif", fontSize: ui.bigNum, lineHeight: 0.82, letterSpacing: '-.045em', color: '#0d8a7e' }}>{sd0.getDate()}</div>
               <div style={css('display:flex;flex-direction:column;gap:4px;padding-bottom:2px')}>
                 <span style={css("font-family:'Mitr',sans-serif;font-weight:500;font-size:19px;line-height:1.1")}>{TH_WD[sd0.getDay()]}</span>
                 <span style={mono(10.5)}>
@@ -829,8 +829,8 @@ export default function CalendarPage() {
                 </span>
               </div>
               <span style={{ flex: 1 }} />
-              {diff === 0 && <span style={css("padding:5px 12px;border-radius:999px;font-size:11px;font-weight:500;font-family:'JetBrains Mono',monospace;letter-spacing:.06em;text-transform:uppercase;background:#f5c243;color:#0d1e1d")}>วันนี้</span>}
-              {rel && <span style={css("font-family:'Caveat',cursive;font-weight:700;font-size:22px;color:#6a7a78;line-height:1")}>{rel}</span>}
+              {diff === 0 && <span style={css("padding:5px 12px;border-radius:999px;font-size:11px;font-weight:500;font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace;letter-spacing:.06em;text-transform:uppercase;background:#f5c243;color:#0d1e1d")}>วันนี้</span>}
+              {rel && <span style={css("font-family:'Caveat',Mitr,cursive;font-weight:700;font-size:22px;color:#6a7a78;line-height:1")}>{rel}</span>}
               <button type="button" className="c2-round" onClick={() => setPanelOpen(false)} aria-label="ย่อแผงวัน" title="ย่อแผง ( ] )" style={css('align-self:flex-start;width:34px;height:34px;border-radius:50%;border:0;background:#fff;color:#0d1e1d;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform .15s ease')}>
                 <Chev dir="r" rot={desk ? '0deg' : '90deg'} />
               </button>
@@ -847,7 +847,7 @@ export default function CalendarPage() {
               </div>
               {items.map((it) => (
                 <button key={it.key} type="button" className="c2-lift" onClick={it.onClick} style={css('display:grid;grid-template-columns:46px minmax(0,1fr) auto;align-items:center;gap:12px;padding:11px 14px 11px 12px;border:0;border-radius:14px;background:#fff;text-align:left;color:#0d1e1d;cursor:pointer')}>
-                  <span style={css("display:flex;flex-direction:column;gap:2px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.2;color:#0d1e1d")}>
+                  <span style={css("display:flex;flex-direction:column;gap:2px;font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace;font-size:11px;line-height:1.2;color:#0d1e1d")}>
                     <span>{it.t1}</span>
                     <span style={{ color: '#9aa8a6' }}>{it.t2}</span>
                   </span>
@@ -858,18 +858,18 @@ export default function CalendarPage() {
                     </span>
                     <span style={css('font-size:12px;color:#6a7a78;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{it.sub}</span>
                   </span>
-                  <span style={{ ...css("padding:4px 9px;border-radius:999px;font-size:10px;font-weight:500;font-family:'JetBrains Mono',monospace;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap"), background: it.tagBg, color: it.tagFg }}>{it.tag}</span>
+                  <span style={{ ...css("padding:4px 9px;border-radius:999px;font-size:10px;font-weight:500;font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap"), background: it.tagBg, color: it.tagFg }}>{it.tag}</span>
                 </button>
               ))}
               {items.length === 0 && (
                 <div style={css('background:#fff;border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:8px')}>
-                  <span style={css("font-family:'Caveat',cursive;font-weight:700;font-size:22px;color:#0d8a7e;line-height:1.1")}>วันนี้ยังว่างอยู่ — it can be fun! ✺</span>
+                  <span style={css("font-family:'Caveat',Mitr,cursive;font-weight:700;font-size:22px;color:#0d8a7e;line-height:1.1")}>วันนี้ยังว่างอยู่ — it can be fun! ✺</span>
                   {upcoming.length > 0 && <span style={mono(10)}>กิจกรรมที่เปิดรับอยู่</span>}
                   {upcoming.map((w) => {
                     const p = getEffectivePrice(w).price;
                     return (
                       <button key={w.id} type="button" className="c2-link" onClick={() => openWs(w)} style={css('display:flex;align-items:center;gap:10px;padding:7px 0;border:0;border-top:1px dashed #e7e3d9;background:transparent;color:#0d1e1d;text-align:left;cursor:pointer')}>
-                        <span style={css("font-family:'JetBrains Mono',monospace;font-size:11px;color:#0d8a7e;width:48px;flex-shrink:0")}>{short(w.date)}</span>
+                        <span style={css("font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace;font-size:11px;color:#0d8a7e;width:48px;flex-shrink:0")}>{short(w.date)}</span>
                         <span style={css('flex:1;min-width:0;font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{w.title}</span>
                         <span style={css('font-size:12.5px;color:#6a7a78')}>{p ? `฿${p.toLocaleString()}` : 'ฟรี'}</span>
                       </button>
@@ -888,7 +888,7 @@ export default function CalendarPage() {
                     <span data-anim="" style={css('color:#f5c243;display:inline-block;animation:v2Spin 6s linear infinite')}>
                       ✺
                     </span>
-                    เขียนต่อเนื่อง <b style={css("font-family:'Archivo Black',sans-serif;font-weight:400;color:#f5c243")}>{streak}</b> วัน
+                    เขียนต่อเนื่อง <b style={css("font-family:'Archivo Black',Mitr,sans-serif;font-weight:400;color:#f5c243")}>{streak}</b> วัน
                   </span>
                 )}
                 <span style={css('flex:1;height:1px;border-top:1px dashed #d4ece8')} />
@@ -922,7 +922,7 @@ export default function CalendarPage() {
                   <Floaty style={{ top: 8, right: 44, width: 56, height: 34, opacity: 0.9 }} anim="v2Float 6s ease-in-out infinite">
                     <Cloud color="#eaf6f4" stroke={3} animate={false} style={{ width: '100%', height: '100%' }} />
                   </Floaty>
-                  <span style={css("position:relative;align-self:flex-start;font-family:'Caveat',cursive;font-weight:700;font-size:24px;line-height:1;color:#0d1e1d")}>
+                  <span style={css("position:relative;align-self:flex-start;font-family:'Caveat',Mitr,cursive;font-weight:700;font-size:24px;line-height:1;color:#0d1e1d")}>
                     {diff === 0 ? 'วันนี้เป็นยังไงบ้าง?' : 'วันนั้นเป็นยังไงบ้าง?'}
                     <DrawLine key={`pl-${sel}`} color="#f5c243" w={6} top={21} />
                   </span>
@@ -953,12 +953,12 @@ export default function CalendarPage() {
                   return (
                     <button key={i} type="button" className="c2-link" onClick={nx.go} style={css('display:flex;align-items:center;gap:12px;padding:8px 4px;border:0;background:transparent;color:#0d1e1d;text-align:left;cursor:pointer')}>
                       <span style={css('width:44px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;line-height:1')}>
-                        <span style={css("font-family:'Archivo Black',sans-serif;font-size:20px;letter-spacing:-.03em")}>{d.getDate()}</span>
-                        <span style={css("font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#6a7a78;margin-top:3px")}>{TH_MON[d.getMonth()]}</span>
+                        <span style={css("font-family:'Archivo Black',Mitr,sans-serif;font-size:20px;letter-spacing:-.03em")}>{d.getDate()}</span>
+                        <span style={css("font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace;font-size:9.5px;color:#6a7a78;margin-top:3px")}>{TH_MON[d.getMonth()]}</span>
                       </span>
                       <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: nx.dot }} />
                       <span style={css('flex:1;min-width:0;font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{nx.title}</span>
-                      <span style={css("font-family:'Caveat',cursive;font-weight:700;font-size:18px;color:#6a7a78;white-space:nowrap")}>{n === 1 ? 'พรุ่งนี้' : `อีก ${n} วัน`}</span>
+                      <span style={css("font-family:'Caveat',Mitr,cursive;font-weight:700;font-size:18px;color:#6a7a78;white-space:nowrap")}>{n === 1 ? 'พรุ่งนี้' : `อีก ${n} วัน`}</span>
                     </button>
                   );
                 })}
@@ -1087,7 +1087,7 @@ export default function CalendarPage() {
                 <div style={css('display:flex;flex-direction:column;gap:8px')}>
                   <div style={css('display:flex;align-items:baseline;justify-content:space-between')}>
                     <span style={mono(10.5)}>วันนี้รู้สึกยังไง</span>
-                    <span style={css("font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#6a7a78")}>
+                    <span style={css("font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace;font-size:10.5px;color:#6a7a78")}>
                       {dy.moods.length}/{MAX_MOODS}
                     </span>
                   </div>
@@ -1104,7 +1104,7 @@ export default function CalendarPage() {
                   </div>
                   {openFam && openCur && (
                     <div style={css('display:flex;flex-direction:column;gap:7px;background:#fff;border-radius:14px;padding:10px 12px 12px')}>
-                      <span style={css("font-family:'Caveat',cursive;font-weight:700;font-size:18px;color:#6a7a78;line-height:1")}>ละเอียดขึ้นอีกนิด · {openFam.label}</span>
+                      <span style={css("font-family:'Caveat',Mitr,cursive;font-weight:700;font-size:18px;color:#6a7a78;line-height:1")}>ละเอียดขึ้นอีกนิด · {openFam.label}</span>
                       <div style={css('display:flex;flex-wrap:wrap;gap:5px')}>
                         {openFam.ring.map((n) => {
                           const on = openCur.n === n;
@@ -1124,7 +1124,7 @@ export default function CalendarPage() {
                   </Floaty>
                   <Twinkle style={{ top: 50, right: 20 }} color="#f5c243" dur={2.8} delay={0} />
                   <Twinkle style={{ bottom: 18, right: 26 }} color="#a5d9d1" dur={3.4} delay={1} size={12} />
-                  <span style={css("position:relative;align-self:flex-start;font-family:'Caveat',cursive;font-weight:700;font-size:20px;color:#0d8a7e;line-height:1")}>
+                  <span style={css("position:relative;align-self:flex-start;font-family:'Caveat',Mitr,cursive;font-weight:700;font-size:20px;color:#0d8a7e;line-height:1")}>
                     dear diary,
                     <DrawLine key={`pp-${sel}`} color="#fce4a0" w={6} top={12} />
                   </span>
@@ -1136,7 +1136,7 @@ export default function CalendarPage() {
                     style={css('position:relative;flex:1;min-height:150px;border:0;outline:none;resize:none;padding:4px 0 0;font-family:inherit;font-size:15px;line-height:32px;color:#0d1e1d;background:repeating-linear-gradient(#fff 0 31px,#efe9db 31px 32px);background-attachment:local')}
                   />
                 </div>
-                <span style={css("font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#6a7a78")}>↻ ซิงก์กับสมุด Diary ของคุณ · แก้ต่อได้ที่ My Journey</span>
+                <span style={css("font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace;font-size:10.5px;letter-spacing:.08em;color:#6a7a78")}>↻ ซิงก์กับสมุด Diary ของคุณ · แก้ต่อได้ที่ My Journey</span>
               </div>
               <div style={css('flex-shrink:0;display:flex;gap:10px;padding:12px 20px 20px')}>
                 <Btn kind="teal" onClick={saveDiary} disabled={busy} style={{ ...btnFull, flex: 1 }}>
@@ -1166,7 +1166,7 @@ export default function CalendarPage() {
               </span>
             );
           })}
-          <span style={css('position:absolute;left:0;top:0;white-space:nowrap;font-family:Caveat,cursive;font-weight:700;font-size:30px;color:#0d8a7e;animation:v2Pop 1.4s cubic-bezier(.2,.7,.2,1) forwards')}>saved ✺</span>
+          <span style={css('position:absolute;left:0;top:0;white-space:nowrap;font-family:Caveat,Mitr,cursive;font-weight:700;font-size:30px;color:#0d8a7e;animation:v2Pop 1.4s cubic-bezier(.2,.7,.2,1) forwards')}>saved ✺</span>
         </div>
       )}
       {toast && (
@@ -1189,21 +1189,21 @@ function WsSheet({ w, st, booked, seatsTaken, today, now, onMemo, btnFull }: { w
   const last = md ? (w.end_date as string) : ds[ds.length - 1];
   const dateLine = ds.length > 1 || md ? `${longD(w.date)} – ${longD(last)} · ${md ? diffDays(w.date, last) + 1 : ds.length} วัน` : `${longD(w.date)} · ${w.time_start} – ${w.time_end}`;
   const gcal = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(w.title)}&dates=${toG(start)}/${toG(end)}&location=${encodeURIComponent(w.map_url || w.location || '')}&ctz=Asia/Bangkok`;
-  const label = css("font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#6a7a78;padding-top:3px");
+  const label = css("font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#6a7a78;padding-top:3px");
   return (
     <>
       <div style={css('flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:4px 20px 16px;display:flex;flex-direction:column;gap:14px')}>
         <div style={{ borderRadius: 18, padding: 20, color: '#fff', background: BANNER[st] }}>
           <div style={css('display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px')}>
-            {w.category && <span style={css("padding:5px 12px;border-radius:999px;font-size:11px;font-weight:500;font-family:'JetBrains Mono',monospace;letter-spacing:.06em;text-transform:uppercase;background:rgba(255,255,255,.18);color:#fff")}>{w.category}</span>}
-            <span style={css("padding:5px 12px;border-radius:999px;font-size:11px;font-weight:500;font-family:'JetBrains Mono',monospace;letter-spacing:.06em;text-transform:uppercase;background:#f5c243;color:#0d1e1d")}>{STATUS[st][2]}</span>
+            {w.category && <span style={css("padding:5px 12px;border-radius:999px;font-size:11px;font-weight:500;font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace;letter-spacing:.06em;text-transform:uppercase;background:rgba(255,255,255,.18);color:#fff")}>{w.category}</span>}
+            <span style={css("padding:5px 12px;border-radius:999px;font-size:11px;font-weight:500;font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace;letter-spacing:.06em;text-transform:uppercase;background:#f5c243;color:#0d1e1d")}>{STATUS[st][2]}</span>
           </div>
           <div style={css("font-family:'Mitr',sans-serif;font-weight:500;font-size:23px;line-height:1.2;margin-bottom:6px")}>{w.title}</div>
-          <div style={css("font-family:'JetBrains Mono',monospace;font-size:12.5px;color:rgba(255,255,255,.85)")}>{dateLine}</div>
+          <div style={css("font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace;font-size:12.5px;color:rgba(255,255,255,.85)")}>{dateLine}</div>
         </div>
         {left > 0 && (
-          <div style={css("background:#1f1f1f;color:#f5d033;border-radius:12px;padding:11px 16px;font-family:'Archivo Black',monospace;font-size:21px;letter-spacing:.04em;text-shadow:0 0 12px rgba(245,208,51,.45);text-align:center;position:relative;overflow:hidden")}>
-            <span style={css("font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#f5d03390;display:block;margin-bottom:4px;text-shadow:none")}>▸ นับถอยหลัง</span>
+          <div style={css("background:#1f1f1f;color:#f5d033;border-radius:12px;padding:11px 16px;font-family:'Archivo Black',IBM Plex Sans Thai,monospace;font-size:21px;letter-spacing:.04em;text-shadow:0 0 12px rgba(245,208,51,.45);text-align:center;position:relative;overflow:hidden")}>
+            <span style={css("font-family:'JetBrains Mono',IBM Plex Sans Thai,monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#f5d03390;display:block;margin-bottom:4px;text-shadow:none")}>▸ นับถอยหลัง</span>
             {`${Math.floor(left / 86400000)}d ${Math.floor((left % 86400000) / 3600000)}h ${Math.floor((left % 3600000) / 60000)}min ${pad(Math.floor((left % 60000) / 1000))}sec`}
             <div style={css('position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(0,0,0,.22) 0 1px,transparent 1px 3px);pointer-events:none')} />
           </div>
@@ -1241,7 +1241,7 @@ function WsSheet({ w, st, booked, seatsTaken, today, now, onMemo, btnFull }: { w
           เพิ่มลง Google Calendar
         </a>
         <Btn kind="teal" href={`/journeys/${w.id}`} style={btnFull}>
-          ดูรายละเอียดเต็ม <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>→</span>
+          ดูรายละเอียดเต็ม <span style={{ fontFamily: "'JetBrains Mono',IBM Plex Sans Thai, monospace" }}>→</span>
         </Btn>
       </div>
     </>

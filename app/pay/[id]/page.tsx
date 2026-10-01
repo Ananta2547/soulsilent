@@ -248,7 +248,7 @@ function GiftLinkPanel({ url }: { url: string }) {
           readOnly
           value={url}
           onFocus={(e) => e.currentTarget.select()}
-          style={{ flex: 1, minWidth: 0, border: 0, background: 'transparent', fontSize: 12.5, color: 'var(--ink)', fontFamily: 'JetBrains Mono, monospace' }}
+          style={{ flex: 1, minWidth: 0, border: 0, background: 'transparent', fontSize: 12.5, color: 'var(--ink)', fontFamily: 'JetBrains Mono,IBM Plex Sans Thai, monospace' }}
         />
         <button
           type="button"

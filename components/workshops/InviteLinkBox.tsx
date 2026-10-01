@@ -48,7 +48,7 @@ export function InviteLinkBox({ url }: { url: string }) {
           readOnly
           value={url}
           onFocus={(e) => e.currentTarget.select()}
-          style={{ flex: 1, minWidth: 0, border: 0, background: 'transparent', fontSize: 12.5, color: 'var(--ink)', fontFamily: 'JetBrains Mono, monospace' }}
+          style={{ flex: 1, minWidth: 0, border: 0, background: 'transparent', fontSize: 12.5, color: 'var(--ink)', fontFamily: 'JetBrains Mono,IBM Plex Sans Thai, monospace' }}
         />
         <button type="button" onClick={copy} className="btn btn-teal" style={{ flexShrink: 0, padding: '9px 16px', fontSize: 13 }}>
           {copied ? tr(lang, 'คัดลอกแล้ว', 'Copied') : tr(lang, 'คัดลอก', 'Copy')}

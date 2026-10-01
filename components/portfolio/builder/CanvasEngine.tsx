@@ -8,6 +8,7 @@ import {
   CANVAS_W,
   SHAPES,
   STICKER_MAP,
+  fontStack,
   type PNode,
 } from '@/lib/portfolio-builder';
 import { tr, type Lang } from '@/lib/i18n';
@@ -91,7 +92,7 @@ function TextContent({
         if (editing) e.stopPropagation();
       }}
       style={{
-        fontFamily: s.fontFamily || 'Mitr, sans-serif',
+        fontFamily: fontStack(s.fontFamily),
         fontSize: s.fontSize || 18,
         fontWeight: s.fontWeight || 400,
         color: s.color || 'inherit',
@@ -134,7 +135,7 @@ function ImageContent({ node }: { node: PNode }) {
             alignItems: 'center',
             justifyContent: 'center',
             color: 'var(--muted)',
-            fontFamily: 'JetBrains Mono, monospace',
+            fontFamily: 'JetBrains Mono,IBM Plex Sans Thai, monospace',
             fontSize: 11,
             letterSpacing: '.08em',
             textTransform: 'uppercase',
@@ -177,7 +178,7 @@ function LinkContent({ node, preview }: { node: PNode; preview: boolean }) {
         borderRadius: s.radius != null ? s.radius : 14,
         fontSize: s.fontSize || 15,
         fontWeight: s.fontWeight || 600,
-        fontFamily: s.fontFamily || 'IBM Plex Sans Thai, Mitr, sans-serif',
+        fontFamily: fontStack(s.fontFamily, 'IBM Plex Sans Thai, Mitr, sans-serif'),
         textAlign: s.align || 'center',
         padding: s.padding || '0 18px',
       }}

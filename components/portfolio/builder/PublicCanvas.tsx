@@ -14,6 +14,7 @@ import {
   STICKER_MAP,
   CRED_MAP,
   SAMPLE_CREDENTIALS,
+  fontStack,
   type PNode,
   type PortfolioDoc,
 } from '@/lib/portfolio-builder';
@@ -58,7 +59,7 @@ export function credentialView(node: PNode, lang: Lang) {
       </div>
       <div className="pb-cred-foot">
         <span>{date}</span>
-        <span style={{ fontFamily: 'Caveat', fontSize: 18 }}>completed ✓</span>
+        <span style={{ fontFamily: 'Caveat, Mitr', fontSize: 18 }}>completed ✓</span>
       </div>
       <div className="pb-cred-seal">✦</div>
     </div>
@@ -93,7 +94,7 @@ function nodeContent(n: PNode, interactive: boolean) {
         <div
           className="pb-text"
           style={{
-            fontFamily: s.fontFamily || 'Mitr, sans-serif',
+            fontFamily: fontStack(s.fontFamily),
             fontSize: s.fontSize || 18,
             fontWeight: s.fontWeight || 400,
             color: s.color || 'inherit',

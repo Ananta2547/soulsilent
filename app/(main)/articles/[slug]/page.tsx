@@ -139,7 +139,7 @@ export default function ArticleDetailPage() {
                 fontSize: 13,
                 fontWeight: 500,
                 marginBottom: 24,
-                fontFamily: 'JetBrains Mono, monospace',
+                fontFamily: 'JetBrains Mono,IBM Plex Sans Thai, monospace',
                 letterSpacing: '.04em',
               }}
             >
@@ -340,7 +340,7 @@ function ArticleBodyView({ blocks }: { blocks: ArticleBlock[] }) {
                       fontStyle: 'normal',
                       fontSize: 13.5,
                       color: 'var(--muted)',
-                      fontFamily: 'JetBrains Mono, monospace',
+                      fontFamily: 'JetBrains Mono,IBM Plex Sans Thai, monospace',
                     }}
                   >
                     — {b.by}
@@ -408,7 +408,7 @@ function AuthorAvatar({ name, size = 36 }: { name: string; size?: number }) {
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontFamily: 'Archivo Black, sans-serif',
+        fontFamily: 'Archivo Black,Mitr, sans-serif',
         fontSize: size * 0.36,
         flexShrink: 0,
       }}
@@ -428,7 +428,7 @@ function PrevNext({ prev, next, lang }: { prev: Article | null; next: Article | 
             background: 'var(--cream)',
             color: 'var(--muted)',
             fontSize: 13,
-            fontFamily: 'JetBrains Mono, monospace',
+            fontFamily: 'JetBrains Mono,IBM Plex Sans Thai, monospace',
             letterSpacing: '.08em',
             display: 'flex',
             alignItems: 'center',

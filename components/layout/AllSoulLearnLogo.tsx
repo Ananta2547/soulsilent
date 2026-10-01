@@ -28,7 +28,7 @@ export function AllSoulLearnLogo({
         fillRule="evenodd"
         strokeLinejoin="round"
       />
-      <text x="73.7" y="120" style={{ fontFamily: "'Poppins', sans-serif", fontSize: 100 }}>
+      <text x="73.7" y="120" style={{ fontFamily: "'Poppins',Mitr, sans-serif", fontSize: 100 }}>
         <tspan style={{ fontWeight: 700 }} fill={ink}>ll</tspan>
         <tspan style={{ fontWeight: 700 }} fill={teal}>Soul</tspan>
         <tspan style={{ fontWeight: 500 }} fill={ink}>Learn</tspan>

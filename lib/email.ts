@@ -48,7 +48,7 @@ export function emailTemplate(opts: {
   footnote?: string;
 }): string {
   const { heading, body, ctaLabel, ctaHref, footnote } = opts;
-  return `<!doctype html><html><body style="margin:0;background:#f6f1e6;font-family:'IBM Plex Sans Thai',Arial,sans-serif;color:#0d1e1d;">
+  return `<!doctype html><html><body style="margin:0;background:#f6f1e6;font-family:'IBM Plex Sans Thai','Noto Sans Thai','Leelawadee UI',Arial,sans-serif;color:#0d1e1d;">
   <div style="max-width:480px;margin:0 auto;padding:40px 24px;">
     <div style="display:inline-flex;align-items:center;gap:8px;margin-bottom:28px;">
       <span style="width:30px;height:30px;border-radius:50%;background:#0d8a7e;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:600;">s</span>

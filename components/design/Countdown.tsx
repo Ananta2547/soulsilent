@@ -94,7 +94,7 @@ export function Countdown({ date, timeStart, timeEnd, endDate }: Props) {
           fontSize: 14,
         }}
       >
-        <div style={{ fontFamily: 'JetBrains Mono', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', opacity: 0.7, marginBottom: 4 }}>
+        <div style={{ fontFamily: 'JetBrains Mono, IBM Plex Sans Thai', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', opacity: 0.7, marginBottom: 4 }}>
           {tr(lang, 'กำลังเริ่มแล้ว', 'In progress')}
         </div>
         {tr(lang, 'กิจกรรมกำลังจัดอยู่ตอนนี้', 'The event is happening now')}
@@ -143,7 +143,7 @@ export function Countdown({ date, timeStart, timeEnd, endDate }: Props) {
           <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <div
               style={{
-                fontFamily: 'Archivo Black',
+                fontFamily: 'Archivo Black, Mitr',
                 fontSize: 'clamp(20px, 3.4vw, 30px)',
                 lineHeight: 1,
                 letterSpacing: '-.02em',

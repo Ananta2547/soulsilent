@@ -175,7 +175,7 @@ export default function HelpPage() {
                   <Icon name={c.icon} size={18} />
                 </span>
                 <div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'JetBrains Mono, monospace', letterSpacing: '.06em', textTransform: 'uppercase' }}>{c.l}</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'JetBrains Mono,IBM Plex Sans Thai, monospace', letterSpacing: '.06em', textTransform: 'uppercase' }}>{c.l}</div>
                   <div style={{ fontSize: 14, fontWeight: 600 }}>{c.v}</div>
                 </div>
               </div>

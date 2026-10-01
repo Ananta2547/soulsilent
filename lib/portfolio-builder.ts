@@ -7,6 +7,11 @@
 export const CANVAS_W = 1200;
 export const CANVAS_H_MIN = 1700;
 
+/** A node's chosen face plus a loopless Thai fallback — Archivo Black, Caveat
+ *  and JetBrains Mono carry no Thai, and the OS default for Thai is looped. */
+export const fontStack = (f?: string, fallback = 'Mitr, sans-serif') =>
+  f ? `${f}, ${/JetBrains/i.test(f) ? 'IBM Plex Sans Thai' : 'Mitr'}, sans-serif` : fallback;
+
 export type Localized = { th: string; en: string };
 
 export interface PNode {

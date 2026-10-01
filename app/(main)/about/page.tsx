@@ -93,7 +93,7 @@ export default function AboutPage() {
           <div className="card card-cream stats-grid" style={{ padding: '36px 24px' }}>
             {numbers.map((s) => (
               <div key={s.label}>
-                <div style={{ fontFamily: 'Archivo Black', fontSize: 'clamp(34px,4.5vw,52px)', color: s.accent ? 'var(--teal)' : 'var(--ink)' }}>
+                <div style={{ fontFamily: 'Archivo Black, Mitr', fontSize: 'clamp(34px,4.5vw,52px)', color: s.accent ? 'var(--teal)' : 'var(--ink)' }}>
                   {s.n}
                   <span style={{ color: 'var(--accent)' }}>.</span>
                 </div>
@@ -121,7 +121,7 @@ export default function AboutPage() {
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={m.avatar_url} alt={m.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
-                      <span style={{ fontFamily: 'Archivo Black', fontSize: 22, color: SWATCHES[i % SWATCHES.length] === 'ph-ink' ? '#fff' : 'var(--teal-deep)', textTransform: 'uppercase', letterSpacing: '.02em' }}>
+                      <span style={{ fontFamily: 'Archivo Black, Mitr', fontSize: 22, color: SWATCHES[i % SWATCHES.length] === 'ph-ink' ? '#fff' : 'var(--teal-deep)', textTransform: 'uppercase', letterSpacing: '.02em' }}>
                         {(m.name || '?').slice(0, 2)}
                       </span>
                     )}
