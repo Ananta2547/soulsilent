@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
-import { roleSql } from '@/lib/roles';
+import { ownRoleSql } from '@/lib/roles';
 import { seatsHeldSubquery, seatsOfRowSql } from '@/lib/seats';
 
 /** What the makers page shows per teacher: who they are, what they teach,
@@ -42,17 +42,19 @@ type WRow = {
   booked: number;
 };
 
-/** Every teacher a workshop row belongs to. */
+/** Every host a workshop row belongs to. The row's own facilitators win: the
+ *  master's organizer is only a fallback for rows that name nobody, so when
+ *  the admin hands a workshop to another host it leaves the old host's card. */
 function teachersOf(w: { instructor_id: string | null; instructor_ids_json: string | null; organizer: string | null }): string[] {
   const ids = new Set<string>();
   if (w.instructor_id) ids.add(w.instructor_id);
-  if (w.organizer) ids.add(w.organizer);
   try {
     const a = w.instructor_ids_json ? (JSON.parse(w.instructor_ids_json) as unknown) : [];
     if (Array.isArray(a)) a.forEach((x) => typeof x === 'string' && x && ids.add(x));
   } catch {
     /* legacy column only */
   }
+  if (ids.size === 0 && w.organizer) ids.add(w.organizer);
   return [...ids];
 }
 
@@ -66,7 +68,7 @@ export async function GET() {
       .prepare(
         `SELECT u.id, u.name, u.nickname, u.avatar_url, u.bio, u.role
            FROM users u
-          WHERE ${roleSql('u', 'teacher')}
+          WHERE ${ownRoleSql('u', 'teacher')}
             AND (u.account_status IS NULL OR u.account_status = 'active')
           ORDER BY u.name ASC`,
       )
@@ -144,9 +146,9 @@ export async function GET() {
       }
     }
 
-    // Admins pass roleSql, but they only belong on the makers page when they
-    // actually lead a workshop of their own; the other admins stay off it.
-    const cards: TeacherCard[] = teachers.filter((t) => t.role !== 'admin' || byTeacher.has(t.id)).map((t) => {
+    // Only users who hold the host (teacher) role are listed — admin alone
+    // does not count, and taking the role away takes them off the page.
+    const cards: TeacherCard[] = teachers.map((t) => {
       const mine = byTeacher.get(t.id) || [];
       const open = mine.filter((w) => w.date >= today);
       const past = mine.filter((w) => w.date < today);

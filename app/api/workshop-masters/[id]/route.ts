@@ -5,6 +5,7 @@ import { requireAdmin } from '@/lib/auth';
 import { expireStaleHolds } from '@/lib/holds';
 import type { ImageMeta, WorkshopMaster } from '@/lib/types';
 import { cardPrice, normalizeTiers, seatPrice } from '@/lib/pricing';
+import { ownRoleSql } from '@/lib/roles';
 
 /** Seats counted as taken (paid + live holds); mirrors bookings route. */
 const SEAT_TAKEN = `
@@ -22,7 +23,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
     const master = await db
       .prepare(
-        `SELECT m.*, u.name AS organizer_name
+        `SELECT m.*, u.name AS organizer_name,
+                -- the public page links the organizer only while they hold the host role
+                CASE WHEN u.id IS NOT NULL AND ${ownRoleSql('u', 'teacher')} THEN 1 ELSE 0 END AS organizer_is_host
          FROM workshop_masters m LEFT JOIN users u ON m.organizer = u.id
          WHERE m.id = ?`
       )

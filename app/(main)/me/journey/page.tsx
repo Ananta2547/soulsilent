@@ -76,7 +76,7 @@ function JourneyAndDiary() {
           return r.json() as Promise<{ items: JourneyItem[]; upcoming?: UpcomingSeat[] }>;
         }),
         fetch('/api/me/diary').then((r) => (r.ok ? (r.json() as Promise<{ entries: DiaryEntry[]; months: string[] }>) : null)),
-        fetch('/api/auth/me').then((r) => r.json() as Promise<{ user?: { name?: string | null } | null }>),
+        fetch('/api/auth/me').then((r) => r.json() as Promise<{ user?: { name?: string | null; nickname?: string | null } | null }>),
         // The user's own events from /calendar, drawn on their diary pages.
         fetch('/api/me/events').then((r) => (r.ok ? (r.json() as Promise<{ events: UserEvent[] }>) : null)),
       ])
@@ -90,7 +90,7 @@ function JourneyAndDiary() {
             setEntries(d.entries || []);
             setMonths(d.months || []);
           }
-          setOwner(me?.user?.name || '');
+          setOwner(me?.user?.nickname || me?.user?.name || '');
         })
         .catch(() => {})
         .finally(() => setLoading(false)),

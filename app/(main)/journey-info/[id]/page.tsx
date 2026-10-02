@@ -72,7 +72,7 @@ export default function WorkshopInfoPage() {
           {master.organizer_name && (
             <p style={{ color: 'var(--muted)', fontSize: 14 }}>
               {tr(lang, 'จัดโดย', 'Organized by')}{' '}
-              {master.organizer ? (
+              {master.organizer && master.organizer_is_host ? (
                 <Link href={`/hosts/${master.organizer}`} style={{ color: 'var(--ink)', fontWeight: 700, textDecoration: 'underline', textUnderlineOffset: 3 }}>
                   {master.organizer_name}
                 </Link>

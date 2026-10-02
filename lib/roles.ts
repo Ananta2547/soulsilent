@@ -40,3 +40,9 @@ export function hasAnyRole(roles: readonly string[] | null | undefined, wanted: 
 export function roleSql(alias: string, r: Role): string {
   return `(${alias}.role = 'admin' OR ${alias}.role = '${r}' OR EXISTS (SELECT 1 FROM json_each(COALESCE(${alias}.roles_json, '[]')) WHERE json_each.value = '${r}'))`;
 }
+
+/** SQL: the user row `alias` was given role `r` itself — admin does not count.
+ *  For public listings (the hosts page) where only real holders belong. */
+export function ownRoleSql(alias: string, r: Role): string {
+  return `(${alias}.role = '${r}' OR EXISTS (SELECT 1 FROM json_each(COALESCE(${alias}.roles_json, '[]')) WHERE json_each.value = '${r}'))`;
+}

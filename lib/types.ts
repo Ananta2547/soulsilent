@@ -112,6 +112,8 @@ export interface WorkshopMaster {
   updated_at: string;
   /** Joined (not a column): the organizer teacher's display name. */
   organizer_name?: string | null;
+  /** 1 while the organizer still holds the host (teacher) role. */
+  organizer_is_host?: number;
 }
 
 export interface Workshop {

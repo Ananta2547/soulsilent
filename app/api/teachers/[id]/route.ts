@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { seatsHeldSubquery, seatsOfRowSql } from '@/lib/seats';
 import { getDB } from '@/lib/db';
 import { expireStaleHolds } from '@/lib/holds';
-import { roleSql } from '@/lib/roles';
+import { ownRoleSql } from '@/lib/roles';
 import { getCurrentUserWithRoles } from '@/lib/auth';
 import { parseTeacherProfile, type TeacherProfile } from '@/lib/teacher-profile';
 import { getWorkshopStatusBadge } from '@/lib/workshop-utils';
@@ -20,12 +20,14 @@ const SEAT_TAKEN = `
     OR (b.payment_status = 'pending' AND b.expires_at IS NOT NULL AND datetime(b.expires_at) > datetime('now'))
   )`;
 
-/** Rounds this teacher leads: listed as an instructor on the row, or
- *  organizer of the master the row belongs to. Binds the id three times. */
+/** Rounds this host leads: listed as a facilitator on the row, or organizer
+ *  of its master when the row names nobody (so a workshop handed to another
+ *  host leaves this page). Binds the id three times. */
 const MINE = `(
   w.instructor_id = ?
   OR EXISTS (SELECT 1 FROM json_each(COALESCE(w.instructor_ids_json, '[]')) WHERE json_each.value = ?)
-  OR m.organizer = ?
+  OR (m.organizer = ? AND COALESCE(w.instructor_id, '') = ''
+      AND NOT EXISTS (SELECT 1 FROM json_each(COALESCE(w.instructor_ids_json, '[]')) WHERE COALESCE(json_each.value, '') != ''))
 )`;
 
 export type TeacherPublic = {
@@ -56,7 +58,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       .prepare(
         `SELECT u.id, u.name, u.nickname, u.avatar_url, u.bio, u.teacher_profile_json
            FROM users u
-          WHERE u.id = ? AND ${roleSql('u', 'teacher')} AND (u.account_status IS NULL OR u.account_status = 'active')`
+          WHERE u.id = ? AND ${ownRoleSql('u', 'teacher')} AND (u.account_status IS NULL OR u.account_status = 'active')`
       )
       .bind(id)
       .first<{ id: string; name: string; nickname: string | null; avatar_url: string | null; bio: string | null; teacher_profile_json: string | null }>();
