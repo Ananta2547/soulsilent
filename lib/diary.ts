@@ -23,11 +23,15 @@ export const FAM: Record<MoodKey, Family> = Object.fromEntries(FAMILIES.map((f) 
 export const TONE_LABEL: Record<Tone, string> = { pos: 'ทางบวก', neu: 'กลาง', neg: 'ทางลบ' };
 
 export const MAX_MOODS = 3;
-export const MAX_PAGES = 6;
-/** Characters per page: the first page shares space with the day heading. */
-export const CAP_FIRST = 220;
-export const CAP_REST = 520;
+export const MAX_PAGES = 10;
+/** A page holds what fits its lines on screen (see reflowPages); these are
+ *  only the safe first split for text written elsewhere (calendar, journey
+ *  notes) — small enough to fit any page, which the book then fills up. */
+export const CAP_FIRST = 150;
+export const CAP_REST = 400;
 export const capOf = (sub: number) => (sub === 0 ? CAP_FIRST : CAP_REST);
+/** Server-side ceiling per stored page — well above what a page can show. */
+export const PAGE_CHARS_MAX = 1000;
 
 export type DiaryEntry = { day: string; moods: Mood[]; notes: string[]; updated_at?: string | null };
 
@@ -73,7 +77,7 @@ export function cleanMoods(raw: unknown): Mood[] {
 /** Pages as stored: strings, capped per page, at most 6, always at least one. */
 export function cleanNotes(raw: unknown): string[] {
   const list = Array.isArray(raw) ? raw : [];
-  const out = list.slice(0, MAX_PAGES).map((v, i) => (typeof v === 'string' ? v.slice(0, capOf(i)) : ''));
+  const out = list.slice(0, MAX_PAGES).map((v) => (typeof v === 'string' ? v.slice(0, PAGE_CHARS_MAX) : ''));
   while (out.length > 1 && !out[out.length - 1].trim()) out.pop();
   return out.length ? out : [''];
 }
@@ -90,7 +94,57 @@ export function paginate(text: string): string[] {
   return pages.length ? pages : [''];
 }
 
-export const hasContent = (e: Pick<DiaryEntry, 'moods' | 'notes'>) => e.moods.length > 0 || e.notes.some((t) => t.trim());
+/** A cut may not land before a Thai vowel/tone mark or inside an emoji. */
+function joinsBack(c: number): boolean {
+  return c === 0x0e31 || (c >= 0x0e34 && c <= 0x0e3a) || (c >= 0x0e47 && c <= 0x0e4e) || (c >= 0xdc00 && c <= 0xdfff) || c === 0x200d || c === 0xfe0f;
+}
+
+/** The longest `extra` prefix (in chars) that still fits after `base`. */
+export function fitPrefix(base: string, extra: string, fits: (t: string) => boolean): number {
+  let lo = 0;
+  let hi = extra.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (fits(base + extra.slice(0, mid))) lo = mid;
+    else hi = mid - 1;
+  }
+  while (lo > 0 && lo < extra.length && joinsBack(extra.charCodeAt(lo))) lo--;
+  return lo;
+}
+
+/**
+ * Re-flows one day's pages so each holds exactly what fits its lines: from
+ * page `from` on, a page that overflows pushes its tail to the front of the
+ * next page, and a page with room pulls the next page's head back. `fitsAt`
+ * gives the measure for page j, or null when that page cannot be measured
+ * yet (it is reflowed later, once shown). Empty pages after `keep` are
+ * dropped. Text is never lost: the page count may pass MAX_PAGES here.
+ */
+export function reflowPages(notes: string[], from: number, fitsAt: (j: number) => ((t: string) => boolean) | null, keep: number): string[] {
+  const out = notes.slice();
+  for (let j = Math.max(0, from); j < out.length; j++) {
+    const fits = fitsAt(j);
+    if (!fits) break;
+    const t = out[j];
+    if (!fits(t)) {
+      const k = Math.max(1, fitPrefix('', t, fits));
+      out[j] = t.slice(0, k);
+      if (j + 1 < out.length) out[j + 1] = t.slice(k) + out[j + 1];
+      else out.push(t.slice(k));
+    } else if (j + 1 < out.length && out[j + 1]) {
+      const next = out[j + 1];
+      const m = fitPrefix(t, next, fits);
+      if (m > 0) {
+        out[j] = t + next.slice(0, m);
+        out[j + 1] = next.slice(m);
+      }
+    }
+  }
+  while (out.length > Math.max(1, keep + 1) && !out[out.length - 1]) out.pop();
+  return out;
+}
+
+export const hasContent =(e: Pick<DiaryEntry, 'moods' | 'notes'>) => e.moods.length > 0 || e.notes.some((t) => t.trim());
 
 export function parseEntry(row: { day: string; moods_json: string | null; notes_json: string | null; updated_at?: string | null }): DiaryEntry {
   let moods: unknown = [];

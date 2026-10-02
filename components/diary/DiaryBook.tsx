@@ -10,7 +10,7 @@
  * a moment later. The page-curl geometry is the design's, carried over as is. */
 
 import { Component, createElement as h, type CSSProperties, type ReactNode } from 'react';
-import { CAP_FIRST, CAP_REST, FAMILIES, FAM, MAX_MOODS, MAX_PAGES, TH_MON, TH_MONTHS, TH_WEEKDAY, TH_DOW, TONE_LABEL, addDays, css, dateOf, type DiaryEntry, type Mood, type MoodKey } from '@/lib/diary';
+import { FAMILIES, FAM, MAX_MOODS, MAX_PAGES, TH_MON, TH_MONTHS, TH_WEEKDAY, TH_DOW, TONE_LABEL, addDays, css, dateOf, PAGE_CHARS_MAX, reflowPages, type DiaryEntry, type Mood, type MoodKey } from '@/lib/diary';
 import type { DiaryQuote } from '@/lib/diary-quotes';
 
 export type BookWorkshop = { title: string; time: string; poster: string | null; drive: string | null };
@@ -134,6 +134,9 @@ export class DiaryBook extends Component<Props, State> {
   private _lastNonce = 0;
   private _lastJump = 0;
   private _focusAfter: string | null = null;
+  private _focusPos: number | null = null;
+  private _mirror: HTMLTextAreaElement | null = null;
+  private _contFits: ((t: string) => boolean) | null = null;
   private _stripMoved = false;
   private _sdrag: { sx: number; sy: number; moved: boolean; touch: boolean } | null = null;
   private _drag: Drag | null = null;
@@ -169,8 +172,10 @@ export class DiaryBook extends Component<Props, State> {
     const { cw, vh, top } = this.state;
     const portrait = cw < 700;
     if (portrait) {
+      // Same 440px page as the spread, only scaled: text then breaks into
+      // pages identically on a phone and a desktop.
       const W = Math.floor(Math.min(cw - 4, 420));
-      return { portrait: true, W, H: Math.round(W * 1.36), REF: 360 };
+      return { portrait: true, W, H: Math.round(W * 1.32), REF: 440 };
     }
     const chrome = 60 + 12 + TOPPAD + 22 + 12 + 42 + 14;
     const availH = Math.max(340, vh - Math.min(top, 260) - chrome);
@@ -257,6 +262,7 @@ export class DiaryBook extends Component<Props, State> {
   }
   componentDidUpdate() {
     this.measure();
+    this.reflowShown();
     const n = this.props.writeNonce || 0;
     if (n !== this._lastNonce) {
       this._lastNonce = n;
@@ -277,6 +283,7 @@ export class DiaryBook extends Component<Props, State> {
     clearInterval(this._iv); clearInterval(this._poll); clearTimeout(this._st); clearTimeout(this._tt);
     this.flush();
     if (this._ro) this._ro.disconnect();
+    if (this._mirror) this._mirror.remove();
   }
 
   say(t: string) {
@@ -306,10 +313,107 @@ export class DiaryBook extends Component<Props, State> {
     });
     this.setState({ saved });
   }
-  writeText(iso: string, sub: number, v: string) {
+  /** A measure for one page's lines: does this text fit without scrolling?
+   *  Uses an off-screen twin of the page's textarea (same box and type). */
+  fitsFor(el: HTMLTextAreaElement): ((t: string) => boolean) | null {
+    const w = el.offsetWidth;
+    const hgt = el.offsetHeight;
+    if (!w || !hgt) return null;
+    let m = this._mirror;
+    if (!m) {
+      m = document.createElement('textarea');
+      m.setAttribute('aria-hidden', 'true');
+      m.tabIndex = -1;
+      document.body.appendChild(m);
+      this._mirror = m;
+    }
+    const mirror = m;
+    mirror.style.cssText = el.style.cssText;
+    Object.assign(mirror.style, { position: 'fixed', left: '-9999px', top: '0', visibility: 'hidden', width: w + 'px', height: hgt + 'px', overflow: 'hidden' });
+    return (t: string) => {
+      mirror.value = t;
+      return mirror.scrollHeight <= mirror.clientHeight + 1;
+    };
+  }
+  /** Measures for one day's pages: the shown page's own box, and the
+   *  continuation box (every continuation page shares it) once one was seen. */
+  fitsAtFor(sub: number, el: HTMLTextAreaElement) {
+    const own = this.fitsFor(el);
+    if (sub > 0 && own) this._contFits = own;
+    let cont = this._contFits;
+    if (!cont && this._root) {
+      const c = this._root.querySelector<HTMLTextAreaElement>('textarea[data-cont="1"]');
+      if (c) cont = this._contFits = this.fitsFor(c);
+    }
+    return (j: number) => (j === sub ? own : j > 0 ? cont : null);
+  }
+  writeText(iso: string, sub: number, v: string, el?: HTMLTextAreaElement) {
     const r = this.rawOf(iso);
-    r.notes[sub] = v.slice(0, sub === 0 ? CAP_FIRST : CAP_REST);
+    const before = r.notes.join('').length;
+    const caret = el ? el.selectionStart : v.length;
+    r.notes[sub] = v.slice(0, PAGE_CHARS_MAX);
+    if (el) {
+      const notes = reflowPages(r.notes, sub, this.fitsAtFor(sub, el), sub);
+      if (notes.length > MAX_PAGES && notes.join('').length > before) {
+        this.say('หนึ่งวันเขียนได้ไม่เกิน ' + MAX_PAGES + ' หน้า');
+        return;
+      }
+      // Follow the caret when what was typed moved on to the next page.
+      let g = r.notes.slice(0, sub).join('').length + caret;
+      let j = 0;
+      while (j < notes.length - 1 && g > notes[j].length) g -= notes[j++].length;
+      r.notes = notes;
+      if (j !== sub) this.goPage(iso, j, g);
+    }
     this.writeRaw(iso, r);
+  }
+  /** Backspace at the very start of a continuation page steps back onto the
+   *  previous page, dropping this one when it is empty. */
+  onTaKey(ev: React.KeyboardEvent<HTMLTextAreaElement>, iso: string, sub: number) {
+    const el = ev.currentTarget;
+    if (ev.key !== 'Backspace' || sub === 0 || el.selectionStart !== 0 || el.selectionEnd !== 0) return;
+    ev.preventDefault();
+    const r = this.rawOf(iso);
+    const prevLen = r.notes[sub - 1].length;
+    if (!r.notes[sub]) {
+      r.notes.splice(sub, 1);
+      this.writeRaw(iso, r);
+    }
+    this.goPage(iso, sub - 1, prevLen);
+  }
+  /** Puts the caret on page `sub` of a day at `pos`, turning to it if needed. */
+  goPage(iso: string, sub: number, pos: number) {
+    const key = iso + ':' + sub;
+    this._focusPos = pos;
+    setTimeout(() => {
+      const el = this._root?.querySelector<HTMLTextAreaElement>('textarea[data-k="' + key + '"]');
+      if (el) { this.focusKey(key); return; }
+      this._focusAfter = key;
+      const B = this.build(this.state.ghost);
+      const i = B.P.findIndex((pg) => pg.key === key);
+      if (i >= 0) this.flipTo(i, B);
+    }, 0);
+  }
+  /** Keeps every page on screen fitted to its lines, so text saved before
+   *  (or as a quick split elsewhere) settles the first time its page shows. */
+  reflowShown() {
+    if (!this._root || this.state.flip) return;
+    const seen = new Set<string>();
+    this._root.querySelectorAll<HTMLTextAreaElement>('textarea[data-k]').forEach((el) => {
+      const key = el.dataset.k || '';
+      if (seen.has(key) || document.activeElement === el) return;
+      seen.add(key);
+      const cut = key.lastIndexOf(':');
+      const iso = key.slice(0, cut);
+      const sub = Number(key.slice(cut + 1));
+      const r = this.rawOf(iso);
+      if (sub >= r.notes.length) return;
+      const notes = reflowPages(r.notes, sub, this.fitsAtFor(sub, el), sub);
+      if (notes.length !== r.notes.length || notes.some((t, k) => t !== r.notes[k])) {
+        r.notes = notes;
+        this.writeRaw(iso, r);
+      }
+    });
   }
   focusKey(key: string) {
     setTimeout(() => {
@@ -318,30 +422,12 @@ export class DiaryBook extends Component<Props, State> {
       if (el) {
         try {
           el.focus();
-          const n = el.value.length;
+          const n = this._focusPos != null ? Math.min(this._focusPos, el.value.length) : el.value.length;
+          this._focusPos = null;
           el.setSelectionRange(n, n);
         } catch {}
       }
     }, 80);
-  }
-  addPage(iso: string) {
-    const r = this.rawOf(iso);
-    if (r.notes.length >= MAX_PAGES) { this.say('หนึ่งวันเพิ่มได้ไม่เกิน ' + MAX_PAGES + ' หน้า'); return; }
-    r.notes.push('');
-    this.writeRaw(iso, r);
-    const key = iso + ':' + (r.notes.length - 1);
-    this._focusAfter = key;
-    setTimeout(() => {
-      const B = this.build(this.state.ghost);
-      const i = B.P.findIndex((p) => p.key === key);
-      if (i >= 0) this.flipTo(i, B);
-    }, 0);
-  }
-  removePage(iso: string, sub: number) {
-    const r = this.rawOf(iso);
-    if (sub === 0 || r.notes.length < 2) return;
-    r.notes.splice(sub, 1);
-    this.writeRaw(iso, r);
   }
   toggleTray(iso: string) {
     const t = this.state.tray;
@@ -694,7 +780,7 @@ export class DiaryBook extends Component<Props, State> {
 
   /* ---------------- page contents ---------------- */
 
-  pageContent(i: number, B: Built, portrait: boolean): { node: ReactNode; no: string } {
+  pageContent(i: number, B: Built): { node: ReactNode; no: string } {
     const p: PageT = i < 0 ? { kind: 'backcover', key: 'back' } : B.P[i] || { kind: 'blank', key: 'blank' };
     const owner = this.props.owner;
     const today = this.props.today;
@@ -854,14 +940,13 @@ export class DiaryBook extends Component<Props, State> {
       const evs = (this.props.events && this.props.events[iso]) || [];
       // A day still ahead: its workshop and events show, the pen does not.
       const locked = iso > this.props.today;
-      const cap = p.sub === 0 ? CAP_FIRST : CAP_REST;
       const len = (p.tx || '').length;
       const status = this.state.saved[iso] === false ? 'กำลังบันทึก…' : this.state.saved[iso] ? '✓ บันทึกแล้ว' : '';
       const F = open && tray?.fam ? FAM[tray.fam] : null;
       return {
         no: 'หน้า ' + (i - 1),
         node: (
-          <div style={css('position:absolute;inset:0;padding:' + (portrait ? '24px 22px 36px' : '30px 30px 40px') + ';display:flex;flex-direction:column')}>
+          <div style={css('position:absolute;inset:0;padding:30px 30px 40px;display:flex;flex-direction:column')}>
             {p.kind === 'day' ? (
               <div style={css('display:block;flex:none')}>
                 <div style={css('display:flex;align-items:flex-end;gap:12px')}>
@@ -983,7 +1068,7 @@ export class DiaryBook extends Component<Props, State> {
             <div style={css('display:flex;flex:1;min-height:0;flex-direction:column;margin-top:' + (p.kind === 'day' ? '14px' : '10px'))}>
               <div style={css('display:flex;align-items:baseline;justify-content:space-between;gap:8px')}>
                 <span style={css('font-family:Mitr,sans-serif;font-weight:500;font-size:13.5px;color:var(--muted)')}>บันทึกของฉัน</span>
-                <span style={css('font-family:var(--font-mono),ui-monospace,monospace;font-size:10.5px;letter-spacing:.08em;color:' + (len >= cap * 0.9 ? '#c9503f' : 'var(--muted)'))}>{locked ? '' : len + ' / ' + cap}</span>
+                {p.total > 1 && <span style={css('font-family:var(--font-mono),ui-monospace,monospace;font-size:10.5px;letter-spacing:.08em;color:var(--muted)')}>{p.sub + 1 + ' / ' + p.total}</span>}
               </div>
               {locked ? (
                 <div style={css('flex:1;min-height:0;position:relative;margin-top:6px;overflow:hidden')}>
@@ -1001,28 +1086,22 @@ export class DiaryBook extends Component<Props, State> {
                 <textarea
                   className="db-ta"
                   data-k={p.key}
+                  data-cont={p.sub > 0 ? '1' : undefined}
                   value={p.tx}
-                  onChange={(ev) => this.writeText(iso, p.sub, ev.target.value)}
+                  onChange={(ev) => this.writeText(iso, p.sub, ev.target.value, ev.target)}
+                  onKeyDown={(ev) => this.onTaKey(ev, iso, p.sub)}
                   onPointerDown={this.stopMouse}
-                  maxLength={cap}
                   placeholder={p.sub === 0 ? 'วันนี้เป็นยังไงบ้าง… แตะแล้วพิมพ์ได้เลย' : 'เขียนต่อ…'}
                   spellCheck={false}
-                  style={css("position:absolute;inset:0;width:100%;height:100%;box-sizing:border-box;border:0;outline:none;resize:none;background:transparent;font-size:16px;line-height:30px;padding:5px 4px 0;color:var(--ink);font-family:'IBM Plex Sans Thai',system-ui,sans-serif;cursor:text")}
+                  style={css("position:absolute;inset:0;width:100%;height:100%;box-sizing:border-box;border:0;outline:none;resize:none;background:transparent;font-size:16px;line-height:30px;padding:5px 4px 0;overflow:hidden;color:var(--ink);font-family:'IBM Plex Sans Thai',system-ui,sans-serif;cursor:text")}
                 />
               </div>
               )}
               <div style={css('display:flex;align-items:center;gap:8px;min-height:34px;margin-top:6px;flex-wrap:wrap')}>
-                {p.sub === p.total - 1 && !locked && (
-                  <button type="button" onPointerDown={this.stopPtr} onClick={() => this.addPage(iso)} style={css('border:0;cursor:pointer;border-radius:999px;padding:7px 14px;background:#e6f4f2;color:var(--teal-deep);font-family:inherit;font-size:12.5px;font-weight:600')}>
-                    + เพิ่มหน้า
-                  </button>
+                {/* Pages turn by themselves: a full page carries on overleaf. */}
+                {!locked && p.sub === p.total - 1 && len > 0 && p.total < MAX_PAGES && (
+                  <span style={css('font-size:11.5px;color:var(--muted)')}>เต็มหน้าแล้วจะขึ้นหน้าใหม่ให้เอง</span>
                 )}
-                {p.sub > 0 && !len && (
-                  <button type="button" onPointerDown={this.stopPtr} onClick={() => this.removePage(iso, p.sub)} style={css('border:0;cursor:pointer;border-radius:999px;padding:7px 14px;background:rgba(13,30,29,.06);color:var(--muted);font-family:inherit;font-size:12.5px')}>
-                    ลบหน้านี้
-                  </button>
-                )}
-                {len >= cap && <span style={css('font-size:12px;color:#c9503f')}>เต็มหน้าแล้ว — เพิ่มหน้าเพื่อเขียนต่อ</span>}
                 <div style={{ flex: 1 }} />
                 <span style={css('font-size:11px;color:var(--muted)')}>{status}</span>
               </div>
@@ -1087,7 +1166,7 @@ export class DiaryBook extends Component<Props, State> {
 
     type Opt = { transform?: string; clip?: string | null; strip?: string | null; filter?: string };
     const mk = (i: number, side: 'l' | 'r' | 'p', x: number, z: number, o: Opt = {}) => {
-      const pc = this.pageContent(i, B, portrait);
+      const pc = this.pageContent(i, B);
       const kind = i < 0 ? 'backcover' : (B.P[i] || { kind: 'blank' }).kind;
       const radius = side === 'l' ? '6px 0 0 6px' : '0 6px 6px 0';
       return (
