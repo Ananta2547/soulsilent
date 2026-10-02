@@ -11,6 +11,7 @@
 
 import { Component, createElement as h, type CSSProperties, type ReactNode } from 'react';
 import { CAP_FIRST, CAP_REST, FAMILIES, FAM, MAX_MOODS, MAX_PAGES, TH_MON, TH_MONTHS, TH_WEEKDAY, TH_DOW, TONE_LABEL, addDays, css, dateOf, type DiaryEntry, type Mood, type MoodKey } from '@/lib/diary';
+import type { DiaryQuote } from '@/lib/diary-quotes';
 
 export type BookWorkshop = { title: string; time: string; poster: string | null; drive: string | null };
 /** A personal event (ลงกิจกรรม on /calendar) shown on its day's page. */
@@ -19,6 +20,8 @@ export type MonthSummary = { month: string; top: string; logged: number; worksho
 
 type Props = {
   owner: string;
+  /** Today's back-cover quote (English text + author); the old tagline when absent. */
+  quote?: DiaryQuote | null;
   today: string;
   entries: DiaryEntry[];
   /** Workshops attended, by their first day. */
@@ -760,11 +763,29 @@ export class DiaryBook extends Component<Props, State> {
             <div style={css('position:absolute;top:0;bottom:0;right:0;width:7%;background:linear-gradient(270deg,rgba(0,0,0,.24),rgba(0,0,0,.06))')} />
             <div style={css('position:absolute;top:0;bottom:0;left:11%;width:14px;background:var(--accent);box-shadow:inset -3px 0 0 rgba(0,0,0,.08),inset 2px 0 0 rgba(255,255,255,.35),-2px 0 6px rgba(0,0,0,.2)')} />
             <div style={css('position:absolute;left:26%;right:16%;bottom:12%;display:flex;flex-direction:column;gap:10px')}>
-              <span style={css("font-family:Caveat,'Mitr',cursive;font-size:26px;line-height:1.1;color:var(--cream)")}>
-                มาด้วยความคาดหวัง
-                <br />
-                กลับไปได้ตัวเอง
-              </span>
+              {this.props.quote ? (
+                <figure style={css('margin:0;display:flex;flex-direction:column;gap:8px')}>
+                  {/* Long quotes step the size down so the cover never overflows. */}
+                  <blockquote
+                    style={css(
+                      `margin:0;font-family:Caveat,'Mitr',cursive;line-height:1.15;color:var(--cream);font-size:${
+                        this.props.quote.text.length > 130 ? 19 : this.props.quote.text.length > 80 ? 22 : 26
+                      }px`,
+                    )}
+                  >
+                    &ldquo;{this.props.quote.text}&rdquo;
+                  </blockquote>
+                  <figcaption style={css("font-family:'JetBrains Mono','IBM Plex Sans Thai',monospace;font-size:11px;letter-spacing:.08em;color:rgba(245,239,226,.75)")}>
+                    &mdash; {this.props.quote.author}
+                  </figcaption>
+                </figure>
+              ) : (
+                <span style={css("font-family:Caveat,'Mitr',cursive;font-size:26px;line-height:1.1;color:var(--cream)")}>
+                  มาด้วยความคาดหวัง
+                  <br />
+                  กลับไปได้ตัวเอง
+                </span>
+              )}
               <div style={css('display:flex;align-items:center;gap:8px;margin-top:6px')}>
                 <span style={css('width:26px;height:26px;border-radius:50%;background:var(--cream);color:var(--teal);display:flex;align-items:center;justify-content:center;font-family:Mitr,sans-serif;font-weight:600;font-size:15px;line-height:1')}>a</span>
                 <span style={css('font-family:Mitr,sans-serif;font-weight:500;font-size:15px;color:var(--cream)')}>

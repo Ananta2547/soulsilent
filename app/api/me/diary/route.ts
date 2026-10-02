@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { v4 as uuid } from 'uuid';
 import { getDB } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
+import { DIARY_QUOTES, drawQuote, type DiaryQuote, type QuoteState } from '@/lib/diary-quotes';
 import { cleanMoods, cleanNotes, hasContent, isDay, MAX_PAGES, paginate, parseEntry, todayBangkok, type DiaryEntry } from '@/lib/diary';
 
 type Row = { day: string; moods_json: string; notes_json: string; updated_at: string | null };
@@ -62,6 +63,46 @@ async function moveJourneyNotes(db: DB, userId: string) {
  * GET /api/me/diary — the signed-in user's whole diary: every written day and
  * the months whose summary they kept. Only ever the caller's own rows.
  */
+/** The back-cover quote for today, drawn on the first diary visit of the day
+ *  (see drawQuote). The write is guarded on the stored day so two tabs opening
+ *  at once agree on one quote. Null if the table is not there yet. */
+async function todaysQuote(db: Awaited<ReturnType<typeof getDB>>, userId: string): Promise<DiaryQuote | null> {
+  try {
+    const today = todayBangkok();
+    const read = () =>
+      db
+        .prepare('SELECT day, current, remaining_json FROM user_quote_state WHERE user_id = ?')
+        .bind(userId)
+        .first<{ day: string; current: number; remaining_json: string }>();
+    const row = await read();
+    let remaining: number[] = [];
+    try {
+      remaining = row ? (JSON.parse(row.remaining_json) as number[]) : [];
+    } catch {
+      /* start a fresh round */
+    }
+    const prev: QuoteState | null = row ? { day: row.day, current: row.current, remaining } : null;
+    const next = drawQuote(prev, today);
+    if (next !== prev) {
+      await db
+        .prepare(
+          `INSERT INTO user_quote_state (user_id, day, current, remaining_json, updated_at)
+           VALUES (?, ?, ?, ?, datetime('now'))
+           ON CONFLICT(user_id) DO UPDATE SET
+             day = excluded.day, current = excluded.current,
+             remaining_json = excluded.remaining_json, updated_at = excluded.updated_at
+           WHERE user_quote_state.day != excluded.day`,
+        )
+        .bind(userId, next.day, next.current, JSON.stringify(next.remaining))
+        .run();
+    }
+    const saved = await read();
+    return DIARY_QUOTES[saved?.current ?? next.current] || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET() {
   try {
     const user = await requireAuth();
@@ -75,6 +116,7 @@ export async function GET() {
       entries: ((rows.results || []) as Row[]).map(parseEntry).filter(hasContent),
       months: ((months.results || []) as { month: string }[]).map((m) => m.month),
       today: todayBangkok(),
+      quote: await todaysQuote(db, user.sub),
     });
   } catch (e) {
     return fail(e);

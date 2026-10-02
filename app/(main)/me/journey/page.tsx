@@ -16,6 +16,7 @@ import { Btn } from '@/components/design/RippleButton';
 import { useLoadingTracker } from '@/components/design/DataLoading';
 import type { JourneyItem } from '@/lib/journey';
 import { cleanNotes, css, todayIso, FAM, type DiaryEntry, type Mood } from '@/lib/diary';
+import type { DiaryQuote } from '@/lib/diary-quotes';
 import { DiaryBook, type BookEvent, type BookWorkshop, type MonthSummary } from '@/components/diary/DiaryBook';
 import { EVENT_KIND, type UserEvent } from '@/lib/user-events';
 import { MoodTab, SummaryTab, monthStats, type DayWorkshop } from '@/components/diary/DiaryTabs';
@@ -43,6 +44,7 @@ function JourneyAndDiary() {
   const [events, setEvents] = useState<UserEvent[]>([]);
   const [upcoming, setUpcoming] = useState<UpcomingSeat[]>([]);
   const [owner, setOwner] = useState('');
+  const [quote, setQuote] = useState<DiaryQuote | null>(null);
   const [loading, setLoading] = useState(true);
   const [unauthorized, setUnauthorized] = useState(false);
   // The URL decides the view: ?view=diary is the diary (the profile menu's
@@ -75,7 +77,7 @@ function JourneyAndDiary() {
           }
           return r.json() as Promise<{ items: JourneyItem[]; upcoming?: UpcomingSeat[] }>;
         }),
-        fetch('/api/me/diary').then((r) => (r.ok ? (r.json() as Promise<{ entries: DiaryEntry[]; months: string[] }>) : null)),
+        fetch('/api/me/diary').then((r) => (r.ok ? (r.json() as Promise<{ entries: DiaryEntry[]; months: string[]; quote?: DiaryQuote | null }>) : null)),
         fetch('/api/auth/me').then((r) => r.json() as Promise<{ user?: { name?: string | null; nickname?: string | null } | null }>),
         // The user's own events from /calendar, drawn on their diary pages.
         fetch('/api/me/events').then((r) => (r.ok ? (r.json() as Promise<{ events: UserEvent[] }>) : null)),
@@ -89,6 +91,7 @@ function JourneyAndDiary() {
           if (d) {
             setEntries(d.entries || []);
             setMonths(d.months || []);
+            setQuote(d.quote || null);
           }
           setOwner(me?.user?.nickname || me?.user?.name || '');
         })
@@ -310,6 +313,7 @@ function JourneyAndDiary() {
             <div style={css('max-width:1600px;margin:14px auto 0')}>
               <DiaryBook
                 owner={owner || 'ฉัน'}
+                quote={quote}
                 today={today}
                 entries={entries}
                 workshops={bookWorkshops}
