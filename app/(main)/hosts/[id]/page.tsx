@@ -166,6 +166,12 @@ export default function TeacherProfilePage() {
     const d = new Date(cy, cm + delta, 1);
     setCursor({ y: d.getFullYear(), m: d.getMonth() });
   };
+  // Back to this month; today is picked too when a round runs on it.
+  const goToday = () => {
+    const [ty, tm] = today.split('-').map(Number);
+    setCursor({ y: ty, m: tm - 1 });
+    if ((marks[today] || 0) > 0) setDay(today);
+  };
   const nudge = (dir: number) => {
     const el = railRef.current;
     if (el) el.scrollBy({ left: dir * Math.max(220, el.clientWidth * 0.8), behavior: 'smooth' });
@@ -532,7 +538,8 @@ export default function TeacherProfilePage() {
               <span className="tm-meta" style={{ whiteSpace: 'nowrap' }}>
                 {monthRounds ? (th ? `${monthRounds} รอบในเดือนนี้` : `${monthRounds} rounds this month`) : th ? 'ไม่มีรอบในเดือนนี้' : 'no rounds this month'}
               </span>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button type="button" className="tm-today-btn" onClick={goToday}>{th ? 'วันนี้' : 'Today'}</button>
                 <button type="button" className="tm-round-btn" style={{ background: 'var(--cream)' }} onClick={() => step(-1)} aria-label="Previous month">‹</button>
                 <button type="button" className="tm-round-btn" style={{ background: 'var(--cream)' }} onClick={() => step(1)} aria-label="Next month">›</button>
               </div>
@@ -560,7 +567,7 @@ export default function TeacherProfilePage() {
                   <button
                     key={key}
                     type="button"
-                    className={`tp2-cell ${has ? 'has' : ''} ${selected ? 'on' : ''}`}
+                    className={`tp2-cell ${has ? 'has' : ''} ${selected ? 'on' : ''} ${key === today ? 'today' : ''}`}
                     disabled={disabled}
                     aria-pressed={selected}
                     onClick={() => setDay(key)}

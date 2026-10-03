@@ -260,6 +260,9 @@
 .tdb-day.dim:hover { background: transparent; }
 .tdb-day .today { position: absolute; top: 8px; right: 9px; width: 6px; height: 6px; border-radius: 99px; background: var(--accent); }
 .tdb-cal.sm { padding: 0; background: transparent; }
+.tdb-cal.sm .tdb-cal-head { align-items: center; }
+.tdb-cal.sm .tdb-cal-month { font-size: 18px; }
+.tdb-cal-nav .tdb-soft-btn { white-space: nowrap; }
 .tdb-cal.sm .tdb-days, .tdb-cal.sm .tdb-dow { gap: 4px; }
 .tdb-cal.sm .tdb-dow { box-shadow: none; padding-bottom: 0; margin-bottom: 4px; }
 .tdb-cal.sm .tdb-day { height: 46px; border-radius: 12px; gap: 2px; }

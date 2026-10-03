@@ -87,14 +87,27 @@ export function TdbCalendar(p: CalProps) {
     const d = new Date(y, m + k, 1);
     p.onMonth({ y: d.getFullYear(), m: d.getMonth() });
   };
+  // Every grid gets "วันนี้": the page's own handler when it has one (it may
+  // also pick the day), else just back to this month.
+  const goToday =
+    p.onToday ||
+    (() => {
+      const t = new Date(today + 'T00:00:00');
+      p.onMonth({ y: t.getFullYear(), m: t.getMonth() });
+    });
   return (
     <div className={p.small ? 'tdb-cal sm' : 'tdb-cal-inner'}>
       <div className="tdb-cal-head">
         {p.small ? (
           <>
-            <button type="button" className="tdb-round-btn" onClick={() => step(-1)} aria-label="เดือนก่อน">‹</button>
             <span className="tdb-cal-month">{TH_MONTHS[m]} {y + 543}</span>
-            <button type="button" className="tdb-round-btn" onClick={() => step(1)} aria-label="เดือนถัดไป">›</button>
+            <div className="tdb-cal-nav">
+              <button type="button" className="tdb-soft-btn" onClick={goToday}>
+                วันนี้
+              </button>
+              <button type="button" className="tdb-round-btn" onClick={() => step(-1)} aria-label="เดือนก่อน">‹</button>
+              <button type="button" className="tdb-round-btn" onClick={() => step(1)} aria-label="เดือนถัดไป">›</button>
+            </div>
           </>
         ) : (
           <>
@@ -103,11 +116,9 @@ export function TdbCalendar(p: CalProps) {
               <div className="tdb-cal-sub">{p.sub ?? `${y + 543} · ${withMarks} ${p.subUnit || 'วันมีรอบ'}`}</div>
             </div>
             <div className="tdb-cal-nav">
-              {p.onToday && (
-                <button type="button" className="tdb-soft-btn" onClick={p.onToday}>
-                  วันนี้
-                </button>
-              )}
+              <button type="button" className="tdb-soft-btn" onClick={goToday}>
+                วันนี้
+              </button>
               <button type="button" className="tdb-round-btn" onClick={() => step(-1)} aria-label="เดือนก่อน">‹</button>
               <button type="button" className="tdb-round-btn" onClick={() => step(1)} aria-label="เดือนถัดไป">›</button>
             </div>

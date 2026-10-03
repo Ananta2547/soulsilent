@@ -69,6 +69,18 @@ export function MonthPicker({
     const d = new Date(cursor.y, cursor.m + delta, 1);
     setCursor({ y: d.getFullYear(), m: d.getMonth() });
   };
+  // Back to this month; today is also picked when it can be.
+  const goToday = () => {
+    const [ty, tm] = today.split('-').map(Number);
+    setCursor({ y: ty, m: tm - 1 });
+    const pickable = !(floor && today < floor) && (!enabledSet || enabledSet.has(today));
+    if (pickable && !multi) onChange(today);
+  };
+  const todayBtn = (
+    <button type="button" className="mp-today" onClick={goToday}>
+      {tr(lang, 'วันนี้', 'Today')}
+    </button>
+  );
   const monthName = lang === 'th' ? TH_MONTHS[cursor.m] : EN_MONTHS[cursor.m];
   const year = lang === 'th' ? cursor.y + 543 : cursor.y;
   const prev = (
@@ -90,13 +102,12 @@ export function MonthPicker({
             <div className="mp-month">{monthName}</div>
             <div className="mp-sub">{year} · {sub}</div>
           </div>
-          <div className="mp-navs">{prev}{next}</div>
+          <div className="mp-navs">{todayBtn}{prev}{next}</div>
         </div>
       ) : (
         <div className="mp-head">
-          {prev}
           <span className="mp-month">{monthName} {year}</span>
-          {next}
+          <div className="mp-navs">{todayBtn}{prev}{next}</div>
         </div>
       )}
       <div className="mp-grid mp-dow">

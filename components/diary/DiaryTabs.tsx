@@ -164,6 +164,16 @@ export function MoodTab({ entries, today, workshops, onSaveMoods }: { entries: D
                 <button type="button" aria-label="เดือนก่อน" onClick={() => step(-1)} style={css('width:30px;height:30px;border-radius:50%;border:0;background:var(--cream);cursor:pointer;font-size:15px')}>‹</button>
                 {TH_MONTHS[m - 1]} {y}
                 <button type="button" aria-label="เดือนถัดไป" onClick={() => step(1)} style={css('width:30px;height:30px;border-radius:50%;border:0;background:var(--cream);cursor:pointer;font-size:15px;opacity:' + (ym >= today.slice(0, 7) ? 0.3 : 1))}>›</button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setYm(today.slice(0, 7));
+                    setSel(today);
+                  }}
+                  style={css('height:30px;padding:0 12px;border-radius:999px;border:0;background:var(--cream);cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap')}
+                >
+                  วันนี้
+                </button>
               </span>
             </div>
             <span style={css('font-size:12.5px;color:var(--muted)')}>บันทึกแล้ว {stats.logged} / {daysSoFar} วัน</span>

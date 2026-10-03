@@ -3800,6 +3800,9 @@ body {
   background: var(--paper); color: var(--ink); font-size: 20px; line-height: 1; cursor: pointer;
 }
 .mp-nav:hover { background: var(--cream); }
+.mp-navs { display: flex; align-items: center; gap: 6px; }
+.mp-today { height: 34px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--cream-deep); background: var(--paper); color: var(--ink); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.mp-today:hover { background: var(--cream); }
 .mp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .mp-dow { margin-bottom: 4px; }
 .mp-dow span { text-align: center; font-size: 11px; color: var(--muted); letter-spacing: .04em; }
@@ -4094,6 +4097,10 @@ body {
 .tm-hl { background: linear-gradient(180deg, transparent 62%, var(--accent-soft) 62%); }
 .tm-round-btn { width: 42px; height: 42px; border-radius: 50%; border: 0; background: var(--paper); color: var(--ink); font-size: 16px; cursor: pointer; font-family: inherit; transition: background .18s ease, color .18s ease; }
 .tm-round-btn:hover { background: var(--teal); color: #fff; }
+/* "วันนี้" beside the month arrows (host profile calendar). */
+.tm-today-btn { height: 42px; padding: 0 18px; border-radius: 999px; border: 0; background: var(--cream); color: var(--ink); font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background .18s ease, color .18s ease; }
+.tm-today-btn:hover { background: var(--teal); color: #fff; }
+.tp2-cell.today .tp2-cell-num { color: var(--teal); opacity: 1; font-weight: 700; }
 .tm-rail { display: grid; grid-auto-flow: column; grid-auto-columns: calc((100% - 20px) / 3); gap: 10px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; scroll-snap-type: x mandatory; padding-bottom: 2px; }
 .tm-rail::-webkit-scrollbar { height: 0; }
 .tm-work { display: block; position: relative; aspect-ratio: 3 / 4; border-radius: var(--radius-media, 14px); scroll-snap-align: start; overflow: hidden; transition: transform .3s cubic-bezier(.2,.7,.2,1); background: var(--cream); }
