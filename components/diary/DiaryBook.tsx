@@ -12,6 +12,7 @@
 import { Component, createElement as h, type CSSProperties, type ReactNode } from 'react';
 import { FAMILIES, FAM, MAX_MOODS, MAX_PAGES, TH_MON, TH_MONTHS, TH_WEEKDAY, TH_DOW, TONE_LABEL, addDays, css, dateOf, PAGE_CHARS_MAX, reflowPages, type DiaryEntry, type Mood, type MoodKey } from '@/lib/diary';
 import type { DiaryQuote } from '@/lib/diary-quotes';
+import { AllSoulLearnLogo } from '@/components/layout/AllSoulLearnLogo';
 
 export type BookWorkshop = { title: string; time: string; poster: string | null; drive: string | null };
 /** A personal event (ลงกิจกรรม on /calendar) shown on its day's page. */
@@ -794,11 +795,15 @@ export class DiaryBook extends Component<Props, State> {
             <div style={css('position:absolute;top:0;bottom:0;left:7%;width:1px;background:rgba(255,255,255,.2)')} />
             <div style={css('position:absolute;top:0;bottom:0;right:11%;width:14px;background:var(--accent);box-shadow:inset 3px 0 0 rgba(0,0,0,.08),inset -2px 0 0 rgba(255,255,255,.35),2px 0 6px rgba(0,0,0,.2)')} />
             <div style={css('position:absolute;left:17%;right:25%;top:16%;background:var(--cream);border-radius:8px;padding:9% 8%;box-shadow:0 2px 0 rgba(0,0,0,.08)')}>
-              <span className="eyebrow" style={{ color: 'var(--teal)' }}>MY DIARY · {today.slice(0, 4)}</span>
+              <div style={css("display:flex;align-items:center;gap:10px;font-family:'JetBrains Mono','IBM Plex Sans Thai',monospace;font-size:11px;font-weight:500;letter-spacing:.3em;color:var(--teal)")}>
+                <span style={css('flex:1;height:1.5px;background:currentColor')} />
+                <span style={css('margin-right:-.3em')}>DIARY</span>
+                <span style={css('flex:1;height:1.5px;background:currentColor')} />
+              </div>
               <div style={css("font-family:'Archivo Black','Mitr',sans-serif;font-size:32px;line-height:.9;letter-spacing:-.02em;margin-top:12px;color:var(--ink)")}>
-                SOULFUL
+                ALL SOUL
                 <br />
-                NOTES
+                NOTE
               </div>
               <div style={css('height:1px;background:rgba(13,30,29,.12);margin:14px 0 10px')} />
               <div style={css('font-family:Mitr,sans-serif;font-weight:500;font-size:14px;color:var(--ink)')}>ของ {owner}</div>
@@ -833,10 +838,6 @@ export class DiaryBook extends Component<Props, State> {
         node: (
           <div style={css('position:absolute;inset:0')}>
             <div style={css('position:absolute;inset:0;background-color:var(--cream);background-image:radial-gradient(#cfe8e4 1.2px,transparent 1.4px);background-size:18px 18px')} />
-            <div style={css('position:absolute;left:12%;right:12%;bottom:14%;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center')}>
-              <span style={css('font-family:Mitr,sans-serif;font-weight:500;font-size:16px')}>เรียนรู้นอกห้องเรียน.</span>
-              <span style={css("font-family:Caveat,'Mitr',cursive;font-size:24px;color:var(--teal)")}>it can be fun! ✺</span>
-            </div>
           </div>
         ),
       };
@@ -872,11 +873,8 @@ export class DiaryBook extends Component<Props, State> {
                   กลับไปได้ตัวเอง
                 </span>
               )}
-              <div style={css('display:flex;align-items:center;gap:8px;margin-top:6px')}>
-                <span style={css('width:26px;height:26px;border-radius:50%;background:var(--cream);color:var(--teal);display:flex;align-items:center;justify-content:center;font-family:Mitr,sans-serif;font-weight:600;font-size:15px;line-height:1')}>a</span>
-                <span style={css('font-family:Mitr,sans-serif;font-weight:500;font-size:15px;color:var(--cream)')}>
-                  allsoullearn<span style={{ color: 'var(--accent)' }}>.</span>
-                </span>
+              <div style={css('margin-top:10px')}>
+                <AllSoulLearnLogo height={20} variant="light" />
               </div>
             </div>
           </div>
@@ -887,7 +885,6 @@ export class DiaryBook extends Component<Props, State> {
         no: 'หน้า ' + (i - 1),
         node: (
           <div style={css('position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:0 10%;text-align:center')}>
-            <span className="eyebrow" style={{ color: 'var(--muted)' }}>ยังเขียนต่อได้อีก</span>
             <div style={css("font-family:'Archivo Black','Mitr',sans-serif;font-size:28px;line-height:.92;color:var(--teal)")}>
               TO BE
               <br />
@@ -969,7 +966,7 @@ export class DiaryBook extends Component<Props, State> {
                     </span>
                   ))}
                   {locked ? (
-                    <span style={css('display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:600;background:var(--cream);color:var(--muted)')}>🔒 เลือกอารมณ์ได้เมื่อถึงวันนั้น</span>
+                    <span style={css('display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:600;background:var(--cream);color:var(--muted)')}>🔒 บันทึกอารมณ์เมื่อถึงวัน</span>
                   ) : (
                     <button type="button" onPointerDown={this.stopPtr} onClick={() => this.toggleTray(iso)} style={css('border:0;cursor:pointer;border-radius:999px;padding:5px 12px;font-family:inherit;font-size:12.5px;font-weight:600;background:' + (open ? 'var(--ink)' : '#e6f4f2') + ';color:' + (open ? '#fff' : 'var(--teal-deep)'))}>
                       {open ? 'เสร็จ' : e.moods.length ? '+ อารมณ์' : '+ อารมณ์วันนี้'}
@@ -1076,7 +1073,7 @@ export class DiaryBook extends Component<Props, State> {
                   <div style={css('position:relative;margin-top:14px;padding:14px 16px;border-radius:14px;background:rgba(246,241,230,.95);box-shadow:inset 0 0 0 1px var(--cream-deep);display:flex;flex-direction:column;gap:6px')}>
                     <span style={css('font-family:Mitr,sans-serif;font-weight:500;font-size:15px;color:var(--ink)')}>🔒 ยังเขียนบันทึกไม่ได้</span>
                     <span style={css('font-size:13px;line-height:1.6;color:var(--muted)')}>
-                      {'หน้านี้จะเปิดให้จดบันทึกและเลือกอารมณ์ในวันที่ ' + d.getDate() + ' ' + TH_MON[d.getMonth()] + ' ' + d.getFullYear() + ' — ' + (e.ws || evs.length ? 'วันกิจกรรมที่คุณลงไว้' : 'เมื่อถึงวันนั้น')}
+                      {'หน้านี้จะเปิดให้จดบันทึกได้ในวันที่ ' + d.getDate() + ' ' + TH_MON[d.getMonth()] + ' ' + d.getFullYear()}
                     </span>
                   </div>
                 </div>

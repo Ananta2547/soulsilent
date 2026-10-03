@@ -4075,6 +4075,7 @@ body {
 .tm-hero-star { position: absolute; left: 6%; top: 150px; font-size: 26px; color: var(--teal-200); --r: -8deg; animation: tm-floaty 6s ease-in-out infinite; pointer-events: none; }
 @keyframes tm-floaty { 0%, 100% { transform: translateY(0) rotate(var(--r, 0deg)); } 50% { transform: translateY(-10px) rotate(var(--r, 0deg)); } }
 .tm-title { font-family: var(--font-display-en); font-size: clamp(48px, 10.5vw, 168px); line-height: .88; letter-spacing: -.035em; margin: 14px 0 0; color: var(--ink); }
+.tm-title-long { font-size: clamp(38px, 8.2vw, 128px); }
 .tm-hero-row { display: flex; flex-wrap: wrap; gap: 28px 56px; align-items: flex-end; justify-content: space-between; margin-top: 26px; }
 .tm-hand-th { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-display-th); font-weight: 500; font-size: 21px; color: var(--teal-deep); margin-top: 16px; padding: 0 2px 2px; background: linear-gradient(180deg, transparent 68%, var(--accent-soft) 68%); }
 .tm-hand-en { display: inline-block; font-family: var(--font-hand); font-weight: 700; font-size: 28px; color: var(--teal-deep); margin-top: 14px; }

@@ -139,18 +139,28 @@ export default function TeachersPage() {
         <span aria-hidden="true" className="tm-hero-star">✺</span>
         <div className="tm-wrap">
           <span className="tm-eyebrow">{th ? '01 — ผู้จัด' : '01 — Makers & hosts'}</span>
-          <h1 className="tm-title">
-            THE
-            <br />
-            MAKERS<span style={{ color: 'var(--teal)' }}>.</span>
+          <h1 className="tm-title tm-title-long">
+            Facilitator<span style={{ color: 'var(--teal)' }}>.</span>
           </h1>
           <div className="tm-hero-row">
             <div style={{ maxWidth: 560 }}>
-              <h2 className="tm-h2">{th ? 'แหล่งรวมคนที่ตั้งใจมอบประสบการณ์บางอย่าง' : 'The people who set out to hand you an experience'}</h2>
+              <h2 className="tm-h2">{th ? (
+                  <>
+                    เชื่อมต่อคุณกับ Host <span style={{ whiteSpace: 'nowrap' }}>ผู้สร้างสรรค์กิจกรรม</span>
+                    <br />
+                    เปลี่ยนวันธรรมดาของคุณให้พิเศษ
+                  </>
+                ) : (
+                  <>
+                    Meet the hosts who create each journey
+                    <br />
+                    and turn an ordinary day into something special
+                  </>
+                )}</h2>
               <p className="tm-lede">
                 {th
-                  ? 'ไม่ใช่แค่คนสอน แต่เป็นผู้จัดที่ออกแบบวันหนึ่งวันให้คุณได้อยู่กับตัวเอง เลือกจากงานที่เขาถนัด อ่านสิ่งที่เขาเชื่อ แล้วค่อยเลือกวัน.'
-                  : 'Not just teachers — hosts who design a day where you get to be with yourself. Browse by craft, read what they believe, then pick a day.'}
+                  ? 'เพราะผู้จัดทุกคนตั้งใจสร้างสรรค์กิจกรรม ให้คุณได้ออกมาใช้เวลา ค้นพบแรงบันดาลใจ ลองเลือกกิจกรรมที่คุณสนใจ อ่านเรื่องราวของ Host แล้วก้าวออกมาสัมผัสประสบการณ์ใหม่ ๆ ด้วยตัวคุณเอง'
+                  : "Every host sets out to create a journey that gets you out, gives you time and sparks new inspiration. Pick what draws you, read the host's story, then step out and try something new for yourself."}
               </p>
               {th ? (
                 <span className="tm-hand-th">มาทำความรู้จักกันก่อน ✺</span>
