@@ -1,12 +1,13 @@
 'use client';
 
-/* The makers page — everyone who teaches here. Built from the "Teachers v2"
- * design: a big hero with site totals, a marquee, one maker in focus that
- * rotates on its own (their workshops on a rail, the rounds they have open),
+/* The hosts page — everyone who hosts here. Built from the "Hosts v4"
+ * design: a big hero with site totals, a marquee, one maker in focus on a
+ * teal band that rotates on its own (a speech bubble, their journeys as
+ * posters, the rounds they have open),
  * then the whole grid filtered by craft and sorted, and a call to host with
  * us. The site header and footer come from the layout. */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useLang } from '@/lib/i18n';
 import { useLoadingTracker } from '@/components/design/DataLoading';
@@ -41,7 +42,6 @@ export default function TeachersPage() {
   const [prog, setProg] = useState(0);
   const [poster, setPoster] = useState<string | null>(null);
   const [meId, setMeId] = useState<string | null>(null);
-  const railRef = useRef<HTMLDivElement>(null);
   const track = useLoadingTracker();
 
   useEffect(() => {
@@ -120,13 +120,11 @@ export default function TeachersPage() {
     setPoster(null);
     setProg(0);
   };
-  const nudgeRail = (dir: number) => {
-    const el = railRef.current;
-    if (el) el.scrollBy({ left: dir * Math.max(220, el.clientWidth * 0.8), behavior: 'smooth' });
-  };
 
   const s = count ? spotList[spot % count] : null;
   const sDisplay = s ? s.nickname || s.name : '';
+  // The bubble quotes a seeker first, else the host's own bio.
+  const spotQuote = s ? (s.quote ? s.quote.comment : s.bio) : null;
   const shortDate = (d: string) => fmtDate(d, lang, 'medium');
 
   return (
@@ -190,102 +188,116 @@ export default function TeachersPage() {
         </div>
       </div>
 
-      {/* ── Maker in focus ───────────────────────────────────── */}
+      {/* ── Maker in focus (Hosts v4) ─────────────────────────── */}
       {s && (
-        <section style={{ padding: '72px 0 0' }}>
+        <section id="spot" className="tm4-spot">
           <div className="tm-wrap">
-            <span className="tm-eyebrow">{th ? '02 — คนที่เราอยากให้รู้จัก' : '02 — Maker in focus'}</span>
-            <div className="tm-spot">
-              <div className="tm-spot-card">
-                <span aria-hidden="true" className="tm-spot-no">{pad2((spot % count) + 1)}</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14, position: 'relative' }}>
-                  <Avatar t={s} size={56} />
-                  <div style={{ minWidth: 0 }}>
-                    <div className="display-th" style={{ fontWeight: 500, fontSize: 21, lineHeight: 1.15 }}>{sDisplay}</div>
-                    <div className="tm-meta" style={{ marginTop: 5 }}>
-                      {s.crafts.length ? s.crafts.slice(0, 2).join(' · ') : th ? 'ผู้จัด' : 'Host'}
-                      {' · '}
-                      {th ? `จัดมาแล้ว ${s.hosted} รอบ` : `${s.hosted} rounds hosted`}
+            <div className="tm4-spot-head">
+              <span className="tm4-spot-eyebrow">{th ? '02 — คนที่เราอยากให้รู้จัก' : '02 — Maker in focus'}</span>
+              <span style={{ flex: 1 }} />
+              <span className="tm4-counter">
+                <span>{pad2((spot % count) + 1)} / {pad2(count)}</span>
+                <span className="tm4-bar"><span style={{ width: `${Math.round(prog * 100)}%` }} /></span>
+              </span>
+              <button type="button" onClick={() => goSpot(-1)} aria-label="Previous" className="tm4-arrow">‹</button>
+              <button type="button" onClick={() => goSpot(1)} aria-label="Next" className="tm4-arrow">›</button>
+            </div>
+
+            <div className="tm4-card">
+              <div className="tm4-top">
+                <div style={{ minWidth: 0 }}>
+                  <div aria-hidden="true" className="tm4-bigno">{pad2((spot % count) + 1)}</div>
+                  <div className="tm4-host">
+                    <Avatar t={s} size={92} className="tm4-avatar" />
+                    <div style={{ minWidth: 0 }}>
+                      <div className="tm4-name">{s.name}</div>
+                      <div className="tm4-hosted">
+                        {(s.crafts.length ? s.crafts.slice(0, 2).join(' · ') + ' · ' : '') + (th ? `จัดมาแล้ว ${s.hosted} รอบ` : `${s.hosted} rounds hosted`)}
+                      </div>
                     </div>
                   </div>
                 </div>
-                <p className="tm-quote">
-                  “<span className="tm-hl">{s.quote ? s.quote.comment : s.bio || (th ? 'ยังไม่มีคำบอกเล่า — มาเป็นคนแรกที่เล่าให้ฟัง' : 'No words yet — be the first to tell us.')}</span>”
-                </p>
-                <span className="tm-meta" style={{ marginTop: 16 }}>
-                  {s.quote ? (th ? `— จากผู้เข้าร่วม ${s.quote.workshop}` : `— a seeker of ${s.quote.workshop}`) : th ? '— จากประวัติผู้จัด' : '— from their profile'}
-                </span>
-                <div className="tm-spot-foot">
-                  <Link href={`/hosts/${s.id}`} className="btn btn-ink">
-                    {th ? 'ดูโปรไฟล์และปฏิทิน' : 'Profile & calendar'} <span className="mono">→</span>
-                  </Link>
-                  <span style={{ flex: 1 }} />
-                  <button type="button" onClick={() => goSpot(-1)} aria-label="Previous" className="tm-round-btn">‹</button>
-                  <button type="button" onClick={() => goSpot(1)} aria-label="Next" className="tm-round-btn">›</button>
-                  <span className="tm-counter">
-                    <span>{pad2((spot % count) + 1)} / {pad2(count)}</span>
-                    <span className="tm-bar"><span style={{ width: `${Math.round(prog * 100)}%` }} /></span>
-                  </span>
+                <div className="tm4-bubble">
+                  <svg aria-hidden="true" width="60" height="70" viewBox="0 0 60 70" className="tm4-tail-left"><path d="M60 0 L0 64 L60 46 Z" fill="#fff" /></svg>
+                  <svg aria-hidden="true" width="44" height="30" viewBox="0 0 44 30" className="tm4-tail-up"><path d="M0 30 L10 0 L44 30 Z" fill="#fff" /></svg>
+                  {spotQuote ? (
+                    <>
+                      <p className="tm4-quote">
+                        “<span className="tm-hl">{spotQuote}</span>”
+                      </p>
+                      <span className="tm4-from">
+                        {s.quote ? (th ? `— จากผู้เข้าร่วม ${s.quote.workshop}` : `— a seeker of ${s.quote.workshop}`) : th ? '— จากประวัติผู้จัด' : '— from their profile'}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="tm4-hello">say hello ✺</span>
+                      <span className="tm4-from" style={{ marginTop: 10, whiteSpace: 'normal' }}>
+                        {th ? `${sDisplay} ยังไม่ได้เขียนแนะนำตัว — ลองดูกิจกรรมที่เขาจัดด้านล่าง` : `${sDisplay} hasn't written an intro yet — see what they host below`}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
 
-              <div className="tm-spot-side">
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-                    <span className="tm-meta">{th ? 'กิจกรรมที่เขาจัด' : 'journeys they host'}</span>
-                    <span style={{ flex: 1 }} />
-                    <button type="button" onClick={() => nudgeRail(-1)} aria-label="Scroll left" className="tm-round-btn tm-round-btn-sm">‹</button>
-                    <button type="button" onClick={() => nudgeRail(1)} aria-label="Scroll right" className="tm-round-btn tm-round-btn-sm">›</button>
-                  </div>
-                  <div ref={railRef} className="tm-rail">
-                    {s.works.length === 0 && (
-                      <span className="ph ph-cream tm-work" style={{ aspectRatio: '3 / 4' }}>{th ? 'ยังไม่มี' : 'none yet'}</span>
-                    )}
-                    {s.works.map((w, i) => {
-                      const key = `${s.id}-${i}`;
-                      const on = poster === key;
-                      return (
-                        <Link
-                          key={w.id}
-                          href={`/journeys/${w.id}`}
-                          className={`tm-work ${w.image_url ? '' : `ph ${PH_CLASS[i % PH_CLASS.length]}`}`}
-                          style={{ transform: on ? 'scale(1.05)' : 'none' }}
-                          onMouseEnter={() => setPoster(key)}
-                          onMouseLeave={() => setPoster(null)}
-                          onFocus={() => setPoster(key)}
-                          onBlur={() => setPoster(null)}
-                          onTouchStart={() => setPoster(key)}
-                        >
-                          {w.image_url && (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={w.image_url} alt="" />
-                          )}
-                          <span aria-hidden="true" className="tm-work-no">{pad2(i + 1)}</span>
-                          <span aria-hidden="true" className="tm-work-star">✺</span>
-                          <span className="tm-work-name" style={{ transform: `translateY(${on ? '0%' : '101%'})` }}>{w.title}</span>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div className="tm-rounds">
-                  <div className="tm-meta" style={{ marginBottom: 14 }}>{th ? 'รอบที่เปิดรับ' : 'open rounds'}</div>
-                  <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }}>
-                    {s.rounds.length === 0 ? (
-                      <div className="tm-round-row">
-                        <span className="tm-round-date">—</span>
-                        <span style={{ fontSize: 13.5 }}>{th ? 'ยังไม่มีรอบที่เปิดรับ' : 'No open rounds yet'}</span>
+              <div className="tm4-bottom">
+                <div style={{ minWidth: 0 }}>
+                  <div className="tm4-posters">
+                    {s.works.length === 0 ? (
+                      <div className="ph ph-cream tm4-poster-empty">
+                        <span style={{ fontSize: 20, color: 'var(--accent)' }}>✺</span>
+                        {th ? 'รอบใหม่กำลังจัด' : 'New rounds coming'}
                       </div>
                     ) : (
-                      s.rounds.map((r) => (
-                        <Link key={r.id} href={`/journeys/${r.id}`} className="tm-round-row">
-                          <span className="tm-round-date">{shortDate(r.date)}</span>
-                          <span style={{ fontSize: 13.5, lineHeight: 1.5, minWidth: 0 }}>{r.title}</span>
-                          <span style={{ flex: 1 }} />
-                          <span className="mono" style={{ fontSize: 11.5, color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>{r.full ? (th ? 'เต็ม' : 'full') : th ? `${r.max} ที่นั่ง` : `${r.max} seats`}</span>
-                        </Link>
-                      ))
+                      s.works.map((w, i) => {
+                        const key = `${s.id}-${i}`;
+                        const on = poster === key;
+                        return (
+                          <Link
+                            key={w.id}
+                            href={`/journeys/${w.id}`}
+                            aria-label={w.title}
+                            className={`tm-work tm4-poster ${w.image_url ? '' : `ph ${PH_CLASS[i % PH_CLASS.length]}`}`}
+                            onMouseEnter={() => setPoster(key)}
+                            onMouseLeave={() => setPoster(null)}
+                            onFocus={() => setPoster(key)}
+                            onBlur={() => setPoster(null)}
+                          >
+                            {w.image_url && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={w.image_url} alt="" />
+                            )}
+                            <span aria-hidden="true" className="tm-work-no">{pad2(i + 1)}</span>
+                            <span aria-hidden="true" className="tm-work-star">✺</span>
+                            <span className="tm-work-name" style={{ transform: `translateY(${on ? '0%' : '101%'})` }}>{w.title}</span>
+                          </Link>
+                        );
+                      })
                     )}
+                  </div>
+                </div>
+                <span aria-hidden="true" className="tm4-divider" />
+                <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+                  <div className="tm4-rounds">
+                    <div className="tm4-rounds-label">{th ? 'รอบที่เปิดรับ' : 'Open rounds'}</div>
+                    <div className="tm4-rounds-list">
+                      {s.rounds.length === 0 ? (
+                        <div className="tm4-round tm4-round-none">{th ? 'รอบใหม่กำลังจัด — ติดตามผู้จัดไว้ก่อน' : 'New rounds coming — follow this host for now'}</div>
+                      ) : (
+                        s.rounds.map((r) => (
+                          <Link key={r.id} href={`/journeys/${r.id}`} className="tm4-round">
+                            <span className="tm4-round-date" style={{ color: r.full ? 'var(--muted)' : 'var(--teal-deep)' }}>{shortDate(r.date)}</span>
+                            <span className="tm4-round-title">{r.title}</span>
+                            <span className="mono tm4-round-seats">{r.full ? (th ? 'เต็ม' : 'full') : th ? `${r.max} ที่นั่ง` : `${r.max} seats`}</span>
+                          </Link>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ paddingTop: 20 }}>
+                    <Link href={`/hosts/${s.id}`} className="btn btn-ink">
+                      {th ? 'ดูโปรไฟล์และปฏิทิน' : 'Profile & calendar'} <span className="mono">→</span>
+                    </Link>
                   </div>
                 </div>
               </div>
