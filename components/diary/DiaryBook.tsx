@@ -14,7 +14,7 @@ import { FAMILIES, FAM, MAX_MOODS, MAX_PAGES, TH_MON, TH_MONTHS, TH_WEEKDAY, TH_
 import type { DiaryQuote } from '@/lib/diary-quotes';
 import { AllSoulLearnLogo } from '@/components/layout/AllSoulLearnLogo';
 
-export type BookWorkshop = { title: string; time: string; poster: string | null; drive: string | null };
+export type BookWorkshop = { id?: string; title: string; time: string; poster: string | null; drive: string | null };
 /** A personal event (ลงกิจกรรม on /calendar) shown on its day's page. */
 export type BookEvent = { title: string; time: string; color: string };
 export type MonthSummary = { month: string; top: string; logged: number; workshops: number; pages: number };
@@ -1006,7 +1006,7 @@ export class DiaryBook extends Component<Props, State> {
                 {!open &&
                   (e.ws ? (
                     <div style={css('display:flex;flex:none;gap:14px;margin-top:12px;padding:12px;border-radius:12px;background:rgba(246,241,230,.9)')}>
-                      <div style={css('position:relative;width:23%;flex:none')}>
+                      <a href={e.ws.id ? '/journeys/' + e.ws.id : undefined} onPointerDown={this.stopPtr} aria-label={e.ws.title} style={css('position:relative;width:23%;flex:none;display:block;color:inherit')}>
                         <div style={css('position:absolute;left:22%;top:-7px;width:56%;height:13px;background:rgba(245,194,67,.6);transform:rotate(-4deg);z-index:2')} />
                         {e.ws.poster ? (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -1014,11 +1014,16 @@ export class DiaryBook extends Component<Props, State> {
                         ) : (
                           <div style={css('width:100%;aspect-ratio:1/1.414;border-radius:3px;background:var(--cream-deep);transform:rotate(-2deg)')} />
                         )}
-                      </div>
+                      </a>
                       <div style={css('flex:1;min-width:0;display:flex;flex-direction:column;gap:7px')}>
                         <span className="eyebrow" style={{ color: 'var(--teal)' }}>JOURNEY</span>
-                        <span style={css('font-family:Mitr,sans-serif;font-weight:500;font-size:15px;line-height:1.3;max-height:2.6em;overflow:hidden')}>{e.ws.title}</span>
+                        <a href={e.ws.id ? '/journeys/' + e.ws.id : undefined} onPointerDown={this.stopPtr} style={css('font-family:Mitr,sans-serif;font-weight:500;font-size:15px;line-height:1.3;max-height:2.6em;overflow:hidden;color:var(--ink);text-decoration:none')}>{e.ws.title}</a>
                         <span style={css("font-family:var(--font-mono),'IBM Plex Sans Thai',ui-monospace,monospace;font-size:10.5px;letter-spacing:.1em;color:var(--muted)")}>{e.ws.time}</span>
+                        {e.ws.id && (
+                          <a href={'/journeys/' + e.ws.id} onPointerDown={this.stopPtr} style={css('font-size:12.5px;font-weight:600;color:var(--teal-deep)')}>
+                            ดูกิจกรรม →
+                          </a>
+                        )}
                         {e.ws.drive && (
                           <a href={e.ws.drive} target="_blank" rel="noopener noreferrer" onPointerDown={this.stopPtr} style={css('font-size:12.5px;font-weight:600;color:var(--teal)')}>
                             รูปกิจกรรม (Google Drive) ↗

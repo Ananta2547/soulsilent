@@ -2,10 +2,11 @@ import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 import { requireAdmin, getCurrentUser } from '@/lib/auth';
 import type { Article } from '@/lib/types';
+import { isArticleShareToken } from '@/lib/article-share';
 
 type AuthorJoined = { author_name: string | null; author_email: string | null };
 
-export async function GET(_request: Request, { params }: { params: Promise<{ slug: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
   try {
     const { slug } = await params;
     const db = await getDB();
@@ -22,10 +23,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
     if (!article) {
       return NextResponse.json({ error: 'not found' }, { status: 404 });
     }
-    // Drafts visible only to admins
+    // Drafts: admins, or anyone holding the draft's share link.
     if (!article.published) {
       const me = await getCurrentUser();
-      if (me?.role !== 'admin') {
+      const shared = await isArticleShareToken(article.id, new URL(request.url).searchParams.get('share'));
+      if (me?.role !== 'admin' && !shared) {
         return NextResponse.json({ error: 'not found' }, { status: 404 });
       }
     }

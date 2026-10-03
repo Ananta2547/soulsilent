@@ -109,6 +109,26 @@ export default function AdminArticlesPage() {
     fetchAll();
   }, []);
 
+  // Drafts: copy a link anyone can open to read it before it is published.
+  const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
+  async function copyShareLink(slug: string) {
+    try {
+      const r = await fetch(`/api/articles/${encodeURIComponent(slug)}/share`);
+      const d = (await r.json()) as { path?: string; error?: string };
+      if (!r.ok || !d.path) throw new Error(d.error || 'share failed');
+      const url = window.location.origin + d.path;
+      try {
+        await navigator.clipboard.writeText(url);
+      } catch {
+        window.prompt('คัดลอกลิงก์นี้', url);
+      }
+      setCopiedSlug(slug);
+      setTimeout(() => setCopiedSlug((s) => (s === slug ? null : s)), 2000);
+    } catch {
+      alert('สร้างลิงก์แชร์ไม่สำเร็จ');
+    }
+  }
+
   function handleEdit(a: Article) {
     setForm({
       slug: a.slug,
@@ -557,6 +577,15 @@ export default function AdminArticlesPage() {
                         >
                           ดู ↗
                         </a>
+                        {!a.published && (
+                          <button
+                            onClick={() => copyShareLink(a.slug)}
+                            title="ลิงก์ให้คนอื่นอ่านฉบับร่างนี้ได้ ก่อนเผยแพร่"
+                            className="text-primary text-xs font-medium hover:underline"
+                          >
+                            {copiedSlug === a.slug ? 'คัดลอกแล้ว ✓' : 'คัดลอกลิงก์แชร์'}
+                          </button>
+                        )}
                         <button
                           onClick={() => handleEdit(a)}
                           className="text-primary text-xs font-medium hover:underline"

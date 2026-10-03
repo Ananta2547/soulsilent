@@ -121,12 +121,12 @@ function JourneyAndDiary() {
   const bookWorkshops = useMemo(() => {
     const m: Record<string, BookWorkshop> = {};
     items.forEach((it) => {
-      if (!m[it.date]) m[it.date] = { title: it.title, time: `${it.time_start}–${it.time_end}`, poster: it.image_url, drive: it.photos_drive_url };
+      if (!m[it.date]) m[it.date] = { id: it.workshop_id, title: it.title, time: `${it.time_start}–${it.time_end}`, poster: it.image_url, drive: it.photos_drive_url };
     });
     // Seats already bought show on their day ahead of time (the page stays
     // locked for writing until then).
     upcoming.forEach((u) => {
-      if (!m[u.date]) m[u.date] = { title: u.title, time: `${u.time_start}–${u.time_end}`, poster: u.image_url, drive: null };
+      if (!m[u.date]) m[u.date] = { id: u.workshop_id, title: u.title, time: `${u.time_start}–${u.time_end}`, poster: u.image_url, drive: null };
     });
     return m;
   }, [items, upcoming]);

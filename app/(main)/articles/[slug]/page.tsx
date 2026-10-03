@@ -14,6 +14,14 @@ import { cardPos } from '@/lib/article-card';
 
 type ArticleWithAuthor = Article & { author_name?: string | null; author_email?: string | null };
 
+/** The page's own ?share= token, passed on to the API (read in the browser,
+ *  so the page needs no Suspense boundary for search params). */
+function shareQuery(): string {
+  if (typeof window === 'undefined') return '';
+  const t = new URLSearchParams(window.location.search).get('share');
+  return t ? `?share=${encodeURIComponent(t)}` : '';
+}
+
 const swatchClass = (s?: string) =>
   s === 'cream' ? 'ph-cream' : s === 'ink' ? 'ph-ink' : s === 'accent' ? 'ph-accent' : 'ph-teal';
 
@@ -31,7 +39,8 @@ export default function ArticleDetailPage() {
   useEffect(() => {
     track(
       Promise.all([
-        fetch(`/api/articles/${slug}`).then((r) => {
+        // A draft opened through its share link carries ?share=<token>.
+        fetch(`/api/articles/${slug}${shareQuery()}`).then((r) => {
           if (r.status === 404) return null;
           return r.json() as Promise<{ article: ArticleWithAuthor }>;
         }),
@@ -147,6 +156,12 @@ export default function ArticleDetailPage() {
               ← <T th="กลับไปหน้ารวมบทความ" en="Back to all articles" />
             </Link>
           </Reveal>
+
+          {!article.published && (
+            <div style={{ marginBottom: 20, padding: '10px 14px', borderRadius: 12, background: '#fff8e1', borderLeft: '4px solid var(--accent)', fontSize: 13.5, color: 'var(--ink)' }}>
+              <T th="ฉบับร่าง — บทความนี้ยังไม่เผยแพร่ เห็นได้เฉพาะคนที่มีลิงก์นี้" en="Draft — not published yet; only people with this link can see it" />
+            </div>
+          )}
 
           <Reveal delay={80}>
             <div
