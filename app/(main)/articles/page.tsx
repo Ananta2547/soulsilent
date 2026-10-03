@@ -6,6 +6,7 @@ import type { Article, ArticleCategory } from '@/lib/types';
 import { DEFAULT_CATEGORIES, categoryLabel, formatArticleDate, parseTags } from '@/lib/article-utils';
 import { useLang } from '@/lib/i18n';
 import { useLoadingTracker } from '@/components/design/DataLoading';
+import { cardPos } from '@/lib/article-card';
 
 /* ============================================================
    Articles / Journal — port of Design Composer "Articles.dc.html".
@@ -148,10 +149,10 @@ export default function ArticlesPage() {
               {/* Featured (lead) — arrows step through up to three articles */}
               <div className="art-lead-wrap">
               <Link key={lead.id} href={`/articles/${lead.slug}`} className="art-featured card art-lead-fade" style={{ padding: 0, color: 'var(--ink)', textDecoration: 'none' }}>
-                <div className={`ph ${swatchClass(lead.cover_swatch)}`} style={{ aspectRatio: '16/11', position: 'relative', overflow: 'hidden' }}>
+                <div className={`ph ${swatchClass(lead.cover_swatch)}`} style={{ aspectRatio: '4/3', position: 'relative', overflow: 'hidden' }}>
                   {lead.cover_image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={lead.cover_image_url} alt={lead.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={lead.cover_image_url} alt={lead.title} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: cardPos(lead) }} />
                   ) : (
                     <span className="mono" style={{ position: 'absolute', bottom: 10, right: 12, fontSize: 9, letterSpacing: '.1em', opacity: 0.5 }}>COVER · 16:11</span>
                   )}
@@ -193,7 +194,7 @@ export default function ArticlesPage() {
                         <div className={`ph ${swatchClass(a.cover_swatch)}`} style={{ aspectRatio: '4/3', position: 'relative', overflow: 'hidden' }}>
                           {a.cover_image_url && (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={a.cover_image_url} alt={a.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <img src={a.cover_image_url} alt={a.title} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: cardPos(a) }} />
                           )}
                         </div>
                         <div style={{ padding: 20 }}>

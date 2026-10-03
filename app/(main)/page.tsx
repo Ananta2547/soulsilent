@@ -9,6 +9,7 @@ import { useLoadingTracker } from '@/components/design/DataLoading';
 import { getEffectivePrice, hasWorkshopEnded, getWorkshopCardStatus, isNewWorkshop, isWorkshopFull, compareWorkshopsForListing } from '@/lib/workshop-utils';
 import { learnServerClock } from '@/lib/server-clock';
 import { categoryLabel, formatArticleDate } from '@/lib/article-utils';
+import { cardPos } from '@/lib/article-card';
 
 /* ============================================================
    Home — port of Design Composer "Home Hero.dc.html".
@@ -621,10 +622,10 @@ function ArticlesSection({ lead, side, categories }: { lead?: Article; side: Art
         <div className="dc-articles-grid">
           {/* Lead article — 16:10 cover */}
           <Link href={`/articles/${lead.slug}`} className="card" style={{ padding: 0, color: 'var(--ink)', textDecoration: 'none', boxShadow: '0 14px 36px -18px rgba(13,30,29,.3)' }}>
-            <div className="ph ph-teal-100" style={{ aspectRatio: '16/10', borderRadius: '22px 22px 0 0', position: 'relative', overflow: 'hidden' }}>
+            <div className="ph ph-teal-100" style={{ aspectRatio: '4/3', borderRadius: '22px 22px 0 0', position: 'relative', overflow: 'hidden' }}>
               {lead.cover_image_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={lead.cover_image_url} alt={lead.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img src={lead.cover_image_url} alt={lead.title} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: cardPos(lead) }} />
               ) : (
                 <span className="mono" style={{ position: 'absolute', bottom: 10, right: 12, fontSize: 9, letterSpacing: '.1em', opacity: 0.5 }}>COVER · 16:10</span>
               )}
@@ -648,7 +649,7 @@ function ArticlesSection({ lead, side, categories }: { lead?: Article; side: Art
                   <div className={s.ph ? 'ph' : 'ph ph-ink'} style={{ width: 84, height: 84, flexShrink: 0, borderRadius: 14, background: s.ph || undefined, position: 'relative', overflow: 'hidden' }}>
                     {a.cover_image_url && (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={a.cover_image_url} alt={a.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <img src={a.cover_image_url} alt={a.title} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: cardPos(a) }} />
                     )}
                   </div>
                   <div style={{ minWidth: 0 }}>

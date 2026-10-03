@@ -13,6 +13,8 @@ import type {
 } from '@/lib/types';
 import { formatArticleDate, parseBody, parseTags } from '@/lib/article-utils';
 import { ImageUploader } from '@/components/admin/image/ImageUploader';
+import { CardFocus } from '@/components/admin/image/CardFocus';
+import { cardX } from '@/lib/article-card';
 import { ASPECTS, type AspectSpec } from '@/lib/image-aspects';
 import { parseImageMeta } from '@/lib/image-meta';
 
@@ -422,18 +424,29 @@ export default function AdminArticlesPage() {
                   <label className="block text-xs font-medium text-dark mb-2">
                     รูปจริง <span className="text-gray font-normal">(อัปโหลด — ทับ swatch ถ้ามี)</span>
                   </label>
+                  {/* The cover lives in 2 spots: crop it here for the 3:1
+                      header of the article page, then pick below which 4:3
+                      part the cards show (kept as card_x in the same meta). */}
                   <ImageUploader
                     folder="article"
-                    /* Article cover lives in 2 spots: 16:9 card on listings +
-                       21:9 hero on detail page. Crop at hero, overlay shows card. */
                     primary={ASPECTS.ARTICLE_HERO}
-                    overlays={[ASPECTS.ARTICLE_COVER]}
                     value={form.cover_image_url}
                     meta={form.cover_image_meta}
                     onChange={({ url, meta }) =>
-                      setForm({ ...form, cover_image_url: url, cover_image_meta: meta })
+                      setForm({
+                        ...form,
+                        cover_image_url: url,
+                        cover_image_meta: meta ? { ...meta, card_x: form.cover_image_meta?.card_x } : null,
+                      })
                     }
                   />
+                  {form.cover_image_url && form.cover_image_meta && (
+                    <CardFocus
+                      src={form.cover_image_url}
+                      value={cardX(form.cover_image_meta)}
+                      onChange={(x) => setForm({ ...form, cover_image_meta: { ...form.cover_image_meta!, card_x: x } })}
+                    />
+                  )}
                 </div>
               </fieldset>
 

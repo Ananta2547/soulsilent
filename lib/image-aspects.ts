@@ -22,8 +22,8 @@ export const ASPECTS = {
   // Workshop master (info) cover — A3 portrait poster (29.7 × 42 cm).
   WORKSHOP_MASTER: { ratio: 297 / 420, label: 'A3 · โปสเตอร์ (ปกข้อมูลกิจกรรม)' },
 
-  ARTICLE_COVER: { ratio: 16 / 9, label: '16:9 · article card' },
-  ARTICLE_HERO: { ratio: 3, label: '3:1 · article header (full width)' },
+  ARTICLE_COVER: { ratio: 4 / 3, label: '4:3 · การ์ดบทความ' },
+  ARTICLE_HERO: { ratio: 3, label: '3:1 · หน้ารายละเอียดบทความ (เต็มความกว้าง)' },
   ARTICLE_BODY_16_9: { ratio: 16 / 9, label: '16:9 · body image' },
   ARTICLE_BODY_4_3: { ratio: 4 / 3, label: '4:3 · body image' },
   ARTICLE_BODY_1_1: { ratio: 1, label: '1:1 · body image' },

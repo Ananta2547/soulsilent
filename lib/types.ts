@@ -338,6 +338,8 @@ export interface ImageMeta {
   original_url: string;
   crop: CropBox;
   aspect?: number; // width / height of the primary crop bound
+  /** Article covers only: where the 4:3 card window sits, object-position x in % (see lib/article-card). */
+  card_x?: number;
 }
 
 export interface ArticleCategory {
@@ -364,6 +366,7 @@ export interface Article {
   excerpt: string | null;
   cover_swatch: ArticleSwatch;
   cover_image_url: string | null;
+  cover_image_meta?: string | null;
   body_json: string;
   author_id: string | null;
   read_minutes: number;

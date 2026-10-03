@@ -10,6 +10,7 @@ import { useLang, T } from '@/lib/i18n';
 import { Reveal } from '@/components/design/Reveal';
 import { ShareButton } from '@/components/design/ShareButton';
 import { useLoadingTracker } from '@/components/design/DataLoading';
+import { cardPos } from '@/lib/article-card';
 
 type ArticleWithAuthor = Article & { author_name?: string | null; author_email?: string | null };
 
@@ -586,10 +587,10 @@ function Related({
             >
               <div
                 className={`ph ${swatchClass(a.cover_swatch)}`}
-                style={{ aspectRatio: '16/10', position: 'relative', overflow: 'hidden' }}
+                style={{ aspectRatio: '4/3', position: 'relative', overflow: 'hidden' }}
               >
                 {a.cover_image_url && (
-                  <img src={a.cover_image_url} alt={a.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={a.cover_image_url} alt={a.title} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: cardPos(a) }} />
                 )}
               </div>
               <div
