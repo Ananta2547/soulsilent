@@ -4066,6 +4066,8 @@ body {
 .tm-meta { color: var(--ink-soft); font-family: var(--font-sans); font-size: 13px; letter-spacing: .01em; }
 .tm[data-lang="en"] .tm-meta { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; }
 .tm-h2 { font-family: var(--font-display-th); font-weight: 500; line-height: 1.02; letter-spacing: -.005em; font-size: clamp(24px, 3.2vw, 34px); margin: 0 0 12px; }
+/* Two set lines that never wrap: the size shrinks so the longer line (~18em) fits the screen. */
+.tm-h2-lines { white-space: nowrap; line-height: 1.2; font-size: min(clamp(24px, 3.2vw, 34px), calc((100vw - 48px) / 18)); }
 .tm-lede { font-size: 15px; line-height: 1.65; color: var(--muted); margin: 0; }
 
 .tm-hero { position: relative; padding: 56px 0 8px; overflow: hidden; }

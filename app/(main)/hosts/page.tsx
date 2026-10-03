@@ -143,18 +143,18 @@ export default function TeachersPage() {
             Facilitator<span style={{ color: 'var(--teal)' }}>.</span>
           </h1>
           <div className="tm-hero-row">
-            <div style={{ maxWidth: 560 }}>
-              <h2 className="tm-h2">{th ? (
+            <div style={{ maxWidth: 620 }}>
+              <h2 className="tm-h2 tm-h2-lines">{th ? (
                   <>
-                    เชื่อมต่อคุณกับ Host <span style={{ whiteSpace: 'nowrap' }}>ผู้สร้างสรรค์กิจกรรม</span>
+                    เชื่อมต่อคุณกับ Host ผู้สร้างสรรค์กิจกรรม
                     <br />
                     เปลี่ยนวันธรรมดาของคุณให้พิเศษ
                   </>
                 ) : (
                   <>
-                    Meet the hosts who create each journey
+                    Meet the hosts behind every journey
                     <br />
-                    and turn an ordinary day into something special
+                    and make an ordinary day special
                   </>
                 )}</h2>
               <p className="tm-lede">
