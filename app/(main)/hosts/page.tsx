@@ -210,7 +210,11 @@ export default function TeachersPage() {
                   <div className="tm4-host">
                     <Avatar t={s} size={92} className="tm4-avatar" />
                     <div style={{ minWidth: 0 }}>
-                      <div className="tm4-name">{s.name}</div>
+                      {/* The name opens their portfolio, else their host page. */}
+                      <Link href={s.portfolio_id ? `/p/${s.portfolio_id}` : `/hosts/${s.id}`} className="tm4-name">
+                        {s.name}
+                        {s.portfolio_id && <span className="tm4-name-tag">{th ? 'ผลงาน ↗' : 'portfolio ↗'}</span>}
+                      </Link>
                       <div className="tm4-hosted">
                         {(s.crafts.length ? s.crafts.slice(0, 2).join(' · ') + ' · ' : '') + (th ? `จัดมาแล้ว ${s.hosted} รอบ` : `${s.hosted} rounds hosted`)}
                       </div>

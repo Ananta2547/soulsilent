@@ -12,6 +12,8 @@ export type TeacherCard = {
   nickname: string | null;
   avatar_url: string | null;
   bio: string | null;
+  /** Their published portfolio (/p/<id>), if any. */
+  portfolio_id: string | null;
   /** Workshop categories this teacher has taught, most frequent first. */
   crafts: string[];
   upcoming: number;
@@ -66,13 +68,14 @@ export async function GET() {
     const db = await getDB();
     const teachersRes = await db
       .prepare(
-        `SELECT u.id, u.name, u.nickname, u.avatar_url, u.bio, u.role
+        `SELECT u.id, u.name, u.nickname, u.avatar_url, u.bio, u.role,
+                (SELECT p.id FROM portfolios p WHERE p.user_id = u.id AND p.published = 1 LIMIT 1) AS portfolio_id
            FROM users u
           WHERE ${ownRoleSql('u', 'teacher')}
             AND (u.account_status IS NULL OR u.account_status = 'active')
           ORDER BY u.name ASC`,
       )
-      .all<{ id: string; name: string; nickname: string | null; avatar_url: string | null; bio: string | null; role: string }>();
+      .all<{ id: string; name: string; nickname: string | null; avatar_url: string | null; bio: string | null; role: string; portfolio_id: string | null }>();
     const teachers = teachersRes.results || [];
     if (teachers.length === 0) {
       return NextResponse.json({ teachers: [], stats: { makers: 0, rounds: 0, people: 0 } });
@@ -164,6 +167,7 @@ export async function GET() {
         name: t.name,
         nickname: t.nickname,
         avatar_url: t.avatar_url,
+        portfolio_id: t.portfolio_id,
         bio: t.bio,
         crafts: [...craftCount.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c),
         upcoming: open.length,

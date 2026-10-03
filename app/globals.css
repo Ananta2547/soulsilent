@@ -4116,8 +4116,10 @@ body {
 .tm4-card { background: var(--cream); border-radius: 36px; overflow: hidden; }
 .tm4-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 72px; align-items: end; padding: 28px 44px 40px; position: relative; }
 .tm4-bigno { font-family: var(--font-display-en); font-size: 168px; line-height: .8; letter-spacing: -.04em; color: rgba(13,30,29,.05); margin-left: -6px; }
-.tm4-host { display: flex; align-items: center; gap: 16px; margin-top: -56px; position: relative; }
-.tm4-name { font-family: var(--font-display-th); font-weight: 500; font-size: 32px; line-height: 1.25; letter-spacing: -.005em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tm4-host { display: flex; align-items: center; gap: 16px; margin-top: 18px; position: relative; }
+.tm4-name { display: flex; align-items: baseline; gap: 10px; min-width: 0; font-family: var(--font-display-th); font-weight: 500; font-size: 32px; line-height: 1.25; letter-spacing: -.005em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink); text-decoration: none; }
+.tm4-name:hover { color: var(--teal-deep); text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 2px; }
+.tm4-name-tag { flex-shrink: 0; font-family: var(--font-sans); font-size: 12.5px; font-weight: 600; color: var(--teal-deep); background: var(--teal-50); border-radius: 999px; padding: 3px 10px; text-decoration: none; }
 .tm4-hosted { color: var(--ink-soft); font-family: var(--font-sans); font-size: 15px; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tm4-bubble { position: relative; background: var(--paper); border-radius: 28px; padding: 28px 36px; height: 220px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
 .tm4-tail-left { position: absolute; left: -52px; bottom: 54px; }
@@ -4156,7 +4158,7 @@ body {
   .tm4-card { border-radius: 24px; }
   .tm4-top { padding: 20px 20px 32px; }
   .tm4-bigno { font-size: 96px; }
-  .tm4-host { margin-top: -28px; }
+  .tm4-host { margin-top: 12px; }
   .tm4-avatar { width: 64px !important; height: 64px !important; font-size: 25px !important; }
   .tm4-name { font-size: 24px; }
   .tm4-hosted { font-size: 14px; }
