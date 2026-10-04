@@ -19,6 +19,8 @@ type Stats = { makers: number; rounds: number; people: number };
 const SPOT_MS = 7000;
 /** How many hosts take turns in "คนที่เราอยากให้รู้จัก". */
 const SPOT_MAX = 5;
+// Open rounds listed on the spotlight card; the rest are on the profile.
+const ROUNDS_SHOWN = 4;
 const PH_CLASS = ['ph-teal', 'ph-cream', 'ph-teal-100', 'ph-accent', 'ph-teal'];
 
 /** First syllable of a Thai display name (or first two letters) for the avatar. */
@@ -271,7 +273,6 @@ export default function TeachersPage() {
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={w.image_url} alt="" />
                             )}
-                            <span aria-hidden="true" className="tm-work-no">{pad2(i + 1)}</span>
                             <span aria-hidden="true" className="tm-work-star">✺</span>
                             <span className="tm-work-name" style={{ transform: `translateY(${on ? '0%' : '101%'})` }}>{w.title}</span>
                           </Link>
@@ -288,7 +289,7 @@ export default function TeachersPage() {
                       {s.rounds.length === 0 ? (
                         <div className="tm4-round tm4-round-none">{th ? 'รอบใหม่กำลังจัด — ติดตามผู้จัดไว้ก่อน' : 'New rounds coming — follow this host for now'}</div>
                       ) : (
-                        s.rounds.map((r) => (
+                        s.rounds.slice(0, ROUNDS_SHOWN).map((r) => (
                           <Link key={r.id} href={`/journeys/${r.id}`} className="tm4-round">
                             <span className="tm4-round-date" style={{ color: r.full ? 'var(--muted)' : 'var(--teal-deep)' }}>{shortDate(r.date)}</span>
                             <span className="tm4-round-title">{r.title}</span>
@@ -298,7 +299,7 @@ export default function TeachersPage() {
                       )}
                     </div>
                   </div>
-                  <div style={{ paddingTop: 20 }}>
+                  <div className="tm4-more">
                     <Link href={`/hosts/${s.id}`} className="btn btn-ink">
                       {th ? 'ดูโปรไฟล์และปฏิทิน' : 'Profile & calendar'} <span className="mono">→</span>
                     </Link>
