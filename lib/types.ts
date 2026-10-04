@@ -371,7 +371,7 @@ export interface Article {
   author_id: string | null;
   read_minutes: number;
   featured: number; // 0/1
-  published: number; // 0/1
+  published: number; // 0 private, 1 public, 2 unlisted — lib/article-visibility.ts
   date: string; // YYYY-MM-DD
   created_at: string;
   updated_at: string;
@@ -426,7 +426,7 @@ export interface Portfolio {
   blocks_json: string;
   /** New Canva-class builder document (nodes + meta) as JSON. Source of truth. */
   doc_json: string | null;
-  published: number; // 0/1
+  published: number; // 0 private, 1 public, 2 unlisted — lib/article-visibility.ts
   created_at: string;
   updated_at: string;
 }

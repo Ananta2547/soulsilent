@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid';
 import { getDB } from '@/lib/db';
 import { requireAdmin, getCurrentUser } from '@/lib/auth';
 import type { Article } from '@/lib/types';
+import { publishedCode } from '@/lib/article-visibility';
 
 export async function GET(request: Request) {
   try {
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
         body.author_id || null,
         body.read_minutes ?? 5,
         body.featured ? 1 : 0,
-        body.published == null ? 1 : body.published ? 1 : 0,
+        publishedCode(body.published),
         body.date
       )
       .run();

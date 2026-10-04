@@ -572,7 +572,14 @@ export default function TeacherProfilePage() {
                     aria-pressed={selected}
                     onClick={() => setDay(key)}
                   >
-                    <span className="tp2-cell-num">{Number(key.slice(-2))}</span>
+                    {key === today ? (
+                      <span className="tp2-cell-today">
+                        Today <span aria-hidden="true" className="tp2-cell-sun">✺</span>
+                        <span className="sr-only"> {Number(key.slice(-2))}</span>
+                      </span>
+                    ) : (
+                      <span className="tp2-cell-num">{Number(key.slice(-2))}</span>
+                    )}
                     {has && <span className="tp2-cell-time">{n > 1 ? `${n} ${th ? 'รอบ' : 'rounds'}` : first?.time_start}</span>}
                     {has && <span aria-hidden="true" className="tp2-cell-dot" />}
                   </button>

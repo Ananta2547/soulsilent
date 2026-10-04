@@ -15,6 +15,7 @@ import { formatArticleDate, parseBody, parseTags } from '@/lib/article-utils';
 import { ImageUploader } from '@/components/admin/image/ImageUploader';
 import { CardFocus } from '@/components/admin/image/CardFocus';
 import { cardX } from '@/lib/article-card';
+import { PUBLISHED_CODE, VISIBILITY_OPTIONS, visibilityOf, type ArticleVisibility } from '@/lib/article-visibility';
 import { ASPECTS, type AspectSpec } from '@/lib/image-aspects';
 import { parseImageMeta } from '@/lib/image-meta';
 
@@ -31,7 +32,7 @@ type ArticleForm = {
   body: ArticleBlock[];
   author_id: string;
   featured: boolean;
-  published: boolean;
+  published: ArticleVisibility;
   date: string;
 };
 
@@ -54,7 +55,7 @@ const emptyForm: ArticleForm = {
   body: [],
   author_id: '',
   featured: false,
-  published: true,
+  published: 'public',
   date: todayIso(),
 };
 
@@ -109,23 +110,43 @@ export default function AdminArticlesPage() {
     fetchAll();
   }, []);
 
-  // Drafts: copy a link anyone can open to read it before it is published.
+  // Unlisted articles are read through their link, so the list offers it.
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
-  async function copyShareLink(slug: string) {
+  async function copyLink(slug: string) {
+    const url = `${window.location.origin}/articles/${slug}`;
     try {
-      const r = await fetch(`/api/articles/${encodeURIComponent(slug)}/share`);
-      const d = (await r.json()) as { path?: string; error?: string };
-      if (!r.ok || !d.path) throw new Error(d.error || 'share failed');
-      const url = window.location.origin + d.path;
-      try {
-        await navigator.clipboard.writeText(url);
-      } catch {
-        window.prompt('คัดลอกลิงก์นี้', url);
-      }
-      setCopiedSlug(slug);
-      setTimeout(() => setCopiedSlug((s) => (s === slug ? null : s)), 2000);
+      await navigator.clipboard.writeText(url);
     } catch {
-      alert('สร้างลิงก์แชร์ไม่สำเร็จ');
+      window.prompt('คัดลอกลิงก์นี้', url);
+    }
+    setCopiedSlug(slug);
+    setTimeout(() => setCopiedSlug((s) => (s === slug ? null : s)), 2000);
+  }
+
+  // Share level and the lead star change straight from the list.
+  async function quickUpdate(slug: string, patch: { published?: ArticleVisibility; featured?: boolean }) {
+    const before = articles;
+    setArticles((list) =>
+      list.map((x) =>
+        x.slug !== slug
+          ? x
+          : {
+              ...x,
+              ...(patch.published !== undefined ? { published: PUBLISHED_CODE[patch.published] } : {}),
+              ...(patch.featured !== undefined ? { featured: patch.featured ? 1 : 0 } : {}),
+            }
+      )
+    );
+    try {
+      const r = await fetch(`/api/articles/${encodeURIComponent(slug)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      if (!r.ok) throw new Error(String(r.status));
+    } catch {
+      setArticles(before);
+      alert('บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง');
     }
   }
 
@@ -145,7 +166,7 @@ export default function AdminArticlesPage() {
       body: parseBody(a),
       author_id: a.author_id || '',
       featured: !!a.featured,
-      published: !!a.published,
+      published: visibilityOf(a.published),
       date: a.date,
     });
     setEditingSlug(a.slug);
@@ -488,13 +509,19 @@ export default function AdminArticlesPage() {
                   </select>
                 </div>
                 <div className="flex flex-col gap-2 pt-6">
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={form.published}
-                      onChange={(e) => setForm({ ...form, published: e.target.checked })}
-                    />
-                    เผยแพร่
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="text-xs text-gray">ระดับการแชร์</span>
+                    <select
+                      value={form.published}
+                      onChange={(e) => setForm({ ...form, published: e.target.value as ArticleVisibility })}
+                      className="input-field"
+                    >
+                      {VISIBILITY_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.th} — {o.hint}
+                        </option>
+                      ))}
+                    </select>
                   </label>
                   <label className="flex items-center gap-2 text-sm">
                     <input
@@ -554,19 +581,31 @@ export default function AdminArticlesPage() {
                       {formatArticleDate(a.date, 'th')}
                     </td>
                     <td className="py-3 px-4 text-center">
-                      {a.published ? (
-                        <span className="badge-success">เผยแพร่</span>
-                      ) : (
-                        <span className="badge-accent">ฉบับร่าง</span>
-                      )}
-                      {!!a.featured && (
-                        <span
-                          className="badge ml-1"
-                          style={{ background: 'var(--accent)', color: 'var(--ink)' }}
+                      <div className="inline-flex items-center gap-2">
+                        <select
+                          value={visibilityOf(a.published)}
+                          onChange={(e) => quickUpdate(a.slug, { published: e.target.value as ArticleVisibility })}
+                          aria-label="ระดับการแชร์"
+                          title={VISIBILITY_OPTIONS.find((o) => o.value === visibilityOf(a.published))?.hint}
+                          className={`art-vis art-vis-${visibilityOf(a.published)}`}
                         >
-                          ★
-                        </span>
-                      )}
+                          {VISIBILITY_OPTIONS.map((o) => (
+                            <option key={o.value} value={o.value}>
+                              {o.th}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => quickUpdate(a.slug, { featured: !a.featured })}
+                          aria-pressed={!!a.featured}
+                          aria-label={a.featured ? 'เอาออกจาก Featured (lead)' : 'ตั้งเป็น Featured (lead)'}
+                          title={a.featured ? 'Featured (lead) — กดเพื่อเอาออก' : 'กดเพื่อตั้งเป็น Featured (lead)'}
+                          className={`art-star${a.featured ? ' on' : ''}`}
+                        >
+                          {a.featured ? '★' : '☆'}
+                        </button>
+                      </div>
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -577,13 +616,13 @@ export default function AdminArticlesPage() {
                         >
                           ดู ↗
                         </a>
-                        {!a.published && (
+                        {visibilityOf(a.published) === 'unlisted' && (
                           <button
-                            onClick={() => copyShareLink(a.slug)}
-                            title="ลิงก์ให้คนอื่นอ่านฉบับร่างนี้ได้ ก่อนเผยแพร่"
+                            onClick={() => copyLink(a.slug)}
+                            title="ลิงก์สำหรับส่งให้คนอื่นอ่าน — บทความนี้ไม่ขึ้นในหน้าเว็บ"
                             className="text-primary text-xs font-medium hover:underline"
                           >
-                            {copiedSlug === a.slug ? 'คัดลอกแล้ว ✓' : 'คัดลอกลิงก์แชร์'}
+                            {copiedSlug === a.slug ? 'คัดลอกแล้ว ✓' : 'คัดลอกลิงก์'}
                           </button>
                         )}
                         <button

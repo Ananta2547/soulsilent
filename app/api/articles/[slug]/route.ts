@@ -2,11 +2,11 @@ import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 import { requireAdmin, getCurrentUser } from '@/lib/auth';
 import type { Article } from '@/lib/types';
-import { isArticleShareToken } from '@/lib/article-share';
+import { publishedCode } from '@/lib/article-visibility';
 
 type AuthorJoined = { author_name: string | null; author_email: string | null };
 
-export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
+export async function GET(_request: Request, { params }: { params: Promise<{ slug: string }> }) {
   try {
     const { slug } = await params;
     const db = await getDB();
@@ -23,11 +23,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
     if (!article) {
       return NextResponse.json({ error: 'not found' }, { status: 404 });
     }
-    // Drafts: admins, or anyone holding the draft's share link.
-    if (!article.published) {
+    // Public (1) and unlisted (2) open for anyone with the link; private (0)
+    // only for admins.
+    if (Number(article.published) === 0) {
       const me = await getCurrentUser();
-      const shared = await isArticleShareToken(article.id, new URL(request.url).searchParams.get('share'));
-      if (me?.role !== 'admin' && !shared) {
+      if (me?.role !== 'admin') {
         return NextResponse.json({ error: 'not found' }, { status: 404 });
       }
     }
@@ -74,7 +74,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ slug
         body.author_id || null,
         body.read_minutes ?? 5,
         body.featured ? 1 : 0,
-        body.published == null ? 1 : body.published ? 1 : 0,
+        publishedCode(body.published),
         body.date,
         slug
       )
@@ -86,6 +86,40 @@ export async function PUT(request: Request, { params }: { params: Promise<{ slug
       return NextResponse.json({ error: err.message }, { status: 403 });
     }
     console.error('Update article error:', error);
+    return NextResponse.json({ error: 'เกิดข้อผิดพลาด' }, { status: 500 });
+  }
+}
+
+/** Quick edits from the admin list: share level and the lead star. */
+export async function PATCH(request: Request, { params }: { params: Promise<{ slug: string }> }) {
+  try {
+    await requireAdmin();
+    const { slug } = await params;
+    const body = (await request.json()) as { published?: unknown; featured?: unknown };
+    const sets: string[] = [];
+    const binds: unknown[] = [];
+    if (body.published !== undefined) {
+      sets.push('published = ?');
+      binds.push(publishedCode(body.published));
+    }
+    if (body.featured !== undefined) {
+      sets.push('featured = ?');
+      binds.push(body.featured ? 1 : 0);
+    }
+    if (!sets.length) return NextResponse.json({ error: 'nothing to update' }, { status: 400 });
+    const db = await getDB();
+    const r = await db
+      .prepare(`UPDATE articles SET ${sets.join(', ')}, updated_at = datetime('now') WHERE slug = ?`)
+      .bind(...binds, slug)
+      .run();
+    if (!r.meta.changes) return NextResponse.json({ error: 'not found' }, { status: 404 });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    const err = error as Error;
+    if (err.message === 'Unauthorized' || err.message === 'Forbidden') {
+      return NextResponse.json({ error: err.message }, { status: 403 });
+    }
+    console.error('Patch article error:', error);
     return NextResponse.json({ error: 'เกิดข้อผิดพลาด' }, { status: 500 });
   }
 }
