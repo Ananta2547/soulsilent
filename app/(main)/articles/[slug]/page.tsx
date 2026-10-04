@@ -153,13 +153,12 @@ export default function ArticleDetailPage() {
             <>
               {/* Not listed anywhere, so keep search engines out too. */}
               <meta name="robots" content="noindex" />
-              <div style={{ marginBottom: 20, padding: '10px 14px', borderRadius: 12, background: '#fff8e1', borderLeft: '4px solid var(--accent)', fontSize: 13.5, color: 'var(--ink)' }}>
-                {visibilityOf(article.published) === 'private' ? (
+              {/* Only admins reach a private article; link readers see no notice. */}
+              {visibilityOf(article.published) === 'private' && (
+                <div style={{ marginBottom: 20, padding: '10px 14px', borderRadius: 12, background: '#fff8e1', borderLeft: '4px solid var(--accent)', fontSize: 13.5, color: 'var(--ink)' }}>
                   <T th="ส่วนตัว — บทความนี้เห็นเฉพาะผู้ดูแล" en="Private — only admins can see this article" />
-                ) : (
-                  <T th="ไม่เป็นสาธารณะ — เปิดได้เฉพาะคนที่มีลิงก์ และไม่ขึ้นในหน้าเว็บ" en="Unlisted — only people with the link can open it; it is not listed on the site" />
-                )}
-              </div>
+                </div>
+              )}
             </>
           )}
 
