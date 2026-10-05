@@ -3977,9 +3977,43 @@ body {
 .tp2-secbtn-del { color: #a13030; }
 .tp2-sectools.dark .tp2-secbtn-del { color: #ffb4a8; }
 .tp2-headedit { display: grid; gap: 14px; max-width: 620px; margin-bottom: 30px; }
-.tp2-addsec { display: flex; flex-direction: column; gap: 4px; padding: 22px; border: 1.5px dashed var(--teal); border-radius: 18px; background: var(--teal-50); }
-.tp2-addsec-row { display: flex; flex-wrap: wrap; gap: 10px; }
-.tp2-addsec-row .tp2-add { margin-top: 10px; background: var(--paper); }
+/* The add box: a header you can drag, then one card per section kind with a tiny picture of it. */
+.tp2-addsec { padding: 20px; border: 2px dashed var(--teal); border-radius: 22px; background: var(--teal-50); }
+.tp2-addsec-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.tp2-addsec-head .tp2-grip { background: var(--paper); }
+.tp2-addsec-title { font-family: var(--font-display-th); font-weight: 500; font-size: 20px; line-height: 1.3; color: var(--ink); }
+.tp2-addsec-sub { font-size: 13.5px; line-height: 1.5; color: var(--ink-soft); }
+.tp2-addsec-count { font-family: var(--font-mono); font-size: 12px; color: var(--teal-deep); background: var(--paper); border-radius: 999px; padding: 6px 10px; white-space: nowrap; }
+.tp2-addsec-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.tp2-addcard { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; padding: 14px; border: 1.5px solid rgba(13,30,29,.1); border-radius: 18px; background: var(--paper); color: var(--ink); font-family: inherit; cursor: pointer; transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease; }
+.tp2-addcard:hover:not(:disabled) { border-color: var(--teal); transform: translateY(-2px); box-shadow: 0 10px 24px -14px rgba(13,30,29,.35); }
+.tp2-addcard:disabled { opacity: .45; cursor: default; }
+.tp2-addcard-art { display: flex; flex-direction: column; justify-content: center; gap: 7px; width: 100%; height: 84px; padding: 12px 14px; margin-bottom: 4px; border-radius: 12px; background: var(--cream); }
+.tp2-addcard-art i { display: flex; align-items: center; gap: 8px; font-style: normal; }
+.tp2-addcard-art b { font-family: var(--font-mono); font-size: 10px; font-weight: 500; color: var(--teal); }
+.tp2-addcard-art em { display: block; height: 6px; border-radius: 3px; background: rgba(13,30,29,.18); }
+.tp2-addcard-art.art-journey { position: relative; padding-left: 20px; }
+.tp2-addcard-art.art-journey::before { content: ''; position: absolute; left: 24px; top: 16px; bottom: 16px; width: 2px; background: var(--teal-200); }
+.tp2-addcard-art.art-journey b { position: relative; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--teal); background: var(--paper); flex: none; }
+.tp2-addcard-art.art-belief { align-items: center; background: var(--ink); }
+.tp2-addcard-quote { font-family: var(--font-display-th); font-size: 34px; line-height: 1; color: var(--accent); letter-spacing: .2em; white-space: nowrap; }
+.tp2-addcard-name { font-family: var(--font-display-th); font-weight: 500; font-size: 16px; line-height: 1.3; }
+.tp2-addcard-desc { font-size: 13px; line-height: 1.45; color: var(--muted); flex: 1; }
+.tp2-addcard-plus { margin-top: 6px; font-size: 13.5px; font-weight: 600; color: #fff; background: var(--teal); border-radius: 999px; padding: 6px 14px; }
+@media (max-width: 760px) {
+  .tp2-addsec-grid { grid-template-columns: 1fr; }
+  .tp2-addcard { flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 12px; }
+  .tp2-addcard-art { width: 76px; height: 60px; padding: 8px 10px; gap: 5px; margin: 0; flex: none; }
+  .tp2-addcard-art.art-journey::before { left: 14px; top: 10px; bottom: 10px; }
+  .tp2-addcard-art.art-journey { padding-left: 10px; }
+  .tp2-addcard-name { flex: 1; min-width: 0; }
+  .tp2-addcard-desc { flex-basis: 100%; }
+  .tp2-addcard-plus { display: none; }
+  .tp2-addsec-head { flex-wrap: wrap; }
+  .tp2-addsec-head > div { order: 5; flex-basis: 100% !important; }
+  .tp2-addsec-count { margin-left: auto; }
+  .tp2-addcard-quote { font-size: 26px; }
+}
 @media (max-width: 560px) { .tp2-sectools-kind { display: none; } .tp2-secbtn-del { padding: 0 8px; } }
 
 @media (max-width: 760px) {

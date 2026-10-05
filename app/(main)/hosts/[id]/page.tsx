@@ -10,7 +10,7 @@
  * becomes a box in place, items can be added or removed, and one save
  * writes the lot. Site header and footer come from the layout. */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useLang, tr } from '@/lib/i18n';
@@ -67,6 +67,8 @@ const cloneProfile = (p: TeacherProfile): TeacherProfile => JSON.parse(JSON.stri
 /** The intro under the name is held to three lines (the user's rule): the form
  *  caps what can be typed, and .tp2-promise clamps older or fallback text. */
 const PROMISE_MAX = 120;
+/** Drag id of the "add a section" box, which moves through the list like a section. */
+const ADD_ID = '__add';
 
 /** First syllable of a Thai display name (or first two letters) for the avatar. */
 function initialOf(display: string): string {
@@ -110,6 +112,10 @@ export default function TeacherProfilePage() {
   const [armed, setArmed] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropAt, setDropAt] = useState<number | null>(null);
+  // The "add a section" box sits in the list too and can be dragged like a
+  // section; new sections go in where it sits. It is anchored to the section
+  // just above it (null = top of the list, undefined = bottom).
+  const [addAfter, setAddAfter] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {
     track(
@@ -201,20 +207,40 @@ export default function TeacherProfilePage() {
       const cur = d || EMPTY_PROFILE;
       return { ...cur, sections: cur.sections.map((s) => (s.id === sid ? fn(s) : s)) };
     });
-  const addSection = (kind: SectionKind) =>
-    setDraft((d) => {
-      const cur = d || EMPTY_PROFILE;
-      if (cur.sections.length >= MAX_SECTIONS) return cur;
-      const s = newSection(kind);
-      // A new list starts with one blank item, ready to type into.
-      if (s.kind === 'takeaways') s.items = [{ title: '', body: '' }];
-      if (s.kind === 'journey') s.items = [{ year: '', title: '', body: '' }];
-      return { ...cur, sections: [...cur.sections, s] };
-    });
+  /** Where the add box sits, as an index into the section list (0…length). */
+  const addIndexOf = (list: ProfileSection[]) => {
+    if (addAfter === undefined) return list.length;
+    if (addAfter === null) return 0;
+    const i = list.findIndex((x) => x.id === addAfter);
+    return i < 0 ? list.length : i + 1;
+  };
+  /** Park the add box before position `to` of the current list. */
+  const moveAddBox = (to: number) => {
+    const list = draft?.sections || [];
+    const t = Math.max(0, Math.min(list.length, to));
+    setAddAfter(t >= list.length ? undefined : t === 0 ? null : list[t - 1].id);
+  };
+  const addSection = (kind: SectionKind) => {
+    if (!draft || draft.sections.length >= MAX_SECTIONS) return;
+    const s = newSection(kind);
+    // A new list starts with one blank item, ready to type into.
+    if (s.kind === 'takeaways') s.items = [{ title: '', body: '' }];
+    if (s.kind === 'journey') s.items = [{ year: '', title: '', body: '' }];
+    const at = addIndexOf(draft.sections);
+    const list = [...draft.sections];
+    list.splice(at, 0, s);
+    setDraft({ ...draft, sections: list });
+    // The box stays just below what was added, so the next one follows it.
+    if (addAfter !== undefined) setAddAfter(s.id);
+  };
   const removeSection = (sid: string) => {
     const s = draft?.sections.find((x) => x.id === sid);
     const filled = s && (s.kind === 'belief' ? !!s.text.trim() : s.items.some((t) => Object.values(t).some((v) => v.trim())));
     if (filled && !window.confirm(th ? 'ลบส่วนนี้ทั้งส่วน?' : 'Remove this whole section?')) return;
+    if (addAfter === sid && draft) {
+      const i = draft.sections.findIndex((x) => x.id === sid);
+      setAddAfter(i > 0 ? draft.sections[i - 1].id : null);
+    }
     setDraft((d) => (d ? { ...d, sections: d.sections.filter((x) => x.id !== sid) } : d));
   };
   /** Move the section `sid` so it lands before position `to` (0…length). */
@@ -307,6 +333,9 @@ export default function TeacherProfilePage() {
   const KIND_LABEL: Record<SectionKind, string> = th
     ? { takeaways: 'สิ่งที่คุณจะได้กลับไป', journey: 'เส้นทาง (ไทม์ไลน์)', belief: 'คำพูด (แถบสีเข้ม)' }
     : { takeaways: 'What you take home', journey: 'Path (timeline)', belief: 'Quote (dark band)' };
+  const KIND_HINT: Record<SectionKind, string> = th
+    ? { takeaways: 'รายการข้อ 01 02 03 บอกว่าผู้เข้าร่วมจะได้อะไร', journey: 'ไทม์ไลน์ตามปี เล่าเส้นทางที่ผ่านมา', belief: 'ประโยคเดียวบนแถบสีเข้ม เต็มความกว้างหน้า' }
+    : { takeaways: 'Numbered points on what people leave with', journey: 'A timeline by year of your path so far', belief: 'One line on a full-width dark band' };
 
   /** Move / delete controls on top of a section while editing. */
   const sectionTools = (s: ProfileSection, i: number, dark = false) => (
@@ -569,57 +598,108 @@ export default function TeacherProfilePage() {
         </div>
       )}
 
-      {/* The host's own sections, in the order they arranged them */}
-      {profile.sections.map((s, i) => (
-        <div
-          key={s.id}
-          className={`tp2-sec ${dragId === s.id ? 'dragging' : ''} ${dropAt === i && dragId && dragId !== s.id ? 'drop-before' : ''} ${dropAt === i + 1 && dragId && dragId !== s.id ? 'drop-after' : ''}`}
-          draggable={editing && armed === s.id}
-          onDragStart={(e) => {
-            setDragId(s.id);
+      {/* The host's own sections, in the order they arranged them. While
+          editing, the add box rides in the same list and can be dragged too. */}
+      {(() => {
+        const addAt = addIndexOf(profile.sections);
+        const full = profile.sections.length >= MAX_SECTIONS;
+        const items: { key: string; i: number; box: boolean }[] = profile.sections.map((s, i) => ({ key: s.id, i, box: false }));
+        if (editing) items.splice(addAt, 0, { key: ADD_ID, i: addAt, box: true });
+        const dragProps = (key: string, i: number) => ({
+          draggable: editing && armed === key,
+          onDragStart: (e: DragEvent) => {
+            setDragId(key);
             e.dataTransfer.effectAllowed = 'move';
-          }}
-          onDragOver={(e) => {
+          },
+          onDragOver: (e: DragEvent) => {
             if (!dragId) return;
             e.preventDefault();
-            const r = e.currentTarget.getBoundingClientRect();
+            const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
             setDropAt(e.clientY < r.top + r.height / 2 ? i : i + 1);
-          }}
-          onDrop={(e) => {
+          },
+          onDrop: (e: DragEvent) => {
             e.preventDefault();
-            if (dragId && dropAt !== null) moveSection(dragId, dropAt);
-          }}
-          onDragEnd={() => {
+            if (dragId === ADD_ID && dropAt !== null) moveAddBox(dropAt);
+            else if (dragId && dropAt !== null) moveSection(dragId, dropAt);
+          },
+          onDragEnd: () => {
             setDragId(null);
             setDropAt(null);
             setArmed(null);
-          }}
-        >
-          {renderSection(s, i)}
-        </div>
-      ))}
-
-      {/* Add a section */}
-      {editing && (
-        <section className="tp2-section">
-          <div className="tp2-wrap">
-            <div className="tp2-addsec">
-              <span className="tp2-field-label">
-                {th
-                  ? `เพิ่มส่วน (${profile.sections.length}/${MAX_SECTIONS}) — เพิ่มชนิดเดียวกันได้หลายส่วน ลาก ⠿ หรือกด ↑ ↓ เพื่อจัดลำดับ`
-                  : `Add a section (${profile.sections.length}/${MAX_SECTIONS}) — any kind, as often as you like; drag ⠿ or use ↑ ↓ to reorder`}
-              </span>
-              <div className="tp2-addsec-row">
-                {(['takeaways', 'journey', 'belief'] as SectionKind[]).map((k) => (
-                  <button key={k} type="button" className="tp2-add" disabled={profile.sections.length >= MAX_SECTIONS} onClick={() => addSection(k)}>
-                    + {KIND_LABEL[k]}
-                  </button>
-                ))}
+          },
+        });
+        return items.map(({ key, i, box }) => {
+          if (box) {
+            return (
+              <div key={key} className={`tp2-sec ${dragId === ADD_ID ? 'dragging' : ''}`} {...dragProps(ADD_ID, i)} onDragOver={undefined} onDrop={undefined}>
+                <section className="tp2-section">
+                  <div className="tp2-wrap">
+                    <div className="tp2-addsec">
+                      <div className="tp2-addsec-head">
+                        <span
+                          className="tp2-grip"
+                          onPointerDown={() => setArmed(ADD_ID)}
+                          onPointerUp={() => setArmed(null)}
+                          title={th ? 'กดค้างแล้วลากเพื่อย้ายกล่องนี้' : 'Hold and drag to move this box'}
+                          aria-hidden="true"
+                        >
+                          ⠿
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div className="tp2-addsec-title">{th ? 'เพิ่มส่วนใหม่ตรงนี้' : 'Add a section here'}</div>
+                          <div className="tp2-addsec-sub">
+                            {th ? 'ส่วนที่เพิ่มจะแทรกตรงตำแหน่งกล่องนี้ — ลาก ⠿ หรือกด ↑ ↓ เพื่อย้ายกล่องไปที่อื่น' : 'New sections land where this box sits — drag ⠿ or use ↑ ↓ to move it'}
+                          </div>
+                        </div>
+                        <span className="tp2-addsec-count">{profile.sections.length}/{MAX_SECTIONS}</span>
+                        <button type="button" className="tp2-secbtn" disabled={addAt === 0} onClick={() => moveAddBox(addAt - 1)} aria-label={th ? 'ย้ายกล่องขึ้น' : 'Move box up'}>↑</button>
+                        <button type="button" className="tp2-secbtn" disabled={addAt >= profile.sections.length} onClick={() => moveAddBox(addAt + 1)} aria-label={th ? 'ย้ายกล่องลง' : 'Move box down'}>↓</button>
+                      </div>
+                      <div className="tp2-addsec-grid">
+                        {(['takeaways', 'journey', 'belief'] as SectionKind[]).map((k) => (
+                          <button key={k} type="button" className="tp2-addcard" disabled={full} onClick={() => addSection(k)}>
+                            <span className={`tp2-addcard-art art-${k}`} aria-hidden="true">
+                              {k === 'takeaways' && (
+                                <>
+                                  <i><b>01</b><em style={{ width: '70%' }} /></i>
+                                  <i><b>02</b><em style={{ width: '52%' }} /></i>
+                                  <i><b>03</b><em style={{ width: '62%' }} /></i>
+                                </>
+                              )}
+                              {k === 'journey' && (
+                                <>
+                                  <i><b /><em style={{ width: '58%' }} /></i>
+                                  <i><b /><em style={{ width: '72%' }} /></i>
+                                  <i><b /><em style={{ width: '48%' }} /></i>
+                                </>
+                              )}
+                              {k === 'belief' && <span className="tp2-addcard-quote">“ ”</span>}
+                            </span>
+                            <span className="tp2-addcard-name">{KIND_LABEL[k]}</span>
+                            <span className="tp2-addcard-desc">{KIND_HINT[k]}</span>
+                            <span className="tp2-addcard-plus">+ {th ? 'เพิ่ม' : 'Add'}</span>
+                          </button>
+                        ))}
+                      </div>
+                      {full && <div className="tp2-addsec-sub" style={{ marginTop: 12 }}>{th ? `ครบ ${MAX_SECTIONS} ส่วนแล้ว — ลบส่วนที่ไม่ใช้ก่อนเพื่อเพิ่มใหม่` : `All ${MAX_SECTIONS} sections used — remove one to add another`}</div>}
+                    </div>
+                  </div>
+                </section>
               </div>
+            );
+          }
+          const s = profile.sections[i];
+          return (
+            <div
+              key={key}
+              className={`tp2-sec ${dragId === key ? 'dragging' : ''} ${dropAt === i && dragId && dragId !== key ? 'drop-before' : ''} ${dropAt === i + 1 && dragId && dragId !== key ? 'drop-after' : ''}`}
+              {...dragProps(key, i)}
+            >
+              {renderSection(s, i)}
             </div>
-          </div>
-        </section>
-      )}
+          );
+        });
+      })()}
 
       {/* Works rail */}
       {teacher.works.length > 0 && (
