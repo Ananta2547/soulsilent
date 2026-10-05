@@ -15,6 +15,8 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useLang, tr } from '@/lib/i18n';
 import { Btn } from '@/components/design/RippleButton';
+import { Icon } from '@/components/design/Icon';
+import { SocialIcon } from '@/components/design/SocialIcon';
 import { useLoadingTracker } from '@/components/design/DataLoading';
 import {
   EMPTY_PROFILE,
@@ -55,6 +57,9 @@ const PH_CLASS = ['ph-teal', 'ph-cream', 'ph-teal-100', 'ph-accent'];
 const CRAFT_TH: Record<string, string> = { art: 'ศิลปะ', craft: 'งานฝีมือ', cooking: 'ทำอาหาร', music: 'ดนตรี', wellness: 'สุขภาพ', nature: 'ธรรมชาติ', kids: 'เด็ก', other: 'อื่น ๆ' };
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
+/** The intro under the name is held to three lines (the user's rule): the form
+ *  caps what can be typed, and .tp2-promise clamps older or fallback text. */
+const PROMISE_MAX = 120;
 
 /** First syllable of a Thai display name (or first two letters) for the avatar. */
 function initialOf(display: string): string {
@@ -298,12 +303,14 @@ export default function TeacherProfilePage() {
                   <textarea
                     className="tp2-input tp2-input-promise"
                     rows={3}
-                    maxLength={LIMITS.promise}
+                    maxLength={PROMISE_MAX}
                     value={profile.promise}
                     placeholder={teacher.bio || (th ? 'เช่น ผมไม่ได้สอนให้วาดสวย ผมสอนให้มองนานพอ…' : 'e.g. I don’t teach pretty drawings…')}
-                    onChange={(e) => patch({ promise: e.target.value })}
+                    onChange={(e) => patch({ promise: e.target.value.replace(/\n{2,}/g, '\n') })}
                   />
-                  <span className="tp2-field-hint">{th ? 'เว้นว่างได้ — จะใช้ bio จากโปรไฟล์แทน' : 'Leave empty to fall back to your bio'}</span>
+                  <span className="tp2-field-hint">
+                    {th ? `แสดงได้ไม่เกิน 3 บรรทัด · ${profile.promise.length}/${PROMISE_MAX} ตัวอักษร · เว้นว่างได้ จะใช้ bio จากโปรไฟล์แทน` : `Shows at most 3 lines · ${profile.promise.length}/${PROMISE_MAX} · leave empty to fall back to your bio`}
+                  </span>
                 </label>
               ) : (
                 promise && <p className="tp2-promise">{promise}</p>
@@ -475,7 +482,7 @@ export default function TeacherProfilePage() {
             ) : (
               <p className="tp2-belief">“{profile.belief}”</p>
             )}
-            <div className="tm-meta tp2-sign">{display} · {th ? 'ผู้จัด' : 'host'}</div>
+            <div className="tm-meta tp2-sign">— {display} · {th ? 'ผู้จัด' : 'host'}</div>
           </div>
         </section>
       )}
@@ -487,7 +494,7 @@ export default function TeacherProfilePage() {
             <div className="tp2-head">
               <div>
                 <span className="tm-eyebrow">{th ? '02 — คลาสที่จัด' : '02 — Classes they host'}</span>
-                <h2 className="tp2-h2" style={{ fontSize: 'clamp(24px,3vw,32px)', margin: '12px 0 0' }}>{th ? 'งานที่ผ่านมาและที่ยังจัดอยู่' : 'Past and running journeys'}</h2>
+                <h2 className="tp2-h2" style={{ fontSize: 'clamp(24px,3vw,32px)', margin: '12px 0 0' }}>{th ? `กิจกรรมของ ${display}` : `${display}’s journeys`}</h2>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button type="button" className="tm-round-btn" style={{ width: 38, height: 38, fontSize: 15, background: 'var(--cream)' }} onClick={() => nudge(-1)} aria-label="Scroll left">‹</button>
@@ -515,7 +522,6 @@ export default function TeacherProfilePage() {
                     )}
                     <span aria-hidden="true" className="tm-work-no">{pad2(i + 1)}</span>
                     <span className={`tp2-work-status ${w.open ? 'open' : ''}`}>{w.open ? (th ? 'เปิดรับ' : 'Open') : th ? 'ปิดรับ' : 'Closed'}</span>
-                    <span aria-hidden="true" className="tm-work-star">✺</span>
                     <span className="tm-work-name" style={{ transform: `translateY(${on ? '0%' : '101%'})` }}>{w.title}</span>
                   </Link>
                 );
@@ -581,7 +587,11 @@ export default function TeacherProfilePage() {
                       <span className="tp2-cell-num">{Number(key.slice(-2))}</span>
                     )}
                     {has && <span className="tp2-cell-time">{n > 1 ? `${n} ${th ? 'รอบ' : 'rounds'}` : first?.time_start}</span>}
-                    {has && <span aria-hidden="true" className="tp2-cell-dot" />}
+                    {has && (
+                      <span aria-hidden="true" className="tp2-cell-event">
+                        <Icon name="event" size={14} align="baseline" />
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -635,15 +645,14 @@ export default function TeacherProfilePage() {
       </section>
 
       {/* Ask */}
+      {/* The heading asks people to get in touch, so the band only shows once there is a channel to use. */}
+      {(editing || profile.socials.length > 0) && (
       <section className="tm-cta">
         <span aria-hidden="true" className="tm-cta-star" style={{ left: 'auto', right: -20, top: -40, bottom: 'auto', fontSize: 200 }}>✺</span>
         <div className="tp2-wrap tm-cta-row" style={{ position: 'relative' }}>
           <div style={{ maxWidth: 560 }}>
             <span className="tm-eyebrow" style={{ color: '#fff' }}>{th ? '04 — คุยกันก่อนก็ได้' : '04 — Talk first'}</span>
-            <h2 className="tp2-h2" style={{ fontSize: 'clamp(24px,3.2vw,34px)', color: '#fff', margin: '14px 0 12px' }}>{th ? 'ยังไม่แน่ใจว่าคลาสไหนเหมาะกับคุณ' : 'Not sure which class fits you?'}</h2>
-            <p style={{ fontSize: 15, lineHeight: 1.65, color: '#fff', margin: 0 }}>
-              {th ? `เล่าให้เราฟังว่าคุณอยากได้อะไรจากวันนั้น เราจะช่วยเลือกรอบให้ หรือส่งต่อให้${display}ตอบคุณเอง` : `Tell us what you want from the day. We’ll help you pick a round — or pass it on to ${display}.`}
-            </p>
+            <h2 className="tp2-h2" style={{ fontSize: 'clamp(24px,3.2vw,34px)', color: '#fff', margin: '14px 0 0' }}>{th ? `ติดต่อ ${display} เพื่อสอบถามเพิ่มเติม` : `Contact ${display} to ask more`}</h2>
           </div>
         </div>
         {(editing || profile.socials.length > 0) && (
@@ -671,8 +680,8 @@ export default function TeacherProfilePage() {
             ) : (
               <div className="tp2-socials">
                 {profile.socials.map((s, i) => (
-                  <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className="tp2-social">
-                    {SOCIAL_LABEL[s.kind]} <span className="mono">↗</span>
+                  <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className="tp2-social" aria-label={SOCIAL_LABEL[s.kind]} title={SOCIAL_LABEL[s.kind]}>
+                    <SocialIcon kind={s.kind} size={20} />
                   </a>
                 ))}
               </div>
@@ -680,6 +689,7 @@ export default function TeacherProfilePage() {
           </div>
         )}
       </section>
+      )}
     </div>
   );
 }
