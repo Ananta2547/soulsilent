@@ -10,7 +10,7 @@
  * becomes a box in place, items can be added or removed, and one save
  * writes the lot. Site header and footer come from the layout. */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useLang, tr } from '@/lib/i18n';
@@ -19,14 +19,24 @@ import { Icon } from '@/components/design/Icon';
 import { SocialIcon } from '@/components/design/SocialIcon';
 import { useLoadingTracker } from '@/components/design/DataLoading';
 import {
+  EMPTY_PROFILE,
+  LIMITS,
+  MAX_JOURNEY,
+  MAX_SECTIONS,
+  MAX_SOCIALS,
+  MAX_TAKEAWAYS,
+  SOCIAL_KINDS,
   SOCIAL_LABEL,
+  newSection,
   parseTeacherProfile,
   sortedJourney,
   type JourneyStep,
   type ProfileSection,
+  type SectionKind,
+  type SocialLink,
+  type Takeaway,
   type TeacherProfile,
 } from '@/lib/teacher-profile';
-import { HostProfileEditor } from '@/components/teacher/HostProfileEditor';
 import type { TeacherPublic } from '@/app/api/teachers/[id]/route';
 
 type Round = {
@@ -57,6 +67,8 @@ const cloneProfile = (p: TeacherProfile): TeacherProfile => JSON.parse(JSON.stri
 /** The intro under the name is held to three lines (the user's rule): the form
  *  caps what can be typed, and .tp2-promise clamps older or fallback text. */
 const PROMISE_MAX = 120;
+/** Drag id of the "add a section" box, which moves through the list like a section. */
+const ADD_ID = '__add';
 
 /** First syllable of a Thai display name (or first two letters) for the avatar. */
 function initialOf(display: string): string {
@@ -95,11 +107,15 @@ export default function TeacherProfilePage() {
   const [draft, setDraft] = useState<TeacherProfile | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  // Editor panel: which group is open, which spot on the page is lit, and on
-  // narrow screens whether the panel or the page preview is showing.
-  const [open, setOpen] = useState<string | null>(null);
-  const [spot, setSpot] = useState<string | null>(null);
-  const [mobileView, setMobileView] = useState<'edit' | 'preview'>('edit');
+  // Section reordering by drag: a section only becomes draggable while its
+  // handle is held, so selecting text inside its inputs still works.
+  const [armed, setArmed] = useState<string | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropAt, setDropAt] = useState<number | null>(null);
+  // The "add a section" box sits in the list too and can be dragged like a
+  // section; new sections go in where it sits. It is anchored to the section
+  // just above it (null = top of the list, undefined = bottom).
+  const [addAfter, setAddAfter] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {
     track(
@@ -137,24 +153,6 @@ export default function TeacherProfilePage() {
   }, [rounds]);
   const onDay = useMemo(() => (day ? rounds.filter((r) => r.date === day) : []), [rounds, day]);
 
-  // The spot a focused editor field fills in: highlight it and bring it into
-  // view. A section's own spot stands in when a finer one is not on the page.
-  const sectionCount = draft?.sections.length ?? 0;
-  useEffect(() => {
-    document.querySelectorAll('.tp2-ek-on').forEach((el) => el.classList.remove('tp2-ek-on'));
-    if (!spot) return;
-    const find = (k: string) => document.querySelector(`[data-ek="${CSS.escape(k)}"]`);
-    const el = find(spot) || (spot.startsWith('sec:') ? find(spot.split(':').slice(0, 2).join(':')) : null);
-    if (!el) return;
-    el.classList.add('tp2-ek-on');
-    // Scroll the window only: scrollIntoView would also scroll the editor
-    // panel, and the two smooth scrolls cancel each other out.
-    const r = el.getBoundingClientRect();
-    if (r.top < 80 || r.bottom > window.innerHeight - 40) {
-      window.scrollTo({ top: Math.max(0, window.scrollY + r.top - Math.max(100, (window.innerHeight - r.height) / 2)), behavior: 'smooth' });
-    }
-  }, [spot, sectionCount]);
-
   if (loading || !cursor) return null;
   if (!teacher) {
     return (
@@ -172,8 +170,8 @@ export default function TeacherProfilePage() {
   const crafts = teacher.crafts.slice(0, 2).map((c) => (th ? CRAFT_TH[c] || c : c)).join(' · ');
   const roleLabel = th ? `ผู้จัด${crafts ? ` — ${crafts}` : ''}` : `Host${crafts ? ` — ${crafts}` : ''}`;
 
-  const stats: { num: string; label: string; years?: boolean }[] = [];
-  if (profile.years) stats.push({ num: String(profile.years), label: th ? 'ปีที่จัดกิจกรรม' : 'years teaching', years: true });
+  const stats: { num: string; label: string }[] = [];
+  if (profile.years && !editing) stats.push({ num: String(profile.years), label: th ? 'ปีที่จัดกิจกรรม' : 'years teaching' });
   stats.push({ num: String(teacher.hosted), label: th ? 'รอบที่จัดมาแล้ว' : 'rounds hosted' });
   stats.push({ num: teacher.joined.toLocaleString(), label: th ? 'คนที่เคยมาเรียน' : 'people who joined' });
 
@@ -201,24 +199,98 @@ export default function TeacherProfilePage() {
     if (el) el.scrollBy({ left: dir * Math.max(220, el.clientWidth * 0.8), behavior: 'smooth' });
   };
 
+  // Editor helpers.
+  const patch = (p: Partial<TeacherProfile>) => setDraft((d) => ({ ...(d || EMPTY_PROFILE), ...p }));
+  // Sections: every list edit goes through updateSection by id.
+  const updateSection = (sid: string, fn: (s: ProfileSection) => ProfileSection) =>
+    setDraft((d) => {
+      const cur = d || EMPTY_PROFILE;
+      return { ...cur, sections: cur.sections.map((s) => (s.id === sid ? fn(s) : s)) };
+    });
+  /** Where the add box sits, as an index into the section list (0…length). */
+  const addIndexOf = (list: ProfileSection[]) => {
+    if (addAfter === undefined) return list.length;
+    if (addAfter === null) return 0;
+    const i = list.findIndex((x) => x.id === addAfter);
+    return i < 0 ? list.length : i + 1;
+  };
+  /** Park the add box before position `to` of the current list. */
+  const moveAddBox = (to: number) => {
+    const list = draft?.sections || [];
+    const t = Math.max(0, Math.min(list.length, to));
+    setAddAfter(t >= list.length ? undefined : t === 0 ? null : list[t - 1].id);
+  };
+  const addSection = (kind: SectionKind) => {
+    if (!draft || draft.sections.length >= MAX_SECTIONS) return;
+    const s = newSection(kind);
+    // A new list starts with one blank item, ready to type into.
+    if (s.kind === 'takeaways') s.items = [{ title: '', body: '' }];
+    if (s.kind === 'journey') s.items = [{ year: '', title: '', body: '' }];
+    const at = addIndexOf(draft.sections);
+    const list = [...draft.sections];
+    list.splice(at, 0, s);
+    setDraft({ ...draft, sections: list });
+    // The box stays just below what was added, so the next one follows it.
+    if (addAfter !== undefined) setAddAfter(s.id);
+  };
+  const removeSection = (sid: string) => {
+    const s = draft?.sections.find((x) => x.id === sid);
+    const filled = s && (s.kind === 'belief' ? !!s.text.trim() : s.items.some((t) => Object.values(t).some((v) => v.trim())));
+    if (filled && !window.confirm(th ? 'ลบส่วนนี้ทั้งส่วน?' : 'Remove this whole section?')) return;
+    if (addAfter === sid && draft) {
+      const i = draft.sections.findIndex((x) => x.id === sid);
+      setAddAfter(i > 0 ? draft.sections[i - 1].id : null);
+    }
+    setDraft((d) => (d ? { ...d, sections: d.sections.filter((x) => x.id !== sid) } : d));
+  };
+  /** Move the section `sid` so it lands before position `to` (0…length). */
+  const moveSection = (sid: string, to: number) =>
+    setDraft((d) => {
+      if (!d) return d;
+      const from = d.sections.findIndex((x) => x.id === sid);
+      if (from < 0) return d;
+      const list = [...d.sections];
+      const [it] = list.splice(from, 1);
+      list.splice(to > from ? to - 1 : to, 0, it);
+      return { ...d, sections: list };
+    });
+  const patchTake = (sid: string, i: number, p: Partial<Takeaway>) =>
+    updateSection(sid, (s) => (s.kind === 'takeaways' ? { ...s, items: s.items.map((t, j) => (j === i ? { ...t, ...p } : t)) } : s));
+  const removeTake = (sid: string, i: number) =>
+    updateSection(sid, (s) => (s.kind === 'takeaways' ? { ...s, items: s.items.filter((_, j) => j !== i) } : s));
+  const addTake = (sid: string) =>
+    updateSection(sid, (s) => (s.kind === 'takeaways' && s.items.length < MAX_TAKEAWAYS ? { ...s, items: [...s.items, { title: '', body: '' }] } : s));
+  const patchStep = (sid: string, i: number, p: Partial<JourneyStep>) =>
+    updateSection(sid, (s) => (s.kind === 'journey' ? { ...s, items: s.items.map((t, j) => (j === i ? { ...t, ...p } : t)) } : s));
+  const removeStep = (sid: string, i: number) =>
+    updateSection(sid, (s) => (s.kind === 'journey' ? { ...s, items: s.items.filter((_, j) => j !== i) } : s));
+  const addStep = (sid: string) =>
+    updateSection(sid, (s) => (s.kind === 'journey' && s.items.length < MAX_JOURNEY ? { ...s, items: [...s.items, { year: '', title: '', body: '' }] } : s));
+  const patchHead = (sid: string, p: { eyebrow?: string; title?: string }) =>
+    updateSection(sid, (s) => (s.kind === 'belief' ? s : { ...s, ...p }));
+  const patchSocial = (i: number, p: Partial<SocialLink>) =>
+    setDraft((d) => {
+      const cur = d || EMPTY_PROFILE;
+      return { ...cur, socials: cur.socials.map((t, j) => (j === i ? { ...t, ...p } : t)) };
+    });
+  const removeSocial = (i: number) =>
+    setDraft((d) => {
+      const cur = d || EMPTY_PROFILE;
+      return { ...cur, socials: cur.socials.filter((_, j) => j !== i) };
+    });
+  const addSocial = () =>
+    setDraft((d) => {
+      const cur = d || EMPTY_PROFILE;
+      const unused = SOCIAL_KINDS.find((k) => !cur.socials.some((s) => s.kind === k)) || 'website';
+      return cur.socials.length >= MAX_SOCIALS ? cur : { ...cur, socials: [...cur.socials, { kind: unused, url: '' }] };
+    });
   const startEdit = () => {
     setSaveError(null);
-    setOpen('hero');
-    setSpot(null);
-    setMobileView('edit');
     setDraft(cloneProfile(teacher.profile));
   };
   const cancelEdit = () => {
     setDraft(null);
     setSaveError(null);
-    setSpot(null);
-  };
-  /** Tapping a part of the preview opens its group in the panel. */
-  const editHere = (group: string, key: string) => {
-    if (!editing) return;
-    setOpen(group);
-    setSpot(key);
-    setMobileView('edit');
   };
   const save = async () => {
     if (!draft) return;
@@ -234,7 +306,6 @@ export default function TeacherProfilePage() {
       if (!r.ok || !d.profile) throw new Error(d.error || tr(lang, 'บันทึกไม่สำเร็จ', 'Could not save'));
       setTeacher({ ...teacher, profile: d.profile });
       setDraft(null);
-      setSpot(null);
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -259,57 +330,156 @@ export default function TeacherProfilePage() {
       : { eyebrow: 'What you take home', title: 'Come expecting technique. Leave with yourself.' },
     journey: th ? { eyebrow: `เส้นทางของ${display}`, title: 'เส้นทางที่ค่อย ๆ เดินมา' } : { eyebrow: `${display} — the path`, title: 'The road so far' },
   };
-  // Placeholder text the preview shows for parts not filled in yet.
-  const ph = (t: string) => <span className="tp2-ph">{t}</span>;
+  const KIND_LABEL: Record<SectionKind, string> = th
+    ? { takeaways: 'สิ่งที่คุณจะได้กลับไป', journey: 'เส้นทาง (ไทม์ไลน์)', belief: 'คำพูด (แถบสีเข้ม)' }
+    : { takeaways: 'What you take home', journey: 'Path (timeline)', belief: 'Quote (dark band)' };
+  const KIND_HINT: Record<SectionKind, string> = th
+    ? { takeaways: 'รายการข้อ 01 02 03 บอกว่าผู้เข้าร่วมจะได้อะไร', journey: 'ไทม์ไลน์ตามปี เล่าเส้นทางที่ผ่านมา', belief: 'ประโยคเดียวบนแถบสีเข้ม เต็มความกว้างหน้า' }
+    : { takeaways: 'Numbered points on what people leave with', journey: 'A timeline by year of your path so far', belief: 'One line on a full-width dark band' };
 
+  /** Move / delete controls on top of a section while editing. */
+  const sectionTools = (s: ProfileSection, i: number, dark = false) => (
+    <div className={`tp2-sectools ${dark ? 'dark' : ''}`}>
+      <span
+        className="tp2-grip"
+        onPointerDown={() => setArmed(s.id)}
+        onPointerUp={() => setArmed(null)}
+        title={th ? 'กดค้างแล้วลากเพื่อย้าย' : 'Hold and drag to move'}
+        aria-hidden="true"
+      >
+        ⠿
+      </span>
+      <span className="tp2-sectools-kind">{KIND_LABEL[s.kind]}</span>
+      <span style={{ flex: 1 }} />
+      <button type="button" className="tp2-secbtn" disabled={i === 0} onClick={() => moveSection(s.id, i - 1)} aria-label={th ? 'ย้ายขึ้น' : 'Move up'}>↑</button>
+      <button type="button" className="tp2-secbtn" disabled={i === profile.sections.length - 1} onClick={() => moveSection(s.id, i + 2)} aria-label={th ? 'ย้ายลง' : 'Move down'}>↓</button>
+      <button type="button" className="tp2-secbtn tp2-secbtn-del" onClick={() => removeSection(s.id)}>✕ {th ? 'ลบส่วนนี้' : 'Remove section'}</button>
+    </div>
+  );
+
+  /** Eyebrow + heading: inputs while editing (blank keeps the default wording). */
   const sectionHead = (s: Extract<ProfileSection, { kind: 'takeaways' | 'journey' }>) => {
     const def = DEFAULT_HEAD[s.kind];
+    if (!editing) {
+      return (
+        <>
+          <span className="tm-eyebrow">{sectionNo[s.id]} — {s.eyebrow || def.eyebrow}</span>
+          <h2 className="tp2-h2" style={{ maxWidth: 620 }}>{s.title || def.title}</h2>
+        </>
+      );
+    }
     return (
-      <>
-        <span className="tm-eyebrow" data-ek={`sec:${s.id}:eyebrow`}>{sectionNo[s.id]} — {s.eyebrow || def.eyebrow}</span>
-        <h2 className="tp2-h2" style={{ maxWidth: 620 }} data-ek={`sec:${s.id}:title`}>{s.title || def.title}</h2>
-      </>
+      <div className="tp2-headedit">
+        <label className="tp2-field">
+          <span className="tp2-field-label">{th ? `หัวข้อเล็ก (หน้าเว็บจะใส่ ${sectionNo[s.id]} — ให้เอง)` : `Small heading (shown after ${sectionNo[s.id]} —)`}</span>
+          <input className="tp2-input" maxLength={LIMITS.eyebrow} value={s.eyebrow} placeholder={def.eyebrow} onChange={(e) => patchHead(s.id, { eyebrow: e.target.value })} />
+        </label>
+        <label className="tp2-field">
+          <span className="tp2-field-label">{th ? 'หัวข้อใหญ่ (เว้นว่างเพื่อใช้ข้อความตัวอย่าง)' : 'Main heading (blank uses the sample wording)'}</span>
+          <input className="tp2-input tp2-input-title" maxLength={LIMITS.title} value={s.title} placeholder={def.title} onChange={(e) => patchHead(s.id, { title: e.target.value })} />
+        </label>
+      </div>
     );
   };
 
   const renderTakeaways = (s: Extract<ProfileSection, { kind: 'takeaways' }>) => (
     <div className="tp2-takes">
       {s.items.map((k, i) => (
-        <div key={i} className="tp2-take" data-ek={`sec:${s.id}:item:${i}`}>
+        <div key={i} className="tp2-take">
           <span className="tp2-take-no">{pad2(i + 1)}</span>
-          <span className="tp2-take-title">{k.title || (editing && ph(th ? 'หัวข้อยังว่าง' : 'No title yet'))}</span>
-          <span className="tp2-take-body">{k.body || (editing && ph(th ? 'รายละเอียดยังว่าง' : 'No detail yet'))}</span>
+          {editing ? (
+            <>
+              <label className="tp2-field">
+                <span className="tp2-field-label">{th ? 'หัวข้อ' : 'Title'}</span>
+                <input className="tp2-input tp2-input-title" maxLength={LIMITS.title} value={k.title} placeholder={th ? 'เช่น มือที่ช้าลง' : 'e.g. A slower hand'} onChange={(e) => patchTake(s.id, i, { title: e.target.value })} />
+              </label>
+              <label className="tp2-field">
+                <span className="tp2-field-label">{th ? 'รายละเอียด' : 'Detail'}</span>
+                <textarea className="tp2-input" rows={3} maxLength={LIMITS.body} value={k.body} placeholder={th ? 'อธิบายสั้น ๆ ว่าผู้เข้าร่วมจะได้อะไร' : 'A sentence or two on what they leave with'} onChange={(e) => patchTake(s.id, i, { body: e.target.value })} />
+              </label>
+              <button type="button" className="tp2-remove" onClick={() => removeTake(s.id, i)} aria-label={th ? 'ลบข้อนี้' : 'Remove this item'}>
+                ✕ {th ? 'ลบข้อนี้' : 'Remove'}
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="tp2-take-title">{k.title}</span>
+              <span className="tp2-take-body">{k.body}</span>
+            </>
+          )}
         </div>
       ))}
-      {editing && s.items.length === 0 && <div className="tp2-empty-hint">{th ? 'ยังไม่มีข้อ — ส่วนนี้จะไม่แสดงจนกว่าจะเพิ่มข้อ' : 'No items — hidden until you add one'}</div>}
+      {editing && s.items.length === 0 && (
+        <div className="tp2-empty-hint">{th ? 'ยังไม่มีข้อ — กด "เพิ่มข้อ" เพื่อเริ่ม (ถ้าไม่มีเลย ส่วนนี้จะไม่แสดง)' : 'No items yet — add one below (with none, this section stays hidden)'}</div>
+      )}
+      {editing && s.items.length < MAX_TAKEAWAYS && (
+        <button type="button" className="tp2-add" onClick={() => addTake(s.id)}>
+          + {th ? `เพิ่มข้อ (${s.items.length}/${MAX_TAKEAWAYS})` : `Add item (${s.items.length}/${MAX_TAKEAWAYS})`}
+        </button>
+      )}
     </div>
   );
 
-  const renderJourney = (s: Extract<ProfileSection, { kind: 'journey' }>) => {
-    // Sorted by year for display; each step keeps its index for the editor spot.
-    const steps = sortedJourney(s.items.map((k, j) => ({ ...k, j }))) as (JourneyStep & { j: number })[];
-    return (
-      <ol className="tp2-journey">
-        {steps.map((k) => (
-          <li key={k.j} className="tp2-jstep" data-ek={`sec:${s.id}:item:${k.j}`}>
+  const renderJourney = (s: Extract<ProfileSection, { kind: 'journey' }>) =>
+    editing ? (
+      <div className="tp2-journey">
+        {s.items.map((k, i) => (
+          <div key={i} className="tp2-jstep">
             <span className="tp2-jdot" aria-hidden="true" />
-            {k.year ? <div className="tp2-jyear">{k.year}</div> : editing && <div className="tp2-jyear">{ph(th ? 'ปี' : 'Year')}</div>}
-            {k.title ? <div className="tp2-jtitle">{k.title}</div> : editing && <div className="tp2-jtitle">{ph(th ? 'หัวข้อยังว่าง' : 'No title yet')}</div>}
+            <div className="tp2-jedit">
+              <label className="tp2-field" style={{ maxWidth: 160 }}>
+                <span className="tp2-field-label">{th ? 'ปี' : 'Year'}</span>
+                <input className="tp2-input" maxLength={LIMITS.year} value={k.year} placeholder={th ? 'เช่น 2017' : 'e.g. 2017'} onChange={(e) => patchStep(s.id, i, { year: e.target.value })} />
+              </label>
+              <label className="tp2-field">
+                <span className="tp2-field-label">{th ? 'หัวข้อ' : 'Title'}</span>
+                <input className="tp2-input tp2-input-title" maxLength={LIMITS.title} value={k.title} placeholder={th ? 'เช่น เริ่มจัดกิจกรรมครั้งแรก' : 'e.g. First class taught'} onChange={(e) => patchStep(s.id, i, { title: e.target.value })} />
+              </label>
+              <label className="tp2-field">
+                <span className="tp2-field-label">{th ? 'เล่าสั้น ๆ' : 'Story'}</span>
+                <textarea className="tp2-input" rows={3} maxLength={LIMITS.journeyBody} value={k.body} onChange={(e) => patchStep(s.id, i, { body: e.target.value })} />
+              </label>
+              <button type="button" className="tp2-remove" style={{ gridColumn: 'auto' }} onClick={() => removeStep(s.id, i)}>✕ {th ? 'ลบปีนี้' : 'Remove'}</button>
+            </div>
+          </div>
+        ))}
+        {s.items.length === 0 && (
+          <div className="tp2-empty-hint">{th ? 'ยังไม่มีเส้นทาง — เพิ่มทีละปี (ถ้าไม่มีเลย ส่วนนี้จะไม่แสดง) หน้าเว็บจะเรียงตามปีให้เอง' : 'No steps yet — add one per year (none hides this section); the page sorts them by year'}</div>
+        )}
+        {s.items.length < MAX_JOURNEY && (
+          <button type="button" className="tp2-add" onClick={() => addStep(s.id)}>
+            + {th ? `เพิ่มปี (${s.items.length}/${MAX_JOURNEY})` : `Add a year (${s.items.length}/${MAX_JOURNEY})`}
+          </button>
+        )}
+      </div>
+    ) : (
+      <ol className="tp2-journey">
+        {sortedJourney(s.items).map((k, i) => (
+          <li key={i} className="tp2-jstep">
+            <span className="tp2-jdot" aria-hidden="true" />
+            {k.year && <div className="tp2-jyear">{k.year}</div>}
+            {k.title && <div className="tp2-jtitle">{k.title}</div>}
             {k.body && <p className="tp2-jbody">{k.body}</p>}
           </li>
         ))}
-        {editing && s.items.length === 0 && <li className="tp2-empty-hint">{th ? 'ยังไม่มีปี — ส่วนนี้จะไม่แสดงจนกว่าจะเพิ่ม' : 'No steps — hidden until you add one'}</li>}
       </ol>
     );
-  };
 
-  const renderSection = (s: ProfileSection) => {
+  const renderSection = (s: ProfileSection, i: number) => {
     if (s.kind === 'belief') {
       return (
         <section className="tp2-band">
           <span aria-hidden="true" className="tm-cta-star" style={{ left: -30, bottom: -40, fontSize: 190 }}>✺</span>
           <div className="tp2-wrap" style={{ position: 'relative' }}>
-            <p className="tp2-belief" data-ek={`sec:${s.id}:text`}>{s.text ? `“${s.text}”` : ph(th ? '“คำพูดของคุณจะอยู่ตรงนี้”' : '“Your words go here”')}</p>
+            {editing && sectionTools(s, i, true)}
+            {editing ? (
+              <label className="tp2-field">
+                <span className="tp2-field-label" style={{ color: 'rgba(255,255,255,.7)' }}>{th ? 'ความเชื่อของคุณ (ประโยคเดียว จะแสดงเป็นคำพูดบนแถบนี้ เว้นว่างเพื่อซ่อน)' : 'Your belief — one line, shown as a quote on this band; blank hides it'}</span>
+                <textarea className="tp2-input tp2-input-belief" rows={3} maxLength={LIMITS.belief} value={s.text} placeholder={th ? 'เช่น คนที่บอกว่าตัวเองวาดไม่เป็น มักมองเห็นอะไรได้ละเอียดที่สุดในห้อง' : 'e.g. The people who say they can’t draw usually see the most in the room.'} onChange={(e) => updateSection(s.id, (x) => (x.kind === 'belief' ? { ...x, text: e.target.value } : x))} />
+              </label>
+            ) : (
+              <p className="tp2-belief">“{s.text}”</p>
+            )}
             <div className="tm-meta tp2-sign">— {display} · {th ? 'ผู้จัด' : 'host'}</div>
           </div>
         </section>
@@ -318,6 +488,7 @@ export default function TeacherProfilePage() {
     return (
       <section className="tp2-section">
         <div className="tp2-wrap">
+          {editing && sectionTools(s, i)}
           {sectionHead(s)}
           {s.kind === 'takeaways' ? renderTakeaways(s) : renderJourney(s)}
         </div>
@@ -326,27 +497,7 @@ export default function TeacherProfilePage() {
   };
 
   return (
-    <div className="tm tp2" data-lang={lang} data-editing={editing ? '1' : undefined} data-mview={editing ? mobileView : undefined}>
-      {editing && draft && (
-        <HostProfileEditor
-          draft={draft}
-          setDraft={setDraft}
-          th={th}
-          bioFallback={teacher.bio || ''}
-          promiseMax={PROMISE_MAX}
-          heads={DEFAULT_HEAD}
-          sectionNo={sectionNo}
-          open={open}
-          setOpen={setOpen}
-          onSpot={setSpot}
-          saving={saving}
-          saveError={saveError}
-          onSave={save}
-          onCancel={cancelEdit}
-          mobileView={mobileView}
-          setMobileView={setMobileView}
-        />
-      )}
+    <div className="tm tp2" data-lang={lang} data-editing={editing ? '1' : undefined}>
       {/* Hero */}
       <section className="tp2-hero">
         <svg aria-hidden="true" width="230" height="96" viewBox="0 0 230 96" className="tm-hero-doodle" style={{ right: -16, top: 56 }}>
@@ -373,10 +524,23 @@ export default function TeacherProfilePage() {
               <span className="tm-eyebrow">{roleLabel}</span>
               <h1 className="tp2-name">{display}</h1>
               {teacher.nickname && teacher.name !== teacher.nickname && <div className="tp2-realname">{teacher.name}</div>}
-              {promise ? (
-                <p className="tp2-promise tp2-editable" data-ek="promise" onClick={() => editHere('hero', 'promise')}>{promise}</p>
+              {editing ? (
+                <label className="tp2-field" style={{ marginTop: 22 }}>
+                  <span className="tp2-field-label">{th ? 'ประโยคแนะนำตัว (ใต้ชื่อ)' : 'Promise line (under the name)'}</span>
+                  <textarea
+                    className="tp2-input tp2-input-promise"
+                    rows={3}
+                    maxLength={PROMISE_MAX}
+                    value={profile.promise}
+                    placeholder={teacher.bio || (th ? 'เช่น ผมไม่ได้สอนให้วาดสวย ผมสอนให้มองนานพอ…' : 'e.g. I don’t teach pretty drawings…')}
+                    onChange={(e) => patch({ promise: e.target.value.replace(/\n{2,}/g, '\n') })}
+                  />
+                  <span className="tp2-field-hint">
+                    {th ? `แสดงได้ไม่เกิน 3 บรรทัด · ${profile.promise.length}/${PROMISE_MAX} ตัวอักษร · เว้นว่างได้ จะใช้ bio จากโปรไฟล์แทน` : `Shows at most 3 lines · ${profile.promise.length}/${PROMISE_MAX} · leave empty to fall back to your bio`}
+                  </span>
+                </label>
               ) : (
-                editing && <p className="tp2-promise tp2-editable" data-ek="promise" onClick={() => editHere('hero', 'promise')}>{ph(th ? 'คำแนะนำตัวของคุณจะอยู่ตรงนี้' : 'Your intro goes here')}</p>
+                promise && <p className="tp2-promise">{promise}</p>
               )}
             </div>
             <span className="tm-avatar tp2-avatar">
@@ -390,14 +554,22 @@ export default function TeacherProfilePage() {
           </div>
 
           <div className="tp2-stats">
-            {editing && !profile.years && (
-              <span className="tp2-stat tp2-editable" data-ek="years" onClick={() => editHere('hero', 'years')}>
-                <span className="tp2-stat-n">{ph('—')}</span>
-                <span className="tm-meta">{th ? 'ปีที่จัดกิจกรรม (ซ่อนอยู่)' : 'years teaching (hidden)'}</span>
-              </span>
+            {editing && (
+              <label className="tp2-stat tp2-field">
+                <input
+                  className="tp2-input tp2-input-years"
+                  type="number"
+                  min={0}
+                  max={LIMITS.years}
+                  value={profile.years ?? ''}
+                  placeholder="0"
+                  onChange={(e) => patch({ years: e.target.value === '' ? null : Number(e.target.value) })}
+                />
+                <span className="tm-meta">{th ? 'ปีที่จัดกิจกรรม (เว้นว่างเพื่อซ่อน)' : 'years teaching (blank hides it)'}</span>
+              </label>
             )}
             {stats.map((s) => (
-              <span key={s.label} className="tp2-stat" data-ek={s.years ? 'years' : undefined}>
+              <span key={s.label} className="tp2-stat">
                 <span className="tp2-stat-n">{s.num}</span>
                 <span className="tm-meta">{s.label}</span>
               </span>
@@ -410,13 +582,124 @@ export default function TeacherProfilePage() {
         </div>
       </section>
 
-      {/* The host's own sections, in the order they arranged them. While
-          editing, a click on one opens it in the editor panel. */}
-      {profile.sections.map((s) => (
-        <div key={s.id} className={`tp2-sec ${editing ? 'tp2-editable' : ''}`} data-ek={`sec:${s.id}`} onClick={() => editHere(s.id, `sec:${s.id}`)}>
-          {renderSection(s)}
+      {/* Editor bar — pinned to the bottom of the screen while editing, so
+          save is always one reach away wherever the teacher has scrolled */}
+      {editing && (
+        <div className="tp2-editbar">
+          <div className="tp2-wrap tp2-editbar-row">
+            <span className="tp2-editbar-text">
+              {th ? 'กำลังแก้ไข — ข้อความในกล่องแก้ได้ทุกช่อง เว้นว่างเพื่อไม่แสดง' : 'Editing — every box can be changed; leave one empty to hide it'}
+            </span>
+            {saveError && <span className="tp2-editbar-err">{saveError}</span>}
+            <span style={{ flex: 1 }} />
+            <button type="button" className="btn btn-paper btn-sm" onClick={cancelEdit} disabled={saving}>{th ? 'ยกเลิก' : 'Cancel'}</button>
+            <button type="button" className="btn btn-teal btn-sm" onClick={save} disabled={saving}>{saving ? (th ? 'กำลังบันทึก…' : 'Saving…') : th ? 'บันทึก' : 'Save'}</button>
+          </div>
         </div>
-      ))}
+      )}
+
+      {/* The host's own sections, in the order they arranged them. While
+          editing, the add box rides in the same list and can be dragged too. */}
+      {(() => {
+        const addAt = addIndexOf(profile.sections);
+        const full = profile.sections.length >= MAX_SECTIONS;
+        const items: { key: string; i: number; box: boolean }[] = profile.sections.map((s, i) => ({ key: s.id, i, box: false }));
+        if (editing) items.splice(addAt, 0, { key: ADD_ID, i: addAt, box: true });
+        const dragProps = (key: string, i: number) => ({
+          draggable: editing && armed === key,
+          onDragStart: (e: DragEvent) => {
+            setDragId(key);
+            e.dataTransfer.effectAllowed = 'move';
+          },
+          onDragOver: (e: DragEvent) => {
+            if (!dragId) return;
+            e.preventDefault();
+            const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+            setDropAt(e.clientY < r.top + r.height / 2 ? i : i + 1);
+          },
+          onDrop: (e: DragEvent) => {
+            e.preventDefault();
+            if (dragId === ADD_ID && dropAt !== null) moveAddBox(dropAt);
+            else if (dragId && dropAt !== null) moveSection(dragId, dropAt);
+          },
+          onDragEnd: () => {
+            setDragId(null);
+            setDropAt(null);
+            setArmed(null);
+          },
+        });
+        return items.map(({ key, i, box }) => {
+          if (box) {
+            return (
+              <div key={key} className={`tp2-sec ${dragId === ADD_ID ? 'dragging' : ''}`} {...dragProps(ADD_ID, i)} onDragOver={undefined} onDrop={undefined}>
+                <section className="tp2-section">
+                  <div className="tp2-wrap">
+                    <div className="tp2-addsec">
+                      <div className="tp2-addsec-head">
+                        <span
+                          className="tp2-grip"
+                          onPointerDown={() => setArmed(ADD_ID)}
+                          onPointerUp={() => setArmed(null)}
+                          title={th ? 'กดค้างแล้วลากเพื่อย้ายกล่องนี้' : 'Hold and drag to move this box'}
+                          aria-hidden="true"
+                        >
+                          ⠿
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div className="tp2-addsec-title">{th ? 'เพิ่มส่วนใหม่ตรงนี้' : 'Add a section here'}</div>
+                          <div className="tp2-addsec-sub">
+                            {th ? 'ส่วนที่เพิ่มจะแทรกตรงตำแหน่งกล่องนี้ — ลาก ⠿ หรือกด ↑ ↓ เพื่อย้ายกล่องไปที่อื่น' : 'New sections land where this box sits — drag ⠿ or use ↑ ↓ to move it'}
+                          </div>
+                        </div>
+                        <span className="tp2-addsec-count">{profile.sections.length}/{MAX_SECTIONS}</span>
+                        <button type="button" className="tp2-secbtn" disabled={addAt === 0} onClick={() => moveAddBox(addAt - 1)} aria-label={th ? 'ย้ายกล่องขึ้น' : 'Move box up'}>↑</button>
+                        <button type="button" className="tp2-secbtn" disabled={addAt >= profile.sections.length} onClick={() => moveAddBox(addAt + 1)} aria-label={th ? 'ย้ายกล่องลง' : 'Move box down'}>↓</button>
+                      </div>
+                      <div className="tp2-addsec-grid">
+                        {(['takeaways', 'journey', 'belief'] as SectionKind[]).map((k) => (
+                          <button key={k} type="button" className="tp2-addcard" disabled={full} onClick={() => addSection(k)}>
+                            <span className={`tp2-addcard-art art-${k}`} aria-hidden="true">
+                              {k === 'takeaways' && (
+                                <>
+                                  <i><b>01</b><em style={{ width: '70%' }} /></i>
+                                  <i><b>02</b><em style={{ width: '52%' }} /></i>
+                                  <i><b>03</b><em style={{ width: '62%' }} /></i>
+                                </>
+                              )}
+                              {k === 'journey' && (
+                                <>
+                                  <i><b /><em style={{ width: '58%' }} /></i>
+                                  <i><b /><em style={{ width: '72%' }} /></i>
+                                  <i><b /><em style={{ width: '48%' }} /></i>
+                                </>
+                              )}
+                              {k === 'belief' && <span className="tp2-addcard-quote">“ ”</span>}
+                            </span>
+                            <span className="tp2-addcard-name">{KIND_LABEL[k]}</span>
+                            <span className="tp2-addcard-desc">{KIND_HINT[k]}</span>
+                            <span className="tp2-addcard-plus">+ {th ? 'เพิ่ม' : 'Add'}</span>
+                          </button>
+                        ))}
+                      </div>
+                      {full && <div className="tp2-addsec-sub" style={{ marginTop: 12 }}>{th ? `ครบ ${MAX_SECTIONS} ส่วนแล้ว — ลบส่วนที่ไม่ใช้ก่อนเพื่อเพิ่มใหม่` : `All ${MAX_SECTIONS} sections used — remove one to add another`}</div>}
+                    </div>
+                  </div>
+                </section>
+              </div>
+            );
+          }
+          const s = profile.sections[i];
+          return (
+            <div
+              key={key}
+              className={`tp2-sec ${dragId === key ? 'dragging' : ''} ${dropAt === i && dragId && dragId !== key ? 'drop-before' : ''} ${dropAt === i + 1 && dragId && dragId !== key ? 'drop-after' : ''}`}
+              {...dragProps(key, i)}
+            >
+              {renderSection(s, i)}
+            </div>
+          );
+        });
+      })()}
 
       {/* Works rail */}
       {teacher.works.length > 0 && (
@@ -586,17 +869,39 @@ export default function TeacherProfilePage() {
             <h2 className="tp2-h2" style={{ fontSize: 'clamp(24px,3.2vw,34px)', color: '#fff', margin: '14px 0 0' }}>{th ? `ติดต่อ ${display} เพื่อสอบถามเพิ่มเติม` : `Contact ${display} to ask more`}</h2>
           </div>
         </div>
-        <div className={`tp2-wrap ${editing ? 'tp2-editable' : ''}`} style={{ position: 'relative', marginTop: 30 }} data-ek="socials" onClick={() => editHere('contact', 'socials')}>
-          <span className="tm-eyebrow" style={{ color: 'rgba(255,255,255,.7)' }}>{th ? 'ช่องทางติดต่อ' : 'Find them on'}</span>
-          <div className="tp2-socials">
-            {profile.socials.map((s, i) => (
-              <a key={i} href={s.url || undefined} target="_blank" rel="noopener noreferrer" className="tp2-social" aria-label={SOCIAL_LABEL[s.kind]} title={SOCIAL_LABEL[s.kind]}>
-                <SocialIcon kind={s.kind} size={20} />
-              </a>
-            ))}
-            {editing && profile.socials.length === 0 && <span className="tp2-ph" style={{ color: 'rgba(255,255,255,.6)' }}>{th ? 'ยังไม่มีช่องทาง — แถบนี้จะซ่อนจนกว่าจะเพิ่ม' : 'No links — this band stays hidden until you add one'}</span>}
+        {(editing || profile.socials.length > 0) && (
+          <div className="tp2-wrap" style={{ position: 'relative', marginTop: 30 }}>
+            <span className="tm-eyebrow" style={{ color: 'rgba(255,255,255,.7)' }}>{th ? 'ช่องทางติดต่อ' : 'Find them on'}</span>
+            {editing ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12, maxWidth: 640 }}>
+                {profile.socials.map((s, i) => (
+                  <div key={i} className="tp2-social-edit">
+                    <select className="tp2-input tp2-social-kind" value={s.kind} onChange={(e) => patchSocial(i, { kind: e.target.value as SocialLink['kind'] })}>
+                      {SOCIAL_KINDS.map((k) => (
+                        <option key={k} value={k}>{SOCIAL_LABEL[k]}</option>
+                      ))}
+                    </select>
+                    <input className="tp2-input tp2-social-url" maxLength={LIMITS.url} value={s.url} placeholder={s.kind === 'line' ? 'https://line.me/ti/p/…' : 'https://…'} onChange={(e) => patchSocial(i, { url: e.target.value })} />
+                    <button type="button" className="tp2-remove" style={{ color: 'var(--accent)' }} onClick={() => removeSocial(i)} aria-label={th ? 'ลบช่องทางนี้' : 'Remove this link'}>✕</button>
+                  </div>
+                ))}
+                {profile.socials.length < MAX_SOCIALS && (
+                  <button type="button" className="tp2-add" style={{ color: '#fff', borderColor: 'rgba(255,255,255,.5)' }} onClick={addSocial}>
+                    + {th ? 'เพิ่มช่องทาง' : 'Add a link'}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="tp2-socials">
+                {profile.socials.map((s, i) => (
+                  <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className="tp2-social" aria-label={SOCIAL_LABEL[s.kind]} title={SOCIAL_LABEL[s.kind]}>
+                    <SocialIcon kind={s.kind} size={20} />
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
+        )}
       </section>
       )}
     </div>
