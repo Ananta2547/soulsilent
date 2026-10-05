@@ -25,22 +25,38 @@ export type TeacherProfile = {
   years: number | null;
   /** One-line promise under the name. Falls back to the bio when empty. */
   promise: string;
-  /** "What you take home" — up to MAX_TAKEAWAYS numbered items. */
-  takeaways: Takeaway[];
-  /** The belief quoted on the dark band, in the teacher's own words. */
-  belief: string;
-  /** Their path so far, one step per year (or span), oldest first on the page. */
-  journey: JourneyStep[];
+  /** The self-written blocks between the hero and the works rail, in the order
+   *  the teacher arranged them. Each kind may appear any number of times. */
+  sections: ProfileSection[];
   /** Where people can reach them, shown as links in the contact band. */
   socials: SocialLink[];
 };
 
+/** A block the teacher adds to their page:
+ *  - takeaways — "What you take home", up to MAX_TAKEAWAYS numbered items
+ *  - journey   — their path, one step per year (or span), sorted by year on the page
+ *  - belief    — one line quoted on the dark band
+ *  An empty eyebrow or title means the page's default wording, so it still
+ *  follows the visitor's language. */
+export type ProfileSection =
+  | { id: string; kind: 'takeaways'; eyebrow: string; title: string; items: Takeaway[] }
+  | { id: string; kind: 'journey'; eyebrow: string; title: string; items: JourneyStep[] }
+  | { id: string; kind: 'belief'; text: string };
+export type SectionKind = ProfileSection['kind'];
+
+export const MAX_SECTIONS = 12;
 export const MAX_TAKEAWAYS = 5;
 export const MAX_JOURNEY = 12;
 export const MAX_SOCIALS = 7;
-export const LIMITS = { promise: 300, title: 80, body: 300, belief: 300, years: 80, year: 12, url: 300, journeyBody: 500 } as const;
+export const LIMITS = { promise: 300, eyebrow: 60, title: 80, body: 300, belief: 300, years: 80, year: 12, url: 300, journeyBody: 500 } as const;
 
-export const EMPTY_PROFILE: TeacherProfile = { years: null, promise: '', takeaways: [], belief: '', journey: [], socials: [] };
+export const EMPTY_PROFILE: TeacherProfile = { years: null, promise: '', sections: [], socials: [] };
+
+/** A fresh empty block of the given kind, with an id unique enough for one page. */
+export function newSection(kind: SectionKind): ProfileSection {
+  const id = `s${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  return kind === 'belief' ? { id, kind, text: '' } : kind === 'journey' ? { id, kind, eyebrow: '', title: '', items: [] } : { id, kind, eyebrow: '', title: '', items: [] };
+}
 
 /** A link a visitor can safely open: http(s) only, "https://" added when the
  *  teacher typed a bare domain. Anything else is dropped. */
@@ -83,20 +99,57 @@ export function parseTeacherProfile(input: unknown): TeacherProfile {
   const o = raw as Record<string, unknown>;
   const yearsNum = Number(o.years);
   const years = Number.isFinite(yearsNum) && yearsNum > 0 ? Math.min(Math.round(yearsNum), LIMITS.years) : null;
-  const takeaways = (Array.isArray(o.takeaways) ? o.takeaways : [])
-    .map((t): Takeaway => {
+  const takes = (v: unknown): Takeaway[] =>
+    (Array.isArray(v) ? v : [])
+      .map((t): Takeaway => {
+        const x = (t && typeof t === 'object' ? t : {}) as Record<string, unknown>;
+        return { title: str(x.title, LIMITS.title), body: str(x.body, LIMITS.body) };
+      })
+      .filter((t) => t.title || t.body)
+      .slice(0, MAX_TAKEAWAYS);
+  const steps = (v: unknown): JourneyStep[] =>
+    (Array.isArray(v) ? v : [])
+      .map((t): JourneyStep => {
+        const x = (t && typeof t === 'object' ? t : {}) as Record<string, unknown>;
+        return { year: str(x.year, LIMITS.year), title: str(x.title, LIMITS.title), body: str(x.body, LIMITS.journeyBody) };
+      })
+      .filter((t) => t.year || t.title || t.body)
+      .slice(0, MAX_JOURNEY);
+
+  // Profiles saved before sections existed hold one of each block in fixed
+  // order (takeaways, journey, belief); read them as three sections.
+  const rawSections: unknown[] = Array.isArray(o.sections)
+    ? o.sections
+    : [
+        { kind: 'takeaways', items: o.takeaways },
+        { kind: 'journey', items: o.journey },
+        { kind: 'belief', text: o.belief },
+      ];
+  const seen = new Set<string>();
+  const sections = rawSections
+    .map((t, i): ProfileSection | null => {
       const x = (t && typeof t === 'object' ? t : {}) as Record<string, unknown>;
-      return { title: str(x.title, LIMITS.title), body: str(x.body, LIMITS.body) };
+      let id = str(x.id, 40).replace(/[^\w-]/g, '') || `s${i}`;
+      if (seen.has(id)) id = `${id}-${i}`;
+      seen.add(id);
+      if (x.kind === 'belief') {
+        const text = str(x.text, LIMITS.belief);
+        return text ? { id, kind: 'belief', text } : null;
+      }
+      const eyebrow = str(x.eyebrow, LIMITS.eyebrow);
+      const title = str(x.title, LIMITS.title);
+      if (x.kind === 'takeaways') {
+        const items = takes(x.items);
+        return items.length ? { id, kind: 'takeaways', eyebrow, title, items } : null;
+      }
+      if (x.kind === 'journey') {
+        const items = steps(x.items);
+        return items.length ? { id, kind: 'journey', eyebrow, title, items } : null;
+      }
+      return null;
     })
-    .filter((t) => t.title || t.body)
-    .slice(0, MAX_TAKEAWAYS);
-  const journey = (Array.isArray(o.journey) ? o.journey : [])
-    .map((t): JourneyStep => {
-      const x = (t && typeof t === 'object' ? t : {}) as Record<string, unknown>;
-      return { year: str(x.year, LIMITS.year), title: str(x.title, LIMITS.title), body: str(x.body, LIMITS.journeyBody) };
-    })
-    .filter((t) => t.year || t.title || t.body)
-    .slice(0, MAX_JOURNEY);
+    .filter((t): t is ProfileSection => !!t)
+    .slice(0, MAX_SECTIONS);
   const socials = (Array.isArray(o.socials) ? o.socials : [])
     .map((t): SocialLink | null => {
       const x = (t && typeof t === 'object' ? t : {}) as Record<string, unknown>;
@@ -106,9 +159,9 @@ export function parseTeacherProfile(input: unknown): TeacherProfile {
     })
     .filter((t): t is SocialLink => !!t)
     .slice(0, MAX_SOCIALS);
-  return { years, promise: str(o.promise, LIMITS.promise), takeaways, belief: str(o.belief, LIMITS.belief), journey, socials };
+  return { years, promise: str(o.promise, LIMITS.promise), sections, socials };
 }
 
 export function isEmptyProfile(p: TeacherProfile): boolean {
-  return p.years == null && !p.promise && p.takeaways.length === 0 && !p.belief && p.journey.length === 0 && p.socials.length === 0;
+  return p.years == null && !p.promise && p.sections.length === 0 && p.socials.length === 0;
 }

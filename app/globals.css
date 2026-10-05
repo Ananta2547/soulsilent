@@ -3957,6 +3957,30 @@ body {
 .tp2-add { align-self: flex-start; margin-top: 18px; border: 1.5px dashed var(--teal); background: transparent; color: var(--teal-deep); font-family: inherit; font-size: 14px; padding: 10px 18px; border-radius: 999px; cursor: pointer; transition: background .18s ease; }
 .tp2-add:hover { background: var(--teal-50); }
 .tp2-empty-hint { padding: 20px 0; border-top: 1px solid rgba(13,30,29,.08); font-size: 14px; color: var(--muted); }
+.tp2-add:disabled { opacity: .45; cursor: default; }
+/* Section builder (editing only): a toolbar on each section to drag, move or remove it. */
+.tp2-sec { position: relative; transition: opacity .18s ease; }
+.tp2-sec.dragging { opacity: .4; }
+.tp2-sec.drop-before::before, .tp2-sec.drop-after::after { content: ''; position: absolute; left: 0; right: 0; height: 4px; background: var(--accent); z-index: 5; border-radius: 2px; }
+.tp2-sec.drop-before::before { top: -2px; }
+.tp2-sec.drop-after::after { bottom: -2px; }
+.tp2-sectools { display: flex; align-items: center; gap: 8px; margin-bottom: 22px; padding: 8px 10px; border: 1.5px dashed rgba(13,30,29,.18); border-radius: 14px; background: var(--paper); }
+.tp2-sectools.dark { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.25); color: #fff; }
+.tp2-grip { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; font-size: 20px; line-height: 1; cursor: grab; user-select: none; touch-action: none; color: var(--teal-deep); background: var(--teal-50); }
+.tp2-sectools.dark .tp2-grip { color: #fff; background: rgba(255,255,255,.12); }
+.tp2-grip:active { cursor: grabbing; }
+.tp2-sectools-kind { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--teal-deep); }
+.tp2-sectools.dark .tp2-sectools-kind { color: rgba(255,255,255,.75); }
+.tp2-secbtn { border: 1px solid rgba(13,30,29,.15); background: transparent; color: inherit; font-family: inherit; font-size: 13px; min-width: 34px; height: 34px; padding: 0 10px; border-radius: 10px; cursor: pointer; }
+.tp2-sectools.dark .tp2-secbtn { border-color: rgba(255,255,255,.25); }
+.tp2-secbtn:disabled { opacity: .35; cursor: default; }
+.tp2-secbtn-del { color: #a13030; }
+.tp2-sectools.dark .tp2-secbtn-del { color: #ffb4a8; }
+.tp2-headedit { display: grid; gap: 14px; max-width: 620px; margin-bottom: 30px; }
+.tp2-addsec { display: flex; flex-direction: column; gap: 4px; padding: 22px; border: 1.5px dashed var(--teal); border-radius: 18px; background: var(--teal-50); }
+.tp2-addsec-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.tp2-addsec-row .tp2-add { margin-top: 10px; background: var(--paper); }
+@media (max-width: 560px) { .tp2-sectools-kind { display: none; } .tp2-secbtn-del { padding: 0 8px; } }
 
 @media (max-width: 760px) {
   .tp2-wrap { padding: 0 20px; }

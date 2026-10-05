@@ -22,14 +22,19 @@ import {
   EMPTY_PROFILE,
   LIMITS,
   MAX_JOURNEY,
+  MAX_SECTIONS,
   MAX_SOCIALS,
   MAX_TAKEAWAYS,
   SOCIAL_KINDS,
   SOCIAL_LABEL,
+  newSection,
   parseTeacherProfile,
   sortedJourney,
   type JourneyStep,
+  type ProfileSection,
+  type SectionKind,
   type SocialLink,
+  type Takeaway,
   type TeacherProfile,
 } from '@/lib/teacher-profile';
 import type { TeacherPublic } from '@/app/api/teachers/[id]/route';
@@ -57,6 +62,8 @@ const PH_CLASS = ['ph-teal', 'ph-cream', 'ph-teal-100', 'ph-accent'];
 const CRAFT_TH: Record<string, string> = { art: 'ศิลปะ', craft: 'งานฝีมือ', cooking: 'ทำอาหาร', music: 'ดนตรี', wellness: 'สุขภาพ', nature: 'ธรรมชาติ', kids: 'เด็ก', other: 'อื่น ๆ' };
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
+/** A deep copy for the editor, so typing never touches the saved profile. */
+const cloneProfile = (p: TeacherProfile): TeacherProfile => JSON.parse(JSON.stringify(p));
 /** The intro under the name is held to three lines (the user's rule): the form
  *  caps what can be typed, and .tp2-promise clamps older or fallback text. */
 const PROMISE_MAX = 120;
@@ -98,6 +105,11 @@ export default function TeacherProfilePage() {
   const [draft, setDraft] = useState<TeacherProfile | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Section reordering by drag: a section only becomes draggable while its
+  // handle is held, so selecting text inside its inputs still works.
+  const [armed, setArmed] = useState<string | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropAt, setDropAt] = useState<number | null>(null);
 
   useEffect(() => {
     track(
@@ -112,8 +124,7 @@ export default function TeacherProfilePage() {
             // ?edit=1 and opens straight into the editor.
             if (d.can_edit && new URLSearchParams(window.location.search).get('edit') === '1') {
               setFromDash(true);
-              const p = d.teacher.profile;
-              setDraft({ ...p, takeaways: p.takeaways.map((t) => ({ ...t })), journey: p.journey.map((t) => ({ ...t })), socials: p.socials.map((t) => ({ ...t })) });
+              setDraft(cloneProfile(d.teacher.profile));
             }
             // Open on the first day they teach, so the page never starts blank.
             const first = d.rounds?.[0]?.date || todayTH();
@@ -184,37 +195,53 @@ export default function TeacherProfilePage() {
 
   // Editor helpers.
   const patch = (p: Partial<TeacherProfile>) => setDraft((d) => ({ ...(d || EMPTY_PROFILE), ...p }));
-  const patchTake = (i: number, p: Partial<{ title: string; body: string }>) =>
+  // Sections: every list edit goes through updateSection by id.
+  const updateSection = (sid: string, fn: (s: ProfileSection) => ProfileSection) =>
     setDraft((d) => {
       const cur = d || EMPTY_PROFILE;
-      return { ...cur, takeaways: cur.takeaways.map((t, j) => (j === i ? { ...t, ...p } : t)) };
+      return { ...cur, sections: cur.sections.map((s) => (s.id === sid ? fn(s) : s)) };
     });
-  const removeTake = (i: number) =>
+  const addSection = (kind: SectionKind) =>
     setDraft((d) => {
       const cur = d || EMPTY_PROFILE;
-      return { ...cur, takeaways: cur.takeaways.filter((_, j) => j !== i) };
+      if (cur.sections.length >= MAX_SECTIONS) return cur;
+      const s = newSection(kind);
+      // A new list starts with one blank item, ready to type into.
+      if (s.kind === 'takeaways') s.items = [{ title: '', body: '' }];
+      if (s.kind === 'journey') s.items = [{ year: '', title: '', body: '' }];
+      return { ...cur, sections: [...cur.sections, s] };
     });
-  const addTake = () =>
+  const removeSection = (sid: string) => {
+    const s = draft?.sections.find((x) => x.id === sid);
+    const filled = s && (s.kind === 'belief' ? !!s.text.trim() : s.items.some((t) => Object.values(t).some((v) => v.trim())));
+    if (filled && !window.confirm(th ? 'ลบส่วนนี้ทั้งส่วน?' : 'Remove this whole section?')) return;
+    setDraft((d) => (d ? { ...d, sections: d.sections.filter((x) => x.id !== sid) } : d));
+  };
+  /** Move the section `sid` so it lands before position `to` (0…length). */
+  const moveSection = (sid: string, to: number) =>
     setDraft((d) => {
-      const cur = d || EMPTY_PROFILE;
-      return cur.takeaways.length >= MAX_TAKEAWAYS ? cur : { ...cur, takeaways: [...cur.takeaways, { title: '', body: '' }] };
+      if (!d) return d;
+      const from = d.sections.findIndex((x) => x.id === sid);
+      if (from < 0) return d;
+      const list = [...d.sections];
+      const [it] = list.splice(from, 1);
+      list.splice(to > from ? to - 1 : to, 0, it);
+      return { ...d, sections: list };
     });
-  // Journey steps and contact links: the same edit-in-place list pattern.
-  const patchStep = (i: number, p: Partial<JourneyStep>) =>
-    setDraft((d) => {
-      const cur = d || EMPTY_PROFILE;
-      return { ...cur, journey: cur.journey.map((t, j) => (j === i ? { ...t, ...p } : t)) };
-    });
-  const removeStep = (i: number) =>
-    setDraft((d) => {
-      const cur = d || EMPTY_PROFILE;
-      return { ...cur, journey: cur.journey.filter((_, j) => j !== i) };
-    });
-  const addStep = () =>
-    setDraft((d) => {
-      const cur = d || EMPTY_PROFILE;
-      return cur.journey.length >= MAX_JOURNEY ? cur : { ...cur, journey: [...cur.journey, { year: '', title: '', body: '' }] };
-    });
+  const patchTake = (sid: string, i: number, p: Partial<Takeaway>) =>
+    updateSection(sid, (s) => (s.kind === 'takeaways' ? { ...s, items: s.items.map((t, j) => (j === i ? { ...t, ...p } : t)) } : s));
+  const removeTake = (sid: string, i: number) =>
+    updateSection(sid, (s) => (s.kind === 'takeaways' ? { ...s, items: s.items.filter((_, j) => j !== i) } : s));
+  const addTake = (sid: string) =>
+    updateSection(sid, (s) => (s.kind === 'takeaways' && s.items.length < MAX_TAKEAWAYS ? { ...s, items: [...s.items, { title: '', body: '' }] } : s));
+  const patchStep = (sid: string, i: number, p: Partial<JourneyStep>) =>
+    updateSection(sid, (s) => (s.kind === 'journey' ? { ...s, items: s.items.map((t, j) => (j === i ? { ...t, ...p } : t)) } : s));
+  const removeStep = (sid: string, i: number) =>
+    updateSection(sid, (s) => (s.kind === 'journey' ? { ...s, items: s.items.filter((_, j) => j !== i) } : s));
+  const addStep = (sid: string) =>
+    updateSection(sid, (s) => (s.kind === 'journey' && s.items.length < MAX_JOURNEY ? { ...s, items: [...s.items, { year: '', title: '', body: '' }] } : s));
+  const patchHead = (sid: string, p: { eyebrow?: string; title?: string }) =>
+    updateSection(sid, (s) => (s.kind === 'belief' ? s : { ...s, ...p }));
   const patchSocial = (i: number, p: Partial<SocialLink>) =>
     setDraft((d) => {
       const cur = d || EMPTY_PROFILE;
@@ -233,12 +260,7 @@ export default function TeacherProfilePage() {
     });
   const startEdit = () => {
     setSaveError(null);
-    setDraft({
-      ...teacher.profile,
-      takeaways: teacher.profile.takeaways.map((t) => ({ ...t })),
-      journey: teacher.profile.journey.map((t) => ({ ...t })),
-      socials: teacher.profile.socials.map((t) => ({ ...t })),
-    });
+    setDraft(cloneProfile(teacher.profile));
   };
   const cancelEdit = () => {
     setDraft(null);
@@ -265,9 +287,185 @@ export default function TeacherProfilePage() {
     }
   };
 
-  const showTake = editing || profile.takeaways.length > 0;
-  const showBelief = editing || !!profile.belief;
-  const showJourney = editing || profile.journey.length > 0;
+  // Headings are numbered down the page in the order the host arranged them;
+  // the belief band has no heading, so it takes no number.
+  const showContact = editing || profile.socials.length > 0;
+  let counter = 0;
+  const sectionNo: Record<string, string> = {};
+  profile.sections.forEach((s) => {
+    if (s.kind !== 'belief') sectionNo[s.id] = pad2(++counter);
+  });
+  const worksNo = teacher.works.length > 0 ? pad2(++counter) : '';
+  const calendarNo = pad2(++counter);
+  const contactNo = showContact ? pad2(++counter) : '';
+  const DEFAULT_HEAD: Record<'takeaways' | 'journey', { eyebrow: string; title: string }> = {
+    takeaways: th
+      ? { eyebrow: 'สิ่งที่คุณจะได้กลับไป', title: 'มาด้วยความคาดหวังว่าจะได้เทคนิค กลับไปได้ตัวเอง' }
+      : { eyebrow: 'What you take home', title: 'Come expecting technique. Leave with yourself.' },
+    journey: th ? { eyebrow: `เส้นทางของ${display}`, title: 'เส้นทางที่ค่อย ๆ เดินมา' } : { eyebrow: `${display} — the path`, title: 'The road so far' },
+  };
+  const KIND_LABEL: Record<SectionKind, string> = th
+    ? { takeaways: 'สิ่งที่คุณจะได้กลับไป', journey: 'เส้นทาง (ไทม์ไลน์)', belief: 'คำพูด (แถบสีเข้ม)' }
+    : { takeaways: 'What you take home', journey: 'Path (timeline)', belief: 'Quote (dark band)' };
+
+  /** Move / delete controls on top of a section while editing. */
+  const sectionTools = (s: ProfileSection, i: number, dark = false) => (
+    <div className={`tp2-sectools ${dark ? 'dark' : ''}`}>
+      <span
+        className="tp2-grip"
+        onPointerDown={() => setArmed(s.id)}
+        onPointerUp={() => setArmed(null)}
+        title={th ? 'กดค้างแล้วลากเพื่อย้าย' : 'Hold and drag to move'}
+        aria-hidden="true"
+      >
+        ⠿
+      </span>
+      <span className="tp2-sectools-kind">{KIND_LABEL[s.kind]}</span>
+      <span style={{ flex: 1 }} />
+      <button type="button" className="tp2-secbtn" disabled={i === 0} onClick={() => moveSection(s.id, i - 1)} aria-label={th ? 'ย้ายขึ้น' : 'Move up'}>↑</button>
+      <button type="button" className="tp2-secbtn" disabled={i === profile.sections.length - 1} onClick={() => moveSection(s.id, i + 2)} aria-label={th ? 'ย้ายลง' : 'Move down'}>↓</button>
+      <button type="button" className="tp2-secbtn tp2-secbtn-del" onClick={() => removeSection(s.id)}>✕ {th ? 'ลบส่วนนี้' : 'Remove section'}</button>
+    </div>
+  );
+
+  /** Eyebrow + heading: inputs while editing (blank keeps the default wording). */
+  const sectionHead = (s: Extract<ProfileSection, { kind: 'takeaways' | 'journey' }>) => {
+    const def = DEFAULT_HEAD[s.kind];
+    if (!editing) {
+      return (
+        <>
+          <span className="tm-eyebrow">{sectionNo[s.id]} — {s.eyebrow || def.eyebrow}</span>
+          <h2 className="tp2-h2" style={{ maxWidth: 620 }}>{s.title || def.title}</h2>
+        </>
+      );
+    }
+    return (
+      <div className="tp2-headedit">
+        <label className="tp2-field">
+          <span className="tp2-field-label">{th ? `หัวข้อเล็ก (หน้าเว็บจะใส่ ${sectionNo[s.id]} — ให้เอง)` : `Small heading (shown after ${sectionNo[s.id]} —)`}</span>
+          <input className="tp2-input" maxLength={LIMITS.eyebrow} value={s.eyebrow} placeholder={def.eyebrow} onChange={(e) => patchHead(s.id, { eyebrow: e.target.value })} />
+        </label>
+        <label className="tp2-field">
+          <span className="tp2-field-label">{th ? 'หัวข้อใหญ่ (เว้นว่างเพื่อใช้ข้อความตัวอย่าง)' : 'Main heading (blank uses the sample wording)'}</span>
+          <input className="tp2-input tp2-input-title" maxLength={LIMITS.title} value={s.title} placeholder={def.title} onChange={(e) => patchHead(s.id, { title: e.target.value })} />
+        </label>
+      </div>
+    );
+  };
+
+  const renderTakeaways = (s: Extract<ProfileSection, { kind: 'takeaways' }>) => (
+    <div className="tp2-takes">
+      {s.items.map((k, i) => (
+        <div key={i} className="tp2-take">
+          <span className="tp2-take-no">{pad2(i + 1)}</span>
+          {editing ? (
+            <>
+              <label className="tp2-field">
+                <span className="tp2-field-label">{th ? 'หัวข้อ' : 'Title'}</span>
+                <input className="tp2-input tp2-input-title" maxLength={LIMITS.title} value={k.title} placeholder={th ? 'เช่น มือที่ช้าลง' : 'e.g. A slower hand'} onChange={(e) => patchTake(s.id, i, { title: e.target.value })} />
+              </label>
+              <label className="tp2-field">
+                <span className="tp2-field-label">{th ? 'รายละเอียด' : 'Detail'}</span>
+                <textarea className="tp2-input" rows={3} maxLength={LIMITS.body} value={k.body} placeholder={th ? 'อธิบายสั้น ๆ ว่าผู้เข้าร่วมจะได้อะไร' : 'A sentence or two on what they leave with'} onChange={(e) => patchTake(s.id, i, { body: e.target.value })} />
+              </label>
+              <button type="button" className="tp2-remove" onClick={() => removeTake(s.id, i)} aria-label={th ? 'ลบข้อนี้' : 'Remove this item'}>
+                ✕ {th ? 'ลบข้อนี้' : 'Remove'}
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="tp2-take-title">{k.title}</span>
+              <span className="tp2-take-body">{k.body}</span>
+            </>
+          )}
+        </div>
+      ))}
+      {editing && s.items.length === 0 && (
+        <div className="tp2-empty-hint">{th ? 'ยังไม่มีข้อ — กด "เพิ่มข้อ" เพื่อเริ่ม (ถ้าไม่มีเลย ส่วนนี้จะไม่แสดง)' : 'No items yet — add one below (with none, this section stays hidden)'}</div>
+      )}
+      {editing && s.items.length < MAX_TAKEAWAYS && (
+        <button type="button" className="tp2-add" onClick={() => addTake(s.id)}>
+          + {th ? `เพิ่มข้อ (${s.items.length}/${MAX_TAKEAWAYS})` : `Add item (${s.items.length}/${MAX_TAKEAWAYS})`}
+        </button>
+      )}
+    </div>
+  );
+
+  const renderJourney = (s: Extract<ProfileSection, { kind: 'journey' }>) =>
+    editing ? (
+      <div className="tp2-journey">
+        {s.items.map((k, i) => (
+          <div key={i} className="tp2-jstep">
+            <span className="tp2-jdot" aria-hidden="true" />
+            <div className="tp2-jedit">
+              <label className="tp2-field" style={{ maxWidth: 160 }}>
+                <span className="tp2-field-label">{th ? 'ปี' : 'Year'}</span>
+                <input className="tp2-input" maxLength={LIMITS.year} value={k.year} placeholder={th ? 'เช่น 2017' : 'e.g. 2017'} onChange={(e) => patchStep(s.id, i, { year: e.target.value })} />
+              </label>
+              <label className="tp2-field">
+                <span className="tp2-field-label">{th ? 'หัวข้อ' : 'Title'}</span>
+                <input className="tp2-input tp2-input-title" maxLength={LIMITS.title} value={k.title} placeholder={th ? 'เช่น เริ่มจัดกิจกรรมครั้งแรก' : 'e.g. First class taught'} onChange={(e) => patchStep(s.id, i, { title: e.target.value })} />
+              </label>
+              <label className="tp2-field">
+                <span className="tp2-field-label">{th ? 'เล่าสั้น ๆ' : 'Story'}</span>
+                <textarea className="tp2-input" rows={3} maxLength={LIMITS.journeyBody} value={k.body} onChange={(e) => patchStep(s.id, i, { body: e.target.value })} />
+              </label>
+              <button type="button" className="tp2-remove" style={{ gridColumn: 'auto' }} onClick={() => removeStep(s.id, i)}>✕ {th ? 'ลบปีนี้' : 'Remove'}</button>
+            </div>
+          </div>
+        ))}
+        {s.items.length === 0 && (
+          <div className="tp2-empty-hint">{th ? 'ยังไม่มีเส้นทาง — เพิ่มทีละปี (ถ้าไม่มีเลย ส่วนนี้จะไม่แสดง) หน้าเว็บจะเรียงตามปีให้เอง' : 'No steps yet — add one per year (none hides this section); the page sorts them by year'}</div>
+        )}
+        {s.items.length < MAX_JOURNEY && (
+          <button type="button" className="tp2-add" onClick={() => addStep(s.id)}>
+            + {th ? `เพิ่มปี (${s.items.length}/${MAX_JOURNEY})` : `Add a year (${s.items.length}/${MAX_JOURNEY})`}
+          </button>
+        )}
+      </div>
+    ) : (
+      <ol className="tp2-journey">
+        {sortedJourney(s.items).map((k, i) => (
+          <li key={i} className="tp2-jstep">
+            <span className="tp2-jdot" aria-hidden="true" />
+            {k.year && <div className="tp2-jyear">{k.year}</div>}
+            {k.title && <div className="tp2-jtitle">{k.title}</div>}
+            {k.body && <p className="tp2-jbody">{k.body}</p>}
+          </li>
+        ))}
+      </ol>
+    );
+
+  const renderSection = (s: ProfileSection, i: number) => {
+    if (s.kind === 'belief') {
+      return (
+        <section className="tp2-band">
+          <span aria-hidden="true" className="tm-cta-star" style={{ left: -30, bottom: -40, fontSize: 190 }}>✺</span>
+          <div className="tp2-wrap" style={{ position: 'relative' }}>
+            {editing && sectionTools(s, i, true)}
+            {editing ? (
+              <label className="tp2-field">
+                <span className="tp2-field-label" style={{ color: 'rgba(255,255,255,.7)' }}>{th ? 'ความเชื่อของคุณ (ประโยคเดียว จะแสดงเป็นคำพูดบนแถบนี้ เว้นว่างเพื่อซ่อน)' : 'Your belief — one line, shown as a quote on this band; blank hides it'}</span>
+                <textarea className="tp2-input tp2-input-belief" rows={3} maxLength={LIMITS.belief} value={s.text} placeholder={th ? 'เช่น คนที่บอกว่าตัวเองวาดไม่เป็น มักมองเห็นอะไรได้ละเอียดที่สุดในห้อง' : 'e.g. The people who say they can’t draw usually see the most in the room.'} onChange={(e) => updateSection(s.id, (x) => (x.kind === 'belief' ? { ...x, text: e.target.value } : x))} />
+              </label>
+            ) : (
+              <p className="tp2-belief">“{s.text}”</p>
+            )}
+            <div className="tm-meta tp2-sign">— {display} · {th ? 'ผู้จัด' : 'host'}</div>
+          </div>
+        </section>
+      );
+    }
+    return (
+      <section className="tp2-section">
+        <div className="tp2-wrap">
+          {editing && sectionTools(s, i)}
+          {sectionHead(s)}
+          {s.kind === 'takeaways' ? renderTakeaways(s) : renderJourney(s)}
+        </div>
+      </section>
+    );
+  };
 
   return (
     <div className="tm tp2" data-lang={lang} data-editing={editing ? '1' : undefined}>
@@ -371,118 +569,54 @@ export default function TeacherProfilePage() {
         </div>
       )}
 
-      {/* What you take home */}
-      {showTake && (
-        <section className="tp2-section">
-          <div className="tp2-wrap">
-            <span className="tm-eyebrow">{th ? '01 — สิ่งที่คุณจะได้กลับไป' : '01 — What you take home'}</span>
-            <h2 className="tp2-h2" style={{ maxWidth: 620 }}>{th ? 'มาด้วยความคาดหวังว่าจะได้เทคนิค กลับไปได้ตัวเอง' : 'Come expecting technique. Leave with yourself.'}</h2>
-            <div className="tp2-takes">
-              {profile.takeaways.map((k, i) => (
-                <div key={i} className="tp2-take">
-                  <span className="tp2-take-no">{pad2(i + 1)}</span>
-                  {editing ? (
-                    <>
-                      <label className="tp2-field">
-                        <span className="tp2-field-label">{th ? 'หัวข้อ' : 'Title'}</span>
-                        <input className="tp2-input tp2-input-title" maxLength={LIMITS.title} value={k.title} placeholder={th ? 'เช่น มือที่ช้าลง' : 'e.g. A slower hand'} onChange={(e) => patchTake(i, { title: e.target.value })} />
-                      </label>
-                      <label className="tp2-field">
-                        <span className="tp2-field-label">{th ? 'รายละเอียด' : 'Detail'}</span>
-                        <textarea className="tp2-input" rows={3} maxLength={LIMITS.body} value={k.body} placeholder={th ? 'อธิบายสั้น ๆ ว่าผู้เข้าร่วมจะได้อะไร' : 'A sentence or two on what they leave with'} onChange={(e) => patchTake(i, { body: e.target.value })} />
-                      </label>
-                      <button type="button" className="tp2-remove" onClick={() => removeTake(i)} aria-label={th ? 'ลบข้อนี้' : 'Remove this item'}>
-                        ✕ {th ? 'ลบข้อนี้' : 'Remove'}
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="tp2-take-title">{k.title}</span>
-                      <span className="tp2-take-body">{k.body}</span>
-                    </>
-                  )}
-                </div>
-              ))}
-              {editing && profile.takeaways.length === 0 && (
-                <div className="tp2-empty-hint">{th ? 'ยังไม่มีข้อ — กด "เพิ่มข้อ" เพื่อเริ่ม (ถ้าไม่มีเลย ส่วนนี้จะไม่แสดง)' : 'No items yet — add one below (with none, this section stays hidden)'}</div>
-              )}
-              {editing && profile.takeaways.length < MAX_TAKEAWAYS && (
-                <button type="button" className="tp2-add" onClick={addTake}>
-                  + {th ? `เพิ่มข้อ (${profile.takeaways.length}/${MAX_TAKEAWAYS})` : `Add item (${profile.takeaways.length}/${MAX_TAKEAWAYS})`}
-                </button>
-              )}
-            </div>
-          </div>
-        </section>
-      )}
+      {/* The host's own sections, in the order they arranged them */}
+      {profile.sections.map((s, i) => (
+        <div
+          key={s.id}
+          className={`tp2-sec ${dragId === s.id ? 'dragging' : ''} ${dropAt === i && dragId && dragId !== s.id ? 'drop-before' : ''} ${dropAt === i + 1 && dragId && dragId !== s.id ? 'drop-after' : ''}`}
+          draggable={editing && armed === s.id}
+          onDragStart={(e) => {
+            setDragId(s.id);
+            e.dataTransfer.effectAllowed = 'move';
+          }}
+          onDragOver={(e) => {
+            if (!dragId) return;
+            e.preventDefault();
+            const r = e.currentTarget.getBoundingClientRect();
+            setDropAt(e.clientY < r.top + r.height / 2 ? i : i + 1);
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            if (dragId && dropAt !== null) moveSection(dragId, dropAt);
+          }}
+          onDragEnd={() => {
+            setDragId(null);
+            setDropAt(null);
+            setArmed(null);
+          }}
+        >
+          {renderSection(s, i)}
+        </div>
+      ))}
 
-      {/* Journey — a timeline by year */}
-      {showJourney && (
+      {/* Add a section */}
+      {editing && (
         <section className="tp2-section">
           <div className="tp2-wrap">
-            <span className="tm-eyebrow">{th ? `เส้นทางของ${display}` : `${display} — the path`}</span>
-            <h2 className="tp2-h2" style={{ maxWidth: 620 }}>{th ? 'เส้นทางที่ค่อย ๆ เดินมา' : 'The road so far'}</h2>
-            {editing ? (
-              <div className="tp2-journey">
-                {profile.journey.map((k, i) => (
-                  <div key={i} className="tp2-jstep">
-                    <span className="tp2-jdot" aria-hidden="true" />
-                    <div className="tp2-jedit">
-                      <label className="tp2-field" style={{ maxWidth: 160 }}>
-                        <span className="tp2-field-label">{th ? 'ปี' : 'Year'}</span>
-                        <input className="tp2-input" maxLength={LIMITS.year} value={k.year} placeholder={th ? 'เช่น 2017' : 'e.g. 2017'} onChange={(e) => patchStep(i, { year: e.target.value })} />
-                      </label>
-                      <label className="tp2-field">
-                        <span className="tp2-field-label">{th ? 'หัวข้อ' : 'Title'}</span>
-                        <input className="tp2-input tp2-input-title" maxLength={LIMITS.title} value={k.title} placeholder={th ? 'เช่น เริ่มจัดกิจกรรมครั้งแรก' : 'e.g. First class taught'} onChange={(e) => patchStep(i, { title: e.target.value })} />
-                      </label>
-                      <label className="tp2-field">
-                        <span className="tp2-field-label">{th ? 'เล่าสั้น ๆ' : 'Story'}</span>
-                        <textarea className="tp2-input" rows={3} maxLength={LIMITS.journeyBody} value={k.body} onChange={(e) => patchStep(i, { body: e.target.value })} />
-                      </label>
-                      <button type="button" className="tp2-remove" style={{ gridColumn: 'auto' }} onClick={() => removeStep(i)}>✕ {th ? 'ลบปีนี้' : 'Remove'}</button>
-                    </div>
-                  </div>
-                ))}
-                {profile.journey.length === 0 && (
-                  <div className="tp2-empty-hint">{th ? 'ยังไม่มีเส้นทาง — เพิ่มทีละปี (ถ้าไม่มีเลย ส่วนนี้จะไม่แสดง) หน้าเว็บจะเรียงตามปีให้เอง' : 'No steps yet — add one per year (none hides this section); the page sorts them by year'}</div>
-                )}
-                {profile.journey.length < MAX_JOURNEY && (
-                  <button type="button" className="tp2-add" onClick={addStep}>
-                    + {th ? `เพิ่มปี (${profile.journey.length}/${MAX_JOURNEY})` : `Add a year (${profile.journey.length}/${MAX_JOURNEY})`}
+            <div className="tp2-addsec">
+              <span className="tp2-field-label">
+                {th
+                  ? `เพิ่มส่วน (${profile.sections.length}/${MAX_SECTIONS}) — เพิ่มชนิดเดียวกันได้หลายส่วน ลาก ⠿ หรือกด ↑ ↓ เพื่อจัดลำดับ`
+                  : `Add a section (${profile.sections.length}/${MAX_SECTIONS}) — any kind, as often as you like; drag ⠿ or use ↑ ↓ to reorder`}
+              </span>
+              <div className="tp2-addsec-row">
+                {(['takeaways', 'journey', 'belief'] as SectionKind[]).map((k) => (
+                  <button key={k} type="button" className="tp2-add" disabled={profile.sections.length >= MAX_SECTIONS} onClick={() => addSection(k)}>
+                    + {KIND_LABEL[k]}
                   </button>
-                )}
-              </div>
-            ) : (
-              <ol className="tp2-journey">
-                {sortedJourney(profile.journey).map((k, i) => (
-                  <li key={i} className="tp2-jstep">
-                    <span className="tp2-jdot" aria-hidden="true" />
-                    {k.year && <div className="tp2-jyear">{k.year}</div>}
-                    {k.title && <div className="tp2-jtitle">{k.title}</div>}
-                    {k.body && <p className="tp2-jbody">{k.body}</p>}
-                  </li>
                 ))}
-              </ol>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* Belief */}
-      {showBelief && (
-        <section className="tp2-band">
-          <span aria-hidden="true" className="tm-cta-star" style={{ left: -30, bottom: -40, fontSize: 190 }}>✺</span>
-          <div className="tp2-wrap" style={{ position: 'relative' }}>
-            {editing ? (
-              <label className="tp2-field">
-                <span className="tp2-field-label" style={{ color: 'rgba(255,255,255,.7)' }}>{th ? 'ความเชื่อของคุณ (ประโยคเดียว จะแสดงเป็นคำพูดบนแถบนี้ เว้นว่างเพื่อซ่อน)' : 'Your belief — one line, shown as a quote on this band; blank hides it'}</span>
-                <textarea className="tp2-input tp2-input-belief" rows={3} maxLength={LIMITS.belief} value={profile.belief} placeholder={th ? 'เช่น คนที่บอกว่าตัวเองวาดไม่เป็น มักมองเห็นอะไรได้ละเอียดที่สุดในห้อง' : 'e.g. The people who say they can’t draw usually see the most in the room.'} onChange={(e) => patch({ belief: e.target.value })} />
-              </label>
-            ) : (
-              <p className="tp2-belief">“{profile.belief}”</p>
-            )}
-            <div className="tm-meta tp2-sign">— {display} · {th ? 'ผู้จัด' : 'host'}</div>
+              </div>
+            </div>
           </div>
         </section>
       )}
@@ -493,7 +627,7 @@ export default function TeacherProfilePage() {
           <div className="tp2-wrap">
             <div className="tp2-head">
               <div>
-                <span className="tm-eyebrow">{th ? '02 — คลาสที่จัด' : '02 — Classes they host'}</span>
+                <span className="tm-eyebrow">{worksNo} — {th ? 'คลาสที่จัด' : 'Classes they host'}</span>
                 <h2 className="tp2-h2" style={{ fontSize: 'clamp(24px,3vw,32px)', margin: '12px 0 0' }}>{th ? `กิจกรรมของ ${display}` : `${display}’s journeys`}</h2>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
@@ -536,7 +670,7 @@ export default function TeacherProfilePage() {
         <div className="tp2-wrap">
           <div className="tp2-head" style={{ gap: '18px 32px', marginBottom: 26 }}>
             <div style={{ maxWidth: 520 }}>
-              <span className="tm-eyebrow">{th ? '03 — เลือกวัน' : '03 — Pick a day'}</span>
+              <span className="tm-eyebrow">{calendarNo} — {th ? 'เลือกวัน' : 'Pick a day'}</span>
               <h2 className="tp2-h2" style={{ fontSize: 'clamp(26px,3.4vw,36px)', margin: '12px 0 8px' }}>{th ? 'วันที่เปิดรอบ' : 'Days they teach'}</h2>
               <p className="tm-lede" style={{ color: 'var(--ink-soft)' }}>{th ? 'กดวันที่มีสีเพื่อดูรอบของวันนั้น' : 'Tap a tinted day to see the rounds that run on it.'}</p>
             </div>
@@ -646,12 +780,12 @@ export default function TeacherProfilePage() {
 
       {/* Ask */}
       {/* The heading asks people to get in touch, so the band only shows once there is a channel to use. */}
-      {(editing || profile.socials.length > 0) && (
+      {showContact && (
       <section className="tm-cta">
         <span aria-hidden="true" className="tm-cta-star" style={{ left: 'auto', right: -20, top: -40, bottom: 'auto', fontSize: 200 }}>✺</span>
         <div className="tp2-wrap tm-cta-row" style={{ position: 'relative' }}>
           <div style={{ maxWidth: 560 }}>
-            <span className="tm-eyebrow" style={{ color: '#fff' }}>{th ? '04 — คุยกันก่อนก็ได้' : '04 — Talk first'}</span>
+            <span className="tm-eyebrow" style={{ color: '#fff' }}>{contactNo} — {th ? 'คุยกันก่อนก็ได้' : 'Talk first'}</span>
             <h2 className="tp2-h2" style={{ fontSize: 'clamp(24px,3.2vw,34px)', color: '#fff', margin: '14px 0 0' }}>{th ? `ติดต่อ ${display} เพื่อสอบถามเพิ่มเติม` : `Contact ${display} to ask more`}</h2>
           </div>
         </div>
