@@ -4379,3 +4379,46 @@ body {
 .art-star:hover { border-color: var(--accent); color: var(--ink); }
 .art-star.on { background: var(--accent); border-color: var(--accent); color: var(--ink); }
 .art-star:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+/* Host profile: heading + paragraph section */
+.tp2-text-body { margin: 0; max-width: 720px; font-size: 17px; line-height: 1.8; color: var(--ink-soft); white-space: pre-line; }
+
+/* Host profile: picked reviews */
+.tp2-reviews { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.tp2-review { position: relative; display: flex; flex-direction: column; gap: 12px; padding: 24px; border-radius: 22px; background: var(--cream); color: var(--ink); text-align: left; font-family: inherit; border: 2px solid transparent; }
+.tp2-review-stars { font-size: 17px; letter-spacing: 2px; color: var(--accent); }
+.tp2-review-stars i { font-style: normal; color: rgba(13,30,29,.15); }
+.tp2-review-text { font-family: var(--font-display-th); font-weight: 400; font-size: 17px; line-height: 1.6; flex: 1; }
+.tp2-review-meta { font-size: 13px; color: var(--muted); }
+.tp2-reviews.pick .tp2-review { cursor: pointer; padding-right: 54px; transition: border-color .15s ease, background .15s ease; }
+.tp2-reviews.pick .tp2-review:hover:not(:disabled) { border-color: var(--teal-200); }
+.tp2-reviews.pick .tp2-review.on { border-color: var(--teal); background: var(--teal-50); }
+.tp2-reviews.pick .tp2-review:disabled { opacity: .45; cursor: default; }
+.tp2-review-pick { position: absolute; top: 16px; right: 16px; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 1.5px dashed var(--teal); color: var(--teal-deep); font-family: var(--font-mono); font-size: 13px; }
+.tp2-review.on .tp2-review-pick { border-style: solid; background: var(--teal); color: #fff; }
+
+/* Host profile: photo slider (scroll-snap; arrows and dots from 2 photos) */
+.tp2-gal { max-width: 760px; }
+.tp2-gal-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; border-radius: 22px; }
+.tp2-gal-track::-webkit-scrollbar { display: none; }
+.tp2-gal-slide { flex: 0 0 100%; margin: 0; scroll-snap-align: start; }
+.tp2-gal-slide img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 22px; background: var(--cream); }
+.tp2-gal-slide figcaption { margin-top: 12px; font-size: 14.5px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tp2-gal-nav { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+.tp2-gal-nav .tm-round-btn:disabled { opacity: .35; cursor: default; }
+.tp2-gal-dots { display: flex; gap: 8px; flex: 1; justify-content: center; }
+.tp2-gal-dots button { width: 9px; height: 9px; padding: 0; border: 0; border-radius: 50%; background: rgba(13,30,29,.18); cursor: pointer; transition: width .2s ease, background .2s ease; }
+.tp2-gal-dots button.on { width: 26px; border-radius: 5px; background: var(--teal); }
+.tp2-gal-count { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.tp2-gal-edit { display: flex; flex-direction: column; gap: 16px; max-width: 720px; }
+.tp2-gal-item { display: flex; flex-direction: column; gap: 12px; padding: 16px; border: 1.5px dashed rgba(13,30,29,.18); border-radius: 18px; background: var(--paper); }
+.tp2-gal-item-top { display: flex; align-items: center; gap: 8px; }
+
+/* Add-box pictures for the new kinds */
+.tp2-addcard-art b.star { font-family: var(--font-sans); font-size: 13px; letter-spacing: 2px; color: var(--accent); }
+.tp2-addcard-photo { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; height: 100%; color: var(--teal-deep); font-size: 18px; }
+.tp2-addcard-photo i { display: block; width: 60%; height: 100%; border-radius: 8px; background: linear-gradient(135deg, var(--teal-200), var(--teal)); }
+@media (max-width: 760px) {
+  .tp2-review { padding: 18px; }
+  .tp2-gal-slide figcaption { font-size: 13.5px; }
+}

@@ -18,10 +18,14 @@ import { Btn } from '@/components/design/RippleButton';
 import { Icon } from '@/components/design/Icon';
 import { SocialIcon } from '@/components/design/SocialIcon';
 import { useLoadingTracker } from '@/components/design/DataLoading';
+import { ImageUploader } from '@/components/admin/image/ImageUploader';
+import { ASPECTS } from '@/lib/image-aspects';
 import {
   EMPTY_PROFILE,
   LIMITS,
+  MAX_GALLERY,
   MAX_JOURNEY,
+  MAX_REVIEWS,
   MAX_SECTIONS,
   MAX_SOCIALS,
   MAX_TAKEAWAYS,
@@ -30,6 +34,7 @@ import {
   newSection,
   parseTeacherProfile,
   sortedJourney,
+  type GalleryImage,
   type JourneyStep,
   type ProfileSection,
   type SectionKind,
@@ -37,7 +42,7 @@ import {
   type Takeaway,
   type TeacherProfile,
 } from '@/lib/teacher-profile';
-import type { TeacherPublic } from '@/app/api/teachers/[id]/route';
+import type { ReviewPublic, TeacherPublic } from '@/app/api/teachers/[id]/route';
 
 type Round = {
   id: string;
@@ -70,6 +75,55 @@ const PROMISE_MAX = 120;
 /** Drag id of the "add a section" box, which moves through the list like a section. */
 const ADD_ID = '__add';
 
+/** Section kinds with a numbered eyebrow and a heading. */
+type HeadKind = 'takeaways' | 'journey' | 'reviews' | 'gallery';
+
+/** Photos one at a time: swipe or use the arrows; arrows and dots appear only
+ *  when there is more than one photo. */
+function GallerySlider({ images, th }: { images: GalleryImage[]; th: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [at, setAt] = useState(0);
+  const go = (i: number) => {
+    const el = ref.current;
+    if (!el) return;
+    const n = Math.max(0, Math.min(images.length - 1, i));
+    el.scrollTo({ left: n * el.clientWidth, behavior: 'smooth' });
+  };
+  const many = images.length > 1;
+  return (
+    <div className="tp2-gal">
+      <div
+        ref={ref}
+        className="tp2-gal-track"
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          setAt(Math.round(el.scrollLeft / Math.max(1, el.clientWidth)));
+        }}
+      >
+        {images.map((g, i) => (
+          <figure key={i} className="tp2-gal-slide">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={g.url} alt={g.caption || ''} loading="lazy" />
+            {g.caption && <figcaption>{g.caption}</figcaption>}
+          </figure>
+        ))}
+      </div>
+      {many && (
+        <div className="tp2-gal-nav">
+          <button type="button" className="tm-round-btn" style={{ background: 'var(--cream)' }} disabled={at === 0} onClick={() => go(at - 1)} aria-label={th ? 'รูปก่อนหน้า' : 'Previous photo'}>‹</button>
+          <div className="tp2-gal-dots">
+            {images.map((_, i) => (
+              <button key={i} type="button" className={i === at ? 'on' : ''} onClick={() => go(i)} aria-label={`${i + 1} / ${images.length}`} />
+            ))}
+          </div>
+          <span className="tp2-gal-count">{at + 1} / {images.length}</span>
+          <button type="button" className="tm-round-btn" style={{ background: 'var(--cream)' }} disabled={at === images.length - 1} onClick={() => go(at + 1)} aria-label={th ? 'รูปถัดไป' : 'Next photo'}>›</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** First syllable of a Thai display name (or first two letters) for the avatar. */
 function initialOf(display: string): string {
   const bare = display.replace(/^(ครู|อาจารย์|คุณ|พี่)/, '') || display;
@@ -93,6 +147,9 @@ export default function TeacherProfilePage() {
   const th = lang === 'th';
   const [teacher, setTeacher] = useState<TeacherPublic | null>(null);
   const [rounds, setRounds] = useState<Round[]>([]);
+  // Written reviews on this host's rounds: all of them for the host, only the
+  // picked ones for visitors (the API decides).
+  const [reviews, setReviews] = useState<ReviewPublic[]>([]);
   const [canEdit, setCanEdit] = useState(false);
   const [fromDash, setFromDash] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -120,11 +177,12 @@ export default function TeacherProfilePage() {
   useEffect(() => {
     track(
       fetch(`/api/teachers/${id}`)
-        .then((r) => (r.ok ? (r.json() as Promise<{ teacher: TeacherPublic; rounds: Round[]; can_edit: boolean }>) : null))
+        .then((r) => (r.ok ? (r.json() as Promise<{ teacher: TeacherPublic; rounds: Round[]; can_edit: boolean; reviews?: ReviewPublic[] }>) : null))
         .then((d) => {
           if (d) {
             setTeacher(d.teacher);
             setRounds(d.rounds || []);
+            setReviews(d.reviews || []);
             setCanEdit(!!d.can_edit);
             // The teacher dashboard's "หน้าโปรไฟล์ของฉัน" lands here with
             // ?edit=1 and opens straight into the editor.
@@ -226,6 +284,7 @@ export default function TeacherProfilePage() {
     // A new list starts with one blank item, ready to type into.
     if (s.kind === 'takeaways') s.items = [{ title: '', body: '' }];
     if (s.kind === 'journey') s.items = [{ year: '', title: '', body: '' }];
+    if (s.kind === 'gallery') s.images = [{ url: '', meta: null, caption: '' }];
     const at = addIndexOf(draft.sections);
     const list = [...draft.sections];
     list.splice(at, 0, s);
@@ -235,7 +294,17 @@ export default function TeacherProfilePage() {
   };
   const removeSection = (sid: string) => {
     const s = draft?.sections.find((x) => x.id === sid);
-    const filled = s && (s.kind === 'belief' ? !!s.text.trim() : s.items.some((t) => Object.values(t).some((v) => v.trim())));
+    const filled =
+      !!s &&
+      (s.kind === 'belief'
+        ? !!s.text.trim()
+        : s.kind === 'text'
+          ? !!(s.title.trim() || s.body.trim())
+          : s.kind === 'reviews'
+            ? s.ids.length > 0
+            : s.kind === 'gallery'
+              ? s.images.some((g) => g.url)
+              : s.items.some((t) => Object.values(t).some((v) => v.trim())));
     if (filled && !window.confirm(th ? 'ลบส่วนนี้ทั้งส่วน?' : 'Remove this whole section?')) return;
     if (addAfter === sid && draft) {
       const i = draft.sections.findIndex((x) => x.id === sid);
@@ -267,7 +336,27 @@ export default function TeacherProfilePage() {
   const addStep = (sid: string) =>
     updateSection(sid, (s) => (s.kind === 'journey' && s.items.length < MAX_JOURNEY ? { ...s, items: [...s.items, { year: '', title: '', body: '' }] } : s));
   const patchHead = (sid: string, p: { eyebrow?: string; title?: string }) =>
-    updateSection(sid, (s) => (s.kind === 'belief' ? s : { ...s, ...p }));
+    updateSection(sid, (s) => (s.kind === 'belief' || s.kind === 'text' ? s : { ...s, ...p }));
+  const patchText = (sid: string, p: { title?: string; body?: string }) => updateSection(sid, (s) => (s.kind === 'text' ? { ...s, ...p } : s));
+  /** Pick or drop a review; picks keep the order they were made in. */
+  const toggleReview = (sid: string, rid: string) =>
+    updateSection(sid, (s) => {
+      if (s.kind !== 'reviews') return s;
+      if (s.ids.includes(rid)) return { ...s, ids: s.ids.filter((x) => x !== rid) };
+      return s.ids.length >= MAX_REVIEWS ? s : { ...s, ids: [...s.ids, rid] };
+    });
+  const patchImage = (sid: string, i: number, p: Partial<GalleryImage>) =>
+    updateSection(sid, (s) => (s.kind === 'gallery' ? { ...s, images: s.images.map((g, j) => (j === i ? { ...g, ...p } : g)) } : s));
+  const removeImage = (sid: string, i: number) => updateSection(sid, (s) => (s.kind === 'gallery' ? { ...s, images: s.images.filter((_, j) => j !== i) } : s));
+  const moveImage = (sid: string, i: number, d: number) =>
+    updateSection(sid, (s) => {
+      if (s.kind !== 'gallery' || i + d < 0 || i + d >= s.images.length) return s;
+      const images = [...s.images];
+      [images[i], images[i + d]] = [images[i + d], images[i]];
+      return { ...s, images };
+    });
+  const addImage = (sid: string) =>
+    updateSection(sid, (s) => (s.kind === 'gallery' && s.images.length < MAX_GALLERY ? { ...s, images: [...s.images, { url: '', meta: null, caption: '' }] } : s));
   const patchSocial = (i: number, p: Partial<SocialLink>) =>
     setDraft((d) => {
       const cur = d || EMPTY_PROFILE;
@@ -319,23 +408,39 @@ export default function TeacherProfilePage() {
   let counter = 0;
   const sectionNo: Record<string, string> = {};
   profile.sections.forEach((s) => {
-    if (s.kind !== 'belief') sectionNo[s.id] = pad2(++counter);
+    if (s.kind !== 'belief' && s.kind !== 'text') sectionNo[s.id] = pad2(++counter);
   });
   const worksNo = teacher.works.length > 0 ? pad2(++counter) : '';
   const calendarNo = pad2(++counter);
   const contactNo = showContact ? pad2(++counter) : '';
-  const DEFAULT_HEAD: Record<'takeaways' | 'journey', { eyebrow: string; title: string }> = {
+  const DEFAULT_HEAD: Record<HeadKind, { eyebrow: string; title: string }> = {
+    reviews: th ? { eyebrow: 'เสียงจากผู้เข้าร่วม', title: 'คนที่เคยมาเล่าว่าอย่างไร' } : { eyebrow: 'From people who came', title: 'What they said' },
+    gallery: th ? { eyebrow: 'ภาพบรรยากาศ', title: 'บางช่วงจากกิจกรรมที่ผ่านมา' } : { eyebrow: 'Moments', title: 'From past rounds' },
     takeaways: th
       ? { eyebrow: 'สิ่งที่คุณจะได้กลับไป', title: 'มาด้วยความคาดหวังว่าจะได้เทคนิค กลับไปได้ตัวเอง' }
       : { eyebrow: 'What you take home', title: 'Come expecting technique. Leave with yourself.' },
     journey: th ? { eyebrow: `เส้นทางของ${display}`, title: 'เส้นทางที่ค่อย ๆ เดินมา' } : { eyebrow: `${display} — the path`, title: 'The road so far' },
   };
   const KIND_LABEL: Record<SectionKind, string> = th
-    ? { takeaways: 'สิ่งที่คุณจะได้กลับไป', journey: 'เส้นทาง (ไทม์ไลน์)', belief: 'คำพูด (แถบสีเข้ม)' }
-    : { takeaways: 'What you take home', journey: 'Path (timeline)', belief: 'Quote (dark band)' };
+    ? { takeaways: 'สิ่งที่คุณจะได้กลับไป', journey: 'เส้นทาง (ไทม์ไลน์)', belief: 'คำพูด (แถบสีเข้ม)', text: 'หัวข้อ + ย่อหน้า', reviews: 'รีวิวจากผู้เข้าร่วม', gallery: 'รูปภาพ' }
+    : { takeaways: 'What you take home', journey: 'Path (timeline)', belief: 'Quote (dark band)', text: 'Heading + paragraph', reviews: 'Reviews', gallery: 'Photos' };
   const KIND_HINT: Record<SectionKind, string> = th
-    ? { takeaways: 'รายการข้อ 01 02 03 บอกว่าผู้เข้าร่วมจะได้อะไร', journey: 'ไทม์ไลน์ตามปี เล่าเส้นทางที่ผ่านมา', belief: 'ประโยคเดียวบนแถบสีเข้ม เต็มความกว้างหน้า' }
-    : { takeaways: 'Numbered points on what people leave with', journey: 'A timeline by year of your path so far', belief: 'One line on a full-width dark band' };
+    ? {
+        takeaways: 'รายการข้อ 01 02 03 บอกว่าผู้เข้าร่วมจะได้อะไร',
+        journey: 'ไทม์ไลน์ตามปี เล่าเส้นทางที่ผ่านมา',
+        belief: 'ประโยคเดียวบนแถบสีเข้ม เต็มความกว้างหน้า',
+        text: 'เขียนอิสระ ใส่แค่หัวข้อหรือแค่ย่อหน้าก็ได้',
+        reviews: `เลือกรีวิวที่ผู้เข้าร่วมเคยเขียนถึงคุณ สูงสุด ${MAX_REVIEWS} รีวิว`,
+        gallery: `สูงสุด ${MAX_GALLERY} รูป มีคำบรรยายใต้รูป เลื่อนดูได้`,
+      }
+    : {
+        takeaways: 'Numbered points on what people leave with',
+        journey: 'A timeline by year of your path so far',
+        belief: 'One line on a full-width dark band',
+        text: 'Free writing — a heading, a paragraph, or both',
+        reviews: `Pick up to ${MAX_REVIEWS} reviews people wrote about you`,
+        gallery: `Up to ${MAX_GALLERY} photos with captions, swipeable`,
+      };
 
   /** Move / delete controls on top of a section while editing. */
   const sectionTools = (s: ProfileSection, i: number, dark = false) => (
@@ -358,7 +463,7 @@ export default function TeacherProfilePage() {
   );
 
   /** Eyebrow + heading: inputs while editing (blank keeps the default wording). */
-  const sectionHead = (s: Extract<ProfileSection, { kind: 'takeaways' | 'journey' }>) => {
+  const sectionHead = (s: Extract<ProfileSection, { kind: HeadKind }>) => {
     const def = DEFAULT_HEAD[s.kind];
     if (!editing) {
       return (
@@ -465,6 +570,114 @@ export default function TeacherProfilePage() {
       </ol>
     );
 
+  const renderText = (s: Extract<ProfileSection, { kind: 'text' }>) =>
+    editing ? (
+      <div className="tp2-headedit" style={{ maxWidth: 720 }}>
+        <label className="tp2-field">
+          <span className="tp2-field-label">{th ? 'หัวข้อ (เว้นว่างได้)' : 'Heading (optional)'}</span>
+          <input className="tp2-input tp2-input-title" maxLength={LIMITS.title} value={s.title} placeholder={th ? 'เช่น ทำไมถึงเริ่มสอน' : 'e.g. Why I started teaching'} onChange={(e) => patchText(s.id, { title: e.target.value })} />
+        </label>
+        <label className="tp2-field">
+          <span className="tp2-field-label">{th ? `ย่อหน้า (เว้นว่างได้) · ${s.body.length}/${LIMITS.textBody}` : `Paragraph (optional) · ${s.body.length}/${LIMITS.textBody}`}</span>
+          <textarea className="tp2-input" rows={5} maxLength={LIMITS.textBody} value={s.body} placeholder={th ? 'เล่าเรื่องอะไรก็ได้ที่อยากให้คนรู้จักคุณ' : 'Anything you want people to know'} onChange={(e) => patchText(s.id, { body: e.target.value })} />
+        </label>
+        {!s.title.trim() && !s.body.trim() && <div className="tp2-empty-hint">{th ? 'ใส่อย่างน้อยหัวข้อหรือย่อหน้า ไม่งั้นส่วนนี้จะไม่แสดง' : 'Fill in a heading or a paragraph, or this section stays hidden'}</div>}
+      </div>
+    ) : (
+      <div className="tp2-text">
+        {s.title && <h2 className="tp2-h2" style={{ maxWidth: 720, margin: s.body ? '0 0 18px' : 0 }}>{s.title}</h2>}
+        {s.body && <p className="tp2-text-body">{s.body}</p>}
+      </div>
+    );
+
+  const reviewCard = (r: ReviewPublic) => (
+    <>
+      <span className="tp2-review-stars" aria-label={`${r.rating}/5`}>{'★'.repeat(Math.max(0, Math.min(5, r.rating)))}<i>{'★'.repeat(5 - Math.max(0, Math.min(5, r.rating)))}</i></span>
+      <span className="tp2-review-text">“{r.comment}”</span>
+      <span className="tp2-review-meta">{[r.reviewer, r.workshop_title].filter(Boolean).join(' · ')}</span>
+    </>
+  );
+
+  const renderReviews = (s: Extract<ProfileSection, { kind: 'reviews' }>) => {
+    const byId = new Map(reviews.map((r) => [r.id, r]));
+    if (!editing) {
+      const picked = s.ids.map((rid) => byId.get(rid)).filter((r): r is ReviewPublic => !!r);
+      return (
+        <div className="tp2-reviews">
+          {picked.map((r) => (
+            <div key={r.id} className="tp2-review">{reviewCard(r)}</div>
+          ))}
+        </div>
+      );
+    }
+    return (
+      <>
+        <div className="tp2-field-label" style={{ marginBottom: 12 }}>
+          {th ? `เลือกรีวิวที่จะแสดง (${s.ids.length}/${MAX_REVIEWS}) — แสดงตามลำดับที่เลือก` : `Pick reviews to show (${s.ids.length}/${MAX_REVIEWS}) — shown in the order picked`}
+        </div>
+        {reviews.length === 0 ? (
+          <div className="tp2-empty-hint">{th ? 'ยังไม่มีรีวิวที่มีข้อความจากผู้เข้าร่วม — เมื่อมีคนรีวิวกิจกรรมของคุณ จะมาให้เลือกตรงนี้' : 'No written reviews yet — they will show up here to pick from'}</div>
+        ) : (
+          <div className="tp2-reviews pick">
+            {reviews.map((r) => {
+              const n = s.ids.indexOf(r.id);
+              const full = n < 0 && s.ids.length >= MAX_REVIEWS;
+              return (
+                <button key={r.id} type="button" className={`tp2-review ${n >= 0 ? 'on' : ''}`} disabled={full} onClick={() => toggleReview(s.id, r.id)} aria-pressed={n >= 0}>
+                  <span className="tp2-review-pick">{n >= 0 ? n + 1 : '+'}</span>
+                  {reviewCard(r)}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </>
+    );
+  };
+
+  const renderGallery = (s: Extract<ProfileSection, { kind: 'gallery' }>) => {
+    const shown = s.images.filter((g) => g.url);
+    if (!editing) return <GallerySlider images={shown} th={th} />;
+    return (
+      <div className="tp2-gal-edit">
+        {s.images.map((g, i) => (
+          <div key={i} className="tp2-gal-item">
+            <div className="tp2-gal-item-top">
+              <span className="tp2-field-label">{th ? `รูปที่ ${i + 1}` : `Photo ${i + 1}`}</span>
+              <span style={{ flex: 1 }} />
+              <button type="button" className="tp2-secbtn" disabled={i === 0} onClick={() => moveImage(s.id, i, -1)} aria-label={th ? 'เลื่อนขึ้น' : 'Move up'}>↑</button>
+              <button type="button" className="tp2-secbtn" disabled={i === s.images.length - 1} onClick={() => moveImage(s.id, i, 1)} aria-label={th ? 'เลื่อนลง' : 'Move down'}>↓</button>
+              <button type="button" className="tp2-secbtn tp2-secbtn-del" onClick={() => removeImage(s.id, i)}>✕ {th ? 'ลบรูป' : 'Remove'}</button>
+            </div>
+            <ImageUploader
+              value={g.url}
+              meta={g.meta}
+              onChange={({ url, meta }) => patchImage(s.id, i, { url, meta })}
+              folder="portfolio"
+              primary={ASPECTS.HOST_GALLERY}
+              label={th ? 'อัปโหลดรูป' : 'Upload a photo'}
+            />
+            <label className="tp2-field">
+              <span className="tp2-field-label">{th ? `คำบรรยายใต้รูป (1 บรรทัด) · ${g.caption.length}/${LIMITS.caption}` : `Caption (one line) · ${g.caption.length}/${LIMITS.caption}`}</span>
+              <input className="tp2-input" maxLength={LIMITS.caption} value={g.caption} placeholder={th ? 'เช่น รอบเดือนกันยา ปั้นแก้วใบแรก' : 'e.g. September round, first cups'} onChange={(e) => patchImage(s.id, i, { caption: e.target.value.replace(/\n/g, ' ') })} />
+            </label>
+          </div>
+        ))}
+        {s.images.length < MAX_GALLERY && (
+          <button type="button" className="tp2-add" onClick={() => addImage(s.id)}>
+            + {th ? `เพิ่มรูป (${s.images.length}/${MAX_GALLERY})` : `Add a photo (${s.images.length}/${MAX_GALLERY})`}
+          </button>
+        )}
+        {shown.length > 0 && (
+          <div style={{ marginTop: 24 }}>
+            <div className="tp2-field-label" style={{ marginBottom: 10 }}>{th ? 'ตัวอย่างที่ผู้เข้าชมจะเห็น' : 'What visitors will see'}</div>
+            <GallerySlider images={shown} th={th} />
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderSection = (s: ProfileSection, i: number) => {
     if (s.kind === 'belief') {
       return (
@@ -489,8 +702,20 @@ export default function TeacherProfilePage() {
       <section className="tp2-section">
         <div className="tp2-wrap">
           {editing && sectionTools(s, i)}
-          {sectionHead(s)}
-          {s.kind === 'takeaways' ? renderTakeaways(s) : renderJourney(s)}
+          {s.kind === 'text' ? (
+            renderText(s)
+          ) : (
+            <>
+              {sectionHead(s)}
+              {s.kind === 'takeaways'
+                ? renderTakeaways(s)
+                : s.kind === 'journey'
+                  ? renderJourney(s)
+                  : s.kind === 'reviews'
+                    ? renderReviews(s)
+                    : renderGallery(s)}
+            </>
+          )}
         </div>
       </section>
     );
@@ -656,7 +881,7 @@ export default function TeacherProfilePage() {
                         <button type="button" className="tp2-secbtn" disabled={addAt >= profile.sections.length} onClick={() => moveAddBox(addAt + 1)} aria-label={th ? 'ย้ายกล่องลง' : 'Move box down'}>↓</button>
                       </div>
                       <div className="tp2-addsec-grid">
-                        {(['takeaways', 'journey', 'belief'] as SectionKind[]).map((k) => (
+                        {(['takeaways', 'journey', 'belief', 'text', 'reviews', 'gallery'] as SectionKind[]).map((k) => (
                           <button key={k} type="button" className="tp2-addcard" disabled={full} onClick={() => addSection(k)}>
                             <span className={`tp2-addcard-art art-${k}`} aria-hidden="true">
                               {k === 'takeaways' && (
@@ -674,6 +899,21 @@ export default function TeacherProfilePage() {
                                 </>
                               )}
                               {k === 'belief' && <span className="tp2-addcard-quote">“ ”</span>}
+                              {k === 'text' && (
+                                <>
+                                  <i><em style={{ width: '46%', height: 9, background: 'rgba(13,30,29,.45)' }} /></i>
+                                  <i><em style={{ width: '88%' }} /></i>
+                                  <i><em style={{ width: '74%' }} /></i>
+                                </>
+                              )}
+                              {k === 'reviews' && (
+                                <>
+                                  <i><b className="star">★★★★★</b></i>
+                                  <i><em style={{ width: '80%' }} /></i>
+                                  <i><em style={{ width: '40%' }} /></i>
+                                </>
+                              )}
+                              {k === 'gallery' && <span className="tp2-addcard-photo"><span>‹</span><i /><span>›</span></span>}
                             </span>
                             <span className="tp2-addcard-name">{KIND_LABEL[k]}</span>
                             <span className="tp2-addcard-desc">{KIND_HINT[k]}</span>

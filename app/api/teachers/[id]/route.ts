@@ -46,6 +46,9 @@ export type TeacherPublic = {
   works: { id: string; title: string; image_url: string | null; open: boolean }[];
 };
 
+/** A written review shown on (or offered to) a host's page. */
+export type ReviewPublic = { id: string; rating: number; comment: string; date: string; workshop_title: string; reviewer: string };
+
 type WorkRow = { id: string; title: string; image_url: string | null; category: string | null; open?: boolean };
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -129,6 +132,39 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
     const me = await getCurrentUserWithRoles();
     const can_edit = !!me && (me.sub === id || me.roles.includes('admin'));
+    const profile = parseTeacherProfile(row.teacher_profile_json);
+
+    // Written reviews on this host's rounds. The host (or an admin) gets them
+    // all to pick from; visitors get only the ones picked into a section.
+    const picked = new Set(profile.sections.flatMap((s) => (s.kind === 'reviews' ? s.ids : [])));
+    let reviews: ReviewPublic[] = [];
+    if (can_edit || picked.size) {
+      const rv = await db
+        .prepare(
+          `SELECT r.id, r.rating, r.comment, r.created_at, w.title AS workshop_title,
+                  u.nickname AS reviewer_nickname, u.name AS reviewer_name
+             FROM reviews r
+             JOIN workshops w ON w.id = r.workshop_id
+             LEFT JOIN workshop_masters m ON m.id = w.master_id
+             LEFT JOIN users u ON u.id = r.user_id
+            WHERE ${MINE} AND r.comment IS NOT NULL AND TRIM(r.comment) != ''
+            ORDER BY r.created_at DESC
+            LIMIT 200`,
+        )
+        .bind(id, id, id)
+        .all<{ id: string; rating: number; comment: string; created_at: string; workshop_title: string; reviewer_nickname: string | null; reviewer_name: string | null }>();
+      reviews = (rv.results || [])
+        .filter((r) => can_edit || picked.has(r.id))
+        .map((r) => ({
+          id: r.id,
+          rating: Number(r.rating) || 0,
+          comment: r.comment.trim(),
+          date: (r.created_at || '').slice(0, 10),
+          workshop_title: r.workshop_title,
+          // Nickname, else first name only — a public page never shows a full name.
+          reviewer: r.reviewer_nickname?.trim() || (r.reviewer_name || '').trim().split(/\s+/)[0] || '',
+        }));
+    }
 
     const teacher: TeacherPublic = {
       id: row.id,
@@ -137,7 +173,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       avatar_url: row.avatar_url,
       bio: row.bio,
       crafts: [...craftCount.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c),
-      profile: parseTeacherProfile(row.teacher_profile_json),
+      profile,
       hosted: pastRows.length,
       joined: Number(joined?.n) || 0,
       works,
@@ -147,7 +183,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const publicRounds = ((rounds.results || []) as (Record<string, unknown> & { booked: number; private_taken: number; max_participants: number })[]).map(
       ({ booked, private_taken, ...r }) => ({ ...r, full: private_taken > 0 || booked >= r.max_participants }),
     );
-    return NextResponse.json({ teacher, rounds: publicRounds, can_edit });
+    return NextResponse.json({ teacher, rounds: publicRounds, can_edit, reviews });
   } catch (error) {
     console.error('Teacher profile error:', error);
     return NextResponse.json({ error: 'เกิดข้อผิดพลาด' }, { status: 500 });

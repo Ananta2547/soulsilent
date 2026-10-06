@@ -35,6 +35,8 @@ export const ASPECTS = {
 
   AVATAR: { ratio: 1, label: '1:1 · avatar' },
   PROFILE_COVER: { ratio: 16 / 5, label: '16:5 · cover photo' },
+  // Photo section on a host's profile page — a 4:3 slider.
+  HOST_GALLERY: { ratio: 4 / 3, label: '4:3 · รูปในหน้าโปรไฟล์ผู้จัด' },
 
   // Slips are photos of a receipt — never crop them, keep the original shape.
   PAYOUT_SLIP: { label: 'สัดส่วนจริง · สลิปโอนเงิน' },
