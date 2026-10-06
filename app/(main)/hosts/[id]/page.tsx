@@ -417,8 +417,8 @@ export default function TeacherProfilePage() {
     reviews: th ? { eyebrow: 'เสียงจากผู้เข้าร่วม', title: 'คนที่เคยมาเล่าว่าอย่างไร' } : { eyebrow: 'From people who came', title: 'What they said' },
     gallery: th ? { eyebrow: 'ภาพบรรยากาศ', title: 'บางช่วงจากกิจกรรมที่ผ่านมา' } : { eyebrow: 'Moments', title: 'From past rounds' },
     takeaways: th
-      ? { eyebrow: 'สิ่งที่คุณจะได้กลับไป', title: 'มาด้วยความคาดหวังว่าจะได้เทคนิค กลับไปได้ตัวเอง' }
-      : { eyebrow: 'What you take home', title: 'Come expecting technique. Leave with yourself.' },
+      ? { eyebrow: 'สิ่งที่คุณจะได้กลับไป', title: 'สิ่งที่เราเชื่อมั่นและให้ความสำคัญ' }
+      : { eyebrow: 'What you take home', title: 'What we believe in and care about' },
     journey: th ? { eyebrow: `เส้นทางของ${display}`, title: 'เส้นทางที่ค่อย ๆ เดินมา' } : { eyebrow: `${display} — the path`, title: 'The road so far' },
   };
   const KIND_LABEL: Record<SectionKind, string> = th
@@ -496,7 +496,7 @@ export default function TeacherProfilePage() {
             <>
               <label className="tp2-field">
                 <span className="tp2-field-label">{th ? 'หัวข้อ' : 'Title'}</span>
-                <input className="tp2-input tp2-input-title" maxLength={LIMITS.title} value={k.title} placeholder={th ? 'เช่น มือที่ช้าลง' : 'e.g. A slower hand'} onChange={(e) => patchTake(s.id, i, { title: e.target.value })} />
+                <input className="tp2-input tp2-input-title" maxLength={LIMITS.title} value={k.title} placeholder={th ? 'เช่น สร้างพื้นที่ปลอดภัย' : 'e.g. A safe space'} onChange={(e) => patchTake(s.id, i, { title: e.target.value })} />
               </label>
               <label className="tp2-field">
                 <span className="tp2-field-label">{th ? 'รายละเอียด' : 'Detail'}</span>
@@ -534,7 +534,7 @@ export default function TeacherProfilePage() {
             <div className="tp2-jedit">
               <label className="tp2-field" style={{ maxWidth: 160 }}>
                 <span className="tp2-field-label">{th ? 'ปี' : 'Year'}</span>
-                <input className="tp2-input" maxLength={LIMITS.year} value={k.year} placeholder={th ? 'เช่น 2017' : 'e.g. 2017'} onChange={(e) => patchStep(s.id, i, { year: e.target.value })} />
+                <input className="tp2-input" maxLength={LIMITS.year} value={k.year} placeholder={th ? 'เช่น 2026' : 'e.g. 2026'} onChange={(e) => patchStep(s.id, i, { year: e.target.value })} />
               </label>
               <label className="tp2-field">
                 <span className="tp2-field-label">{th ? 'หัวข้อ' : 'Title'}</span>
@@ -542,7 +542,7 @@ export default function TeacherProfilePage() {
               </label>
               <label className="tp2-field">
                 <span className="tp2-field-label">{th ? 'เล่าสั้น ๆ' : 'Story'}</span>
-                <textarea className="tp2-input" rows={3} maxLength={LIMITS.journeyBody} value={k.body} onChange={(e) => patchStep(s.id, i, { body: e.target.value })} />
+                <textarea className="tp2-input" rows={3} maxLength={LIMITS.journeyBody} value={k.body} placeholder={th ? 'อธิบายช่วงเวลานั้นให้เราฟังหน่อย' : 'Tell us about that time'} onChange={(e) => patchStep(s.id, i, { body: e.target.value })} />
               </label>
               <button type="button" className="tp2-remove" style={{ gridColumn: 'auto' }} onClick={() => removeStep(s.id, i)}>✕ {th ? 'ลบปีนี้' : 'Remove'}</button>
             </div>
@@ -659,7 +659,7 @@ export default function TeacherProfilePage() {
             />
             <label className="tp2-field">
               <span className="tp2-field-label">{th ? `คำบรรยายใต้รูป (1 บรรทัด) · ${g.caption.length}/${LIMITS.caption}` : `Caption (one line) · ${g.caption.length}/${LIMITS.caption}`}</span>
-              <input className="tp2-input" maxLength={LIMITS.caption} value={g.caption} placeholder={th ? 'เช่น รอบเดือนกันยา ปั้นแก้วใบแรก' : 'e.g. September round, first cups'} onChange={(e) => patchImage(s.id, i, { caption: e.target.value.replace(/\n/g, ' ') })} />
+              <input className="tp2-input" maxLength={LIMITS.caption} value={g.caption} placeholder={th ? 'เช่น จุดเริ่มต้นของกิจกรรม' : 'e.g. Where it all started'} onChange={(e) => patchImage(s.id, i, { caption: e.target.value.replace(/\n/g, ' ') })} />
             </label>
           </div>
         ))}
@@ -688,12 +688,12 @@ export default function TeacherProfilePage() {
             {editing ? (
               <label className="tp2-field">
                 <span className="tp2-field-label" style={{ color: 'rgba(255,255,255,.7)' }}>{th ? 'ความเชื่อของคุณ (ประโยคเดียว จะแสดงเป็นคำพูดบนแถบนี้ เว้นว่างเพื่อซ่อน)' : 'Your belief — one line, shown as a quote on this band; blank hides it'}</span>
-                <textarea className="tp2-input tp2-input-belief" rows={3} maxLength={LIMITS.belief} value={s.text} placeholder={th ? 'เช่น คนที่บอกว่าตัวเองวาดไม่เป็น มักมองเห็นอะไรได้ละเอียดที่สุดในห้อง' : 'e.g. The people who say they can’t draw usually see the most in the room.'} onChange={(e) => updateSection(s.id, (x) => (x.kind === 'belief' ? { ...x, text: e.target.value } : x))} />
+                <textarea className="tp2-input tp2-input-belief" rows={3} maxLength={LIMITS.belief} value={s.text} placeholder={th ? 'บอกเราหน่อยว่าประโยคเด็ดของคุณคืออะไร' : 'Tell us your signature line'} onChange={(e) => updateSection(s.id, (x) => (x.kind === 'belief' ? { ...x, text: e.target.value } : x))} />
               </label>
             ) : (
               <p className="tp2-belief">“{s.text}”</p>
             )}
-            <div className="tm-meta tp2-sign">— {display} · {th ? 'ผู้จัด' : 'host'}</div>
+            <div className="tm-meta tp2-sign">— {display} · {th ? 'ผู้จัด' : 'host'} —</div>
           </div>
         </section>
       );
@@ -757,7 +757,7 @@ export default function TeacherProfilePage() {
                     rows={3}
                     maxLength={PROMISE_MAX}
                     value={profile.promise}
-                    placeholder={teacher.bio || (th ? 'เช่น ผมไม่ได้สอนให้วาดสวย ผมสอนให้มองนานพอ…' : 'e.g. I don’t teach pretty drawings…')}
+                    placeholder={teacher.bio || (th ? 'เช่น เปลี่ยนเรื่องยาก ให้เป็นเรื่องง่ายเพื่อเทคนิคที่สนุกและทำได้จริง' : 'e.g. Turning the hard parts into easy, fun techniques you can really use')}
                     onChange={(e) => patch({ promise: e.target.value.replace(/\n{2,}/g, '\n') })}
                   />
                   <span className="tp2-field-hint">
@@ -974,7 +974,6 @@ export default function TeacherProfilePage() {
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={w.image_url} alt="" />
                     )}
-                    <span aria-hidden="true" className="tm-work-no">{pad2(i + 1)}</span>
                     <span className={`tp2-work-status ${w.open ? 'open' : ''}`}>{w.open ? (th ? 'เปิดรับ' : 'Open') : th ? 'ปิดรับ' : 'Closed'}</span>
                     <span className="tm-work-name" style={{ transform: `translateY(${on ? '0%' : '101%'})` }}>{w.title}</span>
                   </Link>
