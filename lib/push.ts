@@ -22,8 +22,11 @@ type Env = { VAPID_PUBLIC_KEY?: string; VAPID_PRIVATE_KEY?: string; SITE_URL?: s
 
 /** The VAPID keys, or null when push is not configured on this deployment. */
 export function vapidKeys(env: Env): VapidKeys | null {
-  if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) return null;
-  return { publicKey: env.VAPID_PUBLIC_KEY, privateKey: env.VAPID_PRIVATE_KEY, subject: env.SITE_URL || 'https://allsoullearn.com' };
+  // Trimmed: a secret piped in from a shell can carry a trailing newline.
+  const publicKey = (env.VAPID_PUBLIC_KEY || '').trim();
+  const privateKey = (env.VAPID_PRIVATE_KEY || '').trim();
+  if (!publicKey || !privateKey) return null;
+  return { publicKey, privateKey, subject: env.SITE_URL || 'https://allsoullearn.com' };
 }
 
 const b64url = /^[A-Za-z0-9_-]+$/;

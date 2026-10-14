@@ -16,6 +16,10 @@ export { BucketCachePurge } from './.open-next/worker.js';
 interface CronEnv {
   SITE_URL?: string;
   CRON_SECRET?: string;
+  /** Comma list of jobs the cron runs; default both. Preview sets "push" only:
+   *  expire-holds talks to the live Beam account (refunds), so it must not run
+   *  from the preview Worker. */
+  CRON_JOBS?: string;
 }
 
 export default {
@@ -29,10 +33,15 @@ export default {
   async scheduled(_event: unknown, env: CronEnv, ctx: { waitUntil(p: Promise<unknown>): void }) {
     const base = env.SITE_URL || 'https://allsoullearn.com';
     const headers = { 'x-cron-secret': env.CRON_SECRET || '' };
-    ctx.waitUntil(
-      fetch(`${base}/api/cron/expire-holds`, { headers }).catch((e) => console.error('scheduled expire-holds failed', e)),
-    );
+    const jobs = (env.CRON_JOBS || 'expire-holds,push').split(',').map((j) => j.trim());
+    if (jobs.includes('expire-holds')) {
+      ctx.waitUntil(
+        fetch(`${base}/api/cron/expire-holds`, { headers }).catch((e) => console.error('scheduled expire-holds failed', e)),
+      );
+    }
     // App notifications: booked, reminders, friend joined (app/api/cron/push).
-    ctx.waitUntil(fetch(`${base}/api/cron/push`, { headers }).catch((e) => console.error('scheduled push failed', e)));
+    if (jobs.includes('push')) {
+      ctx.waitUntil(fetch(`${base}/api/cron/push`, { headers }).catch((e) => console.error('scheduled push failed', e)));
+    }
   },
 };

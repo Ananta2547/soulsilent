@@ -12,7 +12,9 @@
 #   - name            : soulsilent-preview     (a different Worker entirely)
 #   - workers_dev     : true                   (preview URL instead of a domain)
 #   - no [[routes]]                            (never touches allsoullearn.com)
-#   - no [triggers]                            (no cron; prod's sweep is enough)
+#   - [triggers] every 5 min, CRON_JOBS="push" (app notifications only — never
+#                                               expire-holds: it calls the LIVE
+#                                               Beam account to refund)
 #   - D1 / R2         : dedicated preview database + bucket
 #   - SITE_URL        : the workers.dev preview URL
 name = "soulsilent-preview"
@@ -22,6 +24,10 @@ compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 
 # Serve on <name>.<account-subdomain>.workers.dev.
 workers_dev = true
+
+# App notifications only (CRON_JOBS = "push"); see the header.
+[triggers]
+crons = ["*/5 * * * *"]
 
 [assets]
 directory = ".open-next/assets"
@@ -62,6 +68,11 @@ BEAM_MERCHANT_ID = "allsoullearn-vg1ez5"
 # redirects will bounce users to production.
 SITE_URL = "https://soulsilent-preview.soulsilent-official.workers.dev"
 EMAIL_FROM = "AllSoulLearn Preview <noreply@allsoullearn.com>"
+# Web push (app notifications) public key — not secret; the private half is
+# the VAPID_PRIVATE_KEY secret. Preview has its own pair, separate from production.
+# Which cron jobs worker.ts runs here: notifications only (see the header).
+CRON_JOBS = "push"
+VAPID_PUBLIC_KEY = "BOL7GuJ1pIbUMpSV5qr--WC_EBOD6aXJfMtSYr0Wp4pQniZQTONr44TrpUr7RurSZfj1UwLbFkf0cYItQnVd7j0"
 
 # Run the Worker near the D1 database rather than at the visitor's colo: every
 # request makes several D1 round trips, and those are far shorter than the one
