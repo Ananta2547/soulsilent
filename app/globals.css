@@ -4487,3 +4487,6 @@ body {
 .pwa-push-nudge-text b { font-family: var(--font-display-th); font-weight: 500; font-size: 15px; }
 .pwa-push-nudge-text span { font-size: 13px; line-height: 1.45; color: var(--muted); }
 .pwa-cta:disabled, .pwa-banner-btn:disabled, .pwa-ghost:disabled { opacity: .6; cursor: default; }
+
+/* Installed app: back button before the logo (SiteHeader). */
+.nav-back { margin-right: 4px; margin-left: -6px; }

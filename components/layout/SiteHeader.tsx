@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useLang, T, tr } from '@/lib/i18n';
 import { LangSwitch } from '@/components/design/LangSwitch';
 import { Btn } from '@/components/design/RippleButton';
 import { ProfileDropdown, type ProfileUser } from '@/components/layout/ProfileDropdown';
 import { AllSoulLearnLogo } from '@/components/layout/AllSoulLearnLogo';
-import { clearUserOfflineData } from '@/components/pwa/usePwa';
+import { clearUserOfflineData, isStandalone } from '@/components/pwa/usePwa';
 import { disablePush } from '@/components/pwa/push';
 
 type UserInfo = ProfileUser;
@@ -19,6 +19,13 @@ export function SiteHeader() {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  // Installed app (no browser chrome): show our own back button off the home page.
+  const pathname = usePathname();
+  const [standalone, setStandalone] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setStandalone(isStandalone());
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -53,6 +60,13 @@ export function SiteHeader() {
     <>
       <div className="nav-wrap">
         <div className="nav-bar">
+          {standalone && pathname !== '/' && (
+            <button type="button" className="nav-icon-btn nav-back" onClick={() => router.back()} aria-label={tr(lang, 'ย้อนกลับ', 'Back')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M15 5l-7 7 7 7" />
+              </svg>
+            </button>
+          )}
           <Link
             href="/"
             className="nav-logo"

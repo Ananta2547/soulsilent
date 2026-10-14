@@ -247,6 +247,10 @@ export default function MyBookingsPage() {
         .then((d) => {
           if (!d) return;
           const next = d.bookings || [];
+          // Installed app: the icon shows how many booked rounds are still ahead.
+          const nav = navigator as Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
+          const ahead = next.filter((b) => b.status === 'confirmed' && b.payment_status === 'paid' && b.ws_date && !bookingEnded(b)).length;
+          if (nav.setAppBadge) (ahead ? nav.setAppBadge(ahead) : nav.clearAppBadge?.())?.catch(() => {});
           // Announce a booking that became paid while the page was open, so the
           // user is told rather than left staring at a countdown.
           setBookings((prev) => {
@@ -651,6 +655,20 @@ export default function MyBookingsPage() {
                         </svg>
                         {tr(lang, 'ดูใบสมัคร', 'View application')}
                       </button>
+                    )}
+
+                    {/* Booked seat, not over yet → add it to the phone's calendar (.ics). */}
+                    {paid && b.status === 'confirmed' && b.ws_date && !bookingEnded(b) && (
+                      <a
+                        href={`/api/bookings/${b.id}/calendar`}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--teal-50)', color: 'var(--teal-deep)', borderRadius: 999, fontSize: 12.5, fontWeight: 700, padding: '8px 14px', textDecoration: 'none' }}
+                      >
+                        <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" viewBox="0 0 24 24" aria-hidden="true">
+                          <rect x="3" y="5" width="18" height="16" rx="3" />
+                          <path d="M8 3v4M16 3v4M3 10h18M12 13v5M9.5 15.5h5" />
+                        </svg>
+                        {tr(lang, 'เพิ่มลงปฏิทิน', 'Add to calendar')}
+                      </a>
                     )}
 
                     {awaitingConfirm && (
