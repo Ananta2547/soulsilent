@@ -8,6 +8,7 @@ import { LangSwitch } from '@/components/design/LangSwitch';
 import { Btn } from '@/components/design/RippleButton';
 import { ProfileDropdown, type ProfileUser } from '@/components/layout/ProfileDropdown';
 import { AllSoulLearnLogo } from '@/components/layout/AllSoulLearnLogo';
+import { clearUserOfflineData } from '@/components/pwa/usePwa';
 
 type UserInfo = ProfileUser;
 
@@ -31,6 +32,8 @@ export function SiteHeader() {
 
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' });
+    // The installed app keeps an offline copy of the member's bookings — drop it.
+    clearUserOfflineData();
     setUser(null);
     router.push('/');
   }

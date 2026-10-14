@@ -200,6 +200,8 @@ export default function MyBookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  // Set when the installed app answered from its offline copy (no connection).
+  const [offlineCopy, setOfflineCopy] = useState(false);
   const [verifyFailed, setVerifyFailed] = useState(false);
   const [unauthorized, setUnauthorized] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
@@ -238,6 +240,7 @@ export default function MyBookingsPage() {
             return null;
           }
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          setOfflineCopy(r.headers.get('x-sw-offline') === '1');
           return r.json() as Promise<{ bookings: Booking[] }>;
         })
         .then((d) => {
@@ -469,6 +472,12 @@ export default function MyBookingsPage() {
         {verifyFailed && (
           <div style={{ background: '#fdf1e7', border: '1px solid #e8b98a', color: '#8a4b1a', borderRadius: 12, padding: '12px 16px', fontSize: 14, marginBottom: 16 }}>
             {tr(lang, 'ยืนยันการชำระเงินอัตโนมัติไม่สำเร็จ หากคุณชำระเงินแล้วแต่สถานะยังไม่อัปเดต กรุณารีเฟรชหน้าอีกครั้งหรือติดต่อผู้ดูแล', 'Automatic payment verification failed. If you paid but the status has not updated, please refresh or contact the admin.')}
+          </div>
+        )}
+
+        {offlineCopy && (
+          <div style={{ background: 'var(--teal-50)', border: '1px solid var(--teal-200)', color: 'var(--teal-deep)', borderRadius: 12, padding: '12px 16px', fontSize: 14, marginBottom: 16 }}>
+            {tr(lang, 'ตอนนี้ไม่มีอินเทอร์เน็ต — แสดงการจองล่าสุดที่บันทึกไว้ในเครื่อง สถานะอาจยังไม่อัปเดต', 'You are offline — showing the bookings last saved on this phone; statuses may be out of date.')}
           </div>
         )}
 
