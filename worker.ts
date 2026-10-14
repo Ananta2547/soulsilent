@@ -28,10 +28,11 @@ export default {
   // give back rather than something to block.
   async scheduled(_event: unknown, env: CronEnv, ctx: { waitUntil(p: Promise<unknown>): void }) {
     const base = env.SITE_URL || 'https://allsoullearn.com';
+    const headers = { 'x-cron-secret': env.CRON_SECRET || '' };
     ctx.waitUntil(
-      fetch(`${base}/api/cron/expire-holds`, {
-        headers: { 'x-cron-secret': env.CRON_SECRET || '' },
-      }).catch((e) => console.error('scheduled expire-holds failed', e)),
+      fetch(`${base}/api/cron/expire-holds`, { headers }).catch((e) => console.error('scheduled expire-holds failed', e)),
     );
+    // App notifications: booked, reminders, friend joined (app/api/cron/push).
+    ctx.waitUntil(fetch(`${base}/api/cron/push`, { headers }).catch((e) => console.error('scheduled push failed', e)));
   },
 };

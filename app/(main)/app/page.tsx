@@ -11,6 +11,7 @@ import QRCode from 'qrcode';
 import { useLang, tr } from '@/lib/i18n';
 import { Icon } from '@/components/design/Icon';
 import { isIOS, isStandalone, usePwa } from '@/components/pwa/usePwa';
+import { PushToggle } from '@/components/pwa/PushToggle';
 
 type Device = 'loading' | 'installed' | 'ios' | 'android' | 'inapp' | 'desktop';
 
@@ -65,7 +66,7 @@ export default function AppInstallPage() {
   const perks = [
     { icon: 'event' as const, t: th ? 'เปิดได้ในแตะเดียว' : 'One tap away', d: th ? 'ไอคอนอยู่บนหน้าจอ เปิดเต็มจอเหมือนแอป ไม่ต้องพิมพ์เว็บ' : 'An icon on your home screen that opens full screen' },
     { icon: 'date' as const, t: th ? 'ดูการจองได้แม้ไม่มีเน็ต' : 'Bookings offline', d: th ? 'วัน เวลา สถานที่ของกิจกรรมที่จองไว้ เปิดดูได้ที่หน้างานแม้สัญญาณไม่ดี' : 'Your booked dates, times and places, even with no signal' },
-    { icon: 'reminder' as const, t: th ? 'แจ้งเตือน (เร็ว ๆ นี้)' : 'Reminders (soon)', d: th ? 'เตือนก่อนวันกิจกรรม รอบใหม่ของผู้จัดที่ชอบ และเมื่อเพื่อนรับคำเชิญ' : 'Before your day, new rounds, and when friends join' },
+    { icon: 'reminder' as const, t: th ? 'แจ้งเตือน' : 'Reminders', d: th ? 'แจ้งเมื่อจองสำเร็จ เตือนก่อนวันกิจกรรม และเมื่อเพื่อนรับคำเชิญเข้ากลุ่ม' : 'Booking confirmed, before your day, and when friends join your group' },
     { icon: 'notes' as const, t: th ? 'Diary อยู่ใกล้มือ' : 'Your Diary, close by', d: th ? 'กดค้างที่ไอคอนเพื่อไปที่การจอง Diary หรือปฏิทินได้ทันที (Android)' : 'Long-press the icon for bookings, Diary or calendar (Android)' },
   ];
 
@@ -141,6 +142,8 @@ export default function AppInstallPage() {
           </div>
         )}
       </section>
+
+      <PushToggle />
 
       <section className="pwa-perks">
         {perks.map((p) => (

@@ -9,6 +9,7 @@ import { Btn } from '@/components/design/RippleButton';
 import { ProfileDropdown, type ProfileUser } from '@/components/layout/ProfileDropdown';
 import { AllSoulLearnLogo } from '@/components/layout/AllSoulLearnLogo';
 import { clearUserOfflineData } from '@/components/pwa/usePwa';
+import { disablePush } from '@/components/pwa/push';
 
 type UserInfo = ProfileUser;
 
@@ -31,6 +32,9 @@ export function SiteHeader() {
   }, []);
 
   async function handleLogout() {
+    // This device stops receiving the member's notifications, and the
+    // installed app drops its offline copy of their bookings.
+    await disablePush().catch(() => {});
     await fetch('/api/auth/logout', { method: 'POST' });
     // The installed app keeps an offline copy of the member's bookings — drop it.
     clearUserOfflineData();

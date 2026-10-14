@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { PushToggle } from '@/components/pwa/PushToggle';
 import { useLang, T, tr } from '@/lib/i18n';
 import { Reveal } from '@/components/design/Reveal';
 import { Btn } from '@/components/design/RippleButton';
@@ -474,6 +475,8 @@ export default function MyBookingsPage() {
             {tr(lang, 'ยืนยันการชำระเงินอัตโนมัติไม่สำเร็จ หากคุณชำระเงินแล้วแต่สถานะยังไม่อัปเดต กรุณารีเฟรชหน้าอีกครั้งหรือติดต่อผู้ดูแล', 'Automatic payment verification failed. If you paid but the status has not updated, please refresh or contact the admin.')}
           </div>
         )}
+
+        {bookings.length > 0 && !offlineCopy && <PushToggle variant="nudge" />}
 
         {offlineCopy && (
           <div style={{ background: 'var(--teal-50)', border: '1px solid var(--teal-200)', color: 'var(--teal-deep)', borderRadius: 12, padding: '12px 16px', fontSize: 14, marginBottom: 16 }}>

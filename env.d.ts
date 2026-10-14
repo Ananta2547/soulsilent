@@ -27,6 +27,11 @@ declare global {
      *  (https://api.beamcheckout.com); set to
      *  https://playground.api.beamcheckout.com for the sandbox. */
     BEAM_BASE_URL?: string;
+    /** Web push (app notifications), lib/push.ts. Public key: raw P-256
+     *  point, base64url — not secret, a [var]. Private key: secret. Push is
+     *  off when either is missing. */
+    VAPID_PUBLIC_KEY?: string;
+    VAPID_PRIVATE_KEY?: string;
   }
 
   namespace NodeJS {

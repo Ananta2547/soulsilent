@@ -4473,3 +4473,17 @@ body {
 @media (display-mode: standalone) {
   body { overscroll-behavior-y: none; }
 }
+
+/* App notifications: the toggle on /app and the nudge on My bookings (components/pwa/PushToggle.tsx). */
+.pwa-push { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
+.pwa-push-head { display: flex; gap: 14px; align-items: flex-start; }
+.pwa-push-head h2 { font-family: var(--font-display-th); font-weight: 500; font-size: 20px; margin: 0 0 4px; }
+.pwa-push-head p { margin: 0; font-size: 14.5px; line-height: 1.6; color: var(--ink-soft); }
+.pwa-push-bell { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--accent-soft); color: var(--ink); }
+.pwa-push-err { color: #a13030 !important; font-size: 13px !important; }
+.pwa-ghost { border: 1.5px solid rgba(13,30,29,.18); background: transparent; border-radius: 999px; padding: 10px 20px; font-family: inherit; font-size: 14.5px; font-weight: 600; color: var(--ink-soft); cursor: pointer; }
+.pwa-push-nudge { display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 14px; margin-bottom: 16px; border-radius: 18px; background: var(--paper); border: 1.5px solid var(--accent-soft); }
+.pwa-push-nudge-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pwa-push-nudge-text b { font-family: var(--font-display-th); font-weight: 500; font-size: 15px; }
+.pwa-push-nudge-text span { font-size: 13px; line-height: 1.45; color: var(--muted); }
+.pwa-cta:disabled, .pwa-banner-btn:disabled, .pwa-ghost:disabled { opacity: .6; cursor: default; }
