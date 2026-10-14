@@ -5,7 +5,7 @@
  * Rules, so the app never shows a stale site and never keeps what it shouldn't:
  *  - Pages always come from the network first. Only a short list of pages a
  *    member may want with no signal (bookings, Diary, calendar…) keeps a copy,
- *    used only when the network fails; anything else falls back to /offline.
+ *    used only when the network fails; anything else falls back to /offline.html.
  *  - Built JS/CSS (/_next/static, content-hashed) and icons are cached for good.
  *  - Event posters (/api/media) are cached, newest 80 kept.
  *  - API calls pass straight through, except the member's own booking list,
@@ -16,13 +16,14 @@
  *
  * Bump VERSION when these rules change; old caches are deleted on activate.
  */
-const VERSION = 'v1';
+const VERSION = 'v3';
 const STATIC = `asl-static-${VERSION}`;
 const PAGES = `asl-pages-${VERSION}`;
 const MEDIA = `asl-media-${VERSION}`;
 const USER = `asl-user-${VERSION}`;
 const KEEP = [STATIC, PAGES, MEDIA, USER];
 
+// public/offline.html; Cloudflare serves it at /offline (and redirects the .html form).
 const OFFLINE_URL = '/offline';
 const MEDIA_MAX = 80;
 
@@ -37,7 +38,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(PAGES)
-      .then((c) => c.addAll([OFFLINE_URL]))
+      .then(keepOfflinePage)
       .then(() => self.skipWaiting()),
   );
 });
@@ -56,7 +57,7 @@ self.addEventListener('message', (event) => {
   if (type === 'clear-user-data') {
     // Signed out: forget everything personal, including pages that showed it.
     event.waitUntil(
-      Promise.all([caches.delete(USER), caches.delete(PAGES)]).then(() => caches.open(PAGES).then((c) => c.add(OFFLINE_URL))),
+      Promise.all([caches.delete(USER), caches.delete(PAGES)]).then(() => caches.open(PAGES).then(keepOfflinePage)),
     );
   }
 });
@@ -86,6 +87,13 @@ self.addEventListener('fetch', (event) => {
   }
   // Everything else: untouched (straight to the network).
 });
+
+/** Store the offline page as a plain response: a redirected one cannot answer a navigation. */
+async function keepOfflinePage(cache) {
+  const res = await fetch(OFFLINE_URL, { cache: 'no-store' });
+  if (!res.ok) return;
+  await cache.put(OFFLINE_URL, new Response(await res.blob(), { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }));
+}
 
 async function pageFirst(req, url) {
   const path = url.pathname.replace(/\/$/, '') || '/';
