@@ -30,6 +30,8 @@ type Booking = {
   ws_workshop_type?: string;
   ws_day_times_json?: string | null;
   ws_require_consent?: number;
+  /** The round's picture, or its master's cover (fills the ticket stub). */
+  ws_image_url?: string | null;
   // selection workflow (joined + computed by GET /api/bookings?mine=1)
   app_status?: string;
   view_status?: string; // masked until announcement
@@ -892,7 +894,10 @@ export default function MyBookingsPage() {
                 <div key={b.id} className={`mb-ticket${isFlipped ? ' is-flipped' : ''}${t.dim ? ' is-dim' : ''}`} style={vars}>
                   <div className="mb-flip">
                     <div className="mb-face mb-front" inert={isFlipped}>
-                      <div className="mb-stub">
+                      <div
+                        className={`mb-stub${b.ws_image_url ? ' has-img' : ''}`}
+                        style={b.ws_image_url ? { backgroundImage: `url("${b.ws_image_url.replace(/"/g, '%22')}")` } : undefined}
+                      >
                         <div className="mb-stub-date">
                           <span className="mb-day">{sd ? sd.day : '—'}</span>
                           {sd && (

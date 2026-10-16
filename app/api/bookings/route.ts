@@ -102,8 +102,11 @@ export async function GET(request: Request) {
                 w.time_end as ws_time_end, w.day_times_json as ws_day_times_json, w.require_consent as ws_require_consent,
                 w.admission_type as ws_admission_type, w.payment_type as ws_payment_type,
                 w.deposit_amount as ws_deposit_amount, w.announce_at as ws_announce_at,
-                w.confirm_main_by as ws_confirm_main_by, w.confirm_waitlist_by as ws_confirm_waitlist_by
-         FROM bookings b LEFT JOIN workshops w ON b.workshop_id = w.id WHERE b.user_id = ? ORDER BY b.created_at DESC`;
+                w.confirm_main_by as ws_confirm_main_by, w.confirm_waitlist_by as ws_confirm_waitlist_by,
+                COALESCE(NULLIF(w.image_url, ''), m.cover_image_url) as ws_image_url
+         FROM bookings b LEFT JOIN workshops w ON b.workshop_id = w.id
+         LEFT JOIN workshop_masters m ON m.id = w.master_id
+         WHERE b.user_id = ? ORDER BY b.created_at DESC`;
       bindings = [user.sub];
     }
 

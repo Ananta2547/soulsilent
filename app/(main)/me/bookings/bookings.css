@@ -51,6 +51,12 @@
 .mb-front:hover { box-shadow: 0 16px 40px -16px rgba(13,30,29,.22); }
 
 .mb-stub { position: relative; height: 122px; flex-shrink: 0; box-sizing: border-box; padding: 18px 20px; display: flex; justify-content: space-between; align-items: flex-start; overflow: hidden; background: var(--stub-bg); color: var(--stub-ink); }
+/* With the journey's picture: the photo fills the stub (same size), darkened
+   just enough for the white date to read. The tag keeps the status colour. */
+.mb-stub.has-img { color: #fff; background-size: cover; background-position: center; }
+.mb-stub.has-img::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(13,30,29,.5) 0%, rgba(13,30,29,.28) 55%, rgba(13,30,29,.42) 100%); }
+.mb-stub.has-img .mb-day, .mb-stub.has-img .mb-my, .mb-stub.has-img .mb-wd-line, .mb-stub.has-img .mb-serial { text-shadow: 0 1px 8px rgba(0,0,0,.35); }
+.mb-stub.has-img .mb-sparkle { z-index: 1; }
 .mb-stub-date, .mb-stub-side { position: relative; z-index: 1; display: flex; flex-direction: column; }
 .mb-stub-date { gap: 6px; }
 .mb-stub-side { align-items: flex-end; gap: 10px; }
@@ -153,6 +159,7 @@
   .mb-my-year, .mb-my-wd { display: none; }
   .mb-wd-line { display: block; font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: .12em; opacity: .6; }
   .mb-stub-side { display: none; }
+  .mb-stub.has-img::before { background: rgba(13,30,29,.45); }
   .mb-sparkle { right: auto; left: -18px; bottom: -30px; font-size: 80px; opacity: 1; }
   .mb-perf { width: 0; height: auto; border-top: 0; border-left: 2px dashed rgba(13,30,29,.12); margin: 14px 0; }
   .mb-perf i:first-child, .mb-perf i:last-child { left: -12px; right: auto; }
