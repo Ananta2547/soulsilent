@@ -1,0 +1,198 @@
+/* My bookings ("My Bookings v2" design): every booking is a ticket of the same
+   size; the front holds only what matters now, ↻ flips it to the details.
+   Desktop: vertical tickets in a grid (stub on top). Under 760px: horizontal
+   tickets in a list (stub on the left). One DOM for both, switched here. */
+
+.mb-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; margin-bottom: 28px; }
+.mb-head h1 { font-size: clamp(38px, 5vw, 60px); margin: 18px 0 10px; }
+.mb-head p { margin: 0; color: var(--muted); font-size: 15px; }
+
+.mb-tabs { position: relative; flex-shrink: 0; width: 560px; max-width: 100%; box-sizing: border-box; padding: 4px; border-radius: 999px; background: var(--paper); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.mb-tabs-thumb { position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / 4); border-radius: 999px; background: var(--ink); transition: transform .45s cubic-bezier(.2,.7,.2,1); }
+.mb-tab { position: relative; z-index: 1; border: 0; background: transparent; color: var(--ink); font-family: inherit; font-size: 13.5px; font-weight: 600; padding: 10px 8px; border-radius: 999px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; transition: color .3s ease; }
+.mb-tab.is-on { color: #fff; }
+.mb-tab-count { font-family: 'JetBrains Mono', monospace; font-size: 11px; min-width: 20px; padding: 1px 6px; border-radius: 999px; background: var(--cream); color: var(--ink); box-sizing: border-box; }
+.mb-tab.is-on .mb-tab-count { background: var(--accent); }
+.mb-tab-short { display: none; }
+.mb-tab:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+.mb-stack { display: flex; flex-direction: column; gap: 14px; margin-bottom: 22px; }
+.mb-stack:empty { display: none; }
+.mb-stack .pwa-push-nudge { margin-bottom: 0; border: 0; }
+.mb-stack .pwa-push-bell { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--accent-soft); color: var(--ink); }
+
+.mb-paid { display: flex; align-items: center; gap: 14px; background: var(--teal); color: #fff; border-radius: 18px; padding: 14px 14px 14px 18px; }
+.mb-paid-icon { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,.18); display: grid; place-items: center; font-size: 18px; flex-shrink: 0; }
+.mb-paid-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.mb-paid-text b { font-family: Mitr, sans-serif; font-weight: 500; font-size: 16px; }
+.mb-paid-text span { font-size: 13.5px; opacity: .85; }
+
+.mb-note { border-radius: 14px; padding: 12px 16px; font-size: 14px; line-height: 1.55; }
+.mb-note.is-warn { background: #fdf1e7; color: #8a4b1a; }
+.mb-note.is-info { background: var(--teal-50); color: var(--teal-deep); }
+.mb-note.is-error { background: #fdecec; color: #9a2b2b; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.mb-note.is-error button { border: 1px solid #9a2b2b; background: transparent; color: #9a2b2b; border-radius: 999px; padding: 4px 14px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; }
+
+.mb-empty { position: relative; overflow: hidden; padding: 72px 32px; border-radius: 22px; background: var(--paper); text-align: center; color: var(--muted); }
+.mb-empty-word { font-family: 'Archivo Black', sans-serif; font-size: 120px; line-height: .88; letter-spacing: -.02em; color: var(--cream); margin-bottom: 18px; }
+.mb-empty p { margin: 0 0 18px; font-size: 15px; }
+.mb-empty.is-filtered { padding: 48px; }
+.mb-empty.is-filtered p { margin: 0; }
+
+/* ---------- tickets ---------- */
+.mb-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; }
+.mb-ticket { height: 350px; perspective: 1400px; }
+.mb-ticket.is-dim { opacity: .6; }
+.mb-flip { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform .7s cubic-bezier(.2,.7,.2,1); }
+.mb-ticket.is-flipped .mb-flip { transform: rotateY(180deg); }
+.mb-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 22px; overflow: hidden; box-sizing: border-box; }
+
+.mb-front { background: var(--paper); display: flex; flex-direction: column; transition: box-shadow .35s ease; }
+.mb-front:hover { box-shadow: 0 16px 40px -16px rgba(13,30,29,.22); }
+
+.mb-stub { position: relative; height: 122px; flex-shrink: 0; box-sizing: border-box; padding: 18px 20px; display: flex; justify-content: space-between; align-items: flex-start; overflow: hidden; background: var(--stub-bg); color: var(--stub-ink); }
+.mb-stub-date, .mb-stub-side { position: relative; z-index: 1; display: flex; flex-direction: column; }
+.mb-stub-date { gap: 6px; }
+.mb-stub-side { align-items: flex-end; gap: 10px; }
+.mb-day { font-family: 'Archivo Black', sans-serif; font-size: 56px; line-height: .85; letter-spacing: -.03em; }
+.mb-my { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; opacity: .8; }
+.mb-wd-line { display: none; }
+.mb-serial { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .16em; opacity: .6; }
+.mb-tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 999px; white-space: nowrap; background: var(--tag-bg); color: var(--tag-ink); }
+.mb-sparkle { position: absolute; right: -6px; bottom: -34px; font-size: 110px; line-height: 1; color: var(--accent); opacity: .9; transform: rotate(14deg); pointer-events: none; }
+
+.mb-perf { position: relative; height: 0; border-top: 2px dashed rgba(13,30,29,.12); margin: 0 18px; }
+.mb-perf i { position: absolute; top: -12px; width: 22px; height: 22px; border-radius: 50%; background: var(--cream); }
+.mb-perf i:first-child { left: -30px; }
+.mb-perf i:last-child { right: -30px; }
+
+.mb-body { flex: 1; min-height: 0; padding: 18px 20px 18px; display: flex; flex-direction: column; gap: 8px; }
+.mb-body-top { display: none; }
+.mb-title { font-family: var(--font-display-th); font-weight: 500; font-size: 19px; line-height: 1.3; margin: 0; height: 50px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; text-wrap: pretty; }
+.mb-title a { color: inherit; text-decoration: none; }
+.mb-title a:hover { color: var(--teal-deep); }
+.mb-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.mb-created { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.mb-price { font-family: 'Archivo Black', Mitr, sans-serif; font-size: 18px; flex-shrink: 0; }
+.mb-price.is-struck { color: var(--muted); text-decoration: line-through; }
+
+.mb-live-wrap { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
+.mb-live { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--live); white-space: nowrap; overflow: hidden; min-width: 0; }
+.mb-live-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--live-dot); box-shadow: 0 0 0 4px var(--live-halo); }
+.mb-live-text { overflow: hidden; text-overflow: ellipsis; }
+.mb-live-text b { font-family: 'Archivo Black', Mitr, sans-serif; font-weight: 400; font-variant-numeric: tabular-nums; color: var(--live-strong); }
+.mb-bar { height: 4px; border-radius: 999px; background: var(--cream); overflow: hidden; }
+.mb-bar span { display: block; height: 100%; border-radius: 999px; background: var(--live-dot); transition: width 1s linear; }
+
+.mb-actions { display: flex; gap: 8px; align-items: center; padding-top: 8px; }
+.mb-act { flex: 1; min-width: 0; height: 40px; padding: 0 14px; border: 0; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-family: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; text-decoration: none; cursor: pointer; transition: filter .18s ease; }
+.mb-act:hover { filter: brightness(.95); }
+.mb-act:disabled { opacity: .6; cursor: default; }
+.mb-act.is-teal { background: var(--teal); color: #fff; }
+.mb-act.is-soft { background: var(--teal-50); color: var(--teal-deep); }
+.mb-act.is-accent { background: var(--accent); color: var(--ink); }
+.mb-act.is-ghost { background: var(--cream); color: var(--ink); }
+.mb-act-short { display: none; }
+.mb-act:focus-visible, .mb-flip-btn:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.mb-flip-btn { width: 40px; height: 40px; flex-shrink: 0; border-radius: 50%; border: 0; background: var(--cream); color: var(--ink); font-size: 17px; cursor: pointer; display: grid; place-items: center; transition: background .18s ease, color .18s ease, transform .4s cubic-bezier(.2,.7,.2,1); }
+.mb-flip-btn:hover { background: var(--ink); color: #fff; transform: rotate(180deg); }
+
+.mb-back { transform: rotateY(180deg); background: var(--ink); color: #fff; padding: 22px; display: flex; flex-direction: column; gap: 14px; }
+.mb-back-head { display: flex; justify-content: space-between; align-items: center; }
+.mb-back-eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); }
+.mb-back-title { font-family: Mitr, sans-serif; font-weight: 500; font-size: 16px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mb-facts { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; font-size: 13px; margin: 0; }
+.mb-facts dt { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; opacity: .55; padding-top: 2px; }
+.mb-facts dd { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.mb-back-note { margin: 0; font-size: 12.5px; line-height: 1.55; color: rgba(255,255,255,.72); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; }
+.mb-back-actions { margin-top: auto; display: flex; gap: 8px; }
+.mb-back-actions .mb-act { padding: 0 10px; }
+.mb-act.is-glass { background: rgba(255,255,255,.1); color: #fff; }
+.mb-act.is-paper { background: var(--paper); color: var(--ink); }
+
+/* ---------- modals ---------- */
+.mb-modal { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 40px 16px; overflow-y: auto; background: rgba(13,30,29,.45); }
+.mb-modal-card { width: 100%; max-width: 420px; background: var(--paper); border-radius: 28px; box-shadow: 0 30px 80px -24px rgba(13,30,29,.5); box-sizing: border-box; overflow: hidden; }
+.mb-modal-card.is-center { text-align: center; padding: 36px 28px; }
+.mb-modal-icon { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font-size: 30px; margin: 0 auto 18px; }
+
+@media (max-width: 999px) {
+  .mb-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mb-head { flex-direction: column; align-items: stretch; gap: 20px; }
+  .mb-tabs { width: 100%; }
+}
+
+/* Phone: horizontal tickets, stub on the left. */
+@media (max-width: 759px) {
+  .mb-head { gap: 18px; margin-bottom: 18px; }
+  .mb-head h1 { margin: 14px 0 6px; }
+  .mb-head p { font-size: 14px; }
+  .mb-tab { flex-direction: column; gap: 1px; line-height: 1.2; font-size: 12px; padding: 8px 2px; min-height: 44px; }
+  .mb-tab-label { display: none; }
+  .mb-tab-short { display: inline; white-space: nowrap; }
+  .mb-tab-count, .mb-tab.is-on .mb-tab-count { order: -1; font-family: 'Archivo Black', sans-serif; font-size: 15px; padding: 0; min-width: 0; background: none; color: inherit; }
+  .mb-stack { gap: 12px; margin-bottom: 18px; }
+  .mb-paid { padding: 12px 12px 12px 14px; gap: 12px; }
+  .mb-paid-icon { width: auto; height: auto; background: none; }
+  .mb-paid-text b { font-size: 14.5px; }
+  .mb-paid-text span { font-size: 12px; }
+  .mb-stack .pwa-push-bell { width: 36px; height: 36px; }
+  .mb-empty { padding: 48px 20px; }
+  .mb-empty-word { font-size: 56px; margin-bottom: 14px; }
+  .mb-empty.is-filtered { padding: 36px; }
+
+  .mb-grid { display: flex; flex-direction: column; gap: 12px; }
+  .mb-ticket { height: 186px; perspective: 1200px; }
+  .mb-face { border-radius: 20px; }
+  .mb-front { flex-direction: row; }
+  .mb-front:hover { box-shadow: none; }
+  .mb-stub { width: 86px; height: auto; padding: 0; flex-direction: column; align-items: center; justify-content: center; }
+  .mb-stub-date { align-items: center; }
+  .mb-day { font-size: 40px; }
+  .mb-my { font-size: 10px; letter-spacing: .12em; }
+  .mb-my-year, .mb-my-wd { display: none; }
+  .mb-wd-line { display: block; font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: .12em; opacity: .6; }
+  .mb-stub-side { display: none; }
+  .mb-sparkle { right: auto; left: -18px; bottom: -30px; font-size: 80px; opacity: 1; }
+  .mb-perf { width: 0; height: auto; border-top: 0; border-left: 2px dashed rgba(13,30,29,.12); margin: 14px 0; }
+  .mb-perf i:first-child, .mb-perf i:last-child { left: -12px; right: auto; }
+  .mb-perf i:first-child { top: -26px; }
+  .mb-perf i:last-child { top: auto; bottom: -26px; }
+  .mb-body { min-width: 0; padding: 14px 14px 12px; gap: 6px; }
+  .mb-body-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+  .mb-body-top .mb-tag { font-size: 10px; padding: 4px 9px; overflow: hidden; text-overflow: ellipsis; min-width: 0; background: var(--soft-bg); color: var(--soft-ink); }
+  .mb-body-top .mb-price { font-size: 14px; }
+  .mb-title { font-size: 15.5px; height: 40px; }
+  .mb-meta { display: none; }
+  .mb-live-wrap { margin-top: 0; gap: 6px; }
+  .mb-live { font-size: 12px; gap: 6px; }
+  .mb-live-dot { width: 7px; height: 7px; box-shadow: 0 0 0 3px var(--live-halo); }
+  .mb-bar { height: 3px; }
+  .mb-actions { margin-top: auto; gap: 6px; padding-top: 0; }
+  .mb-act { font-size: 12.5px; padding: 0 12px; }
+  .mb-act-long { display: none; }
+  .mb-act-short { display: inline; }
+  .mb-flip-btn { font-size: 16px; }
+  .mb-flip-btn:hover { transform: none; }
+
+  .mb-back { padding: 14px 16px; gap: 6px; }
+  .mb-back-eyebrow { font-size: 10px; letter-spacing: .14em; }
+  .mb-back-title { display: none; }
+  .mb-facts { gap: 2px 12px; font-size: 12.5px; line-height: 1.4; }
+  .mb-facts dt { font-size: 10px; letter-spacing: .08em; padding-top: 1px; }
+  .mb-facts dd { white-space: nowrap; }
+  .mb-facts .mb-fact-amount { display: none; }
+  .mb-back-note { font-size: 11.5px; line-height: 1.5; -webkit-line-clamp: 3; }
+  .mb-back-actions { gap: 6px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mb-flip, .mb-tabs-thumb, .mb-flip-btn, .mb-bar span { transition: none; }
+}
+
+/* Phone: the reminder nudge keeps only its question, like the design. */
+@media (max-width: 759px) {
+  .mb-stack .pwa-push-nudge { gap: 10px; padding: 10px 6px 10px 12px; }
+  .mb-stack .pwa-push-nudge-text b { font-size: 14px; line-height: 1.3; }
+  .mb-stack .pwa-push-nudge-text span:not(.pwa-push-err) { display: none; }
+}

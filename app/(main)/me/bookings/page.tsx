@@ -1,17 +1,16 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { PushToggle } from '@/components/pwa/PushToggle';
 import { useLang, T, tr } from '@/lib/i18n';
 import { Reveal } from '@/components/design/Reveal';
 import { Btn } from '@/components/design/RippleButton';
-import { fmtDateTime, sqliteToMs } from '@/lib/datetime';
-import { AnnounceCountdown } from '@/components/workshops/AnnounceCountdown';
+import { fmtDate as fmtDateOnly, fmtDateTime, sqliteToMs } from '@/lib/datetime';
 import { ApplicationConsentModal } from '@/components/workshops/ApplicationConsentModal';
 import { isWorkshopOngoing, hasWorkshopEnded, getWorkshopStart, getWorkshopDays } from '@/lib/workshop-utils';
-import { Icon } from '@/components/design/Icon';
 import { useLoadingTracker } from '@/components/design/DataLoading';
+import './bookings.css';
 
 type Booking = {
   id: string;
@@ -181,9 +180,88 @@ function classify(b: Booking): Bucket {
   return outcome(b).bucket;
 }
 
-function fmtDate(d: string, lang: 'th' | 'en') {
-  return fmtDateTime(d, lang);
+
+/** What a ticket shows. Every booking maps to exactly one kind; the kind picks
+ *  the stub colours, the tag, the live line and the one action on the front. */
+type Kind =
+  | 'pay'
+  | 'paid_upcoming'
+  | 'paid_ongoing'
+  | 'sel_applied'
+  | 'sel_approved'
+  | 'sel_waitlist'
+  | 'done'
+  | 'other'
+  | 'refunded'
+  | 'expired'
+  | 'pending';
+
+/** [stub bg, stub ink], [tag bg, tag ink] on the stub, [tag bg, tag ink] on the phone body. */
+const PAL: Record<Kind, { stub: [string, string]; tag: [string, string]; soft: [string, string] }> = {
+  pay: { stub: ['var(--accent)', 'var(--ink)'], tag: ['var(--ink)', '#fff'], soft: ['#fde7d3', '#a04a14'] },
+  paid_upcoming: { stub: ['var(--teal)', '#fff'], tag: ['#fff', 'var(--teal-deep)'], soft: ['var(--teal)', '#fff'] },
+  paid_ongoing: { stub: ['var(--ink)', '#fff'], tag: ['var(--accent)', 'var(--ink)'], soft: ['var(--accent)', 'var(--ink)'] },
+  sel_applied: { stub: ['var(--cream-deep)', 'var(--ink)'], tag: ['#fff', 'var(--muted)'], soft: ['var(--cream-deep)', 'var(--muted)'] },
+  sel_approved: { stub: ['var(--teal-50)', 'var(--teal-deep)'], tag: ['var(--teal)', '#fff'], soft: ['#e7f3ee', 'var(--teal-deep)'] },
+  sel_waitlist: { stub: ['var(--accent-soft)', 'var(--ink)'], tag: ['#fff', '#a04a14'], soft: ['#fde7d3', '#a04a14'] },
+  done: { stub: ['var(--teal-deep)', '#fff'], tag: ['var(--accent)', 'var(--ink)'], soft: ['var(--teal-50)', 'var(--teal-deep)'] },
+  other: { stub: ['#fde7d3', '#a04a14'], tag: ['#fff', '#a04a14'], soft: ['#fde7d3', '#a04a14'] },
+  refunded: { stub: ['#fde7d3', '#a04a14'], tag: ['#fff', '#a04a14'], soft: ['#fde7d3', '#a04a14'] },
+  expired: { stub: ['var(--cream-deep)', 'var(--muted)'], tag: ['#fff', 'var(--muted)'], soft: ['var(--cream-deep)', 'var(--muted)'] },
+  pending: { stub: ['var(--cream-deep)', 'var(--ink)'], tag: ['#fff', 'var(--muted)'], soft: ['var(--cream-deep)', 'var(--muted)'] },
+};
+
+/** Colours of the live line: [text, strong text, dot, halo]. */
+type Tone = 'muted' | 'wait' | 'grey' | 'warn' | 'urgent' | 'red' | 'teal';
+const TONE: Record<Tone, [string, string, string, string]> = {
+  muted: ['var(--muted)', 'var(--ink)', 'var(--teal)', 'var(--teal-50)'],
+  wait: ['var(--muted)', 'var(--ink)', 'var(--accent)', '#fdf1e7'],
+  grey: ['var(--muted)', 'var(--ink)', 'var(--muted)', 'var(--cream)'],
+  warn: ['#a04a14', '#a04a14', 'var(--accent)', '#fdf1e7'],
+  urgent: ['#c0392b', '#c0392b', '#c0392b', '#fdf1e7'],
+  red: ['#c0392b', '#c0392b', '#c0392b', '#fde7d3'],
+  teal: ['var(--teal-deep)', 'var(--teal-deep)', 'var(--teal)', 'rgba(13,138,126,.22)'],
+};
+
+/** A pending hold lasts 10 minutes; the bar on a "pay" ticket shrinks over it. */
+const HOLD_SECONDS = 600;
+
+const MON = {
+  th: ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'],
+  en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+};
+const WD = {
+  th: ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'],
+  en: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+};
+const p2 = (n: number) => String(n).padStart(2, '0');
+
+/** Stub date parts from a "YYYY-MM-DD" day (no timezone shift: it is a Thai date). */
+function stubDate(day: string, lang: 'th' | 'en') {
+  const [y, m, d] = day.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  return {
+    day: p2(d),
+    month: MON[lang][m - 1],
+    year: String(lang === 'th' ? y + 543 : y),
+    weekday: WD[lang][new Date(Date.UTC(y, m - 1, d)).getUTCDay()],
+  };
 }
+
+/** Short ticket number from the booking id, e.g. "Nº 3F9A". */
+function serialOf(id: string): string {
+  return id.replace(/[^a-z0-9]/gi, '').slice(-4).toUpperCase();
+}
+
+type Ticket = {
+  kind: Kind;
+  tag: string;
+  live: { label: string; strong: string; tone: Tone };
+  barPct: number | null;
+  note: string;
+  dim: boolean;
+  struck: boolean;
+};
 
 /** Late-refund notices the user has already read, as "<bookingId>:<state>".
  *
@@ -194,6 +272,171 @@ const LATE_ACK_KEY = 'asl.lateRefundAck';
 
 function lateAckKey(b: { id: string; cancel_reason?: string | null }): string {
   return `${b.id}:${b.cancel_reason ?? ''}`;
+}
+
+/** The selection/payment facts every part of a ticket reads from. */
+function facts(b: Booking) {
+  const paid = b.payment_status === 'paid' || b.status === 'confirmed';
+  const isSelection = b.ws_admission_type === 'selection';
+  const view = b.view_status || 'applied';
+  // Approved selection seat awaiting the user's confirmation.
+  const awaitingConfirm = isSelection && view === 'approved' && !paid && !b.confirmed_at;
+  // Application submitted but payment not completed (incl. abandoned checkout /
+  // expired hold). Direct booking owes immediately; selection owes only after
+  // the seat is confirmed.
+  const owesPayment =
+    !paid &&
+    b.status !== 'cancelled' &&
+    b.payment_status === 'pending' &&
+    (b.amount || 0) > 0 &&
+    (isSelection ? !!b.confirmed_at : true);
+  // Only treat as a dead "expired hold" when there's nothing to resume.
+  const showExpired = isExpiredHold(b) && !owesPayment;
+  return { paid, isSelection, view, awaitingConfirm, owesPayment, showExpired };
+}
+
+/** Everything the front and back of one ticket need, at time `now`. */
+function ticketOf(b: Booking, now: number, lang: 'th' | 'en'): Ticket {
+  const f = facts(b);
+  const o = outcome(b);
+  const dim = f.showExpired || (b.status === 'cancelled' && !f.isSelection);
+  const base = { dim, struck: f.showExpired, barPct: null };
+
+  if (o.bucket === 'other') {
+    const remark = cancelRemark(o.reason, lang) || '';
+    const refunded = b.payment_status === 'refunded';
+    return {
+      ...base,
+      kind: refunded ? 'refunded' : 'other',
+      tag: refunded ? `↩ ${tr(lang, 'คืนเงินแล้ว', 'Refunded')}` : `✕ ${tr(lang, 'ไม่สำเร็จ', 'Unsuccessful')}`,
+      live: { label: tr(lang, 'หมายเหตุ:', 'Note:'), strong: remark || (refunded ? tr(lang, 'คืนเงินแล้ว', 'Refunded') : tr(lang, 'ยกเลิกแล้ว', 'Cancelled')), tone: 'red' },
+      note: remark ? `${tr(lang, 'หมายเหตุ: ', 'Note: ')}${remark}` : tr(lang, 'การจองนี้ไม่สำเร็จ', 'This booking did not go through.'),
+    };
+  }
+
+  if (o.bucket === 'done') {
+    return {
+      ...base,
+      kind: 'done',
+      tag: `✓ ${tr(lang, 'สำเร็จ', 'Completed')}`,
+      live: { label: tr(lang, 'เข้าร่วมครบทุกวันแล้ว', 'Attended every day'), strong: '✓', tone: 'teal' },
+      note: tr(lang, 'ขอบคุณที่มาด้วยกัน — กลับไปได้ตัวเอง.', 'Thank you for coming along.'),
+    };
+  }
+
+  if (f.owesPayment) {
+    const left = b.expires_at ? Math.max(0, Math.floor((sqliteToMs(b.expires_at) - now) / 1000)) : null;
+    const note = tr(
+      lang,
+      'ห้ามบันทึก QR ไว้จ่ายภายหลังหรือสแกนซ้ำ — จ่ายหลังหมดเวลา/จ่ายซ้ำ เงินจะถูกตัดแต่ระบบไม่รับชำระและไม่ได้ที่นั่งเพิ่ม',
+      'Do not save the QR to pay later or scan it twice — a late or repeat payment is deducted but rejected, and grants no extra seat.',
+    );
+    const tag = tr(lang, 'รอชำระเงิน', 'Pending payment');
+    if (left === null) {
+      return { ...base, kind: 'pay', tag, note, live: { label: tr(lang, 'รอชำระเงิน', 'Awaiting payment'), strong: '', tone: 'warn' } };
+    }
+    if (left === 0) {
+      return { ...base, kind: 'pay', tag, note, live: { label: `⛔ ${tr(lang, 'หมดเวลาชำระเงิน', 'Payment time expired')}`, strong: '', tone: 'red' } };
+    }
+    return {
+      ...base,
+      kind: 'pay',
+      tag,
+      note,
+      barPct: Math.min(100, (left / HOLD_SECONDS) * 100),
+      live: { label: tr(lang, 'ชำระภายใน', 'Pay within'), strong: `${p2(Math.floor(left / 60))}:${p2(left % 60)}`, tone: left <= 120 ? 'urgent' : 'warn' },
+    };
+  }
+
+  if (f.awaitingConfirm) {
+    return {
+      ...base,
+      kind: 'sel_approved',
+      tag: `✓ ${tr(lang, 'ผ่านการคัดเลือก', 'Approved')}`,
+      live: b.confirm_by
+        ? { label: tr(lang, 'ยืนยันสิทธิ์ภายใน', 'Confirm by'), strong: fmtDateTime(b.confirm_by, lang, 'short'), tone: 'warn' }
+        : { label: tr(lang, 'กรุณายืนยันสิทธิ์', 'Please confirm your seat'), strong: '', tone: 'warn' },
+      note: tr(
+        lang,
+        'คุณผ่านการคัดเลือก กรุณายืนยันสิทธิ์ภายในเวลาที่กำหนด ไม่เช่นนั้นสิทธิ์จะส่งต่อให้ตัวสำรอง',
+        'You were selected. Confirm within the deadline, or the seat passes to the waitlist.',
+      ),
+    };
+  }
+
+  if (f.isSelection && !f.paid && f.view === 'waitlisted') {
+    const rank = b.waitlist_rank ?? '—';
+    return {
+      ...base,
+      kind: 'sel_waitlist',
+      tag: tr(lang, `ตัวสำรอง #${rank}`, `Waitlist #${rank}`),
+      live: { label: tr(lang, 'รอเรียกตัวสำรอง ·', 'On the waitlist ·'), strong: tr(lang, `อันดับ ${rank}`, `#${rank}`), tone: 'wait' },
+      note: tr(lang, 'หากมีที่นั่งว่าง เราจะแจ้งคุณทันทีตามลำดับตัวสำรอง', 'If a seat opens up, we will tell you right away, in waitlist order.'),
+    };
+  }
+
+  if (f.isSelection && !f.paid) {
+    const announce = b.ws_announce_at ? new Date(b.ws_announce_at).getTime() : NaN;
+    const t = Number.isNaN(announce) ? 0 : Math.max(0, Math.floor((announce - now) / 1000));
+    return {
+      ...base,
+      kind: 'sel_applied',
+      tag: tr(lang, 'อยู่ระหว่างพิจารณา', 'Under review'),
+      live:
+        t > 0
+          ? {
+              label: tr(lang, 'ประกาศผลใน', 'Results in'),
+              strong: `${Math.floor(t / 86400)}${tr(lang, 'ว', 'd')} ${p2(Math.floor((t % 86400) / 3600))}:${p2(Math.floor((t % 3600) / 60))}:${p2(t % 60)}`,
+              tone: 'grey',
+            }
+          : { label: tr(lang, 'รอประกาศผล', 'Awaiting results'), strong: '', tone: 'grey' },
+      note: tr(lang, 'กิจกรรมนี้คัดเลือกผู้เข้าร่วม ผลจะแสดงที่นี่เมื่อถึงเวลาประกาศ', 'This journey selects its participants. The result shows here when it is announced.'),
+    };
+  }
+
+  if (f.paid && b.ws_date) {
+    if (bookingOngoing(b)) {
+      return {
+        ...base,
+        kind: 'paid_ongoing',
+        tag: `● ${tr(lang, 'กำลังจัดอยู่', 'Happening now')}`,
+        live: { label: tr(lang, 'กิจกรรมกำลังดำเนินอยู่', 'Event in progress'), strong: '', tone: 'teal' },
+        note: tr(lang, 'กิจกรรมกำลังดำเนินอยู่ ดูใบสมัครหรือแก้ไขความยินยอมการถ่ายภาพได้จากด้านหน้า', 'The event is on. View your application or change your photo consent from the front.'),
+      };
+    }
+    const t = Math.max(0, Math.floor((getWorkshopStart(wsShape(b)).getTime() - now) / 1000));
+    const d = Math.floor(t / 86400);
+    const h = Math.floor((t % 86400) / 3600);
+    return {
+      ...base,
+      kind: 'paid_upcoming',
+      tag: `✓ ${tr(lang, 'ชำระแล้ว', 'Paid')}`,
+      live: {
+        label: tr(lang, 'เริ่มในอีก', 'Starts in'),
+        strong: d > 0 ? tr(lang, `${d} วัน ${h} ชม.`, `${d}d ${h}h`) : `${p2(h)}:${p2(Math.floor((t % 3600) / 60))}:${p2(t % 60)}`,
+        tone: 'muted',
+      },
+      note: tr(lang, 'ที่นั่งของคุณได้รับการยืนยันแล้ว เราจะเตือนคืนก่อนวันและก่อนเริ่ม 2 ชั่วโมง', 'Your seat is confirmed. We will remind you the evening before and 2 hours before.'),
+    };
+  }
+
+  if (f.showExpired) {
+    return {
+      ...base,
+      kind: 'expired',
+      tag: tr(lang, 'หมดเวลาจอง', 'Hold expired'),
+      live: { label: `⛔ ${tr(lang, 'หมดเวลาจอง', 'Hold expired')}`, strong: '', tone: 'red' },
+      note: tr(lang, 'ที่นั่งถูกปล่อยแล้ว หากยังต้องการเข้าร่วม จองใหม่ได้หากยังมีที่นั่งว่าง', 'The seat was released. Book again while seats remain.'),
+    };
+  }
+
+  return {
+    ...base,
+    kind: 'pending',
+    tag: f.paid ? `✓ ${tr(lang, 'ยืนยันแล้ว', 'Confirmed')}` : tr(lang, 'รอดำเนินการ', 'Pending'),
+    live: { label: f.paid ? tr(lang, 'ยืนยันที่นั่งแล้ว', 'Seat confirmed') : tr(lang, 'รอดำเนินการ', 'Pending'), strong: '', tone: f.paid ? 'teal' : 'grey' },
+    note: tr(lang, 'ดูรายละเอียดกิจกรรมได้ที่หน้ากิจกรรม', 'See the journey page for details.'),
+  };
 }
 
 export default function MyBookingsPage() {
@@ -211,6 +454,10 @@ export default function MyBookingsPage() {
   const [filter, setFilter] = useState<'all' | 'active' | 'done' | 'other'>('all');
   const [slipUrl, setSlipUrl] = useState<string | null>(null);
   const [consentFor, setConsentFor] = useState<Booking | null>(null);
+  /** Tickets turned over to their back. Cleared when the tab changes. */
+  const [flipped, setFlipped] = useState<Record<string, boolean>>({});
+  /** One clock for every countdown on the page. */
+  const [now, setNow] = useState(() => Date.now());
   /** Set when a booking flips to paid while this page is open. */
   const [justPaid, setJustPaid] = useState<string | null>(null);
   /** Late-refund notices the user has acknowledged this visit. */
@@ -226,6 +473,8 @@ export default function MyBookingsPage() {
       return [];
     }
   });
+  /** Holds already reported as timed out, so each is sent to the server once. */
+  const expireSent = useRef<Set<string>>(new Set());
 
   // Only the first load raises the loading screen; the poll that refreshes this
   // page while a payment settles is left untracked by the tracker itself.
@@ -257,10 +506,10 @@ export default function MyBookingsPage() {
             const wasPending = new Set(
               prev.filter((b) => b.payment_status === 'pending' && b.status !== 'cancelled').map((b) => b.id),
             );
-            const flipped = next.find(
+            const flippedToPaid = next.find(
               (b) => wasPending.has(b.id) && (b.payment_status === 'paid' || b.status === 'confirmed'),
             );
-            if (flipped) setJustPaid(flipped.id);
+            if (flippedToPaid) setJustPaid(flippedToPaid.id);
             return next;
           });
         })
@@ -300,6 +549,28 @@ export default function MyBookingsPage() {
       load();
     })();
   }, [load]);
+
+  // Tick once a second for the countdowns on the tickets.
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // A hold that runs out while on screen: tell the server to close the checkout
+  // (kills a saved QR) and mark the booking, then refresh the list. Once per
+  // booking.
+  useEffect(() => {
+    const due = bookings.filter(
+      (b) => facts(b).owesPayment && b.expires_at && sqliteToMs(b.expires_at) <= now && !expireSent.current.has(b.id),
+    );
+    if (due.length === 0) return;
+    due.forEach((b) => expireSent.current.add(b.id));
+    Promise.all(
+      due.map((b) =>
+        fetch(`/api/bookings/${b.id}/expire`, { method: 'POST' }).catch((e) => console.error('Failed to expire booking', e)),
+      ),
+    ).then(() => load());
+  }, [bookings, now, load]);
 
   // Money arrived after the hold lapsed and is being sent back. Raised as a
   // popup because the row alone only says "cancelled", which tells someone who
@@ -386,7 +657,7 @@ export default function MyBookingsPage() {
         return;
       }
       if (data.checkoutUrl) {
-        window.location.href = data.checkoutUrl;
+        window.location.assign(data.checkoutUrl);
         return;
       }
       load();
@@ -407,7 +678,7 @@ export default function MyBookingsPage() {
         return;
       }
       if (data.checkoutUrl) {
-        window.location.href = data.checkoutUrl;
+        window.location.assign(data.checkoutUrl);
         return;
       }
       // Free workshop → confirmed without payment.
@@ -436,301 +707,296 @@ export default function MyBookingsPage() {
     );
   }
 
+  const counts = {
+    all: bookings.length,
+    active: bookings.filter((b) => classify(b) === 'active').length,
+    done: bookings.filter((b) => classify(b) === 'done').length,
+    other: bookings.filter((b) => classify(b) === 'other').length,
+  };
+  const actionCount = bookings.filter((b) => {
+    const f = facts(b);
+    return f.owesPayment || f.awaitingConfirm;
+  }).length;
+  const tabs: { key: 'all' | 'active' | 'done' | 'other'; label: string; short: string }[] = [
+    { key: 'all', label: tr(lang, 'ทั้งหมด', 'All'), short: tr(lang, 'ทั้งหมด', 'All') },
+    { key: 'active', label: tr(lang, 'กำลังดำเนินการ', 'In progress'), short: tr(lang, 'ดำเนินการ', 'Active') },
+    { key: 'done', label: tr(lang, 'สำเร็จ', 'Completed'), short: tr(lang, 'สำเร็จ', 'Done') },
+    { key: 'other', label: tr(lang, 'ไม่สำเร็จ', 'Unsuccessful'), short: tr(lang, 'ไม่สำเร็จ', 'Failed') },
+  ];
+  const tabIndex = Math.max(0, tabs.findIndex((t) => t.key === filter));
+  const filtered = filter === 'all' ? bookings : bookings.filter((b) => classify(b) === filter);
+
   return (
     <section className="section" style={{ paddingTop: 48, paddingBottom: 64 }}>
       <div className="container">
         <Reveal>
-          <span className="eyebrow">
-            <T th="โปรไฟล์ของฉัน" en="my account" />
-          </span>
-          <h1 className="display-th" style={{ fontSize: 'clamp(34px, 5vw, 60px)', margin: '18px 0 8px' }}>
-            <T th="การจองของฉัน" en="My bookings" />
-          </h1>
-          <p style={{ color: 'var(--muted)', fontSize: 15, marginBottom: 20 }}>
-            {tr(lang, 'ทั้งหมด', 'Total')} {bookings.length} {tr(lang, 'รายการ', 'bookings')}
-          </p>
-        </Reveal>
-
-        {/* Payment landed while the page was open. Shown prominently and left
-            up until dismissed — a user who does not see this is a user who
-            scans the QR again and pays twice. */}
-        {justPaid && (
-          <div
-            role="status"
-            style={{ background: '#e6f4f1', border: '1px solid #0d8a7e', color: '#0b5f57', borderRadius: 12, padding: '14px 16px', fontSize: 14.5, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}
-          >
-            <span style={{ fontSize: 20 }}>✓</span>
-            <strong>{tr(lang, 'ได้รับการชำระเงินแล้ว', 'Payment received')}</strong>
-            <span style={{ color: '#0b5f57' }}>
-              {tr(lang, 'ที่นั่งของคุณได้รับการยืนยันเรียบร้อย — ไม่ต้องสแกนจ่ายซ้ำ', 'Your seat is confirmed — no need to scan and pay again.')}
-            </span>
-            <button
-              type="button"
-              onClick={() => setJustPaid(null)}
-              style={{ marginLeft: 'auto', border: '1px solid #0d8a7e', background: 'transparent', color: '#0b5f57', borderRadius: 999, padding: '4px 14px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}
-            >
-              {tr(lang, 'รับทราบ', 'Got it')}
-            </button>
-          </div>
-        )}
-
-        {verifyFailed && (
-          <div style={{ background: '#fdf1e7', border: '1px solid #e8b98a', color: '#8a4b1a', borderRadius: 12, padding: '12px 16px', fontSize: 14, marginBottom: 16 }}>
-            {tr(lang, 'ยืนยันการชำระเงินอัตโนมัติไม่สำเร็จ หากคุณชำระเงินแล้วแต่สถานะยังไม่อัปเดต กรุณารีเฟรชหน้าอีกครั้งหรือติดต่อผู้ดูแล', 'Automatic payment verification failed. If you paid but the status has not updated, please refresh or contact the admin.')}
-          </div>
-        )}
-
-        {bookings.length > 0 && !offlineCopy && <PushToggle variant="nudge" />}
-
-        {offlineCopy && (
-          <div style={{ background: 'var(--teal-50)', border: '1px solid var(--teal-200)', color: 'var(--teal-deep)', borderRadius: 12, padding: '12px 16px', fontSize: 14, marginBottom: 16 }}>
-            {tr(lang, 'ตอนนี้ไม่มีอินเทอร์เน็ต — แสดงการจองล่าสุดที่บันทึกไว้ในเครื่อง สถานะอาจยังไม่อัปเดต', 'You are offline — showing the bookings last saved on this phone; statuses may be out of date.')}
-          </div>
-        )}
-
-        {loadError && (
-          <div style={{ background: '#fdecec', border: '1px solid #e6a5a5', color: '#9a2b2b', borderRadius: 12, padding: '12px 16px', fontSize: 14, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <span>{tr(lang, 'โหลดข้อมูลการจองไม่สำเร็จ', 'Failed to load your bookings')}</span>
-            <button type="button" onClick={() => { setLoading(true); load(); }} style={{ border: '1px solid #9a2b2b', background: 'transparent', color: '#9a2b2b', borderRadius: 999, padding: '4px 14px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}>
-              {tr(lang, 'ลองใหม่', 'Retry')}
-            </button>
-          </div>
-        )}
-
-        {/* Tabs */}
-        {(() => {
-          const counts = {
-            all: bookings.length,
-            active: bookings.filter((b) => classify(b) === 'active').length,
-            done: bookings.filter((b) => classify(b) === 'done').length,
-            other: bookings.filter((b) => classify(b) === 'other').length,
-          };
-          const tabs: { key: 'all' | 'active' | 'done' | 'other'; label: string }[] = [
-            { key: 'all', label: `${tr(lang, 'ทั้งหมด', 'All')} (${counts.all})` },
-            { key: 'active', label: `${tr(lang, 'กำลังดำเนินการ', 'In progress')} (${counts.active})` },
-            { key: 'done', label: `${tr(lang, 'สำเร็จ', 'Completed')} (${counts.done})` },
-            { key: 'other', label: `${tr(lang, 'ดำเนินการไม่สำเร็จ', 'Unsuccessful')} (${counts.other})` },
-          ];
-          return (
-            <div style={{ display: 'flex', gap: 8, marginBottom: 28, flexWrap: 'wrap' }}>
-              {tabs.map((t) => {
-                const on = filter === t.key;
-                return (
-                  <button
-                    key={t.key}
-                    type="button"
-                    onClick={() => setFilter(t.key)}
-                    style={{
-                      border: on ? '1px solid var(--teal)' : '1px solid var(--cream-deep)',
-                      background: on ? 'var(--teal)' : 'var(--paper)',
-                      color: on ? '#fff' : 'var(--ink)',
-                      borderRadius: 999,
-                      padding: '8px 18px',
-                      fontSize: 13.5,
-                      fontWeight: 600,
-                      fontFamily: 'inherit',
-                      cursor: 'pointer',
-                      transition: 'all .15s',
-                    }}
-                  >
-                    {t.label}
-                  </button>
-                );
-              })}
+          <div className="mb-head">
+            <div>
+              <span className="eyebrow">
+                <T th="โปรไฟล์ของฉัน" en="my account" />
+              </span>
+              <h1 className="display-th">
+                <T th="การจองของฉัน" en="My bookings" />
+              </h1>
+              <p>
+                {tr(lang, `ทั้งหมด ${counts.all} รายการ`, `${counts.all} bookings`)}
+                {actionCount > 0 && ` · ${tr(lang, `รอคุณดำเนินการ ${actionCount} รายการ`, `${actionCount} waiting on you`)}`}
+              </p>
             </div>
-          );
-        })()}
-
-        {(() => {
-          const filtered = filter === 'all' ? bookings : bookings.filter((b) => classify(b) === filter);
-          if (bookings.length === 0) {
-            return (
-              <div style={{ padding: 48, borderRadius: 22, background: 'var(--cream)', textAlign: 'center', color: 'var(--muted)' }}>
-                <p style={{ marginBottom: 14 }}>
-                  {tr(lang, 'ยังไม่มีการจอง — ลองดูกิจกรรมเร็ว ๆ นี้ดูสิ', 'No bookings yet — explore upcoming journeys')}
-                </p>
-                <Btn kind="teal" href="/journeys">
-                  {tr(lang, 'ดูกิจกรรมทั้งหมด', 'Browse journeys')} →
-                </Btn>
-              </div>
-            );
-          }
-          if (filtered.length === 0) {
-            return (
-              <div style={{ padding: 40, borderRadius: 22, background: 'var(--cream)', textAlign: 'center', color: 'var(--muted)' }}>
-                <p style={{ margin: 0 }}>{tr(lang, 'ไม่มีรายการในหมวดนี้', 'No bookings in this category')}</p>
-              </div>
-            );
-          }
-          return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {filtered.map((b) => {
-              const paid = b.payment_status === 'paid' || b.status === 'confirmed';
-              const expired = isExpiredHold(b);
-              const isSelection = b.ws_admission_type === 'selection';
-              const view = b.view_status || 'applied';
-              // Approved selection seat awaiting the user's confirmation.
-              const awaitingConfirm =
-                isSelection && view === 'approved' && !paid && !b.confirmed_at;
-              // Application submitted but payment not completed (incl. abandoned
-              // checkout / expired hold). Direct booking owes immediately;
-              // selection owes only after the seat is confirmed.
-              const owesPayment =
-                !paid &&
-                b.status !== 'cancelled' &&
-                b.payment_status === 'pending' &&
-                (b.amount || 0) > 0 &&
-                (isSelection ? !!b.confirmed_at : true);
-              // Only treat as a dead "expired hold" when there's nothing to resume.
-              const showExpired = expired && !owesPayment;
-              // Pending Announcement: applied to a selection workshop, result
-              // still masked, and an announcement datetime is set.
-              const pendingAnnounce = isSelection && view === 'applied' && !!b.ws_announce_at;
-
-              return (
-                <div
-                  key={b.id}
-                  className="card"
-                  style={{
-                    padding: 20,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 18,
-                    background: 'var(--paper)',
-                    flexWrap: 'wrap',
-                    opacity: showExpired || (b.status === 'cancelled' && !isSelection) ? 0.6 : 1,
+            <div className="mb-tabs" role="tablist" aria-label={tr(lang, 'หมวดการจอง', 'Booking categories')}>
+              <span className="mb-tabs-thumb" style={{ transform: `translateX(${tabIndex * 100}%)` }} aria-hidden="true" />
+              {tabs.map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={filter === t.key}
+                  className={`mb-tab${filter === t.key ? ' is-on' : ''}`}
+                  onClick={() => {
+                    setFilter(t.key);
+                    setFlipped({});
                   }}
                 >
-                  <Link href={`/journeys/${b.workshop_id}`} style={{ flex: 1, minWidth: 220, textDecoration: 'none', color: 'var(--ink)' }}>
-                    <h3 className="display-th" style={{ fontSize: 18, margin: '0 0 4px' }}>
-                      {b.workshop_title}
-                    </h3>
-                    <div className="mono" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
-                      {new Date(b.created_at).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </div>
-                    {awaitingConfirm && b.confirm_by && (
-                      <div style={{ fontSize: 12, color: '#a04a14', marginTop: 6 }}>
-                        {tr(lang, 'ยืนยันสิทธิ์ภายใน', 'Confirm by')} {fmtDate(b.confirm_by, lang)}
+                  <span className="mb-tab-label">{t.label}</span>
+                  <span className="mb-tab-short">{t.short}</span>
+                  <span className="mb-tab-count">{counts[t.key]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </Reveal>
+
+        <div className="mb-stack">
+          {/* Payment landed while the page was open. Shown prominently and left
+              up until dismissed — a user who does not see this is a user who
+              scans the QR again and pays twice. */}
+          {justPaid && (
+            <div role="status" className="mb-paid">
+              <span className="mb-paid-icon">✓</span>
+              <div className="mb-paid-text">
+                <b>{tr(lang, 'ได้รับการชำระเงินแล้ว', 'Payment received')}</b>
+                <span>
+                  {tr(lang, 'ที่นั่งของคุณได้รับการยืนยันเรียบร้อย — ไม่ต้องสแกนจ่ายซ้ำ', 'Your seat is confirmed — no need to scan and pay again.')}
+                </span>
+              </div>
+              <button type="button" onClick={() => setJustPaid(null)} className="btn btn-paper btn-sm" style={{ minHeight: 40 }}>
+                {tr(lang, 'รับทราบ', 'Got it')}
+              </button>
+            </div>
+          )}
+
+          {verifyFailed && (
+            <div className="mb-note is-warn">
+              {tr(lang, 'ยืนยันการชำระเงินอัตโนมัติไม่สำเร็จ หากคุณชำระเงินแล้วแต่สถานะยังไม่อัปเดต กรุณารีเฟรชหน้าอีกครั้งหรือติดต่อผู้ดูแล', 'Automatic payment verification failed. If you paid but the status has not updated, please refresh or contact the admin.')}
+            </div>
+          )}
+
+          {bookings.length > 0 && !offlineCopy && <PushToggle variant="nudge" />}
+
+          {offlineCopy && (
+            <div className="mb-note is-info">
+              {tr(lang, 'ตอนนี้ไม่มีอินเทอร์เน็ต — แสดงการจองล่าสุดที่บันทึกไว้ในเครื่อง สถานะอาจยังไม่อัปเดต', 'You are offline — showing the bookings last saved on this phone; statuses may be out of date.')}
+            </div>
+          )}
+
+          {loadError && (
+            <div className="mb-note is-error">
+              <span>{tr(lang, 'โหลดข้อมูลการจองไม่สำเร็จ', 'Failed to load your bookings')}</span>
+              <button type="button" onClick={() => { setLoading(true); load(); }}>
+                {tr(lang, 'ลองใหม่', 'Retry')}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {bookings.length === 0 ? (
+          <div className="mb-empty">
+            <div className="mb-empty-word" aria-hidden="true">NO TICKET</div>
+            <p>{tr(lang, 'ยังไม่มีการจอง — ลองดูกิจกรรมเร็ว ๆ นี้ดูสิ', 'No bookings yet — explore upcoming journeys')}</p>
+            <Btn kind="teal" href="/journeys">
+              {tr(lang, 'ดูกิจกรรมทั้งหมด', 'Browse journeys')} →
+            </Btn>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="mb-empty is-filtered">
+            <p>{tr(lang, 'ไม่มีรายการในหมวดนี้', 'No bookings in this category')}</p>
+          </div>
+        ) : (
+          <div className="mb-grid">
+            {filtered.map((b) => {
+              const f = facts(b);
+              const t = ticketOf(b, now, lang);
+              const pal = PAL[t.kind];
+              const [live, liveStrong, liveDot, liveHalo] = TONE[t.live.tone];
+              const isFlipped = !!flipped[b.id];
+              const toggle = () => setFlipped((s) => ({ ...s, [b.id]: !s[b.id] }));
+              const firstDay = b.ws_date ? getWorkshopDays(wsShape(b))[0] || b.ws_date : null;
+              const sd = firstDay ? stubDate(firstDay, lang) : null;
+              const serial = serialOf(b.id);
+              const price = (b.amount || 0) > 0 ? `฿${(b.amount || 0).toLocaleString()}` : tr(lang, 'ฟรี', 'Free');
+              const created = fmtDateOnly(sqliteToMs(b.created_at), lang);
+              const eventDate = b.ws_date ? fmtDateTime(getWorkshopStart(wsShape(b)), lang) : '—';
+              const busy = confirmingId === b.id;
+              const slipLabel =
+                b.ws_payment_type === 'deposit'
+                  ? tr(lang, 'ดูสลิปคืนมัดจำ', 'View deposit refund slip')
+                  : tr(lang, 'ดูสลิปโอนเงินคืน', 'View refund slip');
+
+              // The one action on the front of the ticket.
+              let act: { tone: 'teal' | 'soft' | 'accent' | 'ghost'; long: string; short: string; onClick?: () => void; href?: string; external?: boolean };
+              if (t.kind === 'pay') {
+                act = {
+                  tone: 'teal',
+                  long: busy ? tr(lang, 'กำลังดำเนินการ…', 'Processing…') : tr(lang, 'ดำเนินการชำระเงินต่อ', 'Continue payment'),
+                  short: busy ? '…' : tr(lang, 'ชำระเงินต่อ', 'Pay now'),
+                  onClick: () => resumePayment(b),
+                };
+              } else if (t.kind === 'sel_approved') {
+                const free = b.ws_payment_type === 'free';
+                act = {
+                  tone: 'teal',
+                  long: busy ? tr(lang, 'กำลังดำเนินการ…', 'Processing…') : free ? tr(lang, 'ยืนยันสิทธิ์', 'Confirm seat') : tr(lang, 'ยืนยัน & ชำระเงิน', 'Confirm & Pay'),
+                  short: busy ? '…' : free ? tr(lang, 'ยืนยันสิทธิ์', 'Confirm') : tr(lang, 'ยืนยัน & ชำระ', 'Confirm & Pay'),
+                  onClick: () => confirmSeat(b),
+                };
+              } else if (t.kind === 'paid_upcoming' && b.status === 'confirmed') {
+                act = { tone: 'soft', long: tr(lang, 'เพิ่มลงปฏิทิน', 'Add to calendar'), short: tr(lang, 'เพิ่มลงปฏิทิน', 'Add to calendar'), href: `/api/bookings/${b.id}/calendar`, external: true };
+              } else if (t.kind === 'paid_ongoing') {
+                act = { tone: 'accent', long: tr(lang, 'ดูใบสมัคร', 'View application'), short: tr(lang, 'ดูใบสมัคร', 'Application'), onClick: () => setConsentFor(b) };
+              } else if (b.refund_slip_url) {
+                act = { tone: 'soft', long: slipLabel, short: tr(lang, 'ดูสลิปคืนเงิน', 'Refund slip'), onClick: () => setSlipUrl(b.refund_slip_url || null) };
+              } else {
+                act = { tone: 'ghost', long: `${tr(lang, 'ดูกิจกรรม', 'View journey')} →`, short: `${tr(lang, 'ดูกิจกรรม', 'View journey')} →`, href: `/journeys/${b.workshop_id}` };
+              }
+              const actInner = (
+                <>
+                  <span className="mb-act-long">{act.long}</span>
+                  <span className="mb-act-short">{act.short}</span>
+                </>
+              );
+
+              const vars = {
+                '--stub-bg': pal.stub[0],
+                '--stub-ink': pal.stub[1],
+                '--tag-bg': pal.tag[0],
+                '--tag-ink': pal.tag[1],
+                '--soft-bg': pal.soft[0],
+                '--soft-ink': pal.soft[1],
+                '--live': live,
+                '--live-strong': liveStrong,
+                '--live-dot': liveDot,
+                '--live-halo': liveHalo,
+              } as React.CSSProperties;
+
+              return (
+                <div key={b.id} className={`mb-ticket${isFlipped ? ' is-flipped' : ''}${t.dim ? ' is-dim' : ''}`} style={vars}>
+                  <div className="mb-flip">
+                    <div className="mb-face mb-front" inert={isFlipped}>
+                      <div className="mb-stub">
+                        <div className="mb-stub-date">
+                          <span className="mb-day">{sd ? sd.day : '—'}</span>
+                          {sd && (
+                            <span className="mb-my">
+                              {sd.month}
+                              <span className="mb-my-year"> {sd.year}</span>
+                              <span className="mb-my-wd"> · {sd.weekday}</span>
+                            </span>
+                          )}
+                          {sd && <span className="mb-wd-line">{sd.weekday}</span>}
+                        </div>
+                        <div className="mb-stub-side">
+                          <span className="mb-tag">{t.tag}</span>
+                          <span className="mb-serial">Nº {serial}</span>
+                        </div>
+                        {t.kind === 'done' && <span className="mb-sparkle" aria-hidden="true">✺</span>}
                       </div>
-                    )}
-                    {owesPayment && b.expires_at && (
-                      <div style={{ marginTop: 6 }}>
-                        <PayCountdown bookingId={b.id} expiresAt={b.expires_at} onExpire={load} lang={lang} />
+                      <div className="mb-perf" aria-hidden="true"><i /><i /></div>
+                      <div className="mb-body">
+                        <div className="mb-body-top">
+                          <span className="mb-tag">{t.tag}</span>
+                          <span className={`mb-price${t.struck ? ' is-struck' : ''}`}>{price}</span>
+                        </div>
+                        <h3 className="mb-title">
+                          <Link href={`/journeys/${b.workshop_id}`}>{b.workshop_title}</Link>
+                        </h3>
+                        <div className="mb-meta">
+                          <span className="mb-created">{tr(lang, 'จองเมื่อ', 'Booked')} {created}</span>
+                          <span className={`mb-price${t.struck ? ' is-struck' : ''}`}>{price}</span>
+                        </div>
+                        <div className="mb-live-wrap">
+                          <div className="mb-live">
+                            <span className="mb-live-dot" />
+                            <span className="mb-live-text">
+                              {t.live.label} {t.live.strong && <b>{t.live.strong}</b>}
+                            </span>
+                          </div>
+                          {t.barPct !== null && (
+                            <div className="mb-bar"><span style={{ width: `${t.barPct}%` }} /></div>
+                          )}
+                        </div>
+                        <div className="mb-actions">
+                          {act.href ? (
+                            act.external ? (
+                              <a href={act.href} className={`mb-act is-${act.tone}`}>{actInner}</a>
+                            ) : (
+                              <Link href={act.href} className={`mb-act is-${act.tone}`}>{actInner}</Link>
+                            )
+                          ) : (
+                            <button type="button" className={`mb-act is-${act.tone}`} onClick={act.onClick} disabled={busy}>
+                              {actInner}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="mb-flip-btn"
+                            onClick={toggle}
+                            aria-label={tr(lang, 'พลิกดูรายละเอียด', 'Flip for details')}
+                            title={tr(lang, 'พลิกดูรายละเอียด', 'Flip for details')}
+                          >
+                            ↻
+                          </button>
+                        </div>
                       </div>
-                    )}
-                  </Link>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                    <StatusBadge booking={b} expired={showExpired} owesPayment={owesPayment} unsuccessful={classify(b) === 'other'} lang={lang} />
-
-                    <div style={{ fontFamily: 'Archivo Black, Mitr, sans-serif', fontSize: 18, color: showExpired ? 'var(--muted)' : 'var(--ink)', textDecoration: showExpired ? 'line-through' : 'none' }}>
-                      ฿{(b.amount || 0).toLocaleString()}
                     </div>
 
-                    {b.refund_slip_url && (
-                      <button
-                        type="button"
-                        onClick={() => setSlipUrl(b.refund_slip_url || null)}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--teal-50, #e6f4f1)', color: 'var(--teal-deep, #0f766e)', border: '1px solid var(--cream-deep)', borderRadius: 999, fontSize: 12.5, fontFamily: 'inherit', fontWeight: 600, cursor: 'pointer', padding: '8px 14px' }}
-                      >
-                        <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <rect x="4" y="3" width="16" height="18" rx="2" strokeWidth={1.7} />
-                          <path strokeLinecap="round" strokeWidth={1.7} d="M8 8h8M8 12h8M8 16h5" />
-                        </svg>
-                        {b.ws_payment_type === 'deposit'
-                          ? tr(lang, 'ดูสลิปคืนมัดจำ', 'View deposit refund slip')
-                          : tr(lang, 'ดูสลิปโอนเงินคืน', 'View refund slip')}
-                      </button>
-                    )}
-
-                    {/* Ongoing event → view application & edit PDPA consent */}
-                    {paid && bookingOngoing(b) && (
-                      <button
-                        type="button"
-                        onClick={() => setConsentFor(b)}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--accent, #f5c243)', color: 'var(--ink)', border: 0, borderRadius: 999, fontSize: 12.5, fontFamily: 'inherit', fontWeight: 700, cursor: 'pointer', padding: '8px 14px' }}
-                      >
-                        <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M9 12h6M9 16h4M8 4h8l4 4v12a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1z" />
-                        </svg>
-                        {tr(lang, 'ดูใบสมัคร', 'View application')}
-                      </button>
-                    )}
-
-                    {/* Booked seat, not over yet → add it to the phone's calendar (.ics). */}
-                    {paid && b.status === 'confirmed' && b.ws_date && !bookingEnded(b) && (
-                      <a
-                        href={`/api/bookings/${b.id}/calendar`}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--teal-50)', color: 'var(--teal-deep)', borderRadius: 999, fontSize: 12.5, fontWeight: 700, padding: '8px 14px', textDecoration: 'none' }}
-                      >
-                        <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" viewBox="0 0 24 24" aria-hidden="true">
-                          <rect x="3" y="5" width="18" height="16" rx="3" />
-                          <path d="M8 3v4M16 3v4M3 10h18M12 13v5M9.5 15.5h5" />
-                        </svg>
-                        {tr(lang, 'เพิ่มลงปฏิทิน', 'Add to calendar')}
-                      </a>
-                    )}
-
-                    {awaitingConfirm && (
-                      <Btn kind="teal" onClick={() => confirmSeat(b)} disabled={confirmingId === b.id} style={{ justifyContent: 'center' }}>
-                        {confirmingId === b.id
-                          ? tr(lang, 'กำลังดำเนินการ…', 'Processing…')
-                          : b.ws_payment_type === 'free'
-                            ? tr(lang, 'ยืนยันสิทธิ์', 'Confirm seat')
-                            : tr(lang, 'ยืนยัน & ชำระเงิน', 'Confirm & Pay')}
-                      </Btn>
-                    )}
-
-                    {owesPayment && (
-                      <>
-                        <Btn kind="teal" onClick={() => resumePayment(b)} disabled={confirmingId === b.id} style={{ justifyContent: 'center' }}>
-                          {confirmingId === b.id ? tr(lang, 'กำลังดำเนินการ…', 'Processing…') : tr(lang, 'ดำเนินการชำระเงินต่อ', 'Continue payment')}
-                        </Btn>
-                        <button
-                          type="button"
-                          onClick={() => cancel(b)}
-                          disabled={cancellingId === b.id}
-                          style={{ background: 'transparent', border: '1px solid var(--cream-deep)', borderRadius: 999, color: 'var(--muted)', fontSize: 12.5, fontFamily: 'inherit', fontWeight: 600, cursor: 'pointer', padding: '8px 14px' }}
-                        >
-                          {cancellingId === b.id ? tr(lang, 'กำลังยกเลิก...', 'Cancelling...') : tr(lang, 'ยกเลิกการจอง', 'Cancel booking')}
+                    <div className="mb-face mb-back" inert={!isFlipped}>
+                      <div className="mb-back-head">
+                        <span className="mb-back-eyebrow">{tr(lang, 'รายละเอียดการจอง', 'Booking details')}</span>
+                        <span className="mb-serial">Nº {serial}</span>
+                      </div>
+                      <div className="mb-back-title">{b.workshop_title}</div>
+                      <dl className="mb-facts">
+                        <dt>{tr(lang, 'วันกิจกรรม', 'Date')}</dt>
+                        <dd>{eventDate}</dd>
+                        <dt>{tr(lang, 'จองเมื่อ', 'Booked')}</dt>
+                        <dd>{created}</dd>
+                        <dt className="mb-fact-amount">{tr(lang, 'ยอด', 'Amount')}</dt>
+                        <dd className="mb-fact-amount">{price}</dd>
+                      </dl>
+                      <p className="mb-back-note">{t.note}</p>
+                      <div className="mb-back-actions">
+                        {f.owesPayment && (
+                          <button type="button" className="mb-act is-glass" onClick={() => cancel(b)} disabled={cancellingId === b.id}>
+                            {cancellingId === b.id ? tr(lang, 'กำลังยกเลิก...', 'Cancelling...') : tr(lang, 'ยกเลิกการจอง', 'Cancel booking')}
+                          </button>
+                        )}
+                        {b.refund_slip_url && (
+                          <button type="button" className="mb-act is-glass" onClick={() => setSlipUrl(b.refund_slip_url || null)}>
+                            <span className="mb-act-long">{slipLabel}</span>
+                            <span className="mb-act-short">{tr(lang, 'ดูสลิป', 'Slip')}</span>
+                          </button>
+                        )}
+                        <button type="button" className="mb-act is-paper" onClick={toggle}>
+                          ↻ {tr(lang, 'พลิกกลับ', 'Flip back')}
                         </button>
-                      </>
-                    )}
-                  </div>
-
-                  {/* No countdowns on an unsuccessful/cancelled card. */}
-                  {pendingAnnounce && classify(b) !== 'other' && (
-                    <div style={{ flexBasis: '100%' }}>
-                      <AnnounceCountdown
-                        announceAt={b.ws_announce_at!}
-                        heading={tr(lang, 'รอประกาศผล — จะประกาศวันที่', 'Pending announcement — results on')}
-                      />
-                    </div>
-                  )}
-
-                  {/* Secured seat, event not over → countdown to the start (In Progress). */}
-                  {paid && b.ws_date && !bookingEnded(b) && classify(b) !== 'other' && (
-                    <div style={{ flexBasis: '100%' }}>
-                      <StartCountdown booking={b} lang={lang} />
-                    </div>
-                  )}
-
-                  {/* Unsuccessful → red remark, no actions/countdown. */}
-                  {(() => {
-                    const o = outcome(b);
-                    const remark = o.bucket === 'other' ? cancelRemark(o.reason, lang) : null;
-                    return remark ? (
-                      <div style={{ flexBasis: '100%', color: '#c0392b', fontSize: 13, fontWeight: 600 }}>
-                        {tr(lang, 'หมายเหตุ: ', 'Note: ')}{remark}
                       </div>
-                    ) : null;
-                  })()}
+                    </div>
+                  </div>
                 </div>
               );
             })}
           </div>
-          );
-        })()}
+        )}
       </div>
 
       {consentFor && (
@@ -756,11 +1022,12 @@ export default function MyBookingsPage() {
 
       {slipUrl && (
         <div
+          className="mb-modal"
+          style={{ background: 'rgba(13,30,29,.55)' }}
           onMouseDown={(e) => { if (e.target === e.currentTarget) setSlipUrl(null); }}
-          style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(13,30,29,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 16px' }}
         >
-          <div style={{ width: '100%', maxWidth: 420, background: 'var(--paper)', borderRadius: 22, boxShadow: '0 30px 80px -24px rgba(13,30,29,.5)', overflow: 'hidden' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--cream-deep)' }}>
+          <div className="mb-modal-card">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px' }}>
               <span className="display-th" style={{ fontSize: 16 }}>
                 <T th="สลิปคืนมัดจำ" en="Refund slip" />
               </span>
@@ -773,11 +1040,11 @@ export default function MyBookingsPage() {
                 <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
-            <div style={{ padding: 16, textAlign: 'center', background: 'var(--cream)' }}>
+            <div style={{ padding: '0 16px 12px', textAlign: 'center' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={slipUrl} alt="refund slip" style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: 12, display: 'inline-block' }} />
+              <img src={slipUrl} alt="refund slip" style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: 14, display: 'inline-block', background: 'var(--cream)' }} />
             </div>
-            <div style={{ padding: '12px 16px', borderTop: '1px solid var(--cream-deep)', textAlign: 'center' }}>
+            <div style={{ padding: '0 16px 16px', textAlign: 'center' }}>
               <a href={slipUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12.5, color: 'var(--teal-deep)', fontWeight: 600, textDecoration: 'none' }}>
                 {tr(lang, 'เปิดรูปเต็ม ↗', 'Open full image ↗')}
               </a>
@@ -808,14 +1075,9 @@ export default function MyBookingsPage() {
           }
         };
         return (
-          <div
-            onMouseDown={(e) => { if (e.target === e.currentTarget) dismiss(); }}
-            style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(13,30,29,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}
-          >
-            <div style={{ width: '100%', maxWidth: 460, background: 'var(--paper)', borderRadius: 22, boxShadow: '0 30px 80px -24px rgba(13,30,29,.5)', padding: '34px 28px' }}>
-              <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#fdf1e7', color: '#a04a14', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, margin: '0 auto 18px' }}>
-                ↩
-              </div>
+          <div className="mb-modal" onMouseDown={(e) => { if (e.target === e.currentTarget) dismiss(); }}>
+            <div className="mb-modal-card" style={{ maxWidth: 460, padding: '34px 28px' }}>
+              <div className="mb-modal-icon" style={{ background: '#fdf1e7', color: '#a04a14' }}>↩</div>
               <h2 className="display-th" style={{ fontSize: 21, margin: '0 0 12px', textAlign: 'center' }}>
                 {tr(lang, 'ชำระเงินหลังหมดเวลา — ระบบคืนเงินให้แล้ว', 'Paid after the deadline — your money is on its way back')}
               </h2>
@@ -826,7 +1088,7 @@ export default function MyBookingsPage() {
                   `We received your payment for "${lateRefund.workshop_title || 'the workshop'}" after the 10-minute window closed, so the seat had already been released to someone else.`,
                 )}
               </p>
-              <div style={{ background: done ? '#e6f4f1' : '#fdf1e7', border: `1px solid ${done ? '#0d8a7e' : '#e8b98a'}`, color: done ? '#0b5f57' : '#8a4b1a', borderRadius: 14, padding: '13px 16px', fontSize: 13.5, lineHeight: 1.65, marginBottom: 20 }}>
+              <div style={{ background: done ? '#e6f4f1' : '#fdf1e7', color: done ? '#0b5f57' : '#8a4b1a', borderRadius: 14, padding: '13px 16px', fontSize: 13.5, lineHeight: 1.65, marginBottom: 20 }}>
                 {done
                   ? tr(
                       lang,
@@ -864,12 +1126,9 @@ export default function MyBookingsPage() {
       })()}
 
       {thankYou && (
-        <div
-          onMouseDown={(e) => { if (e.target === e.currentTarget) setThankYou(false); }}
-          style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(13,30,29,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 16px' }}
-        >
-          <div style={{ width: '100%', maxWidth: 420, background: 'var(--paper)', borderRadius: 22, boxShadow: '0 30px 80px -24px rgba(13,30,29,.5)', textAlign: 'center', padding: '36px 28px' }}>
-            <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--teal)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, margin: '0 auto 18px' }}>✓</div>
+        <div className="mb-modal" onMouseDown={(e) => { if (e.target === e.currentTarget) setThankYou(false); }}>
+          <div className="mb-modal-card is-center">
+            <div className="mb-modal-icon" style={{ background: 'var(--teal)', color: '#fff', fontSize: 32 }}>✓</div>
             <h2 className="display-th" style={{ fontSize: 22, margin: '0 0 10px' }}>
               <T th="ส่งใบสมัครสำเร็จ" en="Application Submitted Successfully" />
             </h2>
@@ -884,158 +1143,4 @@ export default function MyBookingsPage() {
       )}
     </section>
   );
-}
-
-/** Countdown to the event start for a secured seat. Once the event is running it
- *  switches to "กิจกรรมกำลังดำเนินอยู่". Shown only in the In Progress tab. */
-function StartCountdown({ booking: b, lang }: { booking: Booking; lang: 'th' | 'en' }) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  if (bookingOngoing(b)) {
-    return (
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 700, color: 'var(--teal-deep)' }}>
-        <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--teal)', display: 'inline-block' }} />
-        {tr(lang, 'กิจกรรมกำลังดำเนินอยู่', 'Event in progress')}
-      </span>
-    );
-  }
-
-  const startMs = getWorkshopStart(wsShape(b)).getTime();
-  const total = Math.max(0, Math.floor((startMs - now) / 1000));
-  const d = Math.floor(total / 86400);
-  const h = Math.floor((total % 86400) / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-  const parts = d > 0
-    ? tr(lang, `${d} วัน ${h} ชม.`, `${d}d ${h}h`)
-    : `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: 'var(--muted)' }}>
-      <Icon name="duration" size={14} /> {tr(lang, 'เริ่มในอีก', 'Starts in')}{' '}
-      <span style={{ fontFamily: 'Archivo Black, Mitr, sans-serif', fontVariantNumeric: 'tabular-nums', color: 'var(--ink)' }}>{parts}</span>
-    </span>
-  );
-}
-
-/** Live mm:ss countdown to the 10-min auto-cancel deadline. Calls onExpire once. */
-function PayCountdown({ bookingId, expiresAt, onExpire, lang }: { bookingId: string; expiresAt: string; onExpire: () => void; lang: 'th' | 'en' }) {
-  const [now, setNow] = useState(() => Date.now());
-  const [done, setDone] = useState(false);
-  const targetMs = sqliteToMs(expiresAt);
-  useEffect(() => {
-    if (Date.now() >= targetMs) {
-      setDone(true);
-      return;
-    }
-    const id = setInterval(() => {
-      setNow(Date.now());
-      if (targetMs - Date.now() <= 0) {
-        clearInterval(id);
-        setDone(true);
-      }
-    }, 1000);
-    return () => clearInterval(id);
-  }, [targetMs]);
-
-  // On timeout: tell the server to close the checkout (kills a saved
-  // QR) + mark the booking, then refresh the list. Runs once.
-  useEffect(() => {
-    if (!done) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        await fetch(`/api/bookings/${bookingId}/expire`, { method: 'POST' });
-      } catch (e) {
-        console.error('Failed to expire booking', e);
-      }
-      if (!cancelled) onExpire();
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [done, bookingId, onExpire]);
-
-  if (done) {
-    return (
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: '#c0392b' }}>
-        ⛔ {tr(lang, 'หมดเวลาชำระเงิน', 'Payment time expired')}
-      </span>
-    );
-  }
-
-  const total = Math.max(0, Math.floor((targetMs - now) / 1000));
-  const mm = String(Math.floor(total / 60)).padStart(2, '0');
-  const ss = String(total % 60).padStart(2, '0');
-  const urgent = total <= 120;
-  return (
-    <span style={{ display: 'block' }}>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: urgent ? '#c0392b' : '#a04a14' }}>
-        <Icon name="duration" size={14} /> {tr(lang, 'ชำระเงินภายใน', 'Pay within')}{' '}
-        <span style={{ fontFamily: 'Archivo Black, Mitr, sans-serif', fontVariantNumeric: 'tabular-nums', letterSpacing: '.02em' }}>
-          {mm}:{ss}
-        </span>{' '}
-        {tr(lang, 'นาที ไม่งั้นจะยกเลิกอัตโนมัติ', "or it's auto-cancelled")}
-      </span>
-      <span style={{ display: 'block', marginTop: 4, fontSize: 11.5, lineHeight: 1.4, color: '#c0392b' }}>
-        {tr(
-          lang,
-          'กรุณาชำระเงินภายในเวลาที่กำหนด ห้ามบันทึก QR ไว้จ่ายภายหลังหรือสแกนซ้ำ — จ่ายหลังหมดเวลา/จ่ายซ้ำ เงินจะถูกตัดจากบัญชีแต่ระบบไม่รับชำระและไม่ได้ที่นั่งเพิ่ม (ธนาคารจะคืนเงินให้ภายหลัง)',
-          'Pay within the time limit. Do not save this QR to pay later or scan it twice — a late or repeat payment is deducted by your bank but rejected by us and grants no extra seat (your bank returns the money later).',
-        )}
-      </span>
-    </span>
-  );
-}
-
-function StatusBadge({ booking: b, expired, owesPayment, unsuccessful, lang }: { booking: Booking; expired?: boolean; owesPayment?: boolean; unsuccessful?: boolean; lang: 'th' | 'en' }) {
-  const isSelection = b.ws_admission_type === 'selection';
-  const paid = b.payment_status === 'paid' || b.status === 'confirmed';
-
-  // Refunds keep their own badge; every other Unsuccessful card reads uniformly.
-  if (unsuccessful && b.payment_status !== 'refunded') {
-    return <span className="tag" style={{ background: '#fde7d3', color: '#a04a14', fontWeight: 700 }}>✕ {tr(lang, 'ดำเนินการไม่สำเร็จ', 'Unsuccessful')}</span>;
-  }
-
-  // Awaiting payment (application submitted, checkout not completed).
-  if (owesPayment) {
-    return <span className="tag tag-warn"><Icon name="duration" size={12} /> {tr(lang, 'รอชำระเงิน', 'Pending payment')}</span>;
-  }
-
-  // Selection-specific badges (use the masked view_status).
-  if (isSelection && !paid) {
-    const view = b.view_status || 'applied';
-    if (view === 'applied') {
-      return <span className="tag" style={{ background: 'var(--cream-deep)', color: 'var(--muted)' }}><Icon name="duration" size={12} /> {tr(lang, 'อยู่ระหว่างพิจารณา', 'Under review')}</span>;
-    }
-    if (view === 'approved') {
-      return <span className="tag" style={{ background: '#e7f3ee', color: 'var(--teal-deep)' }}>{tr(lang, '✓ ผ่านการคัดเลือก', '✓ Approved')}</span>;
-    }
-    if (view === 'waitlisted') {
-      return <span className="tag tag-warn">{tr(lang, `ตัวสำรอง อันดับ ${b.waitlist_rank ?? '—'}`, `Waitlist #${b.waitlist_rank ?? '—'}`)}</span>;
-    }
-    if (view === 'rejected') {
-      return <span className="tag" style={{ background: '#fde7d3', color: '#a04a14', fontWeight: 700 }}>✕ {tr(lang, 'สิทธิ์การเข้าร่วมเต็มแล้ว', 'Participation slots are full')}</span>;
-    }
-  }
-
-  if (expired) {
-    return <span className="tag" style={{ background: 'var(--cream-deep)', color: 'var(--muted)' }}><Icon name="duration" size={12} /> {tr(lang, 'หมดเวลาจอง', 'hold expired')}</span>;
-  }
-  if (b.status === 'cancelled') {
-    if (b.payment_status === 'refunded') {
-      return <span className="tag" style={{ background: '#fde7d3', color: '#a04a14' }}>↩ {tr(lang, 'คืนเงินแล้ว', 'refunded')}</span>;
-    }
-    return <span className="tag" style={{ background: 'var(--cream-deep)', color: 'var(--muted)' }}>× {tr(lang, 'ยกเลิกแล้ว', 'cancelled')}</span>;
-  }
-  if (paid) {
-    return <span className="tag" style={{ background: 'var(--teal)', color: '#fff' }}>✓ {tr(lang, 'ชำระแล้ว', 'paid')}</span>;
-  }
-  if (b.payment_status === 'pending') {
-    return <span className="tag tag-warn">{tr(lang, 'รอชำระ', 'pending')}</span>;
-  }
-  return <span className="tag">{b.status}</span>;
 }
