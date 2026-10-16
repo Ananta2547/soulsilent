@@ -2,7 +2,8 @@
 
 /**
  * Turn app notifications on/off for this device.
- *  - variant "full" (on /app): always shown, explains every state.
+ *  - variant "full" (on /app): always shown, explains every state; once on,
+ *    lets the member pick which kinds they get (PushPrefs).
  *  - variant "nudge" (on My bookings): a small card only while notifications
  *    are off and could be turned on; closing it keeps it away for 30 days.
  */
@@ -68,7 +69,7 @@ export function PushToggle({ variant = 'full' }: { variant?: 'full' | 'nudge' })
           <span>
             {state === 'install-first'
               ? tr(lang, 'บน iPhone ต้องติดตั้งแอปก่อน แล้วเปิดการแจ้งเตือนจากในแอป', 'On iPhone, install the app first, then turn reminders on inside it')
-              : tr(lang, 'แจ้งเมื่อจองสำเร็จ เตือนคืนก่อนวัน และก่อนเริ่ม 2 ชั่วโมง', 'Booking confirmed, the evening before, and 2 hours before')}
+              : tr(lang, 'เตือนคืนก่อนวันและก่อนเริ่ม 2 ชั่วโมง และแจ้งทันทีถ้ากิจกรรมเลื่อนหรือยกเลิก', 'The evening before, 2 hours before, and right away if your round moves or is cancelled')}
           </span>
           {err && <span className="pwa-push-err">{err}</span>}
         </div>
@@ -97,8 +98,8 @@ export function PushToggle({ variant = 'full' }: { variant?: 'full' | 'nudge' })
   }
 
   const text: Record<PushState, string> = {
-    on: tr(lang, 'เปิดอยู่บนเครื่องนี้ — จะแจ้งเมื่อจองสำเร็จ เตือนคืนก่อนวัน และก่อนเริ่ม 2 ชั่วโมง', 'On for this device — booking confirmed, the evening before, and 2 hours before'),
-    off: tr(lang, 'แจ้งเมื่อจองสำเร็จ เตือนคืนก่อนวันกิจกรรม และก่อนเริ่ม 2 ชั่วโมง', 'Booking confirmed, the evening before, and 2 hours before your day'),
+    on: tr(lang, 'เปิดอยู่บนเครื่องนี้ เลือกได้ว่าอยากรับเรื่องไหน', 'On for this device. Choose what you want to hear about.'),
+    off: tr(lang, 'แจ้งเมื่อจองสำเร็จ เตือนคืนก่อนวันและก่อนเริ่ม 2 ชั่วโมง และแจ้งทันทีถ้ากิจกรรมเลื่อนหรือยกเลิก', 'Booking confirmed, the evening before, 2 hours before, and right away if your round moves or is cancelled'),
     'install-first': tr(lang, 'บน iPhone / iPad ต้องติดตั้งแอปตามขั้นตอนด้านบนก่อน แล้วเปิดแอปจากไอคอนเพื่อเปิดการแจ้งเตือน', 'On iPhone/iPad, install the app above first, then open it from the icon to turn notifications on'),
     denied: tr(lang, 'เครื่องนี้ปิดการแจ้งเตือนของเว็บไว้ เปิดได้ในการตั้งค่าของเบราว์เซอร์ (ไอคอนแม่กุญแจข้าง URL)', 'Notifications are blocked for this site — allow them in your browser settings'),
     unsupported: tr(lang, 'เบราว์เซอร์นี้ยังไม่รองรับการแจ้งเตือน ลองใช้ Chrome หรือ Safari ล่าสุด', 'This browser does not support notifications — try the latest Chrome or Safari'),
@@ -120,11 +121,118 @@ export function PushToggle({ variant = 'full' }: { variant?: 'full' | 'nudge' })
           {busy ? tr(lang, 'กำลังเปิด…', 'Turning on…') : tr(lang, 'เปิดการแจ้งเตือน', 'Turn on notifications')}
         </button>
       )}
+      {state === 'on' && <PushPrefs />}
       {state === 'on' && (
         <button type="button" className="pwa-ghost" disabled={busy} onClick={turnOff}>
           {tr(lang, 'ปิดการแจ้งเตือนบนเครื่องนี้', 'Turn off on this device')}
         </button>
       )}
+    </div>
+  );
+}
+
+type Kind = 'booking' | 'reminder' | 'host';
+
+/** Which kinds of notification to get, for every device of this member.
+ *  Moves and cancellations are listed but locked on. */
+function PushPrefs() {
+  const { lang } = useLang();
+  const [off, setOff] = useState<Kind[] | null>(null);
+  const [host, setHost] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/push/prefs')
+      .then((r) => (r.ok ? (r.json() as Promise<{ off: Kind[]; host: boolean }>) : null))
+      .then((d) => {
+        if (!alive || !d) return;
+        setOff(d.off);
+        setHost(d.host);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  if (!off) return null;
+
+  const toggle = async (k: Kind) => {
+    const next = off.includes(k) ? off.filter((x) => x !== k) : [...off, k];
+    const prev = off;
+    setOff(next);
+    setSaving(true);
+    setErr('');
+    try {
+      const r = await fetch('/api/push/prefs', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ off: next }),
+      });
+      if (!r.ok) throw new Error();
+    } catch {
+      setOff(prev);
+      setErr(tr(lang, 'บันทึกไม่สำเร็จ ลองอีกครั้ง', 'Could not save, try again'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const rows: { k: Kind | 'change'; title: string; sub: string }[] = [
+    {
+      k: 'change',
+      title: tr(lang, 'กิจกรรมเลื่อนหรือยกเลิก', 'Round moved or cancelled'),
+      sub: tr(lang, 'ส่งเสมอ เพื่อไม่ให้พลาดวันหรือสถานที่ใหม่', 'Always on, so you never miss a new day or place'),
+    },
+    {
+      k: 'reminder',
+      title: tr(lang, 'เตือนก่อนวันกิจกรรม', 'Reminders'),
+      sub: tr(lang, 'คืนก่อนวัน และก่อนเริ่ม 2 ชั่วโมง', 'The evening before and 2 hours before'),
+    },
+    {
+      k: 'booking',
+      title: tr(lang, 'การจองของฉัน', 'My bookings'),
+      sub: tr(lang, 'จองสำเร็จ และเพื่อนรับคำเชิญเข้ากลุ่ม', 'Booking confirmed, a friend joined your group'),
+    },
+    ...(host
+      ? [
+          {
+            k: 'host' as const,
+            title: tr(lang, 'มีคนจองรอบของคุณ', 'Someone booked your round'),
+            sub: tr(lang, 'สำหรับผู้จัด ทุกครั้งที่มีการจองใหม่', 'For hosts, on every new booking'),
+          },
+        ]
+      : []),
+  ];
+
+  return (
+    <div className="pwa-prefs" aria-busy={saving}>
+      {rows.map((row) => {
+        const locked = row.k === 'change';
+        const on = locked || !off.includes(row.k as Kind);
+        return (
+          <label key={row.k} className={`pwa-pref${locked ? ' is-locked' : ''}`}>
+            <span className="pwa-pref-text">
+              <b>{row.title}</b>
+              <span>{row.sub}</span>
+            </span>
+            <input
+              type="checkbox"
+              role="switch"
+              className="pwa-switch"
+              checked={on}
+              disabled={locked}
+              onChange={() => !locked && toggle(row.k as Kind)}
+            />
+          </label>
+        );
+      })}
+      <p className="pwa-prefs-note">
+        {tr(lang, 'ใช้กับทุกเครื่องที่คุณเปิดการแจ้งเตือนไว้', 'Applies to every device you turned notifications on')}
+      </p>
+      {err && <p className="pwa-push-err">{err}</p>}
     </div>
   );
 }

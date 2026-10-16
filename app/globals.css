@@ -4487,6 +4487,19 @@ body {
 .pwa-push-nudge-text b { font-family: var(--font-display-th); font-weight: 500; font-size: 15px; }
 .pwa-push-nudge-text span { font-size: 13px; line-height: 1.45; color: var(--muted); }
 .pwa-cta:disabled, .pwa-banner-btn:disabled, .pwa-ghost:disabled { opacity: .6; cursor: default; }
+.pwa-prefs { align-self: stretch; display: flex; flex-direction: column; border-top: 1.5px solid rgba(13,30,29,.08); }
+.pwa-pref { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid rgba(13,30,29,.06); cursor: pointer; }
+.pwa-pref.is-locked { cursor: default; }
+.pwa-pref-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pwa-pref-text b { font-family: var(--font-display-th); font-weight: 500; font-size: 15px; }
+.pwa-pref-text span { font-size: 13px; line-height: 1.45; color: var(--muted); }
+.pwa-switch { appearance: none; -webkit-appearance: none; flex: none; position: relative; width: 44px; height: 26px; margin: 0; border-radius: 999px; background: rgba(13,30,29,.18); cursor: pointer; transition: background .2s; }
+.pwa-switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: transform .2s; }
+.pwa-switch:checked { background: #0C8577; }
+.pwa-switch:checked::after { transform: translateX(18px); }
+.pwa-switch:disabled { opacity: .55; cursor: default; }
+.pwa-switch:focus-visible { outline: 2px solid #0C8577; outline-offset: 2px; }
+.pwa-prefs-note { margin: 10px 0 0 !important; font-size: 12.5px !important; color: var(--muted) !important; }
 
 /* Installed app: back button before the logo (SiteHeader). */
 .nav-back { margin-right: 4px; margin-left: -6px; }

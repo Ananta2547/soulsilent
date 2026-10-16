@@ -20,6 +20,36 @@ export type PushPayload = {
 
 type Env = { VAPID_PUBLIC_KEY?: string; VAPID_PRIVATE_KEY?: string; SITE_URL?: string };
 
+/**
+ * Kinds of notification a member can switch off (push_prefs, migration 066).
+ * 'change' — a round moved or was cancelled — is not among them: it is always
+ * sent, so nobody turns up on the wrong day.
+ */
+export const PUSH_KINDS = ['booking', 'reminder', 'host'] as const;
+export type PushKind = (typeof PUSH_KINDS)[number] | 'change' | 'test';
+
+/** The kinds this member switched off. Empty when none (or before 066). */
+export async function mutedKinds(db: D1Database, userId: string): Promise<string[]> {
+  try {
+    const row = await db.prepare('SELECT off FROM push_prefs WHERE user_id = ?').bind(userId).first<{ off: string }>();
+    return (row?.off || '').split(',').filter((k) => (PUSH_KINDS as readonly string[]).includes(k));
+  } catch {
+    return [];
+  }
+}
+
+export async function saveMutedKinds(db: D1Database, userId: string, off: string[]): Promise<string[]> {
+  const clean = [...new Set(off.filter((k) => (PUSH_KINDS as readonly string[]).includes(k)))];
+  await db
+    .prepare(
+      `INSERT INTO push_prefs (user_id, off, updated_at) VALUES (?, ?, datetime('now'))
+       ON CONFLICT(user_id) DO UPDATE SET off = excluded.off, updated_at = excluded.updated_at`,
+    )
+    .bind(userId, clean.join(','))
+    .run();
+  return clean;
+}
+
 /** The VAPID keys, or null when push is not configured on this deployment. */
 export function vapidKeys(env: Env): VapidKeys | null {
   // Trimmed: a secret piped in from a shell can carry a trailing newline.
@@ -67,17 +97,19 @@ export async function removeSubscription(db: D1Database, endpoint: string): Prom
 
 /**
  * Send to every device of one member. Returns how many devices accepted it.
- * Dead subscriptions (404/410) are deleted on the way.
+ * Dead subscriptions (404/410) are deleted on the way. With `kind`, nothing
+ * is sent when the member switched that kind off.
  */
 export async function sendPushToUser(
   db: D1Database,
   env: Env,
   userId: string,
   payload: PushPayload,
-  opts: { ttl?: number; urgency?: 'low' | 'normal' | 'high'; topic?: string } = {},
+  opts: { ttl?: number; urgency?: 'low' | 'normal' | 'high'; topic?: string; kind?: PushKind } = {},
 ): Promise<number> {
   const keys = vapidKeys(env);
   if (!keys) return 0;
+  if (opts.kind && (await mutedKinds(db, userId)).includes(opts.kind)) return 0;
   let subs: { endpoint: string; p256dh: string; auth: string }[] = [];
   try {
     subs =
