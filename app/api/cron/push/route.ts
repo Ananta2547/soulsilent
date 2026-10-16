@@ -146,7 +146,17 @@ export async function GET(request: Request) {
       if (ok) counts.joined++;
     }
 
-    return NextResponse.json({ ok: true, ...counts });
+    // Housekeeping, 03:00–03:09 Thai time: forget sent-markers older than 60
+    // days. Every notice above only looks at bookings from the last hour or
+    // for today/tomorrow, so an old key can never be claimed again.
+    let pruned = 0;
+    const thaiNow = new Date(Date.now() + 7 * 3600 * 1000).toISOString();
+    if (thaiNow.slice(11, 13) === '03' && Number(thaiNow.slice(14, 16)) < 10) {
+      const r = await db.prepare(`DELETE FROM push_sent WHERE sent_at < datetime('now', '-60 days')`).run();
+      pruned = r.meta?.changes ?? 0;
+    }
+
+    return NextResponse.json({ ok: true, ...counts, pruned });
   } catch (error) {
     // Before migration 064 the subscription table does not exist: nothing to do.
     const msg = error instanceof Error ? error.message : String(error);

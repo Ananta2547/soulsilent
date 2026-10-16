@@ -11,10 +11,13 @@
  */
 import { useEffect } from 'react';
 import { wirePwaEvents } from './usePwa';
+import { countAppOpen, countInstall } from './appStats';
 
 export function PwaRegister() {
   useEffect(() => {
     wirePwaEvents();
+    window.addEventListener('appinstalled', countInstall);
+    countAppOpen();
     if (!('serviceWorker' in navigator)) return;
     let devOptIn = false;
     try {

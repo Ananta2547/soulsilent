@@ -3,13 +3,14 @@ import './globals.css';
 import { LangProvider } from '@/lib/i18n';
 import { DataLoadingProvider, DataLoadingScreen } from '@/components/design/DataLoading';
 import { PwaRegister } from '@/components/pwa/PwaRegister';
+import { APPLE_SPLASH } from '@/components/pwa/splash';
 
 export const metadata: Metadata = {
   title: 'AllSoulLearn · learn outside the room',
   description: 'Workshop · Camp · Organize — เรียนรู้นอกห้องเรียน',
   applicationName: 'AllSoulLearn',
   // Installed on iPhone/iPad (Add to Home Screen): full screen, own icon/title.
-  appleWebApp: { capable: true, title: 'AllSoulLearn', statusBarStyle: 'default' },
+  appleWebApp: { capable: true, title: 'AllSoulLearn', statusBarStyle: 'default', startupImage: APPLE_SPLASH },
   icons: { apple: '/icons/apple-touch-icon.png' },
   formatDetection: { telephone: false },
 };

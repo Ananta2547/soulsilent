@@ -2,6 +2,7 @@
 
 import { PageLoader } from '@/components/design/PageLoader';
 import { sqliteToMs } from '@/lib/datetime';
+import type { AppStats } from '@/app/api/admin/app-stats/route';
 
 import { useEffect, useState } from 'react';
 
@@ -35,6 +36,7 @@ interface ApiResp {
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
+  const [app, setApp] = useState<AppStats | null>(null);
   const [loading, setLoading] = useState(true);
   // Paging is per box and client-side: the dashboard already holds every
   // booking, so switching pages never refetches or navigates.
@@ -72,6 +74,11 @@ export default function AdminDashboard() {
       }
     }
     fetchStats();
+    // The app card loads on its own so a failure never blanks the dashboard.
+    fetch('/api/admin/app-stats')
+      .then((r) => (r.ok ? (r.json() as Promise<AppStats>) : null))
+      .then(setApp)
+      .catch(() => {});
   }, []);
 
   if (loading) {
@@ -101,6 +108,20 @@ export default function AdminDashboard() {
     { label: 'ผู้ใช้งาน', value: stats?.totalUsers || 0, suffix: 'คน', icon: UsersIcon, tint: 'bg-blue-50 text-blue-600' },
     { label: 'กิจกรรม', value: stats?.totalWorkshops || 0, suffix: 'รายการ', icon: WorkshopIcon, tint: 'bg-primary/10 text-primary' },
     { label: 'รายรับรวม', value: totalRevenue, suffix: 'บาท', icon: MoneyIcon, tint: 'bg-emerald-50 text-emerald-600', money: true },
+    {
+      label: 'ติดตั้งแอป',
+      value: app?.installs || 0,
+      suffix: `เครื่อง · 30 วันล่าสุด +${(app?.installs30d || 0).toLocaleString()}`,
+      detail: app
+        ? [
+            `เปิดแอป ${app.opens30d.toLocaleString()} ครั้ง ใน 30 วัน`,
+            `เปิดแจ้งเตือน ${app.pushMembers.toLocaleString()} คน (${app.pushDevices.toLocaleString()} เครื่อง)`,
+            `ส่งแจ้งเตือน ${app.sent30d.toLocaleString()} ครั้ง ใน 30 วัน`,
+          ]
+        : undefined,
+      icon: AppIcon,
+      tint: 'bg-amber-50 text-amber-600',
+    },
   ];
 
   return (
@@ -134,6 +155,13 @@ export default function AdminDashboard() {
                 {s.money ? `฿${s.value.toLocaleString()}` : s.value.toLocaleString()}
               </div>
               <div className="text-xs text-gray mt-1">{s.suffix}</div>
+              {'detail' in s && s.detail && (
+                <div className="text-[11px] text-gray mt-2 leading-relaxed">
+                  {s.detail.map((d) => (
+                    <div key={d}>{d}</div>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}
@@ -385,6 +413,14 @@ function WorkshopIcon() {
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
         d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+  );
+}
+function AppIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <rect x="7" y="2.5" width="10" height="19" rx="2.5" strokeWidth={1.5} />
+      <path strokeLinecap="round" strokeWidth={1.5} d="M11 18.5h2" />
     </svg>
   );
 }
