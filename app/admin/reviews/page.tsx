@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { AdminHead, AdminChips, AdminSheet, SheetSection } from '@/components/admin/AdminShell';
+import { adminConfirm, AdminHead, AdminChips, AdminSheet, SheetSection } from '@/components/admin/AdminShell';
 import { sqliteToMs } from '@/lib/datetime';
+import { AdmSelect } from '@/components/admin/pickers';
 
 type ReviewRow = {
   id: string;
@@ -95,7 +96,7 @@ export default function AdminReviewsPage() {
   }
 
   async function remove(id: string) {
-    if (!confirm('ลบรีวิวนี้?')) return;
+    if (!(await adminConfirm({ title: 'ลบรีวิวนี้?', ok: 'ลบรีวิว', danger: true }))) return;
     setBusyId(id);
     try {
       await fetch(`/api/reviews/${id}`, { method: 'DELETE' });
@@ -219,25 +220,25 @@ export default function AdminReviewsPage() {
           {err && <div className="adm-notice" style={{ background: '#fde4e1', color: '#a3261a', borderRadius: 14 }}>{err}</div>}
           <div className="adm-field">
             <label htmlFor="rv-ws">กิจกรรม</label>
-            <select id="rv-ws" value={wsId} onChange={(e) => setWsId(e.target.value)}>
+            <AdmSelect id="rv-ws" value={wsId} onChange={(e) => setWsId(e.target.value)}>
               <option value="">— เลือกกิจกรรม —</option>
               {workshops.map((w) => (
                 <option key={w.id} value={w.id}>
                   {w.label}
                 </option>
               ))}
-            </select>
+            </AdmSelect>
           </div>
           <div className="adm-field">
             <label htmlFor="rv-user">ผู้เข้าร่วม</label>
-            <select id="rv-user" value={userId} onChange={(e) => setUserId(e.target.value)}>
+            <AdmSelect id="rv-user" value={userId} onChange={(e) => setUserId(e.target.value)}>
               <option value="">— เลือกผู้เข้าร่วม —</option>
               {users.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.label}
                 </option>
               ))}
-            </select>
+            </AdmSelect>
           </div>
           <div className="adm-field">
             <span className="adm-field-label">คะแนน</span>

@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { getProvinces, getDistricts, getSubdistricts } from '@/lib/thai-addresses';
+import { AdmSelect } from '@/components/admin/pickers';
 
 type Value = { province: string; district: string; subdistrict: string };
 
@@ -22,7 +23,7 @@ export function AddressPicker({ value, onChange }: Props) {
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
       <div>
         <label className="block text-xs font-medium text-dark mb-1">จังหวัด</label>
-        <select
+        <AdmSelect
           value={value.province}
           onChange={(e) =>
             onChange({ province: e.target.value, district: '', subdistrict: '' })
@@ -36,11 +37,11 @@ export function AddressPicker({ value, onChange }: Props) {
               {p}
             </option>
           ))}
-        </select>
+        </AdmSelect>
       </div>
       <div>
         <label className="block text-xs font-medium text-dark mb-1">อำเภอ / เขต</label>
-        <select
+        <AdmSelect
           value={value.district}
           onChange={(e) => onChange({ ...value, district: e.target.value, subdistrict: '' })}
           className="input-field"
@@ -53,11 +54,11 @@ export function AddressPicker({ value, onChange }: Props) {
               {d}
             </option>
           ))}
-        </select>
+        </AdmSelect>
       </div>
       <div>
         <label className="block text-xs font-medium text-dark mb-1">ตำบล / แขวง</label>
-        <select
+        <AdmSelect
           value={value.subdistrict}
           onChange={(e) => onChange({ ...value, subdistrict: e.target.value })}
           className="input-field"
@@ -70,7 +71,7 @@ export function AddressPicker({ value, onChange }: Props) {
               {s}
             </option>
           ))}
-        </select>
+        </AdmSelect>
       </div>
     </div>
   );

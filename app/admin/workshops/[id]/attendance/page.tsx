@@ -11,7 +11,7 @@ import { PdpaBadge } from '@/components/workshops/PdpaBadge';
 import { RefundSlipModal } from '@/components/admin/RefundSlipModal';
 import { FacilitatorNote } from '@/components/admin/FacilitatorNote';
 import { applicantName } from '@/lib/applicant';
-import { AdminHead, Badge } from '@/components/admin/AdminShell';
+import { adminAlert, AdminHead, Badge } from '@/components/admin/AdminShell';
 
 type BookingRow = {
   id: string;
@@ -194,7 +194,7 @@ export default function AttendancePage() {
       setRemoveFor(null);
     } catch (e) {
       console.error('Failed to remove participant', e);
-      alert('เอาผู้เข้าร่วมออกไม่สำเร็จ กรุณาลองใหม่');
+      adminAlert('เอาผู้เข้าร่วมออกไม่สำเร็จ', 'กรุณาลองใหม่');
     } finally {
       setPendingIds((s) => {
         const next = new Set(s);

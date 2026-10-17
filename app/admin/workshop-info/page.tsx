@@ -7,7 +7,7 @@ import { parseTiers, tierDesc } from '@/lib/pricing';
 type WorkshopRow = Workshop & { booking_count?: number };
 import Link from 'next/link';
 import { AdminFormModal } from '@/components/admin/AdminFormModal';
-import { AdminHead, AdminChips, RowMenu } from '@/components/admin/AdminShell';
+import { adminConfirm, AdminHead, AdminChips, RowMenu } from '@/components/admin/AdminShell';
 import { MasterForm } from './_components/MasterForm';
 import type { WorkshopMaster } from '@/lib/types';
 
@@ -78,7 +78,7 @@ export default function WorkshopInfoAdminPage() {
   }
 
   async function remove(m: WorkshopMaster) {
-    if (!confirm(`ลบข้อมูล "${m.title}"? (รอบที่จัดจะยังอยู่ แต่จะไม่ผูกกับข้อมูลนี้)`)) return;
+    if (!(await adminConfirm({ title: `ลบข้อมูล "${m.title}"?`, msg: 'รอบที่จัดจะยังอยู่ แต่จะไม่ผูกกับข้อมูลนี้', ok: 'ลบข้อมูล', danger: true }))) return;
     setBusyId(m.id);
     try {
       await fetch(`/api/workshop-masters/${m.id}`, { method: 'DELETE' });

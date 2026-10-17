@@ -5,14 +5,15 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { DayTime, ImageMeta, Location, ScheduleDay, ScheduleItem, User, Workshop, WorkshopMaster } from '@/lib/types';
 import { ImageUploader } from '@/components/admin/image/ImageUploader';
-import { TimeField24 } from '@/components/admin/TimeField24';
-import { DateField24 } from '@/components/admin/DateField24';
-import { DateTimePicker } from '@/components/admin/DateTimePicker';
+// The admin popup pickers (design "Date picker"), same values as before.
+import { PickTime as TimeField24, PickDate as DateField24, PickDateTime as DateTimePicker } from '@/components/admin/pickers';
+import { adminConfirm } from '@/components/admin/AdminShell';
 import { ASPECTS } from '@/lib/image-aspects';
 import { parseImageMeta } from '@/lib/image-meta';
 import { safeParseArray } from '@/lib/workshop-utils';
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import { ONLINE_PLATFORMS } from '@/lib/online-platform';
+import { AdmSelect } from '@/components/admin/pickers';
 
 /** Sentinel value for the venue picker — ONLINE is not a `locations` row. */
 const ONLINE_OPTION = '__online__';
@@ -440,7 +441,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
 
   async function handleDelete() {
     if (!editingId) return;
-    if (!confirm('ต้องการลบกิจกรรมนี้?')) return;
+    if (!(await adminConfirm({ title: 'ลบกิจกรรมนี้?', msg: 'การจองและข้อมูลของรอบนี้จะถูกลบไปด้วย', ok: 'ลบกิจกรรม', danger: true }))) return;
     setDeleting(true);
     try {
       await fetch(`/api/workshops/${editingId}`, { method: 'DELETE' });
@@ -510,7 +511,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
     setForm({ ...form, target_items: form.target_items.filter((_, idx) => idx !== i) });
 
   /** Selecting a master pulls its overview into this session as a starting point. */
-  const selectMaster = (mid: string) => {
+  const selectMaster = async (mid: string) => {
     const m = masters.find((x) => x.id === mid);
     if (!mid || !m) {
       setForm({ ...form, master_id: mid });
@@ -523,7 +524,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
       form.learn_items.some((s) => s.trim()) ||
       form.target_items.some((s) => s.trim()) ||
       form.image_url !== '';
-    if (hasData && !window.confirm('ต้องการแทนที่ข้อมูลในแบบฟอร์มปัจจุบันด้วยข้อมูลจากแม่แบบหรือไม่?')) {
+    if (hasData && !(await adminConfirm({ title: 'แทนที่ข้อมูลในฟอร์ม?', msg: 'ข้อมูลที่กรอกไว้จะถูกแทนด้วยข้อมูลจากแม่แบบ (Master)', ok: 'แทนที่' }))) {
       // Keep the admin's typed data — only link the master.
       setForm({ ...form, master_id: mid });
       return;
@@ -611,7 +612,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
         <label className="block text-sm font-medium text-dark mb-1">
           ข้อมูลกิจกรรม (Master) <span className="text-gray font-normal">— ผูกรอบนี้กับภาพรวมกิจกรรม</span>
         </label>
-        <select
+        <AdmSelect
           value={form.master_id}
           onChange={(e) => selectMaster(e.target.value)}
           className="input-field"
@@ -620,7 +621,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
           {masters.map((m) => (
             <option key={m.id} value={m.id}>{m.title}</option>
           ))}
-        </select>
+        </AdmSelect>
         {form.master_id && (
           <p className="text-xs text-gray mt-1">เลือกแล้วระบบจะดึงข้อมูลภาพรวมมาเติมให้อัตโนมัติ — แก้ไขเฉพาะรอบนี้ต่อได้เลย</p>
         )}
@@ -828,7 +829,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-dark mb-1">สถานที่</label>
-          <select
+          <AdmSelect
             value={form.is_online ? ONLINE_OPTION : form.location_id}
             onChange={(e) => {
               const v = e.target.value;
@@ -857,7 +858,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
                 {loc.name} ({loc.province})
               </option>
             ))}
-          </select>
+          </AdmSelect>
 
           {/* Online-only fields. Rendered right under the picker so the whole
               venue decision reads as one block. */}
@@ -865,7 +866,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
             <div className="mt-3 space-y-3 border border-gray-lighter rounded-xl p-3 bg-surface/40">
               <div>
                 <label className="block text-sm font-medium text-dark mb-1">แพลตฟอร์ม</label>
-                <select
+                <AdmSelect
                   value={form.online_platform}
                   onChange={(e) => setForm({ ...form, online_platform: e.target.value })}
                   className="input-field"
@@ -875,7 +876,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
                       {p.value === 'other' ? 'อื่นๆ (Others)' : p.label}
                     </option>
                   ))}
-                </select>
+                </AdmSelect>
               </div>
 
               {form.online_platform === 'other' && (
@@ -1571,7 +1572,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
 
       <div>
         <label className="block text-sm font-medium text-dark mb-1">สถานะ</label>
-        <select
+        <AdmSelect
           value={form.status}
           onChange={(e) =>
             setForm({ ...form, status: e.target.value as WorkshopFormValues['status'] })
@@ -1582,7 +1583,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
           <option value="closed">ปิดรับ (Closed)</option>
           <option value="draft">แบบร่าง (Draft)</option>
           <option value="cancelled">ยกเลิกกิจกรรม (Cancelled)</option>
-        </select>
+        </AdmSelect>
         {form.status === 'cancelled' && (
           <p className="text-xs mt-1" style={{ color: '#b3261e' }}>
             เมื่อบันทึก ระบบจะยกเลิกการจองทั้งหมดของกิจกรรมนี้ และแสดงหมายเหตุ &ldquo;กิจกรรมมีการเปลี่ยนแปลงกำหนดการ&rdquo; ให้ผู้เข้าร่วม

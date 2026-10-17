@@ -7,6 +7,7 @@ import { hostGrossOf } from '@/lib/comp';
 import { parseImageMeta } from '@/lib/image-meta';
 import { ImageUploader } from '@/components/admin/image/ImageUploader';
 import { ASPECTS } from '@/lib/image-aspects';
+import { AdmSelect } from '@/components/admin/pickers';
 
 const baht = (n: number) => '฿' + Math.round(n).toLocaleString();
 
@@ -103,11 +104,11 @@ export function PayoutManager({
       <fieldset className="border border-gray-lighter rounded-xl p-4 bg-surface/40 space-y-3">
         <legend className="text-sm font-medium text-dark px-2">ค่าใช้จ่ายที่หัก</legend>
         <div className="flex flex-wrap items-center gap-3">
-          <select value={dType} onChange={(e) => setDType(e.target.value as typeof dType)} className="input-field !w-auto">
+          <AdmSelect value={dType} onChange={(e) => setDType(e.target.value as typeof dType)} className="input-field !w-auto">
             <option value="none">ไม่หัก</option>
             <option value="fixed">จำนวนเงินคงที่ (บาท)</option>
             <option value="percent">เปอร์เซ็นต์ (%)</option>
-          </select>
+          </AdmSelect>
           {dType !== 'none' && (
             <input
               type="number"
@@ -125,10 +126,10 @@ export function PayoutManager({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-dark mb-1">สถานะการโอน</label>
-          <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)} className="input-field">
+          <AdmSelect value={status} onChange={(e) => setStatus(e.target.value as typeof status)} className="input-field">
             <option value="pending">รอโอน</option>
             <option value="paid">โอนแล้ว</option>
-          </select>
+          </AdmSelect>
         </div>
         <ImageUploader
           label="สลิปโอนเงิน"

@@ -18,7 +18,8 @@ import { cardX } from '@/lib/article-card';
 import { PUBLISHED_CODE, VISIBILITY_OPTIONS, visibilityOf, type ArticleVisibility } from '@/lib/article-visibility';
 import { ASPECTS, type AspectSpec } from '@/lib/image-aspects';
 import { parseImageMeta } from '@/lib/image-meta';
-import { AdminHead, AdminSearch, AdminChips, AdminSheet, SheetSection, Badge, RowMenu, type MenuItem } from '@/components/admin/AdminShell';
+import { adminAlert, adminConfirm, AdminHead, AdminSearch, AdminChips, AdminSheet, SheetSection, Badge, RowMenu, type MenuItem } from '@/components/admin/AdminShell';
+import { AdmSelect, PickDate } from '@/components/admin/pickers';
 
 type ArticleForm = {
   slug: string;
@@ -151,7 +152,7 @@ export default function AdminArticlesPage() {
       if (!r.ok) throw new Error(String(r.status));
     } catch {
       setArticles(before);
-      alert('บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง');
+      adminAlert('บันทึกไม่สำเร็จ', 'ลองใหม่อีกครั้ง');
     }
   }
 
@@ -219,7 +220,7 @@ export default function AdminArticlesPage() {
   }
 
   async function handleDelete(slug: string) {
-    if (!confirm('ลบบทความนี้?')) return;
+    if (!(await adminConfirm({ title: 'ลบบทความนี้?', msg: 'ลบแล้วกู้คืนไม่ได้', ok: 'ลบบทความ', danger: true }))) return;
     await fetch(`/api/articles/${slug}`, { method: 'DELETE' });
     fetchAll();
   }
@@ -257,7 +258,7 @@ export default function AdminArticlesPage() {
     { label: 'ลบบทความ', danger: true, onClick: () => handleDelete(a.slug) },
   ];
   const visSelect = (a: Article) => (
-    <select
+    <AdmSelect
       value={visibilityOf(a.published)}
       onChange={(e) => quickUpdate(a.slug, { published: e.target.value as ArticleVisibility })}
       aria-label="ระดับการแชร์"
@@ -269,7 +270,7 @@ export default function AdminArticlesPage() {
           {o.th}
         </option>
       ))}
-    </select>
+    </AdmSelect>
   );
   const star = (a: Article) => (
     <button
@@ -461,8 +462,8 @@ export default function AdminArticlesPage() {
                 </p>
               </div>
               <div className="adm-field">
-                <label htmlFor="art-date">วันที่</label>
-                <input id="art-date" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+                <label>วันที่</label>
+                <PickDate value={form.date} onChange={(v) => setForm({ ...form, date: v })} />
               </div>
             </div>
             <div className="adm-field">
@@ -472,7 +473,7 @@ export default function AdminArticlesPage() {
             <div className="adm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
               <div className="adm-field">
                 <label htmlFor="art-cat">หมวด</label>
-                <select id="art-cat" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+                <AdmSelect id="art-cat" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
                   {categories.length === 0 ? (
                     <option value="" disabled>
                       — ยังไม่มีหมวดในระบบ —
@@ -484,18 +485,18 @@ export default function AdminArticlesPage() {
                       </option>
                     ))
                   )}
-                </select>
+                </AdmSelect>
               </div>
               <div className="adm-field">
                 <label htmlFor="art-author">ผู้เขียน</label>
-                <select id="art-author" value={form.author_id} onChange={(e) => setForm({ ...form, author_id: e.target.value })}>
+                <AdmSelect id="art-author" value={form.author_id} onChange={(e) => setForm({ ...form, author_id: e.target.value })}>
                   <option value="">— ไม่ระบุ —</option>
                   {users.map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.name} ({u.role})
                     </option>
                   ))}
-                </select>
+                </AdmSelect>
               </div>
             </div>
             <div className="adm-field">
@@ -588,13 +589,13 @@ export default function AdminArticlesPage() {
           <SheetSection n={3} title="การเผยแพร่">
             <div className="adm-field">
               <label htmlFor="art-vis">ระดับการแชร์</label>
-              <select id="art-vis" value={form.published} onChange={(e) => setForm({ ...form, published: e.target.value as ArticleVisibility })}>
+              <AdmSelect id="art-vis" value={form.published} onChange={(e) => setForm({ ...form, published: e.target.value as ArticleVisibility })}>
                 {VISIBILITY_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.th} — {o.hint}
                   </option>
                 ))}
-              </select>
+              </AdmSelect>
             </div>
             <label className="adm-check" style={{ margin: '0 -14px' }}>
               <input type="checkbox" checked={form.featured} onChange={(e) => setForm({ ...form, featured: e.target.checked })} />
@@ -798,7 +799,7 @@ function BlockEditor({
                   className="input-field !py-2"
                   placeholder="คำใบ้สำหรับรูป (เช่น photo — sunset)"
                 />
-                <select
+                <AdmSelect
                   value={b.aspect || '16/9'}
                   onChange={(e) => updateBlock(i, { aspect: e.target.value })}
                   className="input-field !py-2"
@@ -806,7 +807,7 @@ function BlockEditor({
                   <option value="16/9">16:9</option>
                   <option value="4/3">4:3</option>
                   <option value="1/1">1:1</option>
-                </select>
+                </AdmSelect>
                 <div>
                   <label className="block text-[10px] font-medium text-gray mb-1.5 uppercase tracking-wider">
                     รูปจริง (ทับ swatch ถ้ามี)
@@ -826,7 +827,7 @@ function BlockEditor({
       </div>
 
       <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-lighter">
-        <select
+        <AdmSelect
           value={adding}
           onChange={(e) => setAdding(e.target.value as BlockKind)}
           className="input-field !py-2 !w-auto flex-1"
@@ -836,7 +837,7 @@ function BlockEditor({
               {label}
             </option>
           ))}
-        </select>
+        </AdmSelect>
         <button
           type="button"
           onClick={addBlock}
@@ -915,10 +916,10 @@ function CategoryPanel({
   async function deleteCategory(key: string) {
     const count = usageCount(key);
     if (count > 0) {
-      alert(`ลบไม่ได้ — มีบทความ ${count} ชิ้นที่ยังใช้หมวด "${key}" อยู่ ย้ายบทความก่อน`);
+      adminAlert('ลบหมวดนี้ไม่ได้', `มีบทความ ${count} ชิ้นที่ยังใช้หมวด "${key}" อยู่ ย้ายบทความก่อน`);
       return;
     }
-    if (!confirm(`ลบหมวด "${key}"?`)) return;
+    if (!(await adminConfirm({ title: `ลบหมวด "${key}"?`, ok: 'ลบหมวด', danger: true }))) return;
     await fetch(`/api/article-categories/${key}`, { method: 'DELETE' });
     onChanged();
   }

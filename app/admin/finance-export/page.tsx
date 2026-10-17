@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { AdminHead, AdminChips, Badge } from '@/components/admin/AdminShell';
+import { AdmSelect, PickDate } from '@/components/admin/pickers';
 
 /** Admin console for trying the finance export by hand: pick a type and a
  *  date range, paste the export key, and see exactly what the accounting app
@@ -127,21 +128,21 @@ export default function FinanceExportTester() {
         <div className="adm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
           <div className="adm-field">
             <label htmlFor="fx-type">type</label>
-            <select id="fx-type" value={type} onChange={(e) => { setType(e.target.value as typeof type); setCursor(''); }}>
+            <AdmSelect id="fx-type" value={type} onChange={(e) => { setType(e.target.value as typeof type); setCursor(''); }}>
               {TYPES.map((t) => (
                 <option key={t.v} value={t.v}>
                   {t.label}
                 </option>
               ))}
-            </select>
+            </AdmSelect>
           </div>
           <div className="adm-field">
-            <label htmlFor="fx-from">from {type === 'workshops' ? '(วันจัด)' : '(วันจอง)'}</label>
-            <input id="fx-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            <label>from {type === 'workshops' ? '(วันจัด)' : '(วันจอง)'}</label>
+            <PickDate value={from} onChange={setFrom} />
           </div>
           <div className="adm-field">
-            <label htmlFor="fx-to">to</label>
-            <input id="fx-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+            <label>to</label>
+            <PickDate value={to} onChange={setTo} />
           </div>
           {type === 'bookings' && (
             <div className="adm-field">
@@ -151,10 +152,10 @@ export default function FinanceExportTester() {
           )}
           <div className="adm-field">
             <label htmlFor="fx-fmt">format</label>
-            <select id="fx-fmt" value={format} onChange={(e) => setFormat(e.target.value as typeof format)}>
+            <AdmSelect id="fx-fmt" value={format} onChange={(e) => setFormat(e.target.value as typeof format)}>
               <option value="json">json</option>
               <option value="csv">csv</option>
-            </select>
+            </AdmSelect>
           </div>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>

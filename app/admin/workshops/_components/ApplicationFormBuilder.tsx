@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { ApplicationQuestion } from '@/lib/types';
+import { AdmSelect } from '@/components/admin/pickers';
 
 const TYPES: { value: ApplicationQuestion['type']; label: string }[] = [
   { value: 'text', label: 'ข้อความสั้น' },
@@ -110,7 +111,7 @@ export function ApplicationFormBuilder({
             />
 
             <div className="flex flex-wrap items-center gap-3">
-              <select
+              <AdmSelect
                 value={q.type}
                 onChange={(e) => update(i, { type: e.target.value as ApplicationQuestion['type'] })}
                 className="input-field !w-auto"
@@ -120,7 +121,7 @@ export function ApplicationFormBuilder({
                     {t.label}
                   </option>
                 ))}
-              </select>
+              </AdmSelect>
               <label className="flex items-center gap-2 text-sm text-dark cursor-pointer">
                 <input type="checkbox" checked={q.required} onChange={(e) => update(i, { required: e.target.checked })} />
                 จำเป็นต้องตอบ

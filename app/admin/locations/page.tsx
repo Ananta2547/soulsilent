@@ -9,7 +9,8 @@ import { GalleryEditor } from '@/components/admin/GalleryEditor';
 import { ImageUploader } from '@/components/admin/image/ImageUploader';
 import { ASPECTS } from '@/lib/image-aspects';
 import { parseImageMeta } from '@/lib/image-meta';
-import { AdminHead, AdminSearch, AdminSheet, SheetSection, Badge, RowMenu, type MenuItem } from '@/components/admin/AdminShell';
+import { adminConfirm, AdminHead, AdminSearch, AdminSheet, SheetSection, Badge, RowMenu, type MenuItem } from '@/components/admin/AdminShell';
+import { AdmSelect } from '@/components/admin/pickers';
 
 type LocationForm = {
   name: string;
@@ -136,7 +137,7 @@ export default function AdminLocationsPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('ต้องการลบสถานที่นี้? กิจกรรมที่อ้างอิงจะถูกถอนการเชื่อม')) return;
+    if (!(await adminConfirm({ title: 'ลบสถานที่นี้?', msg: 'กิจกรรมที่อ้างอิงจะถูกถอนการเชื่อม', ok: 'ลบสถานที่', danger: true }))) return;
     await fetch(`/api/locations/${id}`, { method: 'DELETE' });
     fetchAll();
   }
@@ -382,14 +383,14 @@ export default function AdminLocationsPage() {
           <SheetSection n={5} title="ข้อมูลภายใน">
             <div className="adm-field">
               <label htmlFor="loc-owner">ผู้รับผิดชอบสถานที่</label>
-              <select id="loc-owner" value={form.owner_id ?? ''} onChange={(e) => setForm({ ...form, owner_id: e.target.value })}>
+              <AdmSelect id="loc-owner" value={form.owner_id ?? ''} onChange={(e) => setForm({ ...form, owner_id: e.target.value })}>
                 <option value="">— เลือกผู้รับผิดชอบ —</option>
                 {users.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.name} ({u.email}) · {u.role}
                   </option>
                 ))}
-              </select>
+              </AdmSelect>
             </div>
             <div className="adm-field">
               <label htmlFor="loc-note">

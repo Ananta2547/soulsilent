@@ -14,7 +14,7 @@ import {
 } from './_components/WorkshopForm';
 import { ApplicationFormBuilder } from './_components/ApplicationFormBuilder';
 import { PayoutManager } from './_components/PayoutManager';
-import { AdminHead, AdminSearch, AdminChips, Badge, RowMenu, type MenuItem, type Tone } from '@/components/admin/AdminShell';
+import { adminAlert, adminConfirm, AdminHead, AdminSearch, AdminChips, Badge, RowMenu, type MenuItem, type Tone } from '@/components/admin/AdminShell';
 
 type ModalState =
   | { mode: 'create' }
@@ -78,7 +78,7 @@ export default function AdminWorkshopsPage() {
   }, []);
 
   async function handleDelete(id: string) {
-    if (!confirm('ต้องการลบกิจกรรมนี้?')) return;
+    if (!(await adminConfirm({ title: 'ลบกิจกรรมนี้?', msg: 'การจองและข้อมูลของรอบนี้จะถูกลบไปด้วย', ok: 'ลบกิจกรรม', danger: true }))) return;
     await fetch(`/api/workshops/${id}`, { method: 'DELETE' });
     fetchAll();
   }
@@ -104,7 +104,7 @@ export default function AdminWorkshopsPage() {
     try {
       const res = await fetch(`/api/workshops/${id}`);
       if (!res.ok) {
-        alert('โหลดกิจกรรมไม่สำเร็จ');
+        adminAlert('โหลดกิจกรรมไม่สำเร็จ', 'ลองใหม่อีกครั้ง');
         return;
       }
       const data = (await res.json()) as {

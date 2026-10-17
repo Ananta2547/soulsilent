@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import QRCode from 'qrcode';
-import { AdminHead } from '@/components/admin/AdminShell';
+import { adminConfirm, AdminHead } from '@/components/admin/AdminShell';
 import type { Workshop } from '@/lib/types';
 import { fmtDate, fmtDateTime } from '@/lib/datetime';
 import { getEffectivePrice, getWorkshopDays } from '@/lib/workshop-utils';
@@ -85,7 +85,7 @@ export default function WorkshopInvitesPage() {
   }
 
   async function withdraw(token: string) {
-    if (!confirm('ยกเลิกบัตรเชิญนี้? ที่นั่งจะกลับไปเปิดขายตามปกติ')) return;
+    if (!(await adminConfirm({ title: 'ยกเลิกบัตรเชิญนี้?', msg: 'ที่นั่งจะกลับไปเปิดขายตามปกติ', ok: 'ยกเลิกบัตรเชิญ', danger: true }))) return;
     const res = await fetch(`/api/admin/workshops/${id}/invites?token=${token}`, { method: 'DELETE' });
     const d = (await res.json()) as { error?: string };
     if (!res.ok) {

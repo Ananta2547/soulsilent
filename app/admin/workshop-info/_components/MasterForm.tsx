@@ -8,6 +8,7 @@ import { ASPECTS } from '@/lib/image-aspects';
 import { parseImageMeta } from '@/lib/image-meta';
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import type { ImageMeta, WorkshopMaster } from '@/lib/types';
+import { AdmSelect } from '@/components/admin/pickers';
 
 function toArr(json: string | null | undefined): string[] {
   try {
@@ -236,12 +237,12 @@ export function MasterForm({
 
       <div>
         <label className="block text-sm font-medium text-dark mb-1">ผู้จัดกิจกรรม (Host)</label>
-        <select value={organizer} onChange={(e) => setOrganizer(e.target.value)} className="input-field">
+        <AdmSelect value={organizer} onChange={(e) => setOrganizer(e.target.value)} className="input-field">
           <option value="">— เลือกผู้จัด —</option>
           {teachers.map((t) => (
             <option key={t.id} value={t.id}>{t.name}</option>
           ))}
-        </select>
+        </AdmSelect>
       </div>
 
       <div>
@@ -286,7 +287,7 @@ export function MasterForm({
                     </div>
                     <div>
                       <label className="block text-xs text-gray mb-1">ประเภท</label>
-                      <select
+                      <AdmSelect
                         value={t.mode}
                         onChange={(e) => {
                           const mode = e.target.value as PriceTier['mode'];
@@ -298,7 +299,7 @@ export function MasterForm({
                         <option value="round">เหมาทั้งรอบ</option>
                         <option value="pack">แพ็กคงที่ (N คน)</option>
                         <option value="range">กลุ่มระบุจำนวน (min–max)</option>
-                      </select>
+                      </AdmSelect>
                     </div>
                     <button type="button" onClick={() => setTiers((x) => x.filter((_, j) => j !== i))} className="h-10 text-red-500 text-sm" aria-label="ลบราคานี้">✕</button>
                   </div>

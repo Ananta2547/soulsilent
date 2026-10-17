@@ -70,6 +70,109 @@ function Mark({ size }: { size: number }) {
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* Confirm dialog + toast (design "Dialog" and the ✓ toast)           */
+/* ------------------------------------------------------------------ */
+
+type DialogReq = {
+  title: string;
+  msg?: string;
+  ok: string;
+  cancel: string | null;
+  danger: boolean;
+  resolve: (ok: boolean) => void;
+};
+
+let pushDialog: ((r: DialogReq) => void) | null = null;
+let pushToast: ((m: string) => void) | null = null;
+
+/** Ask before doing something. Resolves true on the main button. */
+export function adminConfirm(o: { title: string; msg?: string; ok?: string; danger?: boolean }): Promise<boolean> {
+  if (!pushDialog) return Promise.resolve(window.confirm(o.msg ? `${o.title}\n${o.msg}` : o.title));
+  return new Promise((resolve) => pushDialog!({ title: o.title, msg: o.msg, ok: o.ok || 'ยืนยัน', cancel: 'ยกเลิก', danger: !!o.danger, resolve }));
+}
+
+/** Tell the admin something went wrong (one button). */
+export function adminAlert(title: string, msg?: string): Promise<void> {
+  if (!pushDialog) {
+    window.alert(msg ? `${title}\n${msg}` : title);
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => pushDialog!({ title, msg, ok: 'รับทราบ', cancel: null, danger: false, resolve: () => resolve() }));
+}
+
+/** A short "✓ saved" note at the bottom of the screen. */
+export function adminToast(message: string) {
+  pushToast?.(message);
+}
+
+function DialogHost() {
+  const [queue, setQueue] = useState<DialogReq[]>([]);
+  const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
+
+  useEffect(() => {
+    pushDialog = (r) => setQueue((q) => [...q, r]);
+    pushToast = (text) => setToast({ id: Date.now(), text });
+    return () => {
+      pushDialog = null;
+      pushToast = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast((cur) => (cur?.id === toast.id ? null : cur)), 2400);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const top = queue[0];
+  useEffect(() => {
+    if (!top) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        top.resolve(false);
+        setQueue((q) => q.slice(1));
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [top]);
+
+  const answer = (ok: boolean) => {
+    top?.resolve(ok);
+    setQueue((q) => q.slice(1));
+  };
+
+  return (
+    <>
+      {top && (
+        <div className="adm-dlg-scrim" onClick={() => answer(false)}>
+          <div className="adm-dlg" role="alertdialog" aria-modal="true" aria-labelledby="adm-dlg-title" onClick={(e) => e.stopPropagation()}>
+            <h3 id="adm-dlg-title">{top.title}</h3>
+            {top.msg && <p>{top.msg}</p>}
+            <div className="adm-dlg-acts">
+              {top.cancel && (
+                <button type="button" className="adm-btn" onClick={() => answer(false)}>
+                  {top.cancel}
+                </button>
+              )}
+              <button type="button" className={`adm-btn ${top.danger ? 'bad' : 'teal'}`} onClick={() => answer(true)} autoFocus>
+                {top.ok}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {toast && (
+        <div className="adm-toast" role="status" key={toast.id}>
+          ✓ {toast.text}
+        </div>
+      )}
+    </>
+  );
+}
+
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || '/admin';
   /** The drawer, and the path it was opened on — moving to another page closes it. */
@@ -176,6 +279,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           </button>
         </nav>
       </div>
+      <DialogHost />
     </div>
   );
 }
