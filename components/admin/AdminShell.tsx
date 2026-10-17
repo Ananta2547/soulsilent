@@ -338,7 +338,12 @@ export function AdminSheet({
   return (
     <>
       <div className="adm-sheet-scrim" onClick={onClose} aria-hidden="true" />
-      <section className="adm-sheet" role="dialog" aria-modal="true" style={width ? { width } : undefined}>
+      <section
+        className="adm-sheet"
+        role="dialog"
+        aria-modal="true"
+        style={width ? ({ '--adm-sheet-w': `${width}px` } as React.CSSProperties) : undefined}
+      >
         <header className="adm-sheet-head">
           <div>
             {eyebrow && <p className="adm-eyebrow" style={{ margin: 0 }}>{eyebrow}</p>}

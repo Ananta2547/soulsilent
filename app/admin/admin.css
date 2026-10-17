@@ -274,7 +274,7 @@ a.adm-round:hover { background: var(--cream); text-decoration: none; color: var(
 
 /* ---------- modal sheet (shared by admin forms) ---------- */
 .adm-sheet-scrim { position: fixed; inset: 0; z-index: 100; background: rgba(13,30,29,.5); backdrop-filter: blur(6px); }
-.adm-sheet { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 101; width: 760px; max-width: calc(100vw - 24px); max-height: calc(100vh - 48px); background: #fff; border-radius: 28px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 40px 80px -24px rgba(13,30,29,.55), 0 0 0 1px rgba(13,30,29,.06); }
+.adm-sheet { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 101; width: var(--adm-sheet-w, 760px); max-width: calc(100vw - 24px); max-height: calc(100vh - 48px); background: #fff; border-radius: 28px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 40px 80px -24px rgba(13,30,29,.55), 0 0 0 1px rgba(13,30,29,.06); }
 .adm-sheet-head { padding: 20px 18px 16px 28px; border-bottom: 1px solid var(--adm-line); flex-shrink: 0; background: var(--adm-soft); display: flex; align-items: flex-start; gap: 12px; }
 .adm-sheet-head > div { flex: 1; min-width: 0; }
 .adm-sheet-title { font-family: Mitr, sans-serif; font-weight: 500; font-size: 22px; line-height: 28px; margin: 4px 0 0; }
@@ -293,6 +293,18 @@ a.adm-round:hover { background: var(--cream); text-decoration: none; color: var(
 .adm-sec-head { position: relative; padding-left: 44px; min-height: 30px; }
 .adm-sec-num { position: absolute; left: 0; top: 0; width: 30px; height: 30px; border-radius: 50%; background: var(--teal-50); color: var(--teal-deep); font-family: 'JetBrains Mono', monospace; font-size: 11.5px; font-weight: 500; display: flex; align-items: center; justify-content: center; margin: 0; }
 .adm-sec-title { font-family: Mitr, sans-serif; font-weight: 500; font-size: 18px; line-height: 26px; margin: 2px 0 0; }
+/* Legacy admin forms inside a sheet: every fieldset turns into a numbered
+   section like the design's 01 / 02 headings, without touching the forms. */
+.adm-form { counter-reset: adm-sec; padding-top: 8px; }
+.adm .adm-form fieldset { border: 0; border-bottom: 1px dashed var(--teal-100); border-radius: 0; background: transparent; padding: 24px 0; margin: 0; min-width: 0; }
+.adm .adm-form fieldset fieldset { border-bottom: 0; padding: 12px 0 0; }
+.adm .adm-form fieldset > legend { float: left; width: 100%; padding: 0 0 16px 44px; position: relative; font-family: Mitr, sans-serif; font-weight: 500; font-size: 18px; line-height: 26px; color: var(--ink); }
+.adm .adm-form fieldset > legend + * { clear: both; }
+.adm .adm-form fieldset > legend::before { counter-increment: adm-sec; content: counter(adm-sec, decimal-leading-zero); position: absolute; left: 0; top: -2px; width: 30px; height: 30px; border-radius: 50%; background: var(--teal-50); color: var(--teal-deep); font-family: 'JetBrains Mono', monospace; font-size: 11.5px; font-weight: 500; display: flex; align-items: center; justify-content: center; }
+.adm .adm-form fieldset fieldset > legend { font-size: 15px; padding-left: 0; padding-bottom: 10px; }
+.adm .adm-form fieldset fieldset > legend::before { display: none; }
+.adm .adm-form label { color: var(--ink); }
+
 .adm-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; }
 
 /* ---------- compact: drawer + top bar ---------- */
