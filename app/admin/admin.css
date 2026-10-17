@@ -195,6 +195,25 @@ a.adm-kpi:hover, button.adm-kpi:hover { transform: translateY(-4px); box-shadow:
 .adm-party { flex: 1 1 220px; min-width: 0; padding: 12px 14px; border-radius: 14px; background: var(--cream); overflow-wrap: anywhere; }
 .adm-party.is-to { background: var(--teal-50); }
 @media (max-width: 759px) { .adm-transfer-arrow { flex-basis: 100%; transform: rotate(90deg); height: 16px; } }
+.adm-code { border-radius: 14px; background: var(--ink); color: var(--teal-100); padding: 12px 14px; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 18px; overflow-x: auto; white-space: nowrap; }
+.adm-pre { margin: 0; border-top: 1px solid var(--adm-line); padding: 16px 20px; font-family: 'JetBrains Mono', monospace; font-size: 12px; overflow: auto; max-height: 560px; background: var(--adm-soft); }
+.adm-fx-status { padding: 16px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.adm-posters { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 16px; align-items: start; }
+.adm-poster { display: flex; flex-direction: column; }
+.adm-poster-img { width: 100%; aspect-ratio: 297 / 420; max-height: 320px; object-fit: cover; display: block; background: var(--cream-deep); }
+.adm-poster-img.is-empty { display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .12em; color: #6b604a; text-transform: uppercase; }
+.adm-poster-body { padding: 16px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.adm-poster-body h3 { font-weight: 600; font-size: 15.5px; line-height: 22px; margin: 0; }
+.adm-poster-body p { margin: 0; }
+.adm-poster-toggle { align-self: flex-start; margin-top: 4px; background: none; border: 0; padding: 0; font: inherit; font-size: 13px; font-weight: 600; color: var(--ink); cursor: pointer; }
+.adm-poster-toggle:hover { color: var(--teal); }
+.adm-rounds { border-radius: 14px; background: var(--adm-soft); overflow: hidden; }
+.adm-round { padding: 10px 12px; font-size: 12.5px; line-height: 18px; display: flex; gap: 8px; align-items: center; color: var(--ink); text-decoration: none; }
+.adm-round + .adm-round { border-top: 1px solid var(--adm-line); }
+a.adm-round:hover { background: var(--cream); text-decoration: none; color: var(--ink); }
+.adm-round b { font-weight: 600; }
+.adm-thumb { border-radius: 12px; background: var(--cream); overflow: hidden; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.adm-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .adm-review { padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; }
 .adm-review-top { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
 .adm-review-stars { font-size: 15px; letter-spacing: 2px; line-height: 1; padding-top: 4px; }

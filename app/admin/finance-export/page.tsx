@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { AdminHead, AdminChips, Badge } from '@/components/admin/AdminShell';
 
 /** Admin console for trying the finance export by hand: pick a type and a
  *  date range, paste the export key, and see exactly what the accounting app
@@ -27,7 +28,16 @@ function cell(v: unknown): string {
 }
 
 export default function FinanceExportTester() {
-  const [key, setKey] = useState('');
+  // Read the saved key on first render (the page only renders on the client,
+  // behind AdminGuard). Kept in sessionStorage so closing the tab forgets it.
+  const [key, setKey] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    try {
+      return sessionStorage.getItem(KEY_STORE) || '';
+    } catch {
+      return '';
+    }
+  });
   const [type, setType] = useState<(typeof TYPES)[number]['v']>('summary');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -38,13 +48,6 @@ export default function FinanceExportTester() {
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState<Result | null>(null);
 
-  useEffect(() => {
-    try {
-      setKey(sessionStorage.getItem(KEY_STORE) || '');
-    } catch {
-      /* private mode */
-    }
-  }, []);
   useEffect(() => {
     try {
       if (key) sessionStorage.setItem(KEY_STORE, key);
@@ -100,110 +103,121 @@ export default function FinanceExportTester() {
   const cols = rows.length ? Object.keys(rows[0]) : [];
 
   return (
-    <div className="max-w-6xl">
-      <h1 className="text-2xl font-semibold mb-1">ทดสอบ Finance Export API</h1>
-      <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>
-        ยิง <code>/api/export/finance</code> ของเซิร์ฟเวอร์นี้ด้วย key เดียวกับที่ทีมบัญชีจะใช้ — ผลที่เห็นคือสิ่งที่แอปภายนอกจะได้รับเป๊ะ ๆ
-        key เก็บไว้เฉพาะแท็บนี้ ปิดแท็บแล้วหาย
-      </p>
+    <>
+      <AdminHead
+        eyebrow="admin · export"
+        title="ทดสอบ Export API"
+        sub="ยิง /api/export/finance ของเซิร์ฟเวอร์นี้ด้วย key เดียวกับที่ทีมบัญชีจะใช้ — ผลที่เห็นคือสิ่งที่แอปภายนอกจะได้รับเป๊ะ ๆ"
+      />
 
-      <div className="rounded-xl border p-4 grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-        <label className="text-sm" style={{ gridColumn: '1 / -1' }}>
-          <span className="block text-xs mb-1" style={{ color: 'var(--muted)' }}>x-export-key</span>
+      <section className="adm-card pad" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="adm-field">
+          <label htmlFor="fx-key">x-export-key</label>
           <input
+            id="fx-key"
             type="password"
-            className="w-full rounded-lg border px-3 py-2 font-mono text-sm"
+            className="adm-mono"
             value={key}
             onChange={(e) => setKey(e.target.value.trim())}
             placeholder="วาง FINANCE_EXPORT_KEY"
             autoComplete="off"
           />
-        </label>
-        <label className="text-sm">
-          <span className="block text-xs mb-1" style={{ color: 'var(--muted)' }}>type</span>
-          <select className="w-full rounded-lg border px-3 py-2" value={type} onChange={(e) => { setType(e.target.value as typeof type); setCursor(''); }}>
-            {TYPES.map((t) => <option key={t.v} value={t.v}>{t.label}</option>)}
-          </select>
-        </label>
-        <label className="text-sm">
-          <span className="block text-xs mb-1" style={{ color: 'var(--muted)' }}>from {type === 'workshops' ? '(วันจัด)' : '(วันจอง)'}</span>
-          <input type="date" className="w-full rounded-lg border px-3 py-2" value={from} onChange={(e) => setFrom(e.target.value)} />
-        </label>
-        <label className="text-sm">
-          <span className="block text-xs mb-1" style={{ color: 'var(--muted)' }}>to</span>
-          <input type="date" className="w-full rounded-lg border px-3 py-2" value={to} onChange={(e) => setTo(e.target.value)} />
-        </label>
-        {type === 'bookings' && (
-          <label className="text-sm">
-            <span className="block text-xs mb-1" style={{ color: 'var(--muted)' }}>limit (1–2000)</span>
-            <input type="number" min={1} max={2000} className="w-full rounded-lg border px-3 py-2" value={limit} onChange={(e) => { setLimit(e.target.value); setCursor(''); }} />
-          </label>
-        )}
-        <label className="text-sm">
-          <span className="block text-xs mb-1" style={{ color: 'var(--muted)' }}>format</span>
-          <select className="w-full rounded-lg border px-3 py-2" value={format} onChange={(e) => setFormat(e.target.value as typeof format)}>
-            <option value="json">json</option>
-            <option value="csv">csv</option>
-          </select>
-        </label>
-        <div className="flex items-end gap-2" style={{ gridColumn: '1 / -1' }}>
-          <button className="btn btn-teal" disabled={busy || !key} onClick={() => { setCursor(''); setTimeout(run, 0); }}>
+          <p className="adm-hint">key เก็บไว้เฉพาะแท็บนี้ ปิดแท็บแล้วหาย</p>
+        </div>
+        <div className="adm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+          <div className="adm-field">
+            <label htmlFor="fx-type">type</label>
+            <select id="fx-type" value={type} onChange={(e) => { setType(e.target.value as typeof type); setCursor(''); }}>
+              {TYPES.map((t) => (
+                <option key={t.v} value={t.v}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="adm-field">
+            <label htmlFor="fx-from">from {type === 'workshops' ? '(วันจัด)' : '(วันจอง)'}</label>
+            <input id="fx-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          </div>
+          <div className="adm-field">
+            <label htmlFor="fx-to">to</label>
+            <input id="fx-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          </div>
+          {type === 'bookings' && (
+            <div className="adm-field">
+              <label htmlFor="fx-limit">limit (1–2000)</label>
+              <input id="fx-limit" type="number" min={1} max={2000} value={limit} onChange={(e) => { setLimit(e.target.value); setCursor(''); }} />
+            </div>
+          )}
+          <div className="adm-field">
+            <label htmlFor="fx-fmt">format</label>
+            <select id="fx-fmt" value={format} onChange={(e) => setFormat(e.target.value as typeof format)}>
+              <option value="json">json</option>
+              <option value="csv">csv</option>
+            </select>
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+          <button className="adm-btn teal" disabled={busy || !key} onClick={() => { setCursor(''); setTimeout(run, 0); }}>
             {busy ? 'กำลังดึง…' : 'ยิง API'}
           </button>
+          <button className="adm-btn" onClick={() => navigator.clipboard?.writeText(curl)}>
+            คัดลอก curl
+          </button>
           {type === 'bookings' && res?.json?.next_cursor && (
-            <button className="btn btn-paper" disabled={busy} onClick={nextPage}>หน้าถัดไป →</button>
+            <button className="adm-btn" disabled={busy} onClick={nextPage}>
+              หน้าถัดไป →
+            </button>
           )}
-          <span className="text-xs ml-auto" style={{ color: 'var(--muted)' }}>
-            {cursor ? `cursor: ${cursor.slice(0, 18)}…` : ''}
-          </span>
+          {cursor && <span className="adm-meta adm-mono" style={{ marginLeft: 'auto', fontSize: 11.5 }}>cursor: {cursor.slice(0, 18)}…</span>}
         </div>
-      </div>
-
-      <div className="mt-3 rounded-lg border px-3 py-2 text-xs font-mono flex items-center gap-2" style={{ background: 'var(--cream)' }}>
-        <span className="truncate flex-1">{curl}</span>
-        <button className="btn btn-paper btn-sm" onClick={() => navigator.clipboard?.writeText(curl)}>copy</button>
-      </div>
+        <div className="adm-code">{curl}</div>
+      </section>
 
       {res && (
-        <div className="mt-5">
-          <div className="flex flex-wrap items-center gap-3 text-sm mb-3">
-            <span
-              className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold"
-              style={res.status === 200 ? { background: '#e5f5ef', color: '#1f6a4f' } : { background: '#fdecec', color: '#a13030' }}
-            >
-              HTTP {res.status || 'ERR'}
+        <section className="adm-card">
+          <div className="adm-fx-status">
+            <Badge tone={res.status === 200 ? 'ok' : 'bad'}>HTTP {res.status || 'ERR'}</Badge>
+            <span className="adm-meta" style={{ fontSize: 13.5 }}>
+              {res.ms} ms · {(res.body.length / 1024).toFixed(1)} KB{res.json?.count != null ? ` · ${res.json.count} แถว` : ''}
             </span>
-            <span style={{ color: 'var(--muted)' }}>{res.ms} ms · {(res.body.length / 1024).toFixed(1)} KB</span>
-            {res.json?.count != null && <span>{res.json.count} แถว</span>}
             {res.json?.totals && (
-              <span className="font-mono text-xs">
-                totals: {Object.entries(res.json.totals).map(([k, v]) => `${k}=${cell(v)}`).join('  ')}
+              <span className="adm-mono" style={{ fontSize: 12 }}>
+                {Object.entries(res.json.totals).map(([k, v]) => `${k}=${cell(v)}`).join(' · ')}
               </span>
             )}
             {res.json?.rows && (
-              <div className="ml-auto inline-flex rounded-full border p-0.5 text-xs">
-                <button className={`px-3 py-1 rounded-full ${view === 'table' ? 'font-semibold' : ''}`} style={view === 'table' ? { background: 'var(--cream)' } : undefined} onClick={() => setView('table')}>ตาราง</button>
-                <button className={`px-3 py-1 rounded-full ${view === 'raw' ? 'font-semibold' : ''}`} style={view === 'raw' ? { background: 'var(--cream)' } : undefined} onClick={() => setView('raw')}>JSON</button>
+              <div style={{ marginLeft: 'auto' }}>
+                <AdminChips
+                  value={view}
+                  onChange={setView}
+                  items={[
+                    { key: 'table', label: 'ตาราง' },
+                    { key: 'raw', label: 'JSON' },
+                  ]}
+                />
               </div>
             )}
           </div>
 
           {res.json?.rows && view === 'table' ? (
             rows.length === 0 ? (
-              <div className="rounded-xl border p-6 text-center text-sm" style={{ color: 'var(--muted)' }}>ไม่มีแถวในช่วงนี้</div>
+              <p className="adm-empty">ไม่มีแถวในช่วงนี้</p>
             ) : (
-              <div className="rounded-xl border overflow-x-auto">
-                <table className="text-xs" style={{ borderCollapse: 'collapse', minWidth: '100%' }}>
+              <div className="adm-table-wrap">
+                <table className="adm-table adm-mono" style={{ fontSize: 12.5 }}>
                   <thead>
-                    <tr style={{ background: 'var(--cream)' }}>
-                      {cols.map((c) => <th key={c} className="text-left px-3 py-2 font-semibold whitespace-nowrap">{c}</th>)}
+                    <tr>
+                      {cols.map((c) => (
+                        <th key={c}>{c}</th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((r, i) => (
-                      <tr key={i} className="border-t">
+                      <tr key={i}>
                         {cols.map((c) => (
-                          <td key={c} className="px-3 py-1.5 whitespace-nowrap font-mono" style={{ maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis' }} title={cell(r[c])}>
+                          <td key={c} style={{ whiteSpace: 'nowrap', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', padding: '8px 16px' }} title={cell(r[c])}>
                             {cell(r[c])}
                           </td>
                         ))}
@@ -214,16 +228,14 @@ export default function FinanceExportTester() {
               </div>
             )
           ) : (
-            <pre className="rounded-xl border p-4 text-xs overflow-auto" style={{ maxHeight: 560, background: 'var(--cream)' }}>
-              {res.json ? JSON.stringify(res.json, null, 2) : res.body}
-            </pre>
+            <pre className="adm-pre">{res.json ? JSON.stringify(res.json, null, 2) : res.body}</pre>
           )}
-        </div>
+        </section>
       )}
 
-      <p className="text-xs mt-6" style={{ color: 'var(--muted)' }}>
+      <p className="adm-meta" style={{ margin: 0 }}>
         คู่มือ field ทั้งหมดอยู่ที่ <code>docs/finance-api.md</code> ใน repo
       </p>
-    </div>
+    </>
   );
 }

@@ -7,6 +7,7 @@ import { parseTiers, tierDesc } from '@/lib/pricing';
 type WorkshopRow = Workshop & { booking_count?: number };
 import Link from 'next/link';
 import { AdminFormModal } from '@/components/admin/AdminFormModal';
+import { AdminHead, AdminChips, RowMenu } from '@/components/admin/AdminShell';
 import { MasterForm } from './_components/MasterForm';
 import type { WorkshopMaster } from '@/lib/types';
 
@@ -88,116 +89,118 @@ export default function WorkshopInfoAdminPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-dark">ข้อมูลกิจกรรม</h1>
-          <p className="text-sm text-gray mt-1">กิจกรรมแบบรอบ = ผู้จัดเปิดรอบเองจากจัดรอบกิจกรรม · กิจกรรมเดี่ยว = admin สร้างแต่ละครั้งที่จัดการกิจกรรม แล้วผูกกับข้อมูลนี้</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setModal({ mode: 'create', kind: tab })}
-          className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90"
-        >
-          {tab === 'single' ? '+ เพิ่มกิจกรรมเดี่ยว' : '+ เพิ่มกิจกรรมแบบรอบ'}
-        </button>
-      </div>
-
-      <div className="flex items-center gap-1 rounded-lg border border-gray-lighter p-1 text-sm w-fit mb-5">
-        {([
-          ['round', `กิจกรรมแบบรอบ · ${roundMasters.length}`],
-          ['single', `กิจกรรมเดี่ยว · ${singleMasters.length}`],
-        ] as const).map(([k, label]) => (
-          <button
-            key={k}
-            type="button"
-            onClick={() => setTab(k)}
-            className={`px-3 py-1.5 rounded-md ${tab === k ? 'bg-dark text-white' : 'text-gray hover:bg-surface'}`}
-          >
-            {label}
+    <>
+      <AdminHead
+        eyebrow="admin · journey info"
+        title="ข้อมูลกิจกรรม"
+        sub="กิจกรรมแบบรอบ = ผู้จัดเปิดรอบเองจากจัดรอบกิจกรรม · กิจกรรมเดี่ยว = admin สร้างแต่ละครั้งที่จัดการกิจกรรม แล้วผูกกับข้อมูลนี้"
+        actions={
+          <button type="button" onClick={() => setModal({ mode: 'create', kind: tab })} className="adm-btn teal">
+            {tab === 'single' ? '+ เพิ่มกิจกรรมเดี่ยว' : '+ เพิ่มกิจกรรมแบบรอบ'}
           </button>
-        ))}
+        }
+      />
+
+      <div className="adm-toolbar">
+        <AdminChips
+          value={tab}
+          onChange={setTab}
+          items={[
+            { key: 'round', label: 'กิจกรรมแบบรอบ', n: roundMasters.length },
+            { key: 'single', label: 'กิจกรรมเดี่ยว', n: singleMasters.length },
+          ]}
+        />
       </div>
 
       {loading ? (
-        <p className="text-gray text-sm">กำลังโหลด…</p>
+        <p className="adm-meta">กำลังโหลด…</p>
       ) : loadError ? (
-        <p className="text-gray text-sm">
-          โหลดข้อมูลไม่สำเร็จ{' '}
-          <button onClick={() => { setLoading(true); load(); }} className="underline text-primary">ลองใหม่</button>
-        </p>
+        <div className="adm-card adm-empty">
+          <p style={{ margin: '0 0 12px' }}>โหลดข้อมูลไม่สำเร็จ</p>
+          <button type="button" className="adm-btn sm" onClick={() => { setLoading(true); load(); }}>
+            ลองใหม่
+          </button>
+        </div>
       ) : shownMasters.length === 0 ? (
-        <div className="border border-dashed border-gray-lighter rounded-xl p-10 text-center text-gray text-sm">
-          {tab === 'single' ? 'ยังไม่มีกิจกรรมเดี่ยว' : 'ยังไม่มีกิจกรรมแบบรอบ'} —{' '}
-          <button type="button" onClick={() => setModal({ mode: 'create', kind: tab })} className="text-primary hover:underline">
+        <div className="adm-card adm-empty">
+          <p style={{ margin: '0 0 12px' }}>{tab === 'single' ? 'ยังไม่มีกิจกรรมเดี่ยว' : 'ยังไม่มีกิจกรรมแบบรอบ'}</p>
+          <button type="button" onClick={() => setModal({ mode: 'create', kind: tab })} className="adm-btn sm teal">
             เพิ่มรายการแรก
           </button>
         </div>
       ) : (
         // Cards are poster-wide: as many A3 portraits fit the row as can.
-        <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 260px))' }}>
-          {shownMasters.map((m) => (
-            <div key={m.id} className="border border-gray-lighter rounded-xl bg-white overflow-hidden">
-              {m.cover_image_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={m.cover_image_url} alt={m.title} className="w-full aspect-[297/420] object-cover" />
-              ) : (
-                <div className="w-full aspect-[297/420] bg-surface flex items-center justify-center text-gray text-sm">ไม่มีรูปปก</div>
-              )}
-              <div className="p-4">
-                <h3 className="font-semibold text-dark">{m.title}</h3>
-                {m.organizer_name && <p className="text-xs text-gray mt-0.5">โดย {m.organizer_name}</p>}
-                {m.kind !== 'single' && (
-                  <p className="text-xs text-gray mt-1">
-                    ราคา/คน {m.price_group != null ? `฿${m.price_group.toLocaleString()}` : '—'}
-                    {parseTiers(m.price_tiers_json).map((t) => ` · ${t.label} ฿${t.price.toLocaleString()} (${tierDesc(t)})`).join('')}
-                  </p>
+        <div className="adm-posters">
+          {shownMasters.map((m) => {
+            const rounds = roundsOf(m.id);
+            const open = openMaster === m.id;
+            return (
+              <article key={m.id} className="adm-card adm-poster">
+                {m.cover_image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={m.cover_image_url} alt={m.title} className="adm-poster-img" />
+                ) : (
+                  <div className="adm-poster-img is-empty">poster · a3</div>
                 )}
-                {/* Rounds the teacher has opened under this master. */}
-                <button
-                  type="button"
-                  onClick={() => setOpenMaster((o) => (o === m.id ? null : m.id))}
-                  className="mt-2 text-xs text-dark hover:text-primary"
-                  aria-expanded={openMaster === m.id}
-                >
-                  {openMaster === m.id ? '▾' : '▸'} {m.kind === 'single' ? 'กิจกรรม' : 'รอบ'} · {roundsOf(m.id).length}
-                </button>
-                {openMaster === m.id && (
-                  <ul className="mt-2 divide-y divide-gray-lighter border border-gray-lighter rounded-lg text-xs">
-                    {roundsOf(m.id).length === 0 && (
-                      <li className="p-2 text-gray">
-                        {m.kind === 'single'
-                          ? <>ยังไม่มีกิจกรรม — สร้างที่ <Link href="/admin/workshops" className="text-primary hover:underline">จัดการกิจกรรม</Link> แล้วผูกกับข้อมูลนี้</>
-                          : 'ยังไม่มีรอบ — ผู้จัดเปิดได้ที่ Host Dashboard → จัดรอบกิจกรรม'}
-                      </li>
-                    )}
-                    {roundsOf(m.id).map((w) => (
-                      <li key={w.id} className="p-2 flex items-center gap-2">
-                        <span className="flex-1 min-w-0">
-                          <span className="text-dark">{w.date}</span> · {w.time_start}–{w.time_end}
-                          {w.location ? ` · ${w.location}` : ''}
-                          {w.status !== 'active' ? ` · ${w.status}` : ''}
-                        </span>
-                        <span className="text-gray">{w.booking_count ?? 0}/{w.max_participants}</span>
-                        <Link href={`/admin/workshops/${w.id}/applicants`} className="text-primary hover:underline">ผู้สมัคร</Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <div className="flex items-center gap-3 mt-3 text-xs">
-                  <Link href={`/journey-info/${m.id}`} target="_blank" className="text-dark hover:text-primary hover:underline">
-                    ดูหน้าจริง ↗
-                  </Link>
-                  <button type="button" onClick={() => setModal({ mode: 'edit', master: m })} className="text-primary hover:underline">
-                    แก้ไข
+                <div className="adm-poster-body">
+                  <h3>{m.title}</h3>
+                  {m.organizer_name && <p className="adm-meta">โดย {m.organizer_name}</p>}
+                  {m.kind !== 'single' && (
+                    <p className="adm-meta">
+                      ราคา/คน {m.price_group != null ? `฿${m.price_group.toLocaleString()}` : '—'}
+                      {parseTiers(m.price_tiers_json).map((t) => ` · ${t.label} ฿${t.price.toLocaleString()} (${tierDesc(t)})`).join('')}
+                    </p>
+                  )}
+                  {/* Rounds the teacher has opened under this master. */}
+                  <button type="button" onClick={() => setOpenMaster((o) => (o === m.id ? null : m.id))} className="adm-poster-toggle" aria-expanded={open}>
+                    {open ? '▾' : '▸'} {m.kind === 'single' ? 'กิจกรรม' : 'รอบ'} · {rounds.length}
                   </button>
-                  <button type="button" onClick={() => remove(m)} disabled={busyId === m.id} className="text-red-500 hover:underline disabled:opacity-50">
-                    {busyId === m.id ? 'กำลังลบ...' : 'ลบ'}
-                  </button>
+                  {open && (
+                    <div className="adm-rounds">
+                      {rounds.length === 0 && (
+                        <div className="adm-round adm-meta">
+                          {m.kind === 'single' ? (
+                            <span>
+                              ยังไม่มีกิจกรรม — สร้างที่ <Link href="/admin/workshops">กิจกรรม (รอบ)</Link> แล้วผูกกับข้อมูลนี้
+                            </span>
+                          ) : (
+                            'ยังไม่มีรอบ — ผู้จัดเปิดได้ที่ Host Dashboard → จัดรอบกิจกรรม'
+                          )}
+                        </div>
+                      )}
+                      {rounds.map((w) => (
+                        <Link key={w.id} href={`/admin/workshops/${w.id}/applicants`} className="adm-round">
+                          <span style={{ flex: 1, minWidth: 0 }}>
+                            <b>{new Date(w.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</b>
+                            <br />
+                            <span className="adm-meta">
+                              {w.time_start}–{w.time_end}
+                              {w.location ? ` · ${w.location}` : ''}
+                              {w.status !== 'active' ? ` · ${w.status}` : ''}
+                            </span>
+                          </span>
+                          <span className="adm-mono" style={{ fontSize: 12 }}>
+                            {w.booking_count ?? 0}/{w.max_participants}
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                  <div className="adm-mcard-acts" style={{ marginTop: 'auto', paddingTop: 10 }}>
+                    <button type="button" className="adm-btn sm" onClick={() => setModal({ mode: 'edit', master: m })}>
+                      แก้ไข
+                    </button>
+                    <RowMenu
+                      items={[
+                        { label: 'ดูหน้าจริง ↗', onClick: () => window.open(`/journey-info/${m.id}`, '_blank', 'noopener') },
+                        { label: busyId === m.id ? 'กำลังลบ…' : 'ลบ', danger: true, disabled: busyId === m.id, onClick: () => remove(m) },
+                      ]}
+                    />
+                  </div>
                 </div>
-              </div>
-            </div>
-          ))}
+              </article>
+            );
+          })}
         </div>
       )}
 
@@ -230,6 +233,6 @@ export default function WorkshopInfoAdminPage() {
           />
         ) : null}
       </AdminFormModal>
-    </div>
+    </>
   );
 }
