@@ -3,6 +3,12 @@
    Desktop: vertical tickets in a grid (stub on top). Under 760px: horizontal
    tickets in a list (stub on the left). One DOM for both, switched here. */
 
+/* Cream page, as in the design: white tickets and pills sit on it, and the
+   ticket's punched holes (cream circles) read as cut-outs. */
+/* The /me layout centres pages in a 1180px .page-main, so the cream is set on
+   the full-width <main> around it — edge to edge, header to footer. */
+main:has(.mb-page) { background: var(--cream); }
+
 .mb-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; margin-bottom: 28px; }
 .mb-head h1 { font-size: clamp(38px, 5vw, 60px); margin: 18px 0 10px; }
 .mb-head p { margin: 0; color: var(--muted); font-size: 15px; }

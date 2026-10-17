@@ -698,7 +698,7 @@ export default function MyBookingsPage() {
 
   if (unauthorized) {
     return (
-      <section className="section" style={{ padding: '80px 0', textAlign: 'center' }}>
+      <section className="section mb-page" style={{ padding: '80px 0', textAlign: 'center' }}>
         <p style={{ color: 'var(--muted)', marginBottom: 16 }}>
           {tr(lang, 'กรุณาเข้าสู่ระบบเพื่อดูการจอง', 'Please sign in to view your bookings')}
         </p>
@@ -729,7 +729,7 @@ export default function MyBookingsPage() {
   const filtered = filter === 'all' ? bookings : bookings.filter((b) => classify(b) === filter);
 
   return (
-    <section className="section" style={{ paddingTop: 48, paddingBottom: 64 }}>
+    <section className="section mb-page" style={{ paddingTop: 48, paddingBottom: 64 }}>
       <div className="container">
         <Reveal>
           <div className="mb-head">
