@@ -1,7 +1,7 @@
 'use client';
 
 import { EXTRA_ROLES, rolesOf } from '@/lib/roles';
-import { AdminHead, AdminSearch, AdminChips, AdminSheet, SheetSection, Badge, RowMenu, type MenuItem } from '@/components/admin/AdminShell';
+import { adminToast, AdminHead, AdminSearch, AdminChips, AdminSheet, SheetSection, Badge, RowMenu, type MenuItem } from '@/components/admin/AdminShell';
 
 /** Everything the picker offers: admin on top, then the extras. */
 const ROLE_OPTIONS = [
@@ -90,6 +90,7 @@ export default function AdminUsersPage() {
       }),
     });
     setEditingId(null);
+    adminToast('บันทึกบทบาทแล้ว');
     fetchUsers();
   }
 

@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { MultiSelect } from '@/components/admin/MultiSelect';
 import { parseTiers, isGroupTier, type PriceTier } from '@/lib/pricing';
 import { ImageUploader } from '@/components/admin/image/ImageUploader';
 import { ASPECTS } from '@/lib/image-aspects';
@@ -9,6 +8,8 @@ import { parseImageMeta } from '@/lib/image-meta';
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import type { ImageMeta, WorkshopMaster } from '@/lib/types';
 import { AdmSelect } from '@/components/admin/pickers';
+import { SheetSection } from '@/components/admin/AdminShell';
+import { UnsavedDialog } from '@/components/admin/UnsavedDialog';
 
 function toArr(json: string | null | undefined): string[] {
   try {
@@ -32,36 +33,37 @@ function ListField({
   placeholder?: string;
 }) {
   return (
-    <fieldset className="border border-gray-lighter rounded-xl p-4 bg-surface/40">
-      <div className="flex items-center justify-between mb-3">
-        <legend className="text-sm font-medium text-dark px-2">{legend}</legend>
-        <button type="button" onClick={() => onChange([...items, ''])} className="text-primary text-sm font-medium hover:underline">
-          + เพิ่ม
-        </button>
-      </div>
-      {items.length === 0 && <p className="text-xs text-gray text-center py-3">ยังไม่มีหัวข้อ</p>}
-      <div className="space-y-2">
+    <div className="adm-field">
+      <span className="adm-field-label">{legend}</span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {items.length === 0 && (
+          <p className="adm-soft-empty" style={{ padding: 12 }}>
+            ยังไม่มีหัวข้อ
+          </p>
+        )}
         {items.map((item, idx) => (
-          <div key={idx} className="flex gap-2 items-start">
-            <span className="px-2 py-2 text-primary text-sm">•</span>
+          <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{ width: 20, textAlign: 'center', color: 'var(--teal)', flexShrink: 0 }}>•</span>
             <input
               type="text"
               value={item}
               onChange={(e) => onChange(items.map((v, i) => (i === idx ? e.target.value : v)))}
-              className="input-field flex-1"
+              style={{ flex: 1, minWidth: 0 }}
               placeholder={placeholder}
+              aria-label={`${legend} ${idx + 1}`}
             />
-            <button
-              type="button"
-              onClick={() => onChange(items.filter((_, i) => i !== idx))}
-              className="px-3 py-2 text-red-500 hover:bg-red-50 rounded-lg text-sm"
-            >
+            <button type="button" onClick={() => onChange(items.filter((_, i) => i !== idx))} className="adm-icon-btn adm-minus" aria-label="ลบ">
               −
             </button>
           </div>
         ))}
+        <div>
+          <button type="button" onClick={() => onChange([...items, ''])} className="adm-link-btn">
+            + เพิ่ม
+          </button>
+        </div>
       </div>
-    </fieldset>
+    </div>
   );
 }
 
@@ -214,224 +216,211 @@ export function MasterForm({
     // On failure the prompt stays open and the error banner explains why.
   }
 
+  const isRound = (initial?.kind || kind) === 'round';
+  const modeLabel: Record<PriceTier['mode'], string> = {
+    seat: 'ต่อคน (1 ที่นั่ง)',
+    round: 'เหมาทั้งรอบ',
+    pack: 'แพ็กคงที่ (N คน)',
+    range: 'กลุ่มระบุจำนวน (min–max)',
+  };
+
   return (
-    <form onSubmit={submit} className="space-y-5">
-      {err && <div className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{err}</div>}
-
-      <ImageUploader
-        label="โปสเตอร์กิจกรรม (Cover · A3 แนวตั้ง)"
-        folder="workshop"
-        primary={ASPECTS.WORKSHOP_MASTER}
-        value={coverUrl}
-        meta={coverMeta}
-        onChange={({ url, meta }) => {
-          setCoverUrl(url);
-          setCoverMeta(meta);
-        }}
-      />
-
-      <div>
-        <label className="block text-sm font-medium text-dark mb-1">ชื่อกิจกรรม</label>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} className="input-field" required />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-dark mb-1">ผู้จัดกิจกรรม (Host)</label>
-        <AdmSelect value={organizer} onChange={(e) => setOrganizer(e.target.value)} className="input-field">
-          <option value="">— เลือกผู้จัด —</option>
-          {teachers.map((t) => (
-            <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
-        </AdmSelect>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-dark mb-1">รายละเอียดกิจกรรม</label>
-        <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={5} className="input-field" />
-      </div>
-
-      {(initial?.kind || kind) === 'round' && (
-      <fieldset className="border border-gray-lighter rounded-lg p-3">
-        <legend className="text-sm font-medium text-dark px-1">ที่นั่ง</legend>
-        <div className="mt-1 max-w-[220px]">
-          <label className="block text-xs text-gray mb-1">ที่นั่งต่อรอบ (ค่าเริ่มต้นตอนผู้จัดเปิดรอบ)</label>
-          <input type="number" min={1} step="1" value={defaultSeats} onChange={(e) => setDefaultSeats(e.target.value)} className="input-field" />
+    <form onSubmit={submit}>
+      {err && (
+        <div className="adm-notice is-bad" style={{ marginTop: 16 }}>
+          {err}
         </div>
-      </fieldset>
       )}
 
-      {(initial?.kind || kind) === 'round' && (
-      <fieldset className="border border-gray-lighter rounded-lg p-3">
-        <legend className="text-sm font-medium text-dark px-1">ราคา (ใช้กับทุกรอบที่ผู้จัดเปิด)</legend>
-        <p className="text-xs text-gray mt-1">
-          เพิ่มราคาเป็นแถว — ต่อคน / เหมาทั้งรอบ / แพ็กคงที่ / กลุ่มระบุจำนวน (ราคากลุ่มคิดต่อคน × จำนวน · ผู้จองนับเป็น 1 คน แล้วส่งลิงก์เชิญเพื่อนที่เหลือ) · การ์ดโชว์ราคาต่อคนแถวแรก ถ้าไม่มีก็โชว์ราคาเหมารอบ
-        </p>
-        {tiers.length === 0 && <p className="text-xs mt-2" style={{ color: '#a04a14' }}>⚠ ยังไม่มีราคา — ผู้จัดเปิดรอบไม่ได้จนกว่าจะเพิ่มอย่างน้อย 1 แถว</p>}
+      <SheetSection n={1} title="ข้อมูลกิจกรรม">
+        <ImageUploader
+          label="โปสเตอร์กิจกรรม (Cover · A3 แนวตั้ง)"
+          folder="workshop"
+          primary={ASPECTS.WORKSHOP_MASTER}
+          value={coverUrl}
+          meta={coverMeta}
+          onChange={({ url, meta }) => {
+            setCoverUrl(url);
+            setCoverMeta(meta);
+          }}
+        />
+        <div className="adm-field">
+          <label htmlFor="mf-title">ชื่อกิจกรรม</label>
+          <input id="mf-title" value={title} onChange={(e) => setTitle(e.target.value)} required />
+        </div>
+        <div className="adm-field">
+          <label>ผู้จัดกิจกรรม (Host)</label>
+          <AdmSelect value={organizer} onChange={(e) => setOrganizer(e.target.value)} aria-label="ผู้จัดกิจกรรม">
+            <option value="">— เลือกผู้จัด —</option>
+            {teachers.map((tc) => (
+              <option key={tc.id} value={tc.id}>
+                {tc.name}
+              </option>
+            ))}
+          </AdmSelect>
+        </div>
+        <div className="adm-field">
+          <label htmlFor="mf-desc">รายละเอียดกิจกรรม</label>
+          <textarea id="mf-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={5} />
+        </div>
+      </SheetSection>
 
-        {/* Tiers the admin adds: a name, a price, and whether one purchase
-            buys a seat or the whole round. */}
-        {tiers.length > 0 && (
-          <div className="mt-3 flex flex-col gap-2">
-            {tiers.map((t, i) => {
-              const set = (patch: Partial<PriceTier>) => setTiers((x) => x.map((y, j) => (j === i ? { ...y, ...patch } : y)));
-              return (
-                <div key={t.id} className="border border-gray-lighter rounded-md p-2">
-                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_130px_190px_32px] gap-2 items-end">
-                    <div>
-                      <label className="block text-xs text-gray mb-1">ชื่อราคา</label>
-                      <input value={t.label} onChange={(e) => set({ label: e.target.value })} className="input-field" placeholder="เช่น นักเรียน / แพ็ก 3 คน / องค์กร" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray mb-1">{t.mode === 'round' ? 'บาท (ทั้งรอบ)' : 'บาท/คน'}</label>
-                      <input type="number" min={0} step="1" value={t.price} onChange={(e) => set({ price: Number(e.target.value) })} className="input-field" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray mb-1">ประเภท</label>
-                      <AdmSelect
-                        value={t.mode}
-                        onChange={(e) => {
-                          const mode = e.target.value as PriceTier['mode'];
-                          set(mode === 'pack' ? { mode, size: t.size || 3, lock: !!t.lock } : mode === 'range' ? { mode, min: t.min || 2, max: t.max || 5, lock: !!t.lock } : mode === 'seat' ? { mode, lock: !!t.lock } : { mode, lock: true });
-                        }}
-                        className="input-field"
-                      >
-                        <option value="seat">ต่อคน (1 ที่นั่ง)</option>
-                        <option value="round">เหมาทั้งรอบ</option>
-                        <option value="pack">แพ็กคงที่ (N คน)</option>
-                        <option value="range">กลุ่มระบุจำนวน (min–max)</option>
-                      </AdmSelect>
-                    </div>
-                    <button type="button" onClick={() => setTiers((x) => x.filter((_, j) => j !== i))} className="h-10 text-red-500 text-sm" aria-label="ลบราคานี้">✕</button>
-                  </div>
-                  {t.mode === 'seat' && (
-                    <div className="flex flex-wrap items-center gap-3 mt-2">
-                      <label className="flex items-center gap-2 text-sm">
-                        <input type="checkbox" checked={!!t.lock} onChange={(e) => set({ lock: e.target.checked })} />
-                        ล็อกรอบเป็นส่วนตัว (Private) — จอง 1 คนแล้วรอบนั้นไม่รับคนอื่น
-                      </label>
-                      <span className="text-xs text-gray">{t.lock ? 'Private: จองได้เฉพาะรอบว่าง · คิดราคาต่อ 1 คน' : 'Public: นั่งร่วมกับคนอื่นจนกว่าที่นั่งจะเต็ม'}</span>
-                    </div>
-                  )}
-                  {t.mode === 'round' && (
-                    <div className="flex flex-wrap items-center gap-3 mt-2">
-                      <label className="flex items-center gap-2 text-sm">
-                        <input type="checkbox" checked readOnly disabled />
-                        ล็อกรอบเป็นส่วนตัว (Private) — เหมารอบย่อมปิดรับคนอื่นเสมอ
-                      </label>
-                      <span className="text-xs text-gray">ที่นั่ง {Number(defaultSeats) || 20} คน (ตามค่าที่นั่งต่อรอบด้านบน)</span>
-                    </div>
-                  )}
-                  {isGroupTier(t) && (
-                    <div className="flex flex-wrap items-end gap-3 mt-2">
-                      {t.mode === 'pack' ? (
-                        <div>
-                          <label className="block text-xs text-gray mb-1">จำนวนคนต่อแพ็ก (รวมผู้จอง)</label>
-                          <input type="number" min={2} step="1" value={t.size ?? 3} onChange={(e) => set({ size: Number(e.target.value) })} className="input-field w-28" />
-                        </div>
-                      ) : (
-                        <>
-                          <div>
-                            <label className="block text-xs text-gray mb-1">ต่ำสุด (คน)</label>
-                            <input type="number" min={2} step="1" value={t.min ?? 2} onChange={(e) => set({ min: Number(e.target.value) })} className="input-field w-24" />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-gray mb-1">สูงสุด (คน)</label>
-                            <input type="number" min={2} step="1" value={t.max ?? 5} onChange={(e) => set({ max: Number(e.target.value) })} className="input-field w-24" />
-                          </div>
-                        </>
-                      )}
-                      <label className="flex items-center gap-2 text-sm pb-2">
-                        <input type="checkbox" checked={!!t.lock} onChange={(e) => set({ lock: e.target.checked })} />
-                        ล็อกรอบเป็นส่วนตัว (Private) — จองแล้วรอบนั้นไม่รับคนอื่น
-                      </label>
-                      <span className="text-xs text-gray pb-2">
-                        {t.lock ? 'Private: จองได้เฉพาะรอบว่าง' : 'Public: รับได้หลายกลุ่มจนกว่าที่นั่งจะเต็ม'}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+      {isRound && (
+        <SheetSection n={2} title="ที่นั่ง & ราคา">
+          <p className="adm-hint" style={{ marginTop: -10 }}>
+            ราคาใช้กับทุกรอบที่ผู้จัดเปิด · ราคากลุ่มคิดต่อคน × จำนวน · ผู้จองนับเป็น 1 คน แล้วส่งลิงก์เชิญเพื่อนที่เหลือ · การ์ดโชว์ราคาต่อคนแถวแรก
+          </p>
+          <div className="adm-field">
+            <label htmlFor="mf-seats">ที่นั่งต่อรอบ</label>
+            <input id="mf-seats" type="number" min={1} step="1" value={defaultSeats} onChange={(e) => setDefaultSeats(e.target.value)} style={{ maxWidth: 200 }} />
+            <p className="adm-hint">ค่าเริ่มต้นตอนผู้จัดเปิดรอบ</p>
           </div>
-        )}
-        <button
-          type="button"
-          onClick={() => setTiers((x) => [...x, { id: `t-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, label: '', price: 0, mode: 'seat' }])}
-          className="mt-3 text-sm text-primary hover:underline"
-        >
-          + เพิ่มราคาอีกแบบ (ตั้งชื่อเอง)
-        </button>
-      </fieldset>
+          {tiers.length === 0 && (
+            <p className="adm-notice is-warn" style={{ margin: 0 }}>
+              ⚠ ยังไม่มีราคา — ผู้จัดเปิดรอบไม่ได้จนกว่าจะเพิ่มอย่างน้อย 1 แถว
+            </p>
+          )}
+
+          {/* Tiers the admin adds: a name, a price, and whether one purchase
+              buys a seat, a group, or the whole round. */}
+          {tiers.map((tr, i) => {
+            const set = (patch: Partial<PriceTier>) => setTiers((x) => x.map((y, j) => (j === i ? { ...y, ...patch } : y)));
+            return (
+              <div key={tr.id} className="adm-soft-card">
+                <div className="adm-soft-card-head" style={{ gap: 8 }}>
+                  <span className="adm-soft-card-n">ราคา {i + 1}</span>
+                  <div style={{ flex: 1 }} />
+                  <button type="button" onClick={() => setTiers((x) => x.filter((_, j) => j !== i))} className="adm-btn sm danger" aria-label="ลบราคานี้">
+                    ลบ
+                  </button>
+                </div>
+                <div className="adm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+                  <div className="adm-field">
+                    <label>ชื่อราคา</label>
+                    <input value={tr.label} onChange={(e) => set({ label: e.target.value })} className="is-white" placeholder="เช่น นักเรียน / แพ็ก 3 คน" />
+                  </div>
+                  <div className="adm-field">
+                    <label>{tr.mode === 'round' ? 'บาท (ทั้งรอบ)' : 'บาท/คน'}</label>
+                    <input type="number" min={0} step="1" value={tr.price} onChange={(e) => set({ price: Number(e.target.value) })} className="is-white" />
+                  </div>
+                  <div className="adm-field is-white">
+                    <label>ประเภท</label>
+                    <AdmSelect
+                      value={tr.mode}
+                      aria-label="ประเภทราคา"
+                      onChange={(e) => {
+                        const mode = e.target.value as PriceTier['mode'];
+                        set(
+                          mode === 'pack'
+                            ? { mode, size: tr.size || 3, lock: !!tr.lock }
+                            : mode === 'range'
+                              ? { mode, min: tr.min || 2, max: tr.max || 5, lock: !!tr.lock }
+                              : mode === 'seat'
+                                ? { mode, lock: !!tr.lock }
+                                : { mode, lock: true },
+                        );
+                      }}
+                    >
+                      {(Object.keys(modeLabel) as PriceTier['mode'][]).map((m) => (
+                        <option key={m} value={m}>
+                          {modeLabel[m]}
+                        </option>
+                      ))}
+                    </AdmSelect>
+                  </div>
+                </div>
+                {tr.mode === 'pack' && (
+                  <div className="adm-field">
+                    <label>จำนวนคนต่อแพ็ก (รวมผู้จอง)</label>
+                    <input type="number" min={2} step="1" value={tr.size ?? 3} onChange={(e) => set({ size: Number(e.target.value) })} className="is-white" style={{ maxWidth: 160 }} />
+                  </div>
+                )}
+                {tr.mode === 'range' && (
+                  <div className="adm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))' }}>
+                    <div className="adm-field">
+                      <label>ต่ำสุด (คน)</label>
+                      <input type="number" min={2} step="1" value={tr.min ?? 2} onChange={(e) => set({ min: Number(e.target.value) })} className="is-white" />
+                    </div>
+                    <div className="adm-field">
+                      <label>สูงสุด (คน)</label>
+                      <input type="number" min={2} step="1" value={tr.max ?? 5} onChange={(e) => set({ max: Number(e.target.value) })} className="is-white" />
+                    </div>
+                  </div>
+                )}
+                <label className="adm-inline-check">
+                  <input type="checkbox" checked={tr.mode === 'round' ? true : !!tr.lock} disabled={tr.mode === 'round'} onChange={(e) => set({ lock: e.target.checked })} />
+                  <span>
+                    ล็อกรอบเป็นส่วนตัว (Private)
+                    <span className="adm-meta" style={{ display: 'block', fontSize: 12, marginTop: 2 }}>
+                      {tr.mode === 'round'
+                        ? `เหมารอบย่อมปิดรับคนอื่นเสมอ · ที่นั่ง ${Number(defaultSeats) || 20} คน`
+                        : tr.lock
+                          ? 'Private: จองแล้วรอบนั้นไม่รับคนอื่น · จองได้เฉพาะรอบว่าง'
+                          : isGroupTier(tr)
+                            ? 'Public: รับได้หลายกลุ่มจนกว่าที่นั่งจะเต็ม'
+                            : 'Public: นั่งร่วมกับคนอื่นจนกว่าที่นั่งจะเต็ม'}
+                    </span>
+                  </span>
+                </label>
+              </div>
+            );
+          })}
+          <div>
+            <button
+              type="button"
+              onClick={() => setTiers((x) => [...x, { id: `t-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, label: '', price: 0, mode: 'seat' }])}
+              className="adm-link-btn"
+            >
+              + เพิ่มราคาอีกแบบ (ตั้งชื่อเอง)
+            </button>
+          </div>
+        </SheetSection>
       )}
 
-      {(initial?.kind || kind) === 'round' && (
-        <fieldset className="border border-gray-lighter rounded-lg p-3">
-          <legend className="text-sm font-medium text-dark px-1">สถานที่ที่เปิดรอบได้ (ผู้จัดเลือกอีกครั้งตอนเปิดรอบ)</legend>
+      {isRound && (
+        <SheetSection n={3} title="สถานที่ที่เปิดรอบได้">
+          <p className="adm-hint" style={{ marginTop: -10 }}>
+            ผู้จัดเลือกอีกครั้งตอนเปิดรอบ
+          </p>
           {locations.length === 0 ? (
-            <p className="text-xs text-gray mt-1">ยังไม่มีสถานที่ในระบบ — เพิ่มได้ที่เมนู สถานที่</p>
+            <p className="adm-soft-empty">ยังไม่มีสถานที่ในระบบ — เพิ่มได้ที่เมนู สถานที่</p>
           ) : (
-            <MultiSelect
-              className="mt-1"
-              options={locations.map((l) => ({ value: l.id, label: l.name, hint: l.province }))}
-              value={locationIds}
-              onChange={setLocationIds}
-              placeholder="ทุกสถานที่ (ยังไม่ได้เลือก)"
-            />
-          )}
-          {locationIds.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              {locations.filter((l) => locationIds.includes(l.id)).map((l) => (
-                <span key={l.id} className="badge" style={{ background: '#e6f4f1', color: '#0f766e' }}>{l.name}</span>
+            <div className="adm-checklist">
+              {locations.map((l) => (
+                <label key={l.id}>
+                  <input
+                    type="checkbox"
+                    checked={locationIds.includes(l.id)}
+                    onChange={(e) => setLocationIds((ids) => (e.target.checked ? [...ids, l.id] : ids.filter((x) => x !== l.id)))}
+                  />
+                  <span style={{ flex: 1, fontSize: 14 }}>{l.name}</span>
+                  <span className="adm-meta">{l.province}</span>
+                </label>
               ))}
             </div>
           )}
-          <p className="text-xs text-gray mt-2">ไม่เลือกเลย = ให้ผู้จัดเลือกได้ทุกสถานที่</p>
-        </fieldset>
+          <p className="adm-hint" style={{ margin: 0 }}>
+            {locationIds.length ? `เลือกแล้ว ${locationIds.length} สถานที่` : 'ไม่เลือกเลย = ให้ผู้จัดเลือกได้ทุกสถานที่'}
+          </p>
+        </SheetSection>
       )}
 
-      <ListField legend="เหมาะกับใคร (Target Audience)" items={target} onChange={setTarget} placeholder="เช่น คนที่อยากพักใจ..." />
+      <SheetSection n={isRound ? 4 : 2} title="เนื้อหา">
+        <ListField legend="เหมาะกับใคร (Target Audience)" items={target} onChange={setTarget} placeholder="เช่น คนที่อยากพักใจ..." />
+        <ListField legend="ได้อะไรจากกิจกรรม" items={takeaways} onChange={setTakeaways} placeholder="เช่น เทคนิคการหายใจ..." />
+      </SheetSection>
 
-      <ListField legend="ได้อะไรจากกิจกรรม" items={takeaways} onChange={setTakeaways} placeholder="เช่น เทคนิคการหายใจ..." />
-
-      <div className="flex items-center gap-2 pt-2">
-        <button type="button" onClick={onCancel} className="px-4 py-2 rounded-lg border border-gray-lighter text-sm text-gray">
+      <div className="adm-sticky-foot">
+        <button type="button" onClick={onCancel} className="adm-btn">
           ยกเลิก
         </button>
-        <button type="submit" disabled={saving} className="ml-auto px-5 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90 disabled:opacity-50">
-          {saving ? 'กำลังบันทึก...' : editingId ? 'บันทึกการแก้ไข' : 'เพิ่มข้อมูล'}
+        <button type="submit" disabled={saving} className="adm-btn teal">
+          {saving ? 'กำลังบันทึก…' : editingId ? 'บันทึกการแก้ไข' : 'เพิ่มข้อมูล'}
         </button>
       </div>
 
       {/* Unsaved-changes prompt — warn before discarding edits on close. */}
-      {pendingClose && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-dark/55" onClick={() => onStay?.()}>
-          <div className="bg-paper rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-heading text-lg text-dark mb-2">ยังไม่ได้บันทึก</h3>
-            <p className="text-sm text-gray mb-5">คุณมีข้อมูลที่แก้ไขแต่ยังไม่ได้กดบันทึก ต้องการบันทึกก่อนออกหรือไม่?</p>
-            {err && <div className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2 mb-3">{err}</div>}
-            <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                disabled={saving}
-                onClick={saveAndClose}
-                className="w-full px-4 py-2.5 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
-              >
-                {saving ? 'กำลังบันทึก...' : 'บันทึก แล้วออก'}
-              </button>
-              <button
-                type="button"
-                onClick={() => onCancel()}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-lighter text-sm text-dark hover:bg-surface"
-              >
-                ออกโดยไม่บันทึก
-              </button>
-              <button type="button" onClick={() => onStay?.()} className="w-full px-4 py-2.5 text-sm text-gray hover:underline">
-                อยู่ต่อ
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {pendingClose && <UnsavedDialog saving={saving} err={err} onSave={saveAndClose} onDiscard={onCancel} onStay={() => onStay?.()} />}
     </form>
   );
 }

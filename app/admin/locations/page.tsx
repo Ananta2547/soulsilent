@@ -9,7 +9,7 @@ import { GalleryEditor } from '@/components/admin/GalleryEditor';
 import { ImageUploader } from '@/components/admin/image/ImageUploader';
 import { ASPECTS } from '@/lib/image-aspects';
 import { parseImageMeta } from '@/lib/image-meta';
-import { adminConfirm, AdminHead, AdminSearch, AdminSheet, SheetSection, Badge, RowMenu, type MenuItem } from '@/components/admin/AdminShell';
+import { adminConfirm, adminToast, AdminHead, AdminSearch, AdminSheet, SheetSection, Badge, RowMenu, type MenuItem } from '@/components/admin/AdminShell';
 import { AdmSelect } from '@/components/admin/pickers';
 
 type LocationForm = {
@@ -133,6 +133,7 @@ export default function AdminLocationsPage() {
     setShowForm(false);
     setEditingId(null);
     setForm(emptyLocation);
+    adminToast('บันทึกสถานที่แล้ว');
     fetchAll();
   }
 

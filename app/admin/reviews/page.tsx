@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { adminConfirm, AdminHead, AdminChips, AdminSheet, SheetSection } from '@/components/admin/AdminShell';
+import { adminConfirm, adminToast, AdminHead, AdminChips, AdminSheet, SheetSection } from '@/components/admin/AdminShell';
 import { sqliteToMs } from '@/lib/datetime';
 import { AdmSelect } from '@/components/admin/pickers';
 
@@ -89,6 +89,7 @@ export default function AdminReviewsPage() {
       setRating(5);
       setComment('');
       setFormOpen(false);
+      adminToast('เพิ่มรีวิวแล้ว');
       await load();
     } finally {
       setSaving(false);

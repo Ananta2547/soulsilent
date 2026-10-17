@@ -298,6 +298,38 @@ a.adm-round:hover { background: var(--cream); text-decoration: none; color: var(
 .adm-dp-foot { display: flex; align-items: center; gap: 8px; padding-top: 4px; }
 .adm-dp-foot span { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+/* ---------- pieces used inside sheet forms ---------- */
+.adm-soft-card { border-radius: 16px; background: var(--adm-soft); padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.adm-soft-card-head { display: flex; align-items: center; gap: 4px; }
+.adm-soft-card-n { font-family: 'JetBrains Mono', 'IBM Plex Sans Thai', monospace; font-size: 11px; letter-spacing: .1em; color: var(--teal); }
+.adm-soft-empty { font-size: 13px; color: var(--muted); margin: 0; padding: 20px; border-radius: 14px; background: var(--adm-soft); text-align: center; }
+.adm .is-white, .adm .is-white .adm-select { background-color: #fff !important; }
+.adm-link-btn { background: none; border: 0; padding: 0; font: inherit; font-size: 14px; font-weight: 600; color: var(--teal); cursor: pointer; }
+.adm-link-btn:hover { text-decoration: underline; }
+.adm-inline-check { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 14px; line-height: 20px; }
+.adm-inline-check input { width: 18px; height: 18px; margin: 1px 0 0; flex-shrink: 0; }
+.adm-notice.is-bad { background: #fde4e1; color: #a3261a; border-radius: 14px; }
+.adm-notice.is-warn { border-radius: 14px; padding: 12px 14px; font-size: 13px; line-height: 20px; color: #5a4410; }
+.adm-sum { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.adm-sum > div { border-radius: 16px; background: var(--adm-soft); padding: 14px; }
+.adm-sum > div.is-net { background: var(--teal-50); }
+.adm-sum .adm-label { font-size: 10.5px; letter-spacing: .1em; }
+.adm-sum b { display: block; font-size: 22px; font-weight: 700; margin-top: 6px; }
+.adm-sum small { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+/* A form's own buttons stick to the bottom of the sheet, like the design footer. */
+.adm-sticky-foot { position: sticky; bottom: -32px; z-index: 3; margin: 24px -24px -32px; padding: 12px 24px; background: #fff; border-top: 1px solid var(--adm-line); display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 759px) { .adm-sticky-foot { bottom: -24px; margin: 20px -16px -24px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); } }
+
+.adm-picked { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; background: var(--teal-50); box-shadow: inset 0 0 0 2px var(--teal); }
+.adm-pick-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 10px 12px; border: 0; border-radius: 14px; background: transparent; font: inherit; cursor: pointer; }
+.adm-pick-row:hover { background: var(--cream); }
+.adm-pick-row:disabled { opacity: .5; cursor: not-allowed; }
+.adm-pick-row b { display: block; font-size: 14px; font-weight: 600; }
+.adm-pick-row span span { display: block; font-size: 12.5px; color: var(--muted); }
+.adm-app-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); gap: 10px 16px; }
+.adm-app-v { font-size: 13.5px; margin-top: 2px; word-break: break-word; }
+.adm-app-sec { border-top: 1px dashed var(--teal-100); padding-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+
 /* ---------- confirm dialog + toast ---------- */
 .adm-dlg-scrim { position: fixed; inset: 0; z-index: 300; background: rgba(13,30,29,.5); display: flex; align-items: center; justify-content: center; padding: 24px; }
 .adm-dlg { width: 100%; max-width: 440px; background: #fff; border-radius: 24px; padding: 24px; box-shadow: 0 30px 60px -20px rgba(13,30,29,.45); }
@@ -443,3 +475,29 @@ a.adm-round:hover { background: var(--cream); text-decoration: none; color: var(
 @media (prefers-reduced-motion: reduce) {
   .adm-side, .adm-kpi, .adm-btn { transition: none; }
 }
+
+/* checkbox list (venues in the master form) + the round "−" remove button */
+.adm-checklist { border-radius: 16px; background: var(--adm-soft); overflow: hidden; }
+.adm-checklist label { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 14px; cursor: pointer; }
+.adm-checklist label + label { border-top: 1px solid var(--adm-line); }
+.adm-checklist label:hover { background: var(--cream); }
+.adm-checklist input { width: 18px; height: 18px; flex-shrink: 0; }
+.adm-minus { width: 40px; height: 40px; color: #b91c1c; font-size: 18px; }
+.adm-minus:hover { background: #fde4e1; }
+
+/* ---------- stepped workshop form (design: tabs in the sheet head) ---------- */
+.adm-steptabs { position: sticky; top: 0; z-index: 4; display: flex; gap: 2px; overflow-x: auto; margin: 0 -24px; padding: 0 16px; background: var(--adm-soft); border-bottom: 1px solid var(--adm-line); scrollbar-width: none; }
+.adm-steptabs::-webkit-scrollbar { display: none; }
+.adm-steptabs button { display: flex; align-items: center; gap: 8px; flex-shrink: 0; padding: 12px 10px; border: 0; border-bottom: 2px solid transparent; background: transparent; cursor: pointer; font: inherit; font-size: 13.5px; white-space: nowrap; color: var(--muted); }
+.adm-steptabs button span { width: 20px; height: 20px; border-radius: 50%; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; background: var(--cream-deep); color: var(--muted); }
+.adm-steptabs button.is-on { color: var(--ink); font-weight: 600; border-bottom-color: var(--teal); }
+.adm-steptabs button.is-on span { background: var(--teal); color: #fff; }
+.adm-step:not(.is-on) { display: none; }
+/* Inside the steps the old fieldsets are sub-groups, not numbered sections. */
+.adm .adm-form .adm-steps fieldset { border: 0; padding: 0; }
+.adm .adm-form .adm-steps fieldset > legend { font-size: 15px; padding: 0 0 10px; }
+.adm .adm-form .adm-steps fieldset > legend::before { display: none; }
+@media (max-width: 759px) { .adm-steptabs { margin: 0 -16px; padding: 0 8px; } }
+.adm-form:has(> .adm-steps) { padding-top: 0; }
+/* A section that is just one old fieldset already has its title. */
+.adm .adm-form .adm-steps .adm-sec > .adm-sec-head + fieldset:last-child > legend { display: none; }

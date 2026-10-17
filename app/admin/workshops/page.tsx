@@ -14,7 +14,7 @@ import {
 } from './_components/WorkshopForm';
 import { ApplicationFormBuilder } from './_components/ApplicationFormBuilder';
 import { PayoutManager } from './_components/PayoutManager';
-import { adminAlert, adminConfirm, AdminHead, AdminSearch, AdminChips, Badge, RowMenu, type MenuItem, type Tone } from '@/components/admin/AdminShell';
+import { adminAlert, adminConfirm, adminToast, AdminHead, AdminSearch, AdminChips, Badge, RowMenu, type MenuItem, type Tone } from '@/components/admin/AdminShell';
 
 type ModalState =
   | { mode: 'create' }
@@ -177,6 +177,7 @@ export default function AdminWorkshopsPage() {
 
   function closeAndRefresh() {
     closeModal();
+    adminToast('บันทึกแล้ว');
     fetchAll();
   }
 

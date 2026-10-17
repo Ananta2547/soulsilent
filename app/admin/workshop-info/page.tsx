@@ -7,7 +7,7 @@ import { parseTiers, tierDesc } from '@/lib/pricing';
 type WorkshopRow = Workshop & { booking_count?: number };
 import Link from 'next/link';
 import { AdminFormModal } from '@/components/admin/AdminFormModal';
-import { adminConfirm, AdminHead, AdminChips, RowMenu } from '@/components/admin/AdminShell';
+import { adminConfirm, adminToast, AdminHead, AdminChips, RowMenu } from '@/components/admin/AdminShell';
 import { MasterForm } from './_components/MasterForm';
 import type { WorkshopMaster } from '@/lib/types';
 
@@ -68,6 +68,7 @@ export default function WorkshopInfoAdminPage() {
 
   function closeAndRefresh() {
     closeModal();
+    adminToast('บันทึกแล้ว');
     load();
   }
 

@@ -7,7 +7,8 @@ import type { DayTime, ImageMeta, Location, ScheduleDay, ScheduleItem, User, Wor
 import { ImageUploader } from '@/components/admin/image/ImageUploader';
 // The admin popup pickers (design "Date picker"), same values as before.
 import { PickTime as TimeField24, PickDate as DateField24, PickDateTime as DateTimePicker } from '@/components/admin/pickers';
-import { adminConfirm } from '@/components/admin/AdminShell';
+import { adminConfirm, SheetSection } from '@/components/admin/AdminShell';
+import { UnsavedDialog } from '@/components/admin/UnsavedDialog';
 import { ASPECTS } from '@/lib/image-aspects';
 import { parseImageMeta } from '@/lib/image-meta';
 import { safeParseArray } from '@/lib/workshop-utils';
@@ -171,6 +172,9 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const errorRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  /** Which of the design's five steps is showing. */
+  const [step, setStep] = useState(0);
   // Scroll the alert into view whenever a validation error appears (the form is
   // long, so an error at the top is easy to miss when scrolled down).
   useEffect(() => {
@@ -363,6 +367,14 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    // The form skips the browser's own required-field check (steps hide
+    // fields), so the name — the one field the browser used to catch — is
+    // checked here and its step brought back into view.
+    if (!form.title.trim()) {
+      setError('กรุณากรอกชื่อกิจกรรม');
+      setStep(0);
+      return;
+    }
 
     // Resolve the date scheme into a canonical `date` (+ end_date / dates).
     let canonicalDate = form.date;
@@ -584,8 +596,26 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
     { value: 'multi_part', label: 'กิจกรรมแบ่งพาร์ท', hint: 'เลือกหลายวันไม่ติดกัน' },
   ];
 
+  const STEPS = ['ข้อมูลหลัก', 'วันเวลา & สถานที่', 'รับสมัคร & ราคา', 'ผู้จัด', 'เนื้อหา'];
+  const lastStep = STEPS.length - 1;
+  const goStep = (n: number) => {
+    setStep(n);
+    // Back to the top of the sheet for the new step.
+    formRef.current?.closest('.adm-sheet-body')?.scrollTo({ top: 0 });
+  };
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-5 max-w-3xl">
+    // noValidate: fields of other steps are hidden, and the browser cannot
+    // point at a hidden required field — handleSubmit / the API report instead.
+    <form ref={formRef} onSubmit={handleSubmit} noValidate className="adm-steps">
+      <nav className="adm-steptabs" aria-label="ขั้นตอนของฟอร์ม">
+        {STEPS.map((label, n) => (
+          <button key={label} type="button" className={step === n ? 'is-on' : ''} aria-current={step === n ? 'step' : undefined} onClick={() => goStep(n)}>
+            <span>{n + 1}</span>
+            {label}
+          </button>
+        ))}
+      </nav>
       {error && (
         <div
           ref={errorRef}
@@ -608,1045 +638,1053 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
         }
       `}</style>
 
-      <div>
-        <label className="block text-sm font-medium text-dark mb-1">
-          ข้อมูลกิจกรรม (Master) <span className="text-gray font-normal">— ผูกรอบนี้กับภาพรวมกิจกรรม</span>
-        </label>
-        <AdmSelect
-          value={form.master_id}
-          onChange={(e) => selectMaster(e.target.value)}
-          className="input-field"
-        >
-          <option value="">— ไม่ผูก (รอบเดี่ยว) —</option>
-          {masters.map((m) => (
-            <option key={m.id} value={m.id}>{m.title}</option>
-          ))}
-        </AdmSelect>
-        {form.master_id && (
-          <p className="text-xs text-gray mt-1">เลือกแล้วระบบจะดึงข้อมูลภาพรวมมาเติมให้อัตโนมัติ — แก้ไขเฉพาะรอบนี้ต่อได้เลย</p>
-        )}
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-dark mb-1">ชื่อกิจกรรม</label>
-        <input
-          value={form.title}
-          onChange={(e) => setForm({ ...form, title: e.target.value })}
-          className="input-field"
-          required
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-dark mb-1">คำอธิบายสั้น</label>
-        <input
-          value={form.short_description}
-          onChange={(e) => setForm({ ...form, short_description: e.target.value })}
-          className="input-field"
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-dark mb-1">รายละเอียด</label>
-        <textarea
-          value={form.description}
-          onChange={(e) => setForm({ ...form, description: e.target.value })}
-          className="input-field"
-          rows={5}
-        />
-      </div>
-
-      {/* Workshop type + date scheme */}
-      <fieldset className="border border-gray-lighter rounded-xl p-4 bg-surface/40 space-y-4">
-        <legend className="text-sm font-medium text-dark px-2">ประเภทรูปแบบกิจกรรม</legend>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          {TYPE_OPTIONS.map((opt) => {
-            const selected = form.workshop_type === opt.value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setForm({ ...form, workshop_type: opt.value })}
-                className={`text-left rounded-xl border p-3 transition ${
-                  selected
-                    ? 'border-primary bg-primary/10 ring-1 ring-primary'
-                    : 'border-gray-lighter hover:border-primary/40'
-                }`}
-              >
-                <div className="text-sm font-medium text-dark">{opt.label}</div>
-                <div className="text-xs text-gray mt-0.5">{opt.hint}</div>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Date inputs — depend on the chosen type. All show DD/MM/YYYY. */}
-        {form.workshop_type === 'one_day' && (
+      <div className={`adm-step${step === 0 ? ' is-on' : ''}`}>
+        <SheetSection n={1} title="ข้อมูลหลัก">
           <div>
-            <label className="block text-sm font-medium text-dark mb-1">วันที่จัดกิจกรรม</label>
-            <DateField24
-              value={form.date}
-              onChange={(v) => setForm({ ...form, date: v })}
+            <label className="block text-sm font-medium text-dark mb-1">
+              ข้อมูลกิจกรรม (Master) <span className="text-gray font-normal">— ผูกรอบนี้กับภาพรวมกิจกรรม</span>
+            </label>
+            <AdmSelect
+              value={form.master_id}
+              onChange={(e) => selectMaster(e.target.value)}
+              className="input-field"
+            >
+              <option value="">— ไม่ผูก (รอบเดี่ยว) —</option>
+              {masters.map((m) => (
+                <option key={m.id} value={m.id}>{m.title}</option>
+              ))}
+            </AdmSelect>
+            {form.master_id && (
+              <p className="text-xs text-gray mt-1">เลือกแล้วระบบจะดึงข้อมูลภาพรวมมาเติมให้อัตโนมัติ — แก้ไขเฉพาะรอบนี้ต่อได้เลย</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-dark mb-1">ชื่อกิจกรรม</label>
+            <input
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              className="input-field"
+              required
             />
           </div>
-        )}
 
-        {form.workshop_type === 'multi_day' && (
           <div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label className="block text-sm font-medium text-dark mb-1">คำอธิบายสั้น</label>
+            <input
+              value={form.short_description}
+              onChange={(e) => setForm({ ...form, short_description: e.target.value })}
+              className="input-field"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-dark mb-1">รายละเอียด</label>
+            <textarea
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              className="input-field"
+              rows={5}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-dark mb-1">สถานะ</label>
+            <AdmSelect
+              value={form.status}
+              onChange={(e) =>
+                setForm({ ...form, status: e.target.value as WorkshopFormValues['status'] })
+              }
+              className="input-field"
+            >
+              <option value="active">เปิดจอง (Open)</option>
+              <option value="closed">ปิดรับ (Closed)</option>
+              <option value="draft">แบบร่าง (Draft)</option>
+              <option value="cancelled">ยกเลิกกิจกรรม (Cancelled)</option>
+            </AdmSelect>
+            {form.status === 'cancelled' && (
+              <p className="text-xs mt-1" style={{ color: '#b3261e' }}>
+                เมื่อบันทึก ระบบจะยกเลิกการจองทั้งหมดของกิจกรรมนี้ และแสดงหมายเหตุ &ldquo;กิจกรรมมีการเปลี่ยนแปลงกำหนดการ&rdquo; ให้ผู้เข้าร่วม
+              </p>
+            )}
+          </div>
+
+          {/* Category + tags */}
+          <fieldset className="border border-gray-lighter rounded-xl p-4 bg-surface/40 space-y-4">
+            <legend className="text-sm font-medium text-dark px-2">หมวด + แท็ก</legend>
+            <div>
+              <label className="block text-sm font-medium text-dark mb-1">หมวดหมู่</label>
+              <input
+                list="ws-category-suggestions"
+                value={form.category ?? ''}
+                onChange={(e) => setForm({ ...form, category: e.target.value })}
+                className="input-field"
+                placeholder="เช่น Workshop, Camp, Talk"
+              />
+              <datalist id="ws-category-suggestions">
+                {CATEGORY_SUGGESTIONS.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-dark mb-1">แท็ก</label>
+              <div className="flex gap-2">
+                <input
+                  value={form.tag_input ?? ''}
+                  onChange={(e) => setForm({ ...form, tag_input: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ',') {
+                      e.preventDefault();
+                      addTag();
+                    }
+                  }}
+                  className="input-field flex-1"
+                  placeholder="พิมพ์แล้วกด Enter"
+                />
+                <button
+                  type="button"
+                  onClick={addTag}
+                  className="px-4 py-2 rounded-xl bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20"
+                >
+                  เพิ่ม
+                </button>
+              </div>
+              {form.tags.length > 0 && (
+                <div className="flex gap-2 flex-wrap mt-2">
+                  {form.tags.map((t) => (
+                    <span
+                      key={t}
+                      className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium"
+                    >
+                      {t}
+                      <button
+                        type="button"
+                        onClick={() => removeTag(t)}
+                        className="text-primary/60 hover:text-red-500 ml-1"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </fieldset>
+        </SheetSection>
+        <SheetSection n={2} title="รูปปก">
+          <ImageUploader
+            label="รูปปกกิจกรรม (โปสเตอร์ A3 · 29.7×42)"
+            folder="workshop"
+            primary={ASPECTS.WORKSHOP_HERO}
+            value={form.image_url}
+            meta={form.image_meta}
+            onChange={({ url, meta }) =>
+              setForm({ ...form, image_url: url, image_meta: meta })
+            }
+          />
+        </SheetSection>
+      </div>
+
+      <div className={`adm-step${step === 1 ? ' is-on' : ''}`}>
+        <SheetSection n={1} title="รูปแบบ & วันเวลา">
+          {/* Workshop type + date scheme */}
+          <fieldset className="border border-gray-lighter rounded-xl p-4 bg-surface/40 space-y-4">
+            <legend className="text-sm font-medium text-dark px-2">ประเภทรูปแบบกิจกรรม</legend>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {TYPE_OPTIONS.map((opt) => {
+                const selected = form.workshop_type === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setForm({ ...form, workshop_type: opt.value })}
+                    className={`text-left rounded-xl border p-3 transition ${
+                      selected
+                        ? 'border-primary bg-primary/10 ring-1 ring-primary'
+                        : 'border-gray-lighter hover:border-primary/40'
+                    }`}
+                  >
+                    <div className="text-sm font-medium text-dark">{opt.label}</div>
+                    <div className="text-xs text-gray mt-0.5">{opt.hint}</div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Date inputs — depend on the chosen type. All show DD/MM/YYYY. */}
+            {form.workshop_type === 'one_day' && (
               <div>
-                <label className="block text-sm font-medium text-dark mb-1">วันเริ่มต้น</label>
+                <label className="block text-sm font-medium text-dark mb-1">วันที่จัดกิจกรรม</label>
                 <DateField24
                   value={form.date}
                   onChange={(v) => setForm({ ...form, date: v })}
                 />
               </div>
+            )}
+
+            {form.workshop_type === 'multi_day' && (
               <div>
-                <label className="block text-sm font-medium text-dark mb-1">วันสิ้นสุด</label>
-                <DateField24
-                  value={form.end_date}
-                  onChange={(v) => setForm({ ...form, end_date: v })}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-dark mb-1">วันเริ่มต้น</label>
+                    <DateField24
+                      value={form.date}
+                      onChange={(v) => setForm({ ...form, date: v })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-dark mb-1">วันสิ้นสุด</label>
+                    <DateField24
+                      value={form.end_date}
+                      onChange={(v) => setForm({ ...form, end_date: v })}
+                    />
+                  </div>
+                </div>
+                {form.date && form.end_date && form.end_date <= form.date && (
+                  <p className="text-xs text-red-500 mt-2">⚠ วันสิ้นสุดต้องมากกว่าวันเริ่มต้น (ต้องเป็นคนละวัน)</p>
+                )}
+              </div>
+            )}
+
+            {form.workshop_type === 'multi_part' && (
+              <div>
+                <label className="block text-sm font-medium text-dark mb-1">
+                  เลือกวันที่ (เพิ่มได้หลายวัน)
+                </label>
+                <div className="flex gap-2 flex-wrap">
+                  <DateField24
+                    value={form.date_input}
+                    onChange={(v) => setForm({ ...form, date_input: v })}
+                  />
+                  <button
+                    type="button"
+                    onClick={addPartDate}
+                    className="px-4 py-2 rounded-xl bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 whitespace-nowrap"
+                  >
+                    + เพิ่มวัน
+                  </button>
+                </div>
+                {form.dates.length === 0 ? (
+                  <p className="text-xs text-gray mt-2">ยังไม่ได้เลือกวัน เช่น จัดทุกวันเสาร์ หรือวันที่ 1, 8, 15</p>
+                ) : (
+                  <div className="flex gap-2 flex-wrap mt-3">
+                    {form.dates.map((d) => (
+                      <span
+                        key={d}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-medium"
+                      >
+                        {fmtDate(d)}
+                        <button
+                          type="button"
+                          onClick={() => removePartDate(d)}
+                          className="text-primary/60 hover:text-red-500"
+                          aria-label={`ลบ ${d}`}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* one_day → a single global time. multi types → per-day times below. */}
+            {form.workshop_type === 'one_day' && (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-dark mb-1">เวลาเริ่ม (24 ชม.)</label>
+                    <TimeField24 value={form.time_start} onChange={(v) => setForm({ ...form, time_start: v })} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-dark mb-1">เวลาจบ (24 ชม.)</label>
+                    <TimeField24 value={form.time_end} onChange={(v) => setForm({ ...form, time_end: v })} />
+                  </div>
+                </div>
+                {form.time_start && form.time_end && form.time_start >= form.time_end && (
+                  <p className="text-xs text-red-500 mt-2">⚠ เวลาเริ่มต้องอยู่ก่อนเวลาจบ</p>
+                )}
+              </>
+            )}
+
+            {/* Per-day operating hours — one block per selected date. */}
+            {form.workshop_type !== 'one_day' && (() => {
+              const days = expandDates();
+              if (days.length === 0) {
+                return (
+                  <p className="text-xs text-gray">
+                    {form.workshop_type === 'multi_day'
+                      ? 'เลือกวันเริ่มต้นและวันสิ้นสุด (คนละวัน) เพื่อกำหนดเวลาของแต่ละวัน'
+                      : 'เพิ่มวันที่อย่างน้อย 1 วัน เพื่อกำหนดเวลาของแต่ละวัน'}
+                  </p>
+                );
+              }
+              return (
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-dark">เวลาของแต่ละวัน (24 ชม.)</label>
+                  <div className="space-y-2">
+                    {days.map((d, i) => {
+                      const dt = getDayTime(d);
+                      const invalid = dt.time_start >= dt.time_end;
+                      return (
+                        <div key={d} className="rounded-xl border border-gray-lighter bg-white p-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold">{i + 1}</span>
+                            <span className="text-sm font-medium text-dark">{fmtDate(d)}</span>
+                          </div>
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <div>
+                              <label className="block text-[11px] text-gray mb-1">เวลาเริ่ม</label>
+                              <TimeField24 value={dt.time_start} onChange={(v) => setDayTime(d, { time_start: v })} />
+                            </div>
+                            <span className="text-gray mt-5">–</span>
+                            <div>
+                              <label className="block text-[11px] text-gray mb-1">เวลาจบ</label>
+                              <TimeField24 value={dt.time_end} onChange={(v) => setDayTime(d, { time_end: v })} />
+                            </div>
+                          </div>
+                          {invalid && (
+                            <p className="text-xs text-red-500 mt-2">⚠ เวลาเริ่มต้องอยู่ก่อนเวลาจบ</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+          </fieldset>
+        </SheetSection>
+        <SheetSection n={2} title="สถานที่ & ที่นั่ง">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-dark mb-1">สถานที่</label>
+              <AdmSelect
+                value={form.is_online ? ONLINE_OPTION : form.location_id}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  // ONLINE has no venue row, so clear location_id/location and let
+                  // is_online carry the choice.
+                  if (v === ONLINE_OPTION) {
+                    setForm({ ...form, is_online: true, location_id: '', location: '' });
+                    return;
+                  }
+                  const loc = locations.find((l) => l.id === v);
+                  setForm({
+                    ...form,
+                    is_online: false,
+                    location_id: v,
+                    location: loc
+                      ? `${loc.name}, ${loc.subdistrict}, ${loc.district}, ${loc.province}`
+                      : '',
+                  });
+                }}
+                className="input-field"
+              >
+                <option value="">— เลือกสถานที่ —</option>
+                <option value={ONLINE_OPTION}>ONLINE (จัดออนไลน์)</option>
+                {locations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name} ({loc.province})
+                  </option>
+                ))}
+              </AdmSelect>
+
+              {/* Online-only fields. Rendered right under the picker so the whole
+                  venue decision reads as one block. */}
+              {form.is_online && (
+                <div className="mt-3 space-y-3 border border-gray-lighter rounded-xl p-3 bg-surface/40">
+                  <div>
+                    <label className="block text-sm font-medium text-dark mb-1">แพลตฟอร์ม</label>
+                    <AdmSelect
+                      value={form.online_platform}
+                      onChange={(e) => setForm({ ...form, online_platform: e.target.value })}
+                      className="input-field"
+                    >
+                      {ONLINE_PLATFORMS.map((p) => (
+                        <option key={p.value} value={p.value}>
+                          {p.value === 'other' ? 'อื่นๆ (Others)' : p.label}
+                        </option>
+                      ))}
+                    </AdmSelect>
+                  </div>
+
+                  {form.online_platform === 'other' && (
+                    <div>
+                      <label className="block text-sm font-medium text-dark mb-1">ชื่อแพลตฟอร์ม</label>
+                      <input
+                        value={form.online_platform_other}
+                        onChange={(e) => setForm({ ...form, online_platform_other: e.target.value })}
+                        className="input-field"
+                        placeholder="เช่น Webex, LINE Meeting"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-medium text-dark mb-1">ลิงก์ห้องประชุม</label>
+                    <input
+                      type="url"
+                      value={form.online_url}
+                      onChange={(e) => setForm({ ...form, online_url: e.target.value })}
+                      className="input-field"
+                      placeholder="https://…"
+                    />
+                    <p className="text-xs text-gray mt-1">
+                      ลิงก์นี้จะแสดงเฉพาะผู้ที่ได้ที่นั่งแล้ว (ชำระเงินสำเร็จ หรือยืนยันแล้วสำหรับกิจกรรมฟรี)
+                    </p>
+                  </div>
+                </div>
+              )}
+              {locations.length === 0 && (
+                <p className="text-xs text-gray mt-1">
+                  ยังไม่มีสถานที่ —{' '}
+                  <a href="/admin/locations" className="text-primary hover:underline">
+                    เพิ่มก่อน
+                  </a>
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-dark mb-1">ที่นั่งสูงสุด</label>
+              <input
+                type="number"
+                value={form.max_participants}
+                onChange={(e) => setForm({ ...form, max_participants: +e.target.value })}
+                className="input-field"
+              />
+            </div>
+          </div>
+
+          {/* Age restriction — leave blank for no limit */}
+          <div>
+            <label className="block text-sm font-medium text-dark mb-1">จำกัดอายุผู้เข้าร่วม (ปี)</label>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <input
+                  type="number"
+                  min={0}
+                  max={120}
+                  inputMode="numeric"
+                  placeholder="อายุขั้นต่ำ"
+                  value={form.min_age}
+                  onChange={(e) => setForm({ ...form, min_age: e.target.value })}
+                  className="input-field"
+                />
+              </div>
+              <div>
+                <input
+                  type="number"
+                  min={0}
+                  max={120}
+                  inputMode="numeric"
+                  placeholder="อายุสูงสุด"
+                  value={form.max_age}
+                  onChange={(e) => setForm({ ...form, max_age: e.target.value })}
+                  className="input-field"
                 />
               </div>
             </div>
-            {form.date && form.end_date && form.end_date <= form.date && (
-              <p className="text-xs text-red-500 mt-2">⚠ วันสิ้นสุดต้องมากกว่าวันเริ่มต้น (ต้องเป็นคนละวัน)</p>
-            )}
+            <p className="text-xs text-gray mt-1">เว้นว่าง = เปิดรับทุกวัย (ไม่จำกัดอายุ)</p>
           </div>
-        )}
+        </SheetSection>
+      </div>
 
-        {form.workshop_type === 'multi_part' && (
-          <div>
-            <label className="block text-sm font-medium text-dark mb-1">
-              เลือกวันที่ (เพิ่มได้หลายวัน)
-            </label>
-            <div className="flex gap-2 flex-wrap">
-              <DateField24
-                value={form.date_input}
-                onChange={(v) => setForm({ ...form, date_input: v })}
-              />
-              <button
-                type="button"
-                onClick={addPartDate}
-                className="px-4 py-2 rounded-xl bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 whitespace-nowrap"
-              >
-                + เพิ่มวัน
-              </button>
-            </div>
-            {form.dates.length === 0 ? (
-              <p className="text-xs text-gray mt-2">ยังไม่ได้เลือกวัน เช่น จัดทุกวันเสาร์ หรือวันที่ 1, 8, 15</p>
-            ) : (
-              <div className="flex gap-2 flex-wrap mt-3">
-                {form.dates.map((d) => (
-                  <span
-                    key={d}
-                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-medium"
+      <div className={`adm-step${step === 2 ? ' is-on' : ''}`}>
+        <SheetSection n={1} title="การรับสมัคร">
+          {/* Admission & payment */}
+          <fieldset className="border border-gray-lighter rounded-xl p-4 bg-surface/40 space-y-4">
+            <legend className="text-sm font-medium text-dark px-2">การรับสมัคร & การชำระเงิน</legend>
+
+            <div>
+              <label className="block text-sm font-medium text-dark mb-1">รูปแบบการรับสมัคร</label>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  { v: 'direct', label: 'จองตรง', hint: 'สมัคร → จ่ายเลย' },
+                  { v: 'selection', label: 'คัดเลือก', hint: 'สมัคร → ประกาศผล → ยืนยัน' },
+                ] as const).map((o) => (
+                  <button
+                    key={o.v}
+                    type="button"
+                    onClick={() => setForm({ ...form, admission_type: o.v })}
+                    className={`text-left rounded-xl border p-3 flex-1 min-w-[150px] transition ${form.admission_type === o.v ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'border-gray-lighter hover:border-primary/40'}`}
                   >
-                    {fmtDate(d)}
-                    <button
-                      type="button"
-                      onClick={() => removePartDate(d)}
-                      className="text-primary/60 hover:text-red-500"
-                      aria-label={`ลบ ${d}`}
-                    >
-                      ×
-                    </button>
-                  </span>
+                    <div className="text-sm font-medium text-dark">{o.label}</div>
+                    <div className="text-xs text-gray mt-0.5">{o.hint}</div>
+                  </button>
                 ))}
               </div>
-            )}
-          </div>
-        )}
-
-        {/* one_day → a single global time. multi types → per-day times below. */}
-        {form.workshop_type === 'one_day' && (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-dark mb-1">เวลาเริ่ม (24 ชม.)</label>
-                <TimeField24 value={form.time_start} onChange={(v) => setForm({ ...form, time_start: v })} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-dark mb-1">เวลาจบ (24 ชม.)</label>
-                <TimeField24 value={form.time_end} onChange={(v) => setForm({ ...form, time_end: v })} />
-              </div>
             </div>
-            {form.time_start && form.time_end && form.time_start >= form.time_end && (
-              <p className="text-xs text-red-500 mt-2">⚠ เวลาเริ่มต้องอยู่ก่อนเวลาจบ</p>
-            )}
-          </>
-        )}
 
-        {/* Per-day operating hours — one block per selected date. */}
-        {form.workshop_type !== 'one_day' && (() => {
-          const days = expandDates();
-          if (days.length === 0) {
-            return (
-              <p className="text-xs text-gray">
-                {form.workshop_type === 'multi_day'
-                  ? 'เลือกวันเริ่มต้นและวันสิ้นสุด (คนละวัน) เพื่อกำหนดเวลาของแต่ละวัน'
-                  : 'เพิ่มวันที่อย่างน้อย 1 วัน เพื่อกำหนดเวลาของแต่ละวัน'}
-              </p>
-            );
-          }
-          return (
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-dark">เวลาของแต่ละวัน (24 ชม.)</label>
-              <div className="space-y-2">
-                {days.map((d, i) => {
-                  const dt = getDayTime(d);
-                  const invalid = dt.time_start >= dt.time_end;
+            <div className="max-w-[320px]">
+              <label className="block text-sm font-medium text-dark mb-1">ปิดรับสมัคร</label>
+              <DateTimePicker value={form.close_at} onChange={(v) => setForm({ ...form, close_at: v })} invalid={!!closeErr} />
+              {closeErr ? (
+                <p className="text-xs text-red-500 mt-1">⚠ {closeErr}</p>
+              ) : (
+                <p className="text-xs text-gray mt-1">ไม่ใส่ = ปิดรับเมื่อกิจกรรมเริ่ม</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-dark mb-1">รูปแบบการชำระเงิน</label>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  { v: 'free', label: 'ฟรี' },
+                  { v: 'deposit', label: 'มัดจำ' },
+                  { v: 'paid', label: 'เต็มจำนวน' },
+                ] as const).map((o) => (
+                  <button
+                    key={o.v}
+                    type="button"
+                    onClick={() => setForm({ ...form, payment_type: o.v, ...(o.v === 'free' ? { price: 0, promo_price: '' } : {}) })}
+                    className={`px-4 py-2 rounded-xl border text-sm transition ${form.payment_type === o.v ? 'border-primary bg-primary/10 ring-1 ring-primary text-dark' : 'border-gray-lighter hover:border-primary/40 text-gray'}`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+              {form.payment_type === 'deposit' && (
+                <div className="mt-3 max-w-xs">
+                  <label className="block text-xs font-medium text-dark mb-1">เงินมัดจำ (บาท) · คืนได้วันงาน (โอนเท่านั้น)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.deposit_amount}
+                    onChange={(e) => setForm({ ...form, deposit_amount: +e.target.value })}
+                    className="input-field"
+                  />
+                </div>
+              )}
+            </div>
+
+            {form.admission_type === 'selection' && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 items-start">
+                <div>
+                  <label className="block text-xs font-medium text-dark mb-1">ประกาศผลคัดเลือก</label>
+                  <DateTimePicker
+                    value={form.announce_at}
+                    onChange={(v) => setForm({ ...form, announce_at: v })}
+                    invalid={!!announceErr}
+                  />
+                  {announceErr && <p className="text-xs text-red-500 mt-1">⚠ {announceErr}</p>}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-dark mb-1">ยืนยันตัวจริง ภายใน</label>
+                  <DateTimePicker
+                    value={form.confirm_main_by}
+                    onChange={(v) => setForm({ ...form, confirm_main_by: v })}
+                    invalid={!!confirmMainErr}
+                  />
+                  {confirmMainErr && <p className="text-xs text-red-500 mt-1">⚠ {confirmMainErr}</p>}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-dark mb-1">ยืนยันตัวสำรอง ภายใน</label>
+                  <DateTimePicker
+                    value={form.confirm_waitlist_by}
+                    onChange={(v) => setForm({ ...form, confirm_waitlist_by: v })}
+                    invalid={!!confirmWaitErr}
+                  />
+                  {confirmWaitErr && <p className="text-xs text-red-500 mt-1">⚠ {confirmWaitErr}</p>}
+                </div>
+              </div>
+            )}
+
+            <label className="flex items-start gap-2 pt-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.require_consent}
+                onChange={(e) => setForm({ ...form, require_consent: e.target.checked })}
+                className="mt-0.5"
+              />
+              <span className="text-sm text-dark">
+                ขอความยินยอมบันทึกเสียง ภาพและวิดีโอ (PDPA)
+                <span className="block text-xs text-gray mt-0.5">
+                  เปิดไว้เพื่อให้แบบฟอร์มใบสมัครมีส่วนขอความยินยอมการบันทึกภาพ/วิดีโอ (บังคับเลือก)
+                </span>
+              </span>
+            </label>
+
+            {/* Google Drive photo link — only relevant when PDPA consent is on */}
+            {form.require_consent && (
+              <div className="pl-6">
+                <label className="block text-xs font-medium text-dark mb-1">
+                  Link Google Drive (รูปกิจกรรม)
+                </label>
+                <input
+                  type="url"
+                  value={form.photos_drive_url}
+                  onChange={(e) => setForm({ ...form, photos_drive_url: e.target.value })}
+                  className="input-field"
+                  placeholder="https://drive.google.com/..."
+                />
+                <p className="text-xs text-gray mt-1">
+                  ลิงก์นี้จะแสดงใน My Journey ให้เฉพาะผู้ที่เข้าร่วมและถูกเช็คชื่อแล้วเท่านั้น
+                </p>
+              </div>
+            )}
+          </fieldset>
+        </SheetSection>
+        <SheetSection n={2} title="ราคา & การชำระเงิน">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-dark mb-1">ราคา (บาท)</label>
+              {form.payment_type === 'free' ? (
+                <input
+                  type="text"
+                  value="ฟรี — ไม่สามารถระบุจำนวนได้"
+                  disabled
+                  className="input-field"
+                  style={{ background: 'var(--cream-deep)', color: 'var(--muted)', cursor: 'not-allowed' }}
+                />
+              ) : (
+                <input
+                  type="number"
+                  value={form.price}
+                  onChange={(e) => setForm({ ...form, price: +e.target.value })}
+                  className="input-field"
+                  required
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Promotion — free events can't run a promo, so the whole block hides. */}
+          {form.payment_type !== 'free' && (
+            <fieldset className="border border-accent/30 rounded-xl p-4 bg-accent/5 space-y-3">
+              <legend className="text-sm font-medium text-dark px-2">โปรโมชัน (ไม่บังคับ)</legend>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
+                <div>
+                  <label className="block text-xs font-medium text-dark mb-1">ราคาโปร</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.promo_price ?? ''}
+                    onChange={(e) => setForm({ ...form, promo_price: e.target.value })}
+                    className="input-field"
+                    placeholder="ปล่อยว่าง = ไม่มีโปร"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-dark mb-1">เริ่ม</label>
+                  <DateTimePicker
+                    value={form.promo_start ?? ''}
+                    onChange={(v) => setForm({ ...form, promo_start: v })}
+                    invalid={!!promoStartErr}
+                  />
+                  {promoStartErr && <p className="text-xs text-red-500 mt-1">⚠ {promoStartErr}</p>}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-dark mb-1">สิ้นสุด</label>
+                  <DateTimePicker
+                    value={form.promo_end ?? ''}
+                    onChange={(v) => setForm({ ...form, promo_end: v })}
+                    invalid={!!(promoStartErr || promoEndErr)}
+                  />
+                  {promoEndErr && <p className="text-xs text-red-500 mt-1">⚠ {promoEndErr}</p>}
+                </div>
+              </div>
+              {form.promo_price && form.price > 0 && Number(form.promo_price) < form.price && (
+                <div className="text-xs text-gray flex items-center gap-2">
+                  <span className="line-through">฿{form.price.toLocaleString()}</span>
+                  <span className="text-primary font-semibold">
+                    ฿{Number(form.promo_price).toLocaleString()}
+                  </span>
+                  <span className="text-accent-dark font-medium">
+                    ลด {Math.round((1 - Number(form.promo_price) / form.price) * 100)}%
+                  </span>
+                </div>
+              )}
+            </fieldset>
+          )}
+        </SheetSection>
+      </div>
+
+      <div className={`adm-step${step === 3 ? ' is-on' : ''}`}>
+        <SheetSection n={1} title="ผู้จัด">
+          {/* Facilitators — multi-select. Order matters: the first one is the
+              owning teacher (teacher dashboard, payout and student nicknames all
+              resolve to that single person) and heads the public list. */}
+          <div>
+            <label className="block text-sm font-medium text-dark mb-1">
+              ผู้จัด <span className="text-gray font-normal">(เลือกได้หลายคน)</span>
+            </label>
+
+            {form.instructor_ids.length > 0 && (
+              <div className="mb-2 space-y-1.5">
+                {form.instructor_ids.map((id, i) => {
+                  const t = teachers.find((x) => x.id === id);
+                  const isOwner = i === 0;
+                  const allowed = isOwner || form.dashboard_access.includes(id);
                   return (
-                    <div key={d} className="rounded-xl border border-gray-lighter bg-white p-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold">{i + 1}</span>
-                        <span className="text-sm font-medium text-dark">{fmtDate(d)}</span>
-                      </div>
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <div>
-                          <label className="block text-[11px] text-gray mb-1">เวลาเริ่ม</label>
-                          <TimeField24 value={dt.time_start} onChange={(v) => setDayTime(d, { time_start: v })} />
-                        </div>
-                        <span className="text-gray mt-5">–</span>
-                        <div>
-                          <label className="block text-[11px] text-gray mb-1">เวลาจบ</label>
-                          <TimeField24 value={dt.time_end} onChange={(v) => setDayTime(d, { time_end: v })} />
-                        </div>
-                      </div>
-                      {invalid && (
-                        <p className="text-xs text-red-500 mt-2">⚠ เวลาเริ่มต้องอยู่ก่อนเวลาจบ</p>
-                      )}
+                    <div
+                      key={id}
+                      className="flex items-center gap-3 flex-wrap rounded-xl bg-primary/5 px-3 py-2"
+                    >
+                      <span className="inline-flex items-center gap-2 text-sm text-dark">
+                        {isOwner && (
+                          <span className="font-mono text-[10px] uppercase text-primary">หลัก</span>
+                        )}
+                        {t ? t.name : id}
+                      </span>
+
+                      {/* Dashboard access. The owner is ticked and locked — they own
+                          the payout and can never be shut out of their own event. */}
+                      <label
+                        className={`flex items-center gap-1.5 text-xs ml-auto ${
+                          isOwner ? 'text-gray cursor-not-allowed' : 'text-dark cursor-pointer'
+                        }`}
+                        title={
+                          isOwner
+                            ? 'ผู้จัดหลักเข้าถึงแดชบอร์ดได้เสมอ'
+                            : 'อนุญาตให้เข้าถึง Dashboard ของกิจกรรมนี้ได้'
+                        }
+                      >
+                        <input
+                          type="checkbox"
+                          checked={allowed}
+                          disabled={isOwner}
+                          onChange={() =>
+                            setForm({
+                              ...form,
+                              dashboard_access: allowed
+                                ? form.dashboard_access.filter((x) => x !== id)
+                                : [...form.dashboard_access, id],
+                            })
+                          }
+                        />
+                        เข้าถึง Dashboard
+                        {isOwner && <span className="text-[10px]">(อัตโนมัติ)</span>}
+                      </label>
+
+                      <button
+                        type="button"
+                        aria-label={`เอา ${t ? t.name : id} ออก`}
+                        onClick={() =>
+                          setForm({
+                            ...form,
+                            instructor_ids: form.instructor_ids.filter((x) => x !== id),
+                            // Revoking a facilitator revokes their access too.
+                            dashboard_access: form.dashboard_access.filter((x) => x !== id),
+                          })
+                        }
+                        className="text-primary/60 hover:text-red-500"
+                      >
+                        ×
+                      </button>
                     </div>
                   );
                 })}
               </div>
-            </div>
-          );
-        })()}
-      </fieldset>
+            )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-dark mb-1">สถานที่</label>
-          <AdmSelect
-            value={form.is_online ? ONLINE_OPTION : form.location_id}
-            onChange={(e) => {
-              const v = e.target.value;
-              // ONLINE has no venue row, so clear location_id/location and let
-              // is_online carry the choice.
-              if (v === ONLINE_OPTION) {
-                setForm({ ...form, is_online: true, location_id: '', location: '' });
-                return;
-              }
-              const loc = locations.find((l) => l.id === v);
-              setForm({
-                ...form,
-                is_online: false,
-                location_id: v,
-                location: loc
-                  ? `${loc.name}, ${loc.subdistrict}, ${loc.district}, ${loc.province}`
-                  : '',
-              });
-            }}
-            className="input-field"
-          >
-            <option value="">— เลือกสถานที่ —</option>
-            <option value={ONLINE_OPTION}>ONLINE (จัดออนไลน์)</option>
-            {locations.map((loc) => (
-              <option key={loc.id} value={loc.id}>
-                {loc.name} ({loc.province})
-              </option>
-            ))}
-          </AdmSelect>
-
-          {/* Online-only fields. Rendered right under the picker so the whole
-              venue decision reads as one block. */}
-          {form.is_online && (
-            <div className="mt-3 space-y-3 border border-gray-lighter rounded-xl p-3 bg-surface/40">
-              <div>
-                <label className="block text-sm font-medium text-dark mb-1">แพลตฟอร์ม</label>
-                <AdmSelect
-                  value={form.online_platform}
-                  onChange={(e) => setForm({ ...form, online_platform: e.target.value })}
-                  className="input-field"
-                >
-                  {ONLINE_PLATFORMS.map((p) => (
-                    <option key={p.value} value={p.value}>
-                      {p.value === 'other' ? 'อื่นๆ (Others)' : p.label}
-                    </option>
-                  ))}
-                </AdmSelect>
-              </div>
-
-              {form.online_platform === 'other' && (
-                <div>
-                  <label className="block text-sm font-medium text-dark mb-1">ชื่อแพลตฟอร์ม</label>
-                  <input
-                    value={form.online_platform_other}
-                    onChange={(e) => setForm({ ...form, online_platform_other: e.target.value })}
-                    className="input-field"
-                    placeholder="เช่น Webex, LINE Meeting"
-                  />
-                </div>
+            <div className="border border-gray-lighter rounded-xl divide-y divide-gray-lighter max-h-56 overflow-y-auto bg-surface/40">
+              {teachers.length === 0 ? (
+                <p className="text-sm text-gray p-3">ยังไม่มีผู้จัดในระบบ</p>
+              ) : (
+                teachers.map((t) => {
+                  const checked = form.instructor_ids.includes(t.id);
+                  return (
+                    <label
+                      key={t.id}
+                      className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-surface"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() =>
+                          setForm({
+                            ...form,
+                            // Append (not sort) so the admin controls the order and
+                            // the first pick stays the owning teacher.
+                            instructor_ids: checked
+                              ? form.instructor_ids.filter((x) => x !== t.id)
+                              : [...form.instructor_ids, t.id],
+                            dashboard_access: checked
+                              ? form.dashboard_access.filter((x) => x !== t.id)
+                              : form.dashboard_access,
+                          })
+                        }
+                      />
+                      <span className="text-sm text-dark">
+                        {t.name} <span className="text-gray">({t.email})</span>
+                      </span>
+                    </label>
+                  );
+                })
               )}
-
-              <div>
-                <label className="block text-sm font-medium text-dark mb-1">ลิงก์ห้องประชุม</label>
-                <input
-                  type="url"
-                  value={form.online_url}
-                  onChange={(e) => setForm({ ...form, online_url: e.target.value })}
-                  className="input-field"
-                  placeholder="https://…"
-                />
-                <p className="text-xs text-gray mt-1">
-                  ลิงก์นี้จะแสดงเฉพาะผู้ที่ได้ที่นั่งแล้ว (ชำระเงินสำเร็จ หรือยืนยันแล้วสำหรับกิจกรรมฟรี)
-                </p>
-              </div>
             </div>
-          )}
-          {locations.length === 0 && (
-            <p className="text-xs text-gray mt-1">
-              ยังไม่มีสถานที่ —{' '}
-              <a href="/admin/locations" className="text-primary hover:underline">
-                เพิ่มก่อน
-              </a>
+            <p className="text-xs text-gray mt-1.5">
+              คนแรกที่เลือก = ผู้รับผิดชอบหลัก (เห็นกิจกรรมนี้ใน Host Dashboard และเป็นผู้รับเงินโอน)
             </p>
-          )}
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-dark mb-1">ที่นั่งสูงสุด</label>
-          <input
-            type="number"
-            value={form.max_participants}
-            onChange={(e) => setForm({ ...form, max_participants: +e.target.value })}
-            className="input-field"
-          />
-        </div>
+          </div>
+        </SheetSection>
       </div>
 
-      {/* Age restriction — leave blank for no limit */}
-      <div>
-        <label className="block text-sm font-medium text-dark mb-1">จำกัดอายุผู้เข้าร่วม (ปี)</label>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <input
-              type="number"
-              min={0}
-              max={120}
-              inputMode="numeric"
-              placeholder="อายุขั้นต่ำ"
-              value={form.min_age}
-              onChange={(e) => setForm({ ...form, min_age: e.target.value })}
-              className="input-field"
-            />
-          </div>
-          <div>
-            <input
-              type="number"
-              min={0}
-              max={120}
-              inputMode="numeric"
-              placeholder="อายุสูงสุด"
-              value={form.max_age}
-              onChange={(e) => setForm({ ...form, max_age: e.target.value })}
-              className="input-field"
-            />
-          </div>
-        </div>
-        <p className="text-xs text-gray mt-1">เว้นว่าง = เปิดรับทุกวัย (ไม่จำกัดอายุ)</p>
-      </div>
-
-      {/* Theme color */}
-      <div>
-        <label className="block text-sm font-medium text-dark mb-2">
-          สีธีม Calendar <span className="text-gray font-normal ml-1">(ไม่บังคับ)</span>
-        </label>
-        <div className="flex items-center gap-3 flex-wrap">
-          {COLOR_SWATCHES.map((c) => {
-            const selected = (form.theme_color || '').toLowerCase() === c.toLowerCase();
-            return (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setForm({ ...form, theme_color: c })}
-                aria-label={c}
-                title={c}
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: '50%',
-                  background: c,
-                  border: 0,
-                  cursor: 'pointer',
-                  boxShadow: selected
-                    ? `0 0 0 2px white, 0 0 0 4px ${c}`
-                    : '0 0 0 1px rgba(0,0,0,.1)',
-                }}
-              />
-            );
-          })}
-          <div className="flex items-center gap-2 ml-2">
-            <input
-              type="color"
-              value={form.theme_color || '#0d8a7e'}
-              onChange={(e) => setForm({ ...form, theme_color: e.target.value })}
-              style={{ width: 32, height: 32, border: 0, borderRadius: '50%', cursor: 'pointer' }}
-            />
-            <input
-              value={form.theme_color ?? ''}
-              onChange={(e) => setForm({ ...form, theme_color: e.target.value })}
-              className="input-field !py-2 !w-28"
-              placeholder="#0d8a7e"
-            />
-          </div>
-          {form.theme_color && (
-            <button
-              type="button"
-              onClick={() => setForm({ ...form, theme_color: '' })}
-              className="text-xs text-gray hover:text-red-500 ml-2"
-            >
-              ล้าง
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Facilitators — multi-select. Order matters: the first one is the
-          owning teacher (teacher dashboard, payout and student nicknames all
-          resolve to that single person) and heads the public list. */}
-      <div>
-        <label className="block text-sm font-medium text-dark mb-1">
-          ผู้จัด <span className="text-gray font-normal">(เลือกได้หลายคน)</span>
-        </label>
-
-        {form.instructor_ids.length > 0 && (
-          <div className="mb-2 space-y-1.5">
-            {form.instructor_ids.map((id, i) => {
-              const t = teachers.find((x) => x.id === id);
-              const isOwner = i === 0;
-              const allowed = isOwner || form.dashboard_access.includes(id);
-              return (
-                <div
-                  key={id}
-                  className="flex items-center gap-3 flex-wrap rounded-xl bg-primary/5 px-3 py-2"
+      <div className={`adm-step${step === 4 ? ' is-on' : ''}`}>
+        <SheetSection n={1} title="ตารางกิจกรรม (Timeline)">
+          {/* Schedule — per-day timelines */}
+          <fieldset className="border border-gray-lighter rounded-xl p-4 bg-surface/40">
+            <div className="flex items-center justify-between mb-3">
+              <legend className="text-sm font-medium text-dark px-2">
+                ตารางกิจกรรม (Timeline)
+              </legend>
+              {isMultiDay && (
+                <button
+                  type="button"
+                  onClick={addDay}
+                  className="text-primary text-sm font-medium hover:underline"
                 >
-                  <span className="inline-flex items-center gap-2 text-sm text-dark">
-                    {isOwner && (
-                      <span className="font-mono text-[10px] uppercase text-primary">หลัก</span>
-                    )}
-                    {t ? t.name : id}
-                  </span>
+                  + เพิ่มวัน
+                </button>
+              )}
+            </div>
 
-                  {/* Dashboard access. The owner is ticked and locked — they own
-                      the payout and can never be shut out of their own event. */}
-                  <label
-                    className={`flex items-center gap-1.5 text-xs ml-auto ${
-                      isOwner ? 'text-gray cursor-not-allowed' : 'text-dark cursor-pointer'
-                    }`}
-                    title={
-                      isOwner
-                        ? 'ผู้จัดหลักเข้าถึงแดชบอร์ดได้เสมอ'
-                        : 'อนุญาตให้เข้าถึง Dashboard ของกิจกรรมนี้ได้'
-                    }
-                  >
-                    <input
-                      type="checkbox"
-                      checked={allowed}
-                      disabled={isOwner}
-                      onChange={() =>
-                        setForm({
-                          ...form,
-                          dashboard_access: allowed
-                            ? form.dashboard_access.filter((x) => x !== id)
-                            : [...form.dashboard_access, id],
-                        })
-                      }
-                    />
-                    เข้าถึง Dashboard
-                    {isOwner && <span className="text-[10px]">(อัตโนมัติ)</span>}
-                  </label>
+            {isMultiDay && (
+              <p className="text-xs text-gray mb-3 px-2">
+                กิจกรรมหลายวัน — เพิ่มตารางแยกแต่ละวันได้ ผู้ใช้จะเลือกดูแต่ละวันจาก dropdown
+              </p>
+            )}
+
+            <div className="space-y-4">
+              {form.scheduleDays.map((day, di) => (
+                <div
+                  key={di}
+                  className={isMultiDay ? 'rounded-xl border border-gray-lighter bg-white/60 p-3' : ''}
+                >
+                  {isMultiDay && (
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-semibold text-primary whitespace-nowrap">
+                        วันที่ {di + 1}
+                      </span>
+                      <input
+                        type="text"
+                        value={day.label}
+                        onChange={(e) => updateDayLabel(di, e.target.value)}
+                        className="input-field !py-1.5 flex-1"
+                        placeholder="ชื่อวัน เช่น วันเสาร์ที่ 6 มิ.ย. หรือ Day 1"
+                      />
+                      {form.scheduleDays.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeDay(di)}
+                          className="px-2 py-1 text-red-500 hover:bg-red-50 rounded-lg text-xs whitespace-nowrap"
+                        >
+                          ลบวัน
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {day.items.length === 0 && (
+                    <p className="text-xs text-gray text-center py-2">ยังไม่มีกิจกรรม</p>
+                  )}
+                  <div className="space-y-2">
+                    {day.items.map((item, idx) => (
+                      <div key={idx} className="flex gap-2 items-start">
+                        <TimeField24
+                          value={item.time || '09:00'}
+                          onChange={(v) => updateScheduleItem(di, idx, 'time', v)}
+                        />
+                        <input
+                          type="text"
+                          value={item.detail}
+                          onChange={(e) => updateScheduleItem(di, idx, 'detail', e.target.value)}
+                          className="input-field flex-1"
+                          placeholder="ลงทะเบียน + welcome drink"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeScheduleItem(di, idx)}
+                          className="px-3 py-2 text-red-500 hover:bg-red-50 rounded-lg text-sm"
+                        >
+                          −
+                        </button>
+                      </div>
+                    ))}
+                  </div>
 
                   <button
                     type="button"
-                    aria-label={`เอา ${t ? t.name : id} ออก`}
-                    onClick={() =>
-                      setForm({
-                        ...form,
-                        instructor_ids: form.instructor_ids.filter((x) => x !== id),
-                        // Revoking a facilitator revokes their access too.
-                        dashboard_access: form.dashboard_access.filter((x) => x !== id),
-                      })
-                    }
-                    className="text-primary/60 hover:text-red-500"
+                    onClick={() => addScheduleItem(di)}
+                    className="text-primary text-sm font-medium hover:underline mt-2"
                   >
-                    ×
+                    + เพิ่มกิจกรรม
                   </button>
                 </div>
-              );
-            })}
-          </div>
-        )}
-
-        <div className="border border-gray-lighter rounded-xl divide-y divide-gray-lighter max-h-56 overflow-y-auto bg-surface/40">
-          {teachers.length === 0 ? (
-            <p className="text-sm text-gray p-3">ยังไม่มีผู้จัดในระบบ</p>
-          ) : (
-            teachers.map((t) => {
-              const checked = form.instructor_ids.includes(t.id);
-              return (
-                <label
-                  key={t.id}
-                  className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-surface"
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() =>
-                      setForm({
-                        ...form,
-                        // Append (not sort) so the admin controls the order and
-                        // the first pick stays the owning teacher.
-                        instructor_ids: checked
-                          ? form.instructor_ids.filter((x) => x !== t.id)
-                          : [...form.instructor_ids, t.id],
-                        dashboard_access: checked
-                          ? form.dashboard_access.filter((x) => x !== t.id)
-                          : form.dashboard_access,
-                      })
-                    }
-                  />
-                  <span className="text-sm text-dark">
-                    {t.name} <span className="text-gray">({t.email})</span>
-                  </span>
-                </label>
-              );
-            })
-          )}
-        </div>
-        <p className="text-xs text-gray mt-1.5">
-          คนแรกที่เลือก = ผู้รับผิดชอบหลัก (เห็นกิจกรรมนี้ใน Host Dashboard และเป็นผู้รับเงินโอน)
-        </p>
-      </div>
-
-      {/* Category + tags */}
-      <fieldset className="border border-gray-lighter rounded-xl p-4 bg-surface/40 space-y-4">
-        <legend className="text-sm font-medium text-dark px-2">หมวด + แท็ก</legend>
-        <div>
-          <label className="block text-sm font-medium text-dark mb-1">หมวดหมู่</label>
-          <input
-            list="ws-category-suggestions"
-            value={form.category ?? ''}
-            onChange={(e) => setForm({ ...form, category: e.target.value })}
-            className="input-field"
-            placeholder="เช่น Workshop, Camp, Talk"
-          />
-          <datalist id="ws-category-suggestions">
-            {CATEGORY_SUGGESTIONS.map((c) => (
-              <option key={c} value={c} />
-            ))}
-          </datalist>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-dark mb-1">แท็ก</label>
-          <div className="flex gap-2">
-            <input
-              value={form.tag_input ?? ''}
-              onChange={(e) => setForm({ ...form, tag_input: e.target.value })}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ',') {
-                  e.preventDefault();
-                  addTag();
-                }
-              }}
-              className="input-field flex-1"
-              placeholder="พิมพ์แล้วกด Enter"
-            />
-            <button
-              type="button"
-              onClick={addTag}
-              className="px-4 py-2 rounded-xl bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20"
-            >
-              เพิ่ม
-            </button>
-          </div>
-          {form.tags.length > 0 && (
-            <div className="flex gap-2 flex-wrap mt-2">
-              {form.tags.map((t) => (
-                <span
-                  key={t}
-                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium"
-                >
-                  {t}
-                  <button
-                    type="button"
-                    onClick={() => removeTag(t)}
-                    className="text-primary/60 hover:text-red-500 ml-1"
-                  >
-                    ×
-                  </button>
-                </span>
               ))}
             </div>
-          )}
-        </div>
-      </fieldset>
-
-      {/* Admission & payment */}
-      <fieldset className="border border-gray-lighter rounded-xl p-4 bg-surface/40 space-y-4">
-        <legend className="text-sm font-medium text-dark px-2">การรับสมัคร & การชำระเงิน</legend>
-
-        <div>
-          <label className="block text-sm font-medium text-dark mb-1">รูปแบบการรับสมัคร</label>
-          <div className="flex flex-wrap gap-2">
-            {([
-              { v: 'direct', label: 'จองตรง', hint: 'สมัคร → จ่ายเลย' },
-              { v: 'selection', label: 'คัดเลือก', hint: 'สมัคร → ประกาศผล → ยืนยัน' },
-            ] as const).map((o) => (
+          </fieldset>
+        </SheetSection>
+        <SheetSection n={2} title="สิ่งที่จะได้เรียนรู้ & เหมาะกับใคร">
+          {/* Learn items */}
+          <fieldset className="border border-gray-lighter rounded-xl p-4 bg-surface/40">
+            <div className="flex items-center justify-between mb-3">
+              <legend className="text-sm font-medium text-dark px-2">สิ่งที่จะได้เรียนรู้</legend>
               <button
-                key={o.v}
                 type="button"
-                onClick={() => setForm({ ...form, admission_type: o.v })}
-                className={`text-left rounded-xl border p-3 flex-1 min-w-[150px] transition ${form.admission_type === o.v ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'border-gray-lighter hover:border-primary/40'}`}
+                onClick={addLearnItem}
+                className="text-primary text-sm font-medium hover:underline"
               >
-                <div className="text-sm font-medium text-dark">{o.label}</div>
-                <div className="text-xs text-gray mt-0.5">{o.hint}</div>
+                + เพิ่ม
               </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="max-w-[320px]">
-          <label className="block text-sm font-medium text-dark mb-1">ปิดรับสมัคร</label>
-          <DateTimePicker value={form.close_at} onChange={(v) => setForm({ ...form, close_at: v })} invalid={!!closeErr} />
-          {closeErr ? (
-            <p className="text-xs text-red-500 mt-1">⚠ {closeErr}</p>
-          ) : (
-            <p className="text-xs text-gray mt-1">ไม่ใส่ = ปิดรับเมื่อกิจกรรมเริ่ม</p>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-dark mb-1">รูปแบบการชำระเงิน</label>
-          <div className="flex flex-wrap gap-2">
-            {([
-              { v: 'free', label: 'ฟรี' },
-              { v: 'deposit', label: 'มัดจำ' },
-              { v: 'paid', label: 'เต็มจำนวน' },
-            ] as const).map((o) => (
-              <button
-                key={o.v}
-                type="button"
-                onClick={() => setForm({ ...form, payment_type: o.v, ...(o.v === 'free' ? { price: 0, promo_price: '' } : {}) })}
-                className={`px-4 py-2 rounded-xl border text-sm transition ${form.payment_type === o.v ? 'border-primary bg-primary/10 ring-1 ring-primary text-dark' : 'border-gray-lighter hover:border-primary/40 text-gray'}`}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
-          {form.payment_type === 'deposit' && (
-            <div className="mt-3 max-w-xs">
-              <label className="block text-xs font-medium text-dark mb-1">เงินมัดจำ (บาท) · คืนได้วันงาน (โอนเท่านั้น)</label>
-              <input
-                type="number"
-                min="0"
-                value={form.deposit_amount}
-                onChange={(e) => setForm({ ...form, deposit_amount: +e.target.value })}
-                className="input-field"
-              />
             </div>
-          )}
-        </div>
-
-        {form.admission_type === 'selection' && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 items-start">
-            <div>
-              <label className="block text-xs font-medium text-dark mb-1">ประกาศผลคัดเลือก</label>
-              <DateTimePicker
-                value={form.announce_at}
-                onChange={(v) => setForm({ ...form, announce_at: v })}
-                invalid={!!announceErr}
-              />
-              {announceErr && <p className="text-xs text-red-500 mt-1">⚠ {announceErr}</p>}
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-dark mb-1">ยืนยันตัวจริง ภายใน</label>
-              <DateTimePicker
-                value={form.confirm_main_by}
-                onChange={(v) => setForm({ ...form, confirm_main_by: v })}
-                invalid={!!confirmMainErr}
-              />
-              {confirmMainErr && <p className="text-xs text-red-500 mt-1">⚠ {confirmMainErr}</p>}
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-dark mb-1">ยืนยันตัวสำรอง ภายใน</label>
-              <DateTimePicker
-                value={form.confirm_waitlist_by}
-                onChange={(v) => setForm({ ...form, confirm_waitlist_by: v })}
-                invalid={!!confirmWaitErr}
-              />
-              {confirmWaitErr && <p className="text-xs text-red-500 mt-1">⚠ {confirmWaitErr}</p>}
-            </div>
-          </div>
-        )}
-
-        <label className="flex items-start gap-2 pt-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={form.require_consent}
-            onChange={(e) => setForm({ ...form, require_consent: e.target.checked })}
-            className="mt-0.5"
-          />
-          <span className="text-sm text-dark">
-            ขอความยินยอมบันทึกเสียง ภาพและวิดีโอ (PDPA)
-            <span className="block text-xs text-gray mt-0.5">
-              เปิดไว้เพื่อให้แบบฟอร์มใบสมัครมีส่วนขอความยินยอมการบันทึกภาพ/วิดีโอ (บังคับเลือก)
-            </span>
-          </span>
-        </label>
-
-        {/* Google Drive photo link — only relevant when PDPA consent is on */}
-        {form.require_consent && (
-          <div className="pl-6">
-            <label className="block text-xs font-medium text-dark mb-1">
-              Link Google Drive (รูปกิจกรรม)
-            </label>
-            <input
-              type="url"
-              value={form.photos_drive_url}
-              onChange={(e) => setForm({ ...form, photos_drive_url: e.target.value })}
-              className="input-field"
-              placeholder="https://drive.google.com/..."
-            />
-            <p className="text-xs text-gray mt-1">
-              ลิงก์นี้จะแสดงใน My Journey ให้เฉพาะผู้ที่เข้าร่วมและถูกเช็คชื่อแล้วเท่านั้น
-            </p>
-          </div>
-        )}
-      </fieldset>
-
-      {/* Promotion — free events can't run a promo, so the whole block hides. */}
-      {form.payment_type !== 'free' && (
-        <fieldset className="border border-accent/30 rounded-xl p-4 bg-accent/5 space-y-3">
-          <legend className="text-sm font-medium text-dark px-2">โปรโมชัน (ไม่บังคับ)</legend>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
-            <div>
-              <label className="block text-xs font-medium text-dark mb-1">ราคาโปร</label>
-              <input
-                type="number"
-                min="0"
-                value={form.promo_price ?? ''}
-                onChange={(e) => setForm({ ...form, promo_price: e.target.value })}
-                className="input-field"
-                placeholder="ปล่อยว่าง = ไม่มีโปร"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-dark mb-1">เริ่ม</label>
-              <DateTimePicker
-                value={form.promo_start ?? ''}
-                onChange={(v) => setForm({ ...form, promo_start: v })}
-                invalid={!!promoStartErr}
-              />
-              {promoStartErr && <p className="text-xs text-red-500 mt-1">⚠ {promoStartErr}</p>}
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-dark mb-1">สิ้นสุด</label>
-              <DateTimePicker
-                value={form.promo_end ?? ''}
-                onChange={(v) => setForm({ ...form, promo_end: v })}
-                invalid={!!(promoStartErr || promoEndErr)}
-              />
-              {promoEndErr && <p className="text-xs text-red-500 mt-1">⚠ {promoEndErr}</p>}
-            </div>
-          </div>
-          {form.promo_price && form.price > 0 && Number(form.promo_price) < form.price && (
-            <div className="text-xs text-gray flex items-center gap-2">
-              <span className="line-through">฿{form.price.toLocaleString()}</span>
-              <span className="text-primary font-semibold">
-                ฿{Number(form.promo_price).toLocaleString()}
-              </span>
-              <span className="text-accent-dark font-medium">
-                ลด {Math.round((1 - Number(form.promo_price) / form.price) * 100)}%
-              </span>
-            </div>
-          )}
-        </fieldset>
-      )}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-dark mb-1">ราคา (บาท)</label>
-          {form.payment_type === 'free' ? (
-            <input
-              type="text"
-              value="ฟรี — ไม่สามารถระบุจำนวนได้"
-              disabled
-              className="input-field"
-              style={{ background: 'var(--cream-deep)', color: 'var(--muted)', cursor: 'not-allowed' }}
-            />
-          ) : (
-            <input
-              type="number"
-              value={form.price}
-              onChange={(e) => setForm({ ...form, price: +e.target.value })}
-              className="input-field"
-              required
-            />
-          )}
-        </div>
-        <ImageUploader
-          label="รูปปกกิจกรรม (โปสเตอร์ A3 · 29.7×42)"
-          folder="workshop"
-          primary={ASPECTS.WORKSHOP_HERO}
-          value={form.image_url}
-          meta={form.image_meta}
-          onChange={({ url, meta }) =>
-            setForm({ ...form, image_url: url, image_meta: meta })
-          }
-        />
-      </div>
-
-      {/* Schedule — per-day timelines */}
-      <fieldset className="border border-gray-lighter rounded-xl p-4 bg-surface/40">
-        <div className="flex items-center justify-between mb-3">
-          <legend className="text-sm font-medium text-dark px-2">
-            ตารางกิจกรรม (Timeline)
-          </legend>
-          {isMultiDay && (
-            <button
-              type="button"
-              onClick={addDay}
-              className="text-primary text-sm font-medium hover:underline"
-            >
-              + เพิ่มวัน
-            </button>
-          )}
-        </div>
-
-        {isMultiDay && (
-          <p className="text-xs text-gray mb-3 px-2">
-            กิจกรรมหลายวัน — เพิ่มตารางแยกแต่ละวันได้ ผู้ใช้จะเลือกดูแต่ละวันจาก dropdown
-          </p>
-        )}
-
-        <div className="space-y-4">
-          {form.scheduleDays.map((day, di) => (
-            <div
-              key={di}
-              className={isMultiDay ? 'rounded-xl border border-gray-lighter bg-white/60 p-3' : ''}
-            >
-              {isMultiDay && (
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-semibold text-primary whitespace-nowrap">
-                    วันที่ {di + 1}
-                  </span>
+            {form.learn_items.length === 0 && (
+              <p className="text-xs text-gray text-center py-3">ยังไม่มีหัวข้อ</p>
+            )}
+            <div className="space-y-2">
+              {form.learn_items.map((item, idx) => (
+                <div key={idx} className="flex gap-2 items-start">
+                  <span className="px-2 py-2 text-primary text-sm">•</span>
                   <input
                     type="text"
-                    value={day.label}
-                    onChange={(e) => updateDayLabel(di, e.target.value)}
-                    className="input-field !py-1.5 flex-1"
-                    placeholder="ชื่อวัน เช่น วันเสาร์ที่ 6 มิ.ย. หรือ Day 1"
+                    value={item}
+                    onChange={(e) => updateLearnItem(idx, e.target.value)}
+                    className="input-field flex-1"
+                    placeholder="เทคนิคพื้นฐาน..."
                   />
-                  {form.scheduleDays.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeDay(di)}
-                      className="px-2 py-1 text-red-500 hover:bg-red-50 rounded-lg text-xs whitespace-nowrap"
-                    >
-                      ลบวัน
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeLearnItem(idx)}
+                    className="px-3 py-2 text-red-500 hover:bg-red-50 rounded-lg text-sm"
+                  >
+                    −
+                  </button>
                 </div>
-              )}
+              ))}
+            </div>
+          </fieldset>
 
-              {day.items.length === 0 && (
-                <p className="text-xs text-gray text-center py-2">ยังไม่มีกิจกรรม</p>
-              )}
-              <div className="space-y-2">
-                {day.items.map((item, idx) => (
-                  <div key={idx} className="flex gap-2 items-start">
-                    <TimeField24
-                      value={item.time || '09:00'}
-                      onChange={(v) => updateScheduleItem(di, idx, 'time', v)}
-                    />
-                    <input
-                      type="text"
-                      value={item.detail}
-                      onChange={(e) => updateScheduleItem(di, idx, 'detail', e.target.value)}
-                      className="input-field flex-1"
-                      placeholder="ลงทะเบียน + welcome drink"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeScheduleItem(di, idx)}
-                      className="px-3 py-2 text-red-500 hover:bg-red-50 rounded-lg text-sm"
-                    >
-                      −
-                    </button>
-                  </div>
-                ))}
+          <fieldset className="border border-gray-lighter rounded-xl p-4 bg-surface/40">
+            <div className="flex items-center justify-between mb-3">
+              <legend className="text-sm font-medium text-dark px-2">เหมาะกับใคร (Target Audience)</legend>
+              <button type="button" onClick={addTargetItem} className="text-primary text-sm font-medium hover:underline">
+                + เพิ่ม
+              </button>
+            </div>
+            {form.target_items.length === 0 && <p className="text-xs text-gray text-center py-3">ยังไม่มีหัวข้อ</p>}
+            <div className="space-y-2">
+              {form.target_items.map((item, idx) => (
+                <div key={idx} className="flex gap-2 items-start">
+                  <span className="px-2 py-2 text-primary text-sm">•</span>
+                  <input
+                    type="text"
+                    value={item}
+                    onChange={(e) => updateTargetItem(idx, e.target.value)}
+                    className="input-field flex-1"
+                    placeholder="เช่น คนที่อยากพักใจ..."
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeTargetItem(idx)}
+                    className="px-3 py-2 text-red-500 hover:bg-red-50 rounded-lg text-sm"
+                  >
+                    −
+                  </button>
+                </div>
+              ))}
+            </div>
+          </fieldset>
+        </SheetSection>
+        <SheetSection n={3} title="สีธีม Calendar">
+          {/* Theme color */}
+          <div>
+            <label className="block text-sm font-medium text-dark mb-2">
+              สีธีม Calendar <span className="text-gray font-normal ml-1">(ไม่บังคับ)</span>
+            </label>
+            <div className="flex items-center gap-3 flex-wrap">
+              {COLOR_SWATCHES.map((c) => {
+                const selected = (form.theme_color || '').toLowerCase() === c.toLowerCase();
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setForm({ ...form, theme_color: c })}
+                    aria-label={c}
+                    title={c}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: '50%',
+                      background: c,
+                      border: 0,
+                      cursor: 'pointer',
+                      boxShadow: selected
+                        ? `0 0 0 2px white, 0 0 0 4px ${c}`
+                        : '0 0 0 1px rgba(0,0,0,.1)',
+                    }}
+                  />
+                );
+              })}
+              <div className="flex items-center gap-2 ml-2">
+                <input
+                  type="color"
+                  value={form.theme_color || '#0d8a7e'}
+                  onChange={(e) => setForm({ ...form, theme_color: e.target.value })}
+                  style={{ width: 32, height: 32, border: 0, borderRadius: '50%', cursor: 'pointer' }}
+                />
+                <input
+                  value={form.theme_color ?? ''}
+                  onChange={(e) => setForm({ ...form, theme_color: e.target.value })}
+                  className="input-field !py-2 !w-28"
+                  placeholder="#0d8a7e"
+                />
               </div>
-
-              <button
-                type="button"
-                onClick={() => addScheduleItem(di)}
-                className="text-primary text-sm font-medium hover:underline mt-2"
-              >
-                + เพิ่มกิจกรรม
-              </button>
+              {form.theme_color && (
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, theme_color: '' })}
+                  className="text-xs text-gray hover:text-red-500 ml-2"
+                >
+                  ล้าง
+                </button>
+              )}
             </div>
-          ))}
-        </div>
-      </fieldset>
-
-      {/* Learn items */}
-      <fieldset className="border border-gray-lighter rounded-xl p-4 bg-surface/40">
-        <div className="flex items-center justify-between mb-3">
-          <legend className="text-sm font-medium text-dark px-2">สิ่งที่จะได้เรียนรู้</legend>
-          <button
-            type="button"
-            onClick={addLearnItem}
-            className="text-primary text-sm font-medium hover:underline"
-          >
-            + เพิ่ม
-          </button>
-        </div>
-        {form.learn_items.length === 0 && (
-          <p className="text-xs text-gray text-center py-3">ยังไม่มีหัวข้อ</p>
-        )}
-        <div className="space-y-2">
-          {form.learn_items.map((item, idx) => (
-            <div key={idx} className="flex gap-2 items-start">
-              <span className="px-2 py-2 text-primary text-sm">•</span>
-              <input
-                type="text"
-                value={item}
-                onChange={(e) => updateLearnItem(idx, e.target.value)}
-                className="input-field flex-1"
-                placeholder="เทคนิคพื้นฐาน..."
-              />
-              <button
-                type="button"
-                onClick={() => removeLearnItem(idx)}
-                className="px-3 py-2 text-red-500 hover:bg-red-50 rounded-lg text-sm"
-              >
-                −
-              </button>
-            </div>
-          ))}
-        </div>
-      </fieldset>
-
-      <fieldset className="border border-gray-lighter rounded-xl p-4 bg-surface/40">
-        <div className="flex items-center justify-between mb-3">
-          <legend className="text-sm font-medium text-dark px-2">เหมาะกับใคร (Target Audience)</legend>
-          <button type="button" onClick={addTargetItem} className="text-primary text-sm font-medium hover:underline">
-            + เพิ่ม
-          </button>
-        </div>
-        {form.target_items.length === 0 && <p className="text-xs text-gray text-center py-3">ยังไม่มีหัวข้อ</p>}
-        <div className="space-y-2">
-          {form.target_items.map((item, idx) => (
-            <div key={idx} className="flex gap-2 items-start">
-              <span className="px-2 py-2 text-primary text-sm">•</span>
-              <input
-                type="text"
-                value={item}
-                onChange={(e) => updateTargetItem(idx, e.target.value)}
-                className="input-field flex-1"
-                placeholder="เช่น คนที่อยากพักใจ..."
-              />
-              <button
-                type="button"
-                onClick={() => removeTargetItem(idx)}
-                className="px-3 py-2 text-red-500 hover:bg-red-50 rounded-lg text-sm"
-              >
-                −
-              </button>
-            </div>
-          ))}
-        </div>
-      </fieldset>
-
-      <div>
-        <label className="block text-sm font-medium text-dark mb-1">สถานะ</label>
-        <AdmSelect
-          value={form.status}
-          onChange={(e) =>
-            setForm({ ...form, status: e.target.value as WorkshopFormValues['status'] })
-          }
-          className="input-field"
-        >
-          <option value="active">เปิดจอง (Open)</option>
-          <option value="closed">ปิดรับ (Closed)</option>
-          <option value="draft">แบบร่าง (Draft)</option>
-          <option value="cancelled">ยกเลิกกิจกรรม (Cancelled)</option>
-        </AdmSelect>
-        {form.status === 'cancelled' && (
-          <p className="text-xs mt-1" style={{ color: '#b3261e' }}>
-            เมื่อบันทึก ระบบจะยกเลิกการจองทั้งหมดของกิจกรรมนี้ และแสดงหมายเหตุ &ldquo;กิจกรรมมีการเปลี่ยนแปลงกำหนดการ&rdquo; ให้ผู้เข้าร่วม
-          </p>
-        )}
+          </div>
+        </SheetSection>
       </div>
 
-      <div className="flex items-center gap-3 pt-4 border-t border-gray-lighter">
-        <button type="submit" disabled={saving} className="btn-primary">
-          {saving ? 'กำลังบันทึก...' : editingId ? 'บันทึกการแก้ไข' : 'สร้างกิจกรรม'}
-        </button>
+      <div className="adm-sticky-foot">
+        {editingId && (
+          <button type="button" onClick={handleDelete} disabled={deleting} className="adm-btn danger">
+            {deleting ? 'กำลังลบ…' : 'ลบกิจกรรมนี้'}
+          </button>
+        )}
+        <div style={{ flex: 1 }} />
         {onCancel || onAttemptClose ? (
-          <button type="button" onClick={() => (onAttemptClose ? onAttemptClose() : onCancel?.())} className="btn-ghost">
+          <button type="button" onClick={() => (onAttemptClose ? onAttemptClose() : onCancel?.())} className="adm-btn">
             ยกเลิก
           </button>
         ) : (
-          <Link href="/admin/workshops" className="btn-ghost">
+          <Link href="/admin/workshops" className="adm-btn">
             ยกเลิก
           </Link>
         )}
-        {editingId && (
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={deleting}
-            className="ml-auto text-red-500 text-sm font-medium hover:underline disabled:opacity-50"
-          >
-            {deleting ? 'กำลังลบ...' : 'ลบกิจกรรมนี้'}
+        {step < lastStep && (
+          <button type="button" onClick={() => goStep(step + 1)} className="adm-btn">
+            ถัดไป →
           </button>
         )}
+        <button type="submit" disabled={saving} className="adm-btn teal">
+          {saving ? 'กำลังบันทึก…' : editingId ? 'บันทึกการแก้ไข' : 'สร้างกิจกรรม'}
+        </button>
       </div>
 
       {/* Unsaved-changes: offer to save a draft before leaving */}
       {pendingClose && (
-        <div
-          className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-dark/55"
-          onClick={() => onStay?.()}
-        >
-          <div className="bg-paper rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-heading text-lg text-dark mb-2">มีข้อมูลที่ยังไม่ได้บันทึก</h3>
-            <p className="text-sm text-gray mb-5">คุณมีข้อมูลที่ยังไม่ได้บันทึก ต้องการบันทึกเป็นฉบับร่าง (Draft) ก่อนออกจากหน้านี้หรือไม่?</p>
-            <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                disabled={saving}
-                onClick={saveDraft}
-                className="w-full px-4 py-2.5 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
-              >
-                {saving ? 'กำลังบันทึก...' : 'บันทึกเป็นฉบับร่าง แล้วออก'}
-              </button>
-              <button
-                type="button"
-                onClick={() => onCancel?.()}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-lighter text-sm text-dark hover:bg-surface"
-              >
-                ออกโดยไม่บันทึก
-              </button>
-              <button type="button" onClick={() => onStay?.()} className="w-full px-4 py-2.5 text-sm text-gray hover:underline">
-                อยู่ต่อ
-              </button>
-            </div>
-          </div>
-        </div>
+        <UnsavedDialog
+          saving={saving}
+          err={null}
+          title="มีข้อมูลที่ยังไม่ได้บันทึก"
+          msg="คุณมีข้อมูลที่ยังไม่ได้บันทึก ต้องการบันทึกเป็นฉบับร่าง (Draft) ก่อนออกจากหน้านี้หรือไม่?"
+          saveLabel="บันทึกเป็นฉบับร่าง แล้วออก"
+          onSave={saveDraft}
+          onDiscard={() => onCancel?.()}
+          onStay={() => onStay?.()}
+        />
       )}
     </form>
   );

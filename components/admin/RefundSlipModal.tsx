@@ -5,6 +5,7 @@ import type { ImageMeta } from '@/lib/types';
 import { ImageUploader } from '@/components/admin/image/ImageUploader';
 import { ASPECTS } from '@/lib/image-aspects';
 import { parseImageMeta } from '@/lib/image-meta';
+import { AdminSheet } from '@/components/admin/AdminShell';
 
 /** Minimal booking shape the modal needs (works for any paid booking). */
 export type RefundSlipTarget = {
@@ -24,11 +25,14 @@ export type RefundSlipTarget = {
 export function RefundSlipModal({
   booking,
   title = 'สลิปคืนมัดจำ',
+  autoCancels = false,
   onClose,
   onSaved,
 }: {
   booking: RefundSlipTarget;
   title?: string;
+  /** A full (non-deposit) refund cancels the seat server-side; say so. */
+  autoCancels?: boolean;
   onClose: () => void;
   onSaved: (url: string | null, meta: ImageMeta | null) => void;
 }) {
@@ -60,48 +64,39 @@ export function RefundSlipModal({
   }
 
   return (
-    <div onClick={onClose} className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden">
-        <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-gray-lighter flex-shrink-0">
-          <div>
-            <h2 className="font-heading text-lg text-dark">{title}</h2>
-            <p className="text-xs text-gray mt-0.5">{booking.user_name || booking.user_email || '—'}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="ปิด"
-            className="flex-shrink-0 w-9 h-9 rounded-full bg-surface hover:bg-gray-lighter text-dark flex items-center justify-center transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+    <AdminSheet
+      open
+      onClose={onClose}
+      eyebrow="admin · refund"
+      title={title}
+      sub={booking.user_name || booking.user_email || '—'}
+      width={520}
+      footer={
+        <>
+          <button type="button" onClick={onClose} className="adm-btn">
+            ยกเลิก
           </button>
-        </div>
-
-        <div className="overflow-y-auto p-6 space-y-4">
-          {error && <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">{error}</div>}
-          <ImageUploader
-            label="รูปสลิปโอนเงินคืน"
-            folder="refund"
-            primary={ASPECTS.REFUND_SLIP}
-            value={url}
-            meta={meta}
-            onChange={({ url: u, meta: m }) => {
-              setUrl(u);
-              setMeta(m);
-            }}
-          />
-          <div className="flex items-center gap-3 pt-2">
-            <button type="button" onClick={save} disabled={saving} className="btn-primary flex-1">
-              {saving ? 'กำลังบันทึก...' : 'บันทึก'}
-            </button>
-            <button type="button" onClick={onClose} className="btn-ghost flex-1">
-              ยกเลิก
-            </button>
-          </div>
-        </div>
+          <button type="button" onClick={save} disabled={saving} className="adm-btn teal">
+            {saving ? 'กำลังบันทึก…' : 'บันทึก'}
+          </button>
+        </>
+      }
+    >
+      <div style={{ padding: '20px 0', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {error && <div className="adm-notice is-bad">{error}</div>}
+        <ImageUploader
+          label="รูปสลิปโอนเงินคืน"
+          folder="refund"
+          primary={ASPECTS.REFUND_SLIP}
+          value={url}
+          meta={meta}
+          onChange={({ url: u, meta: m }) => {
+            setUrl(u);
+            setMeta(m);
+          }}
+        />
+        {autoCancels && <p className="adm-notice is-warn" style={{ margin: 0 }}>การแนบสลิปคืนเงินเต็มจำนวนจะยกเลิกที่นั่งนี้อัตโนมัติ</p>}
       </div>
-    </div>
+    </AdminSheet>
   );
 }

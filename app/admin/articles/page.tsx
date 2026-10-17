@@ -18,7 +18,7 @@ import { cardX } from '@/lib/article-card';
 import { PUBLISHED_CODE, VISIBILITY_OPTIONS, visibilityOf, type ArticleVisibility } from '@/lib/article-visibility';
 import { ASPECTS, type AspectSpec } from '@/lib/image-aspects';
 import { parseImageMeta } from '@/lib/image-meta';
-import { adminAlert, adminConfirm, AdminHead, AdminSearch, AdminChips, AdminSheet, SheetSection, Badge, RowMenu, type MenuItem } from '@/components/admin/AdminShell';
+import { adminAlert, adminConfirm, adminToast, AdminHead, AdminSearch, AdminChips, AdminSheet, SheetSection, Badge, RowMenu, type MenuItem } from '@/components/admin/AdminShell';
 import { AdmSelect, PickDate } from '@/components/admin/pickers';
 
 type ArticleForm = {
@@ -213,6 +213,7 @@ export default function AdminArticlesPage() {
       setShowForm(false);
       setForm(emptyForm);
       setEditingSlug(null);
+      adminToast('บันทึกบทความแล้ว');
       fetchAll();
     } finally {
       setSaving(false);
@@ -925,119 +926,84 @@ function CategoryPanel({
   }
 
   return (
-    <div className="card !p-6 space-y-4">
-      <div>
-        <p className="text-xs font-mono text-primary tracking-[.16em] uppercase mb-1">
-          article categories
+    <>
+      <SheetSection n={1} title="หมวดทั้งหมด">
+        <p className="adm-hint" style={{ marginTop: -10 }}>
+          แก้ชื่อ TH/EN และลำดับได้เลย · ลบได้เฉพาะหมวดที่ไม่มีบทความใช้
         </p>
-        <h2 className="font-heading text-xl text-dark">หมวดบทความ</h2>
-        <p className="text-xs text-gray mt-1">
-          แก้ชื่อ TH/EN ของแต่ละหมวด · เพิ่มหมวดใหม่ · ลบที่ไม่ใช้แล้ว (ลบไม่ได้ถ้ามีบทความใช้อยู่)
-        </p>
-      </div>
-
-      {/* Existing categories — editable inline */}
-      <div className="space-y-2">
-        {categories.length === 0 && (
-          <p className="text-sm text-gray text-center py-4">ยังไม่มีหมวด</p>
-        )}
+        {categories.length === 0 && <p className="adm-soft-empty">ยังไม่มีหมวด</p>}
         {categories.map((c) => {
           const count = usageCount(c.key);
           return (
-            <div
-              key={c.key}
-              className="grid grid-cols-12 gap-2 items-center p-3 rounded-xl bg-surface"
-            >
-              <div className="col-span-12 sm:col-span-2 font-mono text-xs text-gray tracking-wider">
-                {c.key}
-              </div>
-              <div className="col-span-12 sm:col-span-3">
-                <input
-                  value={c.th}
-                  onChange={(e) => updateCategory(c.key, { th: e.target.value })}
-                  className="input-field !py-2"
-                  placeholder="ภาษาไทย"
-                />
-              </div>
-              <div className="col-span-12 sm:col-span-3">
-                <input
-                  value={c.en}
-                  onChange={(e) => updateCategory(c.key, { en: e.target.value })}
-                  className="input-field !py-2"
-                  placeholder="English"
-                />
-              </div>
-              <div className="col-span-6 sm:col-span-2">
-                <input
-                  type="number"
-                  value={c.sort_order}
-                  onChange={(e) =>
-                    updateCategory(c.key, { sort_order: +e.target.value })
-                  }
-                  className="input-field !py-2"
-                  placeholder="ลำดับ"
-                  title="ลำดับการแสดง (น้อยมาก่อน)"
-                />
-              </div>
-              <div className="col-span-6 sm:col-span-2 flex items-center justify-end gap-2 text-xs">
-                <span className="text-gray font-mono">{count} ใช้</span>
+            <div key={c.key} className="adm-soft-card" style={{ gap: 10, padding: 12 }}>
+              <div className="adm-soft-card-head" style={{ gap: 8 }}>
+                <span className="adm-mono adm-meta" style={{ fontSize: 12 }}>
+                  {c.key}
+                </span>
+                <div style={{ flex: 1 }} />
+                <span className="adm-meta" style={{ fontSize: 12 }}>
+                  {count} บทความ
+                </span>
                 <button
                   type="button"
                   onClick={() => deleteCategory(c.key)}
                   disabled={count > 0}
-                  className="text-red-500 font-medium hover:underline disabled:opacity-30 disabled:no-underline disabled:cursor-not-allowed"
+                  className="adm-btn sm danger"
+                  style={{ opacity: count > 0 ? 0.35 : 1 }}
                   title={count > 0 ? `มี ${count} บทความใช้หมวดนี้อยู่` : 'ลบหมวด'}
                 >
                   ลบ
                 </button>
               </div>
+              <div className="adm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}>
+                <input value={c.th} onChange={(e) => updateCategory(c.key, { th: e.target.value })} className="is-white" placeholder="ภาษาไทย" aria-label="ภาษาไทย" />
+                <input value={c.en} onChange={(e) => updateCategory(c.key, { en: e.target.value })} className="is-white" placeholder="English" aria-label="English" />
+                <input
+                  type="number"
+                  value={c.sort_order}
+                  onChange={(e) => updateCategory(c.key, { sort_order: +e.target.value })}
+                  className="is-white"
+                  placeholder="ลำดับ"
+                  aria-label="ลำดับการแสดง"
+                  title="ลำดับการแสดง (น้อยมาก่อน)"
+                />
+              </div>
             </div>
           );
         })}
-      </div>
+      </SheetSection>
 
-      {/* Add new */}
-      <form
-        onSubmit={addCategory}
-        className="border-t border-gray-lighter pt-4 grid grid-cols-12 gap-2 items-end"
-      >
-        <div className="col-span-12 sm:col-span-3">
-          <label className="block text-xs font-medium text-dark mb-1">key (a-z 0-9 -)</label>
-          <input
-            value={newKey}
-            onChange={(e) => setNewKey(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-            className="input-field !py-2"
-            placeholder="ux-research"
-            required
-          />
-        </div>
-        <div className="col-span-12 sm:col-span-3">
-          <label className="block text-xs font-medium text-dark mb-1">ภาษาไทย</label>
-          <input
-            value={newTh}
-            onChange={(e) => setNewTh(e.target.value)}
-            className="input-field !py-2"
-            placeholder="งานวิจัย UX"
-            required
-          />
-        </div>
-        <div className="col-span-12 sm:col-span-3">
-          <label className="block text-xs font-medium text-dark mb-1">English</label>
-          <input
-            value={newEn}
-            onChange={(e) => setNewEn(e.target.value)}
-            className="input-field !py-2"
-            placeholder="UX Research"
-            required
-          />
-        </div>
-        <div className="col-span-12 sm:col-span-3">
-          <button type="submit" disabled={busy} className="btn-primary text-sm w-full">
-            {busy ? '...' : '+ เพิ่มหมวด'}
-          </button>
-        </div>
-        {error && <p className="col-span-12 text-xs text-red-500">{error}</p>}
-      </form>
-    </div>
+      <SheetSection n={2} title="เพิ่มหมวดใหม่">
+        <form onSubmit={addCategory} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="adm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+            <div className="adm-field">
+              <label htmlFor="cat-key">key (a-z 0-9 -)</label>
+              <input
+                id="cat-key"
+                className="adm-mono"
+                value={newKey}
+                onChange={(e) => setNewKey(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                placeholder="ux-research"
+                required
+              />
+            </div>
+            <div className="adm-field">
+              <label htmlFor="cat-th">ภาษาไทย</label>
+              <input id="cat-th" value={newTh} onChange={(e) => setNewTh(e.target.value)} placeholder="งานวิจัย UX" required />
+            </div>
+            <div className="adm-field">
+              <label htmlFor="cat-en">English</label>
+              <input id="cat-en" value={newEn} onChange={(e) => setNewEn(e.target.value)} placeholder="UX Research" required />
+            </div>
+          </div>
+          {error && <p style={{ margin: 0, fontSize: 13, color: '#a3261a' }}>{error}</p>}
+          <div>
+            <button type="submit" disabled={busy} className="adm-btn soft">
+              {busy ? '…' : '+ เพิ่มหมวด'}
+            </button>
+          </div>
+        </form>
+      </SheetSection>
+    </>
   );
 }

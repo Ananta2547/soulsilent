@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { ApplicationQuestion } from '@/lib/types';
 import { AdmSelect } from '@/components/admin/pickers';
+import { SheetSection } from '@/components/admin/AdminShell';
 
 const TYPES: { value: ApplicationQuestion['type']; label: string }[] = [
   { value: 'text', label: 'ข้อความสั้น' },
@@ -76,65 +77,66 @@ export function ApplicationFormBuilder({
   }
 
   return (
-    <div className="space-y-4 max-w-2xl">
-      <p className="text-sm text-gray">
-        ตั้งคำถามเพิ่มเติมสำหรับผู้สมัครกิจกรรมนี้ — ผู้เข้าร่วมจะตอบในขั้นตอนก่อนชำระเงิน
-      </p>
-
+    <div>
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">{error}</div>
+        <div className="adm-notice is-bad" style={{ marginTop: 16 }}>
+          {error}
+        </div>
       )}
 
-      {questions.length === 0 && (
-        <p className="text-xs text-gray text-center py-4 border border-dashed border-gray-lighter rounded-xl">
-          ยังไม่มีคำถาม — กด “+ เพิ่มคำถาม” ด้านล่าง
+      <SheetSection n={1} title="คำถามเพิ่มเติม">
+        <p className="adm-hint" style={{ marginTop: -10 }}>
+          ผู้เข้าร่วมจะตอบในขั้นตอนก่อนชำระเงิน
         </p>
-      )}
+        {questions.length === 0 && <p className="adm-soft-empty">ยังไม่มีคำถาม — กด “+ เพิ่มคำถาม”</p>}
 
-      <div className="space-y-3">
         {questions.map((q, i) => (
-          <div key={q.id} className="rounded-xl border border-gray-lighter p-4 bg-surface/40 space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-primary">คำถาม {i + 1}</span>
-              <div className="ml-auto flex items-center gap-1">
-                <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="px-2 py-1 text-xs rounded hover:bg-cream disabled:opacity-40" title="ขึ้น">↑</button>
-                <button type="button" onClick={() => move(i, 1)} disabled={i === questions.length - 1} className="px-2 py-1 text-xs rounded hover:bg-cream disabled:opacity-40" title="ลง">↓</button>
-                <button type="button" onClick={() => remove(i)} className="px-2 py-1 text-xs text-red-500 rounded hover:bg-red-50" title="ลบ">ลบ</button>
-              </div>
+          <div key={q.id} className="adm-soft-card">
+            <div className="adm-soft-card-head">
+              <span className="adm-soft-card-n">คำถาม {i + 1}</span>
+              <div style={{ flex: 1 }} />
+              <button type="button" className="adm-icon-btn" onClick={() => move(i, -1)} disabled={i === 0} aria-label="ขึ้น" style={{ opacity: i === 0 ? 0.35 : 1 }}>
+                ↑
+              </button>
+              <button type="button" className="adm-icon-btn" onClick={() => move(i, 1)} disabled={i === questions.length - 1} aria-label="ลง" style={{ opacity: i === questions.length - 1 ? 0.35 : 1 }}>
+                ↓
+              </button>
+              <button type="button" className="adm-btn sm danger" onClick={() => remove(i)}>
+                ลบ
+              </button>
             </div>
 
             <input
               value={q.label}
               onChange={(e) => update(i, { label: e.target.value })}
-              className="input-field"
+              className="is-white"
               placeholder="หัวข้อคำถาม เช่น มีประสบการณ์มาก่อนไหม?"
+              aria-label={`หัวข้อคำถาม ${i + 1}`}
             />
 
-            <div className="flex flex-wrap items-center gap-3">
-              <AdmSelect
-                value={q.type}
-                onChange={(e) => update(i, { type: e.target.value as ApplicationQuestion['type'] })}
-                className="input-field !w-auto"
-              >
-                {TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </AdmSelect>
-              <label className="flex items-center gap-2 text-sm text-dark cursor-pointer">
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
+              <div style={{ flex: '1 1 200px', minWidth: 0 }} className="is-white">
+                <AdmSelect value={q.type} onChange={(e) => update(i, { type: e.target.value as ApplicationQuestion['type'] })} aria-label="ประเภทคำถาม">
+                  {TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </AdmSelect>
+              </div>
+              <label className="adm-inline-check">
                 <input type="checkbox" checked={q.required} onChange={(e) => update(i, { required: e.target.checked })} />
                 จำเป็นต้องตอบ
               </label>
             </div>
 
             {HAS_OPTIONS(q.type) && (
-              <div>
-                <label className="block text-xs font-medium text-dark mb-1">ตัวเลือก (บรรทัดละ 1 รายการ)</label>
+              <div className="adm-field">
+                <label>ตัวเลือก (บรรทัดละ 1 รายการ)</label>
                 <textarea
                   value={(q.options || []).join('\n')}
                   onChange={(e) => update(i, { options: e.target.value.split('\n') })}
-                  className="input-field"
+                  className="is-white"
                   rows={3}
                   placeholder={'ตัวเลือก 1\nตัวเลือก 2'}
                 />
@@ -142,18 +144,20 @@ export function ApplicationFormBuilder({
             )}
           </div>
         ))}
-      </div>
 
-      <button type="button" onClick={add} className="text-primary text-sm font-medium hover:underline">
-        + เพิ่มคำถาม
-      </button>
+        <div>
+          <button type="button" onClick={add} className="adm-link-btn">
+            + เพิ่มคำถาม
+          </button>
+        </div>
+      </SheetSection>
 
-      <div className="flex items-center gap-3 pt-4 border-t border-gray-lighter">
-        <button type="button" onClick={save} disabled={saving} className="btn-primary">
-          {saving ? 'กำลังบันทึก...' : 'บันทึกฟอร์มสมัคร'}
-        </button>
-        <button type="button" onClick={onCancel} className="btn-ghost">
+      <div className="adm-sticky-foot">
+        <button type="button" onClick={onCancel} className="adm-btn">
           ยกเลิก
+        </button>
+        <button type="button" onClick={save} disabled={saving} className="adm-btn teal">
+          {saving ? 'กำลังบันทึก…' : 'บันทึกฟอร์มสมัคร'}
         </button>
       </div>
     </div>

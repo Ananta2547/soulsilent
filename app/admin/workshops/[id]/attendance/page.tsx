@@ -11,7 +11,7 @@ import { PdpaBadge } from '@/components/workshops/PdpaBadge';
 import { RefundSlipModal } from '@/components/admin/RefundSlipModal';
 import { FacilitatorNote } from '@/components/admin/FacilitatorNote';
 import { applicantName } from '@/lib/applicant';
-import { adminAlert, AdminHead, Badge } from '@/components/admin/AdminShell';
+import { adminAlert, AdminHead, AdminSheet, Badge } from '@/components/admin/AdminShell';
 
 type BookingRow = {
   id: string;
@@ -395,6 +395,7 @@ export default function AttendancePage() {
         <RefundSlipModal
           booking={slipFor}
           title={slipNoun}
+          autoCancels={!isDeposit}
           onClose={() => setSlipFor(null)}
           onSaved={(url, meta) => {
             // A full refund (non-deposit) auto-cancels the booking server-side —
@@ -465,41 +466,30 @@ function RemoveParticipantModal({
   const paidForMoney = booking.payment_status === 'paid' && booking.amount > 0;
   const name = applicantName(booking.application_json, booking.user_name);
   return (
-    <div onClick={onClose} className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl w-full max-w-md overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-lighter">
-          <h2 className="font-heading text-lg text-dark">
-            {paidForMoney ? 'ยกเลิกที่นั่งนี้?' : 'เอาผู้เข้าร่วมออก?'}
-          </h2>
+    <div className="adm-dlg-scrim" onClick={onClose}>
+      <div className="adm-dlg" role="alertdialog" aria-modal="true" aria-labelledby="rm-title" onClick={(e) => e.stopPropagation()}>
+        <h3 id="rm-title">{paidForMoney ? 'ยกเลิกที่นั่งนี้?' : 'เอาผู้เข้าร่วมออก?'}</h3>
+        <div style={{ fontSize: 14, marginBottom: 8 }}>
+          <b style={{ fontWeight: 600 }}>{name}</b>
+          {booking.user_email ? <span className="adm-meta"> · {booking.user_email}</span> : null}
         </div>
-        <div className="p-6 space-y-3 text-sm text-dark">
+        {paidForMoney ? (
           <p>
-            <span className="font-medium">{name}</span>
-            {booking.user_email ? <span className="text-gray"> · {booking.user_email}</span> : null}
+            ที่นั่งนี้ชำระเงินมาแล้ว ฿{booking.amount.toLocaleString()} ระบบจะ<b style={{ color: 'var(--ink)' }}>ยกเลิกที่นั่ง</b>
+            เพื่อคืนที่ว่างให้คนอื่น แต่ยังเก็บรายการเงินไว้ในรายงาน — แถวนี้จะยังอยู่ในรายชื่อพร้อมป้าย “ยกเลิกแล้ว”
+            เผื่อต้องแนบสลิปคืนเงินภายหลัง
           </p>
-          {paidForMoney ? (
-            <p className="text-gray leading-relaxed">
-              ที่นั่งนี้ชำระเงินมาแล้ว ฿{booking.amount.toLocaleString()} ระบบจะ<strong className="text-dark">ยกเลิกที่นั่ง</strong>
-              เพื่อคืนที่ว่างให้คนอื่น แต่ยังเก็บรายการเงินไว้ในรายงาน — แถวนี้จะยังอยู่ในรายชื่อพร้อมป้าย “ยกเลิกแล้ว”
-              เผื่อต้องแนบสลิปคืนเงินภายหลัง
-            </p>
-          ) : (
-            <p className="text-gray leading-relaxed">
-              ที่นั่งนี้ไม่มียอดชำระ ระบบจะ<strong className="text-dark">ลบออกถาวร</strong> พร้อมลิงก์โอนสิทธิ์ที่ผูกกับที่นั่งนี้ (ถ้ามี)
-              — กู้คืนไม่ได้
-            </p>
-          )}
-        </div>
-        <div className="px-6 py-4 border-t border-gray-lighter flex justify-end gap-2">
-          <button type="button" onClick={onClose} disabled={busy} className="btn btn-paper btn-sm">
+        ) : (
+          <p>
+            ที่นั่งนี้ไม่มียอดชำระ ระบบจะ<b style={{ color: 'var(--ink)' }}>ลบออกถาวร</b> พร้อมลิงก์โอนสิทธิ์ที่ผูกกับที่นั่งนี้ (ถ้ามี) —
+            กู้คืนไม่ได้
+          </p>
+        )}
+        <div className="adm-dlg-acts">
+          <button type="button" onClick={onClose} disabled={busy} className="adm-btn">
             ยกเลิก
           </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={busy}
-            className="btn btn-sm bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
-          >
+          <button type="button" onClick={onConfirm} disabled={busy} className="adm-btn bad">
             {busy ? 'กำลังดำเนินการ…' : paidForMoney ? 'ยกเลิกที่นั่ง' : 'ลบออกถาวร'}
           </button>
         </div>
@@ -576,78 +566,77 @@ function AddParticipantModal({
   }
 
   return (
-    <div onClick={onClose} className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden">
-        <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-gray-lighter flex-shrink-0">
-          <div>
-            <h2 className="font-heading text-lg text-dark">เพิ่มผู้เข้าร่วม</h2>
-            <p className="text-xs text-gray mt-0.5">ค้นหาด้วยชื่อ หรืออีเมล</p>
-          </div>
-          <button type="button" onClick={onClose} aria-label="ปิด" className="flex-shrink-0 w-9 h-9 rounded-full bg-surface hover:bg-gray-lighter text-dark flex items-center justify-center transition-colors">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+    <AdminSheet
+      open
+      onClose={onClose}
+      eyebrow="admin · attendance"
+      title="เพิ่มผู้เข้าร่วม"
+      sub="ค้นหาด้วยชื่อ หรืออีเมล"
+      width={520}
+      footer={
+        <>
+          <button type="button" onClick={onClose} className="adm-btn">
+            ยกเลิก
           </button>
-        </div>
-
-        <div className="overflow-y-auto p-6 space-y-4">
-          {error && <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">{error}</div>}
-
-          <input
-            autoFocus
-            type="text"
-            value={q}
-            onChange={(e) => { setQ(e.target.value); setSelected(null); }}
-            placeholder="พิมพ์ชื่อ หรืออีเมล..."
-            className="input-field"
-          />
-
-          {selected ? (
-            <div className="flex items-center justify-between gap-3 p-3 rounded-xl border border-primary bg-primary/5">
-              <div className="min-w-0">
-                <div className="text-sm font-medium text-dark truncate">{selected.name || '—'}</div>
-                <div className="text-xs text-gray truncate">{selected.email || '—'}</div>
-              </div>
-              <button type="button" onClick={() => setSelected(null)} className="text-xs text-gray hover:text-primary shrink-0">เปลี่ยน</button>
+          <button type="button" onClick={confirm} disabled={!selected || saving} className="adm-btn teal">
+            {saving ? 'กำลังเพิ่ม…' : 'ยืนยันเพิ่มเข้ารายชื่อ'}
+          </button>
+        </>
+      }
+    >
+      <div style={{ padding: '20px 0', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {error && <div className="adm-notice is-bad">{error}</div>}
+        <input
+          autoFocus
+          type="text"
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setSelected(null);
+          }}
+          placeholder="พิมพ์ชื่อ หรืออีเมล..."
+          aria-label="ค้นหาผู้เข้าร่วม"
+        />
+        {selected ? (
+          <div className="adm-picked">
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 14.5 }}>{selected.name || '—'}</div>
+              <div className="adm-meta">{selected.email || '—'}</div>
             </div>
-          ) : (
-            <div className="max-h-64 overflow-y-auto -mx-1">
-              {searching ? (
-                <p className="text-sm text-gray text-center py-6">กำลังค้นหา...</p>
-              ) : q.trim().length < 2 ? (
-                <p className="text-sm text-gray text-center py-6">พิมพ์อย่างน้อย 2 ตัวอักษร</p>
-              ) : results.length === 0 ? (
-                <p className="text-sm text-gray text-center py-6">ไม่พบผู้เข้าร่วม</p>
-              ) : (
-                results.map((u) => {
-                  const already = existingEmails.has((u.email || '').toLowerCase());
-                  return (
-                    <button
-                      key={u.id}
-                      type="button"
-                      disabled={already}
-                      onClick={() => setSelected(u)}
-                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-surface transition flex items-center justify-between gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <span className="min-w-0">
-                        <span className="block text-sm font-medium text-dark truncate">{u.name || '—'}</span>
-                        <span className="block text-xs text-gray truncate">{u.email || '—'}</span>
-                      </span>
-                      {already && <span className="text-[11px] text-gray shrink-0">อยู่ในรายชื่อแล้ว</span>}
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          )}
-
-          <div className="flex items-center gap-3 pt-1">
-            <button type="button" onClick={confirm} disabled={!selected || saving} className="btn-primary flex-1 disabled:opacity-50">
-              {saving ? 'กำลังเพิ่ม...' : 'ยืนยันเพิ่มเข้ารายชื่อ'}
+            <button type="button" onClick={() => setSelected(null)} className="adm-btn sm white">
+              เปลี่ยน
             </button>
-            <button type="button" onClick={onClose} className="btn-ghost flex-1">ยกเลิก</button>
           </div>
-        </div>
+        ) : searching ? (
+          <p className="adm-meta" style={{ textAlign: 'center', padding: '24px 0', margin: 0, fontSize: 13.5 }}>
+            กำลังค้นหา…
+          </p>
+        ) : q.trim().length < 2 ? (
+          <p className="adm-meta" style={{ textAlign: 'center', padding: '24px 0', margin: 0, fontSize: 13.5 }}>
+            พิมพ์อย่างน้อย 2 ตัวอักษร
+          </p>
+        ) : results.length === 0 ? (
+          <p className="adm-meta" style={{ textAlign: 'center', padding: '24px 0', margin: 0, fontSize: 13.5 }}>
+            ไม่พบผู้เข้าร่วม
+          </p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {results.map((u) => {
+              const already = existingEmails.has((u.email || '').toLowerCase());
+              return (
+                <button key={u.id} type="button" disabled={already} onClick={() => setSelected(u)} className="adm-pick-row">
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <b>{u.name || '—'}</b>
+                    <span>{u.email || '—'}</span>
+                  </span>
+                  {already && <span className="adm-meta" style={{ fontSize: 11.5 }}>อยู่ในรายชื่อแล้ว</span>}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
-    </div>
+    </AdminSheet>
   );
 }
 
@@ -659,7 +648,7 @@ function ApplicationDetail({ json }: { json: string | null }) {
     snap = null;
   }
   if (!snap) {
-    return <p className="text-xs text-gray">ไม่มีข้อมูลใบสมัคร</p>;
+    return <p className="adm-meta" style={{ margin: 0 }}>ไม่มีข้อมูลใบสมัคร</p>;
   }
   const p = snap.profile || {};
   const items: [string, string][] = [
@@ -677,35 +666,39 @@ function ApplicationDetail({ json }: { json: string | null }) {
     ['การเดินทาง', formatTravel(snap.travel)],
   ];
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5 text-xs">
+    <>
+      <div className="adm-app-grid">
         {items.map(([k, v]) => (
           <div key={k}>
-            <span className="text-gray">{k}: </span>
-            <span className="text-dark">{v}</span>
+            <div className="adm-label" style={{ letterSpacing: '.08em' }}>
+              {k}
+            </div>
+            <div className="adm-app-v">{v}</div>
           </div>
         ))}
       </div>
       {(snap.answers || []).length > 0 && (
-        <div className="border-t border-gray-lighter pt-3 space-y-1.5 text-xs">
-          <div className="font-medium text-dark mb-1">คำตอบแบบฟอร์ม</div>
+        <div className="adm-app-sec">
+          <div style={{ fontSize: 13, fontWeight: 600 }}>คำตอบแบบฟอร์ม</div>
           {(snap.answers || []).map((a) => (
-            <div key={a.id}>
-              <span className="text-gray">{a.label}: </span>
-              <span className="text-dark">{Array.isArray(a.value) ? a.value.join(', ') : a.value || '—'}</span>
+            <div key={a.id} style={{ fontSize: 13.5 }}>
+              <span className="adm-meta" style={{ fontSize: 13.5 }}>{a.label}: </span>
+              {Array.isArray(a.value) ? a.value.join(', ') : a.value || '—'}
             </div>
           ))}
         </div>
       )}
       {snap.consent && (
-        <div className="border-t border-gray-lighter pt-3 text-xs">
-          <span className="text-gray">ยินยอมบันทึกภาพ/วิดีโอ (PDPA): </span>
-          <span className={snap.consent.photoVideo === 'granted' ? 'text-emerald-700 font-medium' : 'text-orange-700 font-medium'}>
-            {snap.consent.label || (snap.consent.photoVideo === 'granted' ? 'ยินยอม' : 'ไม่ยินยอม')}
+        <div className="adm-app-sec" style={{ fontSize: 13.5 }}>
+          <span>
+            <span className="adm-meta" style={{ fontSize: 13.5 }}>ยินยอมบันทึกภาพ/วิดีโอ (PDPA): </span>
+            <b style={{ fontWeight: 600, color: snap.consent.photoVideo === 'granted' ? '#0b6b4f' : '#c75f17' }}>
+              {snap.consent.label || (snap.consent.photoVideo === 'granted' ? 'ยินยอม' : 'ไม่ยินยอม')}
+            </b>
           </span>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
