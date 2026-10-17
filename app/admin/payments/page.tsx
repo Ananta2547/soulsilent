@@ -2,6 +2,7 @@
 
 import { PageLoader } from '@/components/design/PageLoader';
 import { useEffect, useState } from 'react';
+import { AdminHead, AdminChips, Badge } from '@/components/admin/AdminShell';
 
 interface Orphan {
   id: string;
@@ -58,80 +59,69 @@ export default function AdminPaymentsPage() {
   if (items === null) return <PageLoader />;
 
   return (
-    <div className="max-w-5xl">
-      <h1 className="text-2xl font-semibold mb-1">ตรวจเงินเข้าผิดปกติ</h1>
-      <p className="text-sm text-muted mb-4" style={{ color: 'var(--muted)' }}>
-        เงินที่เข้า Beam แต่ไม่ตรงกับการจองที่ต้องจ่าย — จ่าย QR หลังหมดเวลา หรือจ่ายซ้ำ
-        ระบบ<strong>คืนเงินให้อัตโนมัติ</strong>แล้วปิดรายการเอง สิ่งที่ค้างอยู่ในนี้คือรายการที่คืนอัตโนมัติไม่สำเร็จ
-        หรือเป็นเงินที่ผูกกับการจองของเราไม่ได้ ต้องคืนเองที่ Beam Dashboard แล้วกด &ldquo;จัดการแล้ว&rdquo;
-      </p>
+    <>
+      <AdminHead
+        eyebrow="admin · payments"
+        title="ตรวจเงินเข้า"
+        sub="เงินที่เข้า Beam แต่ไม่ตรงกับการจองที่ต้องจ่าย — จ่าย QR หลังหมดเวลา หรือจ่ายซ้ำ"
+      />
 
-      <label className="inline-flex items-center gap-2 text-sm mb-4 cursor-pointer">
-        <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} />
-        แสดงที่จัดการแล้วด้วย
-      </label>
+      <div className="adm-notice">
+        ระบบ<b>คืนเงินอัตโนมัติ</b>ให้รายการที่จ่าย QR หลังหมดเวลาหรือจ่ายซ้ำแล้ว — ที่ค้างในนี้คือรายการที่คืนอัตโนมัติไม่สำเร็จ
+        หรือผูกกับการจองไม่ได้ ให้คืนเองที่ Beam Dashboard แล้วกด &ldquo;จัดการแล้ว&rdquo; · PromptPay คืนเงินตามรอบธนาคาร ปกติ 1–3 วันทำการ
+      </div>
+
+      <div className="adm-toolbar">
+        <AdminChips
+          value={showAll ? 'all' : 'open'}
+          onChange={(k) => setShowAll(k === 'all')}
+          items={[
+            { key: 'open', label: 'ค้างอยู่' },
+            { key: 'all', label: 'รวมที่จัดการแล้ว' },
+          ]}
+        />
+      </div>
 
       {items.length === 0 ? (
-        <div className="rounded-xl border p-6 text-center text-sm" style={{ color: 'var(--muted)' }}>
-          ✓ ไม่มีเงินเข้าผิดปกติที่ต้องจัดการ
-        </div>
+        <div className="adm-card adm-empty">ไม่มีรายการค้าง ✺</div>
       ) : (
-        <div className="space-y-3">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {items.map((o) => (
-            <div
-              key={o.id}
-              className="rounded-xl border p-4 flex flex-wrap items-center gap-x-6 gap-y-2"
-              style={{ opacity: o.resolved ? 0.55 : 1 }}
-            >
-              <div>
-                <div className="text-lg font-semibold">
+            <article key={o.id} className="adm-card adm-orphan" style={{ opacity: o.resolved ? 0.55 : 1 }}>
+              <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+                <div className="adm-orphan-amount">
                   {(o.amount / 100).toLocaleString('th-TH', { minimumFractionDigits: 2 })} {o.currency.toUpperCase()}
                 </div>
-                <div className="text-xs" style={{ color: 'var(--muted)' }}>{o.created_at} UTC</div>
+                <div className="adm-meta" style={{ fontSize: 12, marginTop: 4 }}>
+                  {o.created_at} UTC
+                </div>
               </div>
-              <div className="text-sm">
-                <span
-                  className="inline-block px-2 py-0.5 rounded-full text-xs"
-                  style={{ background: '#fdecec', color: '#a13030' }}
-                >
-                  {REASON_LABEL[o.reason] || o.reason}
-                </span>
-                <div className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>
+              <div style={{ flex: '2 1 240px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
+                <Badge tone="bad">{REASON_LABEL[o.reason] || o.reason}</Badge>
+                <div className="adm-meta" style={{ wordBreak: 'break-all' }}>
                   {o.email || '—'}
                   {o.booking_id && <> · booking {o.booking_id.slice(0, 8)}</>}
                 </div>
-              </div>
-              <div className="ml-auto flex items-center gap-3">
                 {/* The charge id is what a refund is issued against, and what
                     to search for in Beam. Beam has no per-charge URL to link
                     to, so it is shown to be copied rather than clicked. */}
-                <code className="text-xs" style={{ color: 'var(--muted)' }}>{o.id}</code>
-                {o.resolved ? (
-                  <button
-                    className="btn btn-paper btn-sm"
-                    disabled={busy === o.id}
-                    onClick={() => resolve(o.id, false)}
-                  >
-                    กลับเป็นค้าง
-                  </button>
-                ) : (
-                  <button
-                    className="btn btn-teal btn-sm"
-                    disabled={busy === o.id}
-                    onClick={() => resolve(o.id, true)}
-                  >
-                    {busy === o.id ? '…' : 'จัดการแล้ว'}
-                  </button>
-                )}
+                <code className="adm-mono adm-meta" style={{ fontSize: 11.5 }}>
+                  {o.id}
+                </code>
               </div>
-            </div>
+              {o.resolved ? (
+                <button className="adm-btn" disabled={busy === o.id} onClick={() => resolve(o.id, false)}>
+                  กลับเป็นค้าง
+                </button>
+              ) : (
+                <button className="adm-btn teal" disabled={busy === o.id} onClick={() => resolve(o.id, true)}>
+                  {busy === o.id ? '…' : 'จัดการแล้ว'}
+                </button>
+              )}
+            </article>
           ))}
         </div>
       )}
-
-      <p className="text-xs mt-6" style={{ color: 'var(--muted)' }}>
-        หมายเหตุ: PromptPay คืนเงินไม่ทันที เงินกลับเข้าบัญชีผู้จ่ายตามรอบธนาคาร ปกติ 1–3 วันทำการ
-      </p>
-    </div>
+    </>
   );
 }

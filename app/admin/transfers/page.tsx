@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { PageLoader } from '@/components/design/PageLoader';
+import { AdminHead, AdminSearch, AdminChips, Badge } from '@/components/admin/AdminShell';
 import { fmtDate, sqliteToMs } from '@/lib/datetime';
 
 type Row = {
@@ -89,119 +90,98 @@ export default function AdminTransfersPage() {
 
   if (!rows && !loadError) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 256 }}>
         <PageLoader />
       </div>
     );
   }
 
   return (
-    <div>
-      <h1 className="text-2xl font-semibold mb-1">ประวัติการโอนย้ายสิทธิ์</h1>
-      <p className="text-sm text-gray mb-6">
-        ที่นั่งที่ถูกซื้อเป็นของขวัญหรือโอนให้คนอื่น — ฝั่งซ้ายคือเจ้าของเดิม ฝั่งขวาคือผู้รับ
-      </p>
+    <>
+      <AdminHead
+        eyebrow="admin · transfers"
+        title="โอนย้ายสิทธิ์"
+        sub="ที่นั่งที่ถูกซื้อเป็นของขวัญ โอนให้คนอื่น หรือส่งเป็นบัตรเชิญ — ซ้ายคือเจ้าของเดิม ขวาคือผู้รับ"
+      />
 
       {loadError ? (
-        <div className="card text-center py-10 text-gray">โหลดข้อมูลไม่สำเร็จ</div>
+        <div className="adm-card adm-empty">โหลดข้อมูลไม่สำเร็จ</div>
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-3 mb-4">
-            <div className="flex flex-wrap gap-2">
-              {FILTERS.map((f) => (
-                <button
-                  key={f.key}
-                  type="button"
-                  onClick={() => setFilter(f.key)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                    filter === f.key ? 'bg-primary text-white' : 'bg-surface text-gray hover:text-dark'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-            <input
-              type="text"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="ค้นหาชื่อ เบอร์ อีเมล หรือกิจกรรม..."
-              className="input-field sm:max-w-xs"
-            />
+          <div className="adm-toolbar">
+            <AdminSearch value={q} onChange={setQ} placeholder="ค้นหาชื่อ เบอร์ อีเมล หรือกิจกรรม" />
+            <AdminChips value={filter} onChange={setFilter} items={FILTERS} />
           </div>
 
           {shown.length === 0 ? (
-            <div className="card text-center py-12 text-gray text-sm">
-              {rows && rows.length === 0 ? 'ยังไม่มีการโอนย้ายสิทธิ์' : 'ไม่พบรายการที่ตรงกับที่ค้นหา'}
-            </div>
+            <div className="adm-card adm-empty">{rows && rows.length === 0 ? 'ยังไม่มีการโอนย้ายสิทธิ์' : 'ไม่พบรายการโอนสิทธิ์'}</div>
           ) : (
-            <div className="flex flex-col gap-3">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {shown.map((r) => {
                 const claimed = r.status === 'claimed';
                 return (
-                  <div key={r.id} className="card !p-0 overflow-hidden">
-                    <div className="flex flex-wrap items-center gap-2 px-5 py-3 bg-surface/60 border-b border-gray-lighter">
-                      <span
-                        className={`text-[11px] font-medium rounded-full px-2.5 py-1 ${
-                          r.kind === 'gift' ? 'bg-amber-100 text-amber-700' : 'bg-primary/15 text-primary'
-                        }`}
-                      >
+                  <article key={r.id} className="adm-card adm-transfer">
+                    <div className="adm-transfer-head">
+                      <Badge tone={r.kind === 'gift' ? 'warn' : r.kind === 'invite' ? 'info' : 'teal'}>
                         {r.kind === 'gift' ? 'ของขวัญ' : r.kind === 'invite' ? 'บัตรเชิญ' : 'โอนสิทธิ์'}
-                      </span>
-                      <span
-                        className={`text-[11px] font-medium rounded-full px-2.5 py-1 ${
-                          claimed ? 'bg-primary/15 text-primary' : 'bg-gray-lighter text-gray'
-                        }`}
-                      >
+                      </Badge>
+                      <Badge tone={claimed ? 'ok' : r.status === 'cancelled' ? 'bad' : 'mute'}>
                         {claimed ? 'รับสิทธิ์แล้ว' : r.status === 'cancelled' ? 'ยกเลิก' : 'รอผู้รับสิทธิ์'}
-                      </span>
-                      <Link
-                        href={`/admin/workshops/${r.workshop_id}/attendance`}
-                        className="text-sm font-medium text-dark hover:text-primary hover:underline"
-                      >
+                      </Badge>
+                      <Link href={`/admin/workshops/${r.workshop_id}/attendance`} className="adm-link-title" style={{ fontSize: 14.5, marginLeft: 4 }}>
                         {r.workshop_title || 'ไม่พบกิจกรรม'}
                       </Link>
-                      {r.workshop_date && (
-                        <span className="text-xs text-gray">· {fmtDate(r.workshop_date, 'th', 'medium')}</span>
-                      )}
+                      {r.workshop_date && <span className="adm-meta">· {fmtDate(r.workshop_date, 'th', 'medium')}</span>}
                     </div>
 
-                    <div className="grid gap-4 px-5 py-4 sm:grid-cols-[1fr_auto_1fr] sm:items-start">
+                    <div className="adm-transfer-parties">
                       <Party label="ผู้โอน" name={r.from_name} phone={r.from_phone} email={r.from_email} />
-                      <span aria-hidden className="hidden sm:block text-gray pt-5">
+                      <div className="adm-transfer-arrow" aria-hidden="true">
                         →
-                      </span>
-                      {claimed ? (
-                        <Party label="ผู้รับ" name={r.to_name} phone={r.to_phone} email={r.to_email} />
-                      ) : (
-                        // Nothing has moved yet, so nobody is named as receiver.
-                        // For a gift the buyer said who it was meant for; that is
-                        // an intention, and reads as one.
-                        <div>
-                          <div className="text-[11px] uppercase tracking-wider text-gray mb-1">ผู้รับ</div>
-                          <div className="text-sm text-gray italic">รอผู้รับสิทธิ์</div>
-                          {r.to_name && (
-                            <div className="text-xs text-gray mt-0.5">
-                              ตั้งใจส่งให้ {r.to_name}
-                              {r.to_phone ? ` · ${r.to_phone}` : ''}
-                            </div>
-                          )}
+                      </div>
+                      <div className="adm-party is-to">
+                        <div className="adm-label" style={{ marginBottom: 4 }}>
+                          ผู้รับ
                         </div>
-                      )}
+                        {claimed ? (
+                          <>
+                            <div style={{ fontWeight: 600, fontSize: 14 }}>{r.to_name || '—'}</div>
+                            <div className="adm-meta">
+                              {r.to_phone || '—'}
+                              {r.to_email ? ` · ${r.to_email}` : ''}
+                            </div>
+                          </>
+                        ) : (
+                          // Nothing has moved yet, so nobody is named as receiver.
+                          // For a gift the buyer said who it was meant for; that is
+                          // an intention, and reads as one.
+                          <>
+                            <div className="adm-meta" style={{ fontSize: 14 }}>
+                              รอผู้รับสิทธิ์
+                            </div>
+                            {r.to_name && (
+                              <div className="adm-meta" style={{ marginTop: 2 }}>
+                                ตั้งใจส่งให้ {r.to_name}
+                                {r.to_phone ? ` · ${r.to_phone}` : ''}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="px-5 pb-4 text-xs text-gray">
+                    <div className="adm-meta" style={{ fontSize: 12 }}>
                       สร้างลิงก์ {fmtStamp(r.created_at)}
                       {claimed ? ` · รับสิทธิ์ ${fmtStamp(r.claimed_at)}` : ''}
                     </div>
-                  </div>
+                  </article>
                 );
               })}
             </div>
           )}
         </>
       )}
-    </div>
+    </>
   );
 }
 
@@ -217,10 +197,12 @@ function Party({
   email: string | null;
 }) {
   return (
-    <div className="min-w-0">
-      <div className="text-[11px] uppercase tracking-wider text-gray mb-1">{label}</div>
-      <div className="text-sm font-medium text-dark truncate">{name || '—'}</div>
-      <div className="text-xs text-gray truncate">
+    <div className="adm-party">
+      <div className="adm-label" style={{ marginBottom: 4 }}>
+        {label}
+      </div>
+      <div style={{ fontWeight: 600, fontSize: 14 }}>{name || '—'}</div>
+      <div className="adm-meta">
         {phone || '—'}
         {email ? ` · ${email}` : ''}
       </div>

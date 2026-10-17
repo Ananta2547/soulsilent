@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Stars as IconStars } from '@/components/design/Icon';
+import { AdminHead, AdminChips, AdminSheet, SheetSection } from '@/components/admin/AdminShell';
+import { sqliteToMs } from '@/lib/datetime';
 
 type ReviewRow = {
   id: string;
@@ -13,9 +14,6 @@ type ReviewRow = {
   workshop_title: string | null;
 };
 type Opt = { id: string; label: string };
-
-/** Local alias so this page keeps its slightly warmer empty-star grey. */
-const Stars = ({ n }: { n: number }) => <IconStars value={n} size={13} emptyColor="#d9d2c2" />;
 
 export default function AdminReviewsPage() {
   const [rows, setRows] = useState<ReviewRow[]>([]);
@@ -33,6 +31,8 @@ export default function AdminReviewsPage() {
   const [comment, setComment] = useState('');
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'featured'>('all');
 
   const load = useCallback(async () => {
     setLoadError(false);
@@ -87,6 +87,7 @@ export default function AdminReviewsPage() {
       setUserId('');
       setRating(5);
       setComment('');
+      setFormOpen(false);
       await load();
     } finally {
       setSaving(false);
@@ -119,118 +120,147 @@ export default function AdminReviewsPage() {
     }
   }
 
-  return (
-    <div className="max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold text-dark mb-1">รีวิวกิจกรรม</h1>
-      <p className="text-sm text-gray mb-6">ทั้งหมด {total} รีวิว</p>
+  const featuredCount = rows.filter((r) => r.featured).length;
+  const shown = filter === 'featured' ? rows.filter((r) => r.featured) : rows;
 
-      {/* Create form */}
-      <div className="border border-gray-lighter rounded-xl bg-white p-5 mb-8">
-        <h2 className="font-semibold text-dark mb-4">เพิ่มรีวิว (แทนผู้เข้าร่วม)</h2>
-        {err && <div className="mb-3 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{err}</div>}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-medium text-dark mb-1">กิจกรรม</label>
-            <select value={wsId} onChange={(e) => setWsId(e.target.value)} className="input-field">
-              <option value="">— เลือกกิจกรรม —</option>
-              {workshops.map((w) => (
-                <option key={w.id} value={w.id}>{w.label}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-dark mb-1">ผู้เข้าร่วม</label>
-            <select value={userId} onChange={(e) => setUserId(e.target.value)} className="input-field">
-              <option value="">— เลือกผู้เข้าร่วม —</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>{u.label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <div className="mt-3">
-          <label className="block text-xs font-medium text-dark mb-1">คะแนน</label>
-          <div className="flex gap-1">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setRating(n)}
-                className="text-2xl leading-none"
-                style={{ color: n <= rating ? '#f5b301' : '#d9d2c2' }}
-                aria-label={`${n} ดาว`}
-              >
-                ★
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="mt-3">
-          <label className="block text-xs font-medium text-dark mb-1">ความคิดเห็น</label>
-          <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} className="input-field" placeholder="ข้อความรีวิว..." />
-        </div>
-        <button
-          type="button"
-          onClick={create}
-          disabled={saving}
-          className="mt-4 px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
-        >
-          {saving ? 'กำลังบันทึก...' : 'เพิ่มรีวิว'}
-        </button>
+  return (
+    <>
+      <AdminHead
+        eyebrow="admin · reviews"
+        title="รีวิว"
+        sub={`ทั้งหมด ${total} รีวิว · ติดดาวเพื่อแสดงในสไลด์หน้าแรก`}
+        actions={
+          <button type="button" className="adm-btn teal" onClick={() => setFormOpen(true)}>
+            + เพิ่มรีวิว
+          </button>
+        }
+      />
+
+      <div className="adm-toolbar">
+        <AdminChips
+          value={filter}
+          onChange={setFilter}
+          items={[
+            { key: 'all', label: 'ทั้งหมด', n: rows.length },
+            { key: 'featured', label: '★ ติดดาว', n: featuredCount },
+          ]}
+        />
       </div>
 
-      {/* List */}
       {loading ? (
-        <p className="text-gray text-sm">กำลังโหลด…</p>
+        <p className="adm-meta">กำลังโหลด…</p>
       ) : loadError ? (
-        <p className="text-gray text-sm">
-          โหลดรีวิวไม่สำเร็จ{' '}
-          <button onClick={() => { setLoading(true); load(); }} className="underline text-primary">ลองใหม่</button>
-        </p>
-      ) : rows.length === 0 ? (
-        <p className="text-gray text-sm">ยังไม่มีรีวิว</p>
+        <div className="adm-card adm-empty">
+          <p style={{ margin: '0 0 12px' }}>โหลดรีวิวไม่สำเร็จ</p>
+          <button type="button" className="adm-btn sm" onClick={() => { setLoading(true); load(); }}>
+            ลองใหม่
+          </button>
+        </div>
+      ) : shown.length === 0 ? (
+        <div className="adm-card adm-empty">{filter === 'featured' ? 'ยังไม่มีรีวิวที่ติดดาว' : 'ยังไม่มีรีวิว'}</div>
       ) : (
-        <div className="space-y-2">
-          {rows.map((r) => (
-            <div key={r.id} className="border border-gray-lighter rounded-xl bg-white p-4 flex items-start gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium text-dark">{r.user_name || '—'}</span>
-                  <span className="text-xs text-gray">· {r.workshop_title || '—'}</span>
-                  <Stars n={r.rating} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {shown.map((r) => (
+            <article key={r.id} className="adm-card adm-review">
+              <div className="adm-review-top">
+                <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 15 }}>{r.user_name || '—'}</div>
+                  <div className="adm-meta" style={{ marginTop: 2 }}>
+                    {r.workshop_title || '—'} ·{' '}
+                    {new Date(sqliteToMs(r.created_at)).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </div>
                 </div>
-                {r.comment && <p className="text-sm text-dark mt-1 whitespace-pre-line">{r.comment}</p>}
-                <div className="text-xs text-gray mt-1">
-                  {new Date(r.created_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
-                </div>
+                <span className="adm-review-stars" aria-label={`${r.rating} ดาว`}>
+                  <span style={{ color: '#f5b301' }}>{'★'.repeat(r.rating)}</span>
+                  <span style={{ color: '#d9d2c2' }}>{'★'.repeat(Math.max(0, 5 - r.rating))}</span>
+                </span>
               </div>
-              <div className="flex items-center gap-3 shrink-0">
+              {r.comment && <p className="adm-review-text">{r.comment}</p>}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <button
                   type="button"
                   onClick={() => toggleFeatured(r)}
                   title={r.featured ? 'เอาออกจากรีวิวติดดาว' : 'ติดดาว (แสดงหน้าแรก)'}
-                  className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                    r.featured
-                      ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                      : 'bg-gray-lighter/60 text-gray hover:bg-gray-lighter'
-                  }`}
+                  className="adm-btn sm"
+                  style={r.featured ? { background: '#fdf1d3', color: '#7a5200' } : undefined}
+                  aria-pressed={!!r.featured}
                 >
-                  <span aria-hidden style={{ color: r.featured ? '#f5b301' : undefined }}>★</span>
-                  {r.featured ? 'ติดดาวแล้ว' : 'ติดดาว'}
+                  <span style={{ color: r.featured ? '#f5b301' : undefined }}>★</span> {r.featured ? 'ติดดาวแล้ว' : 'ติดดาว'}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => remove(r.id)}
-                  disabled={busyId === r.id}
-                  className="text-red-500 text-xs font-medium hover:underline disabled:opacity-50"
-                >
-                  {busyId === r.id ? 'กำลังลบ...' : 'ลบ'}
+                <div style={{ flex: 1 }} />
+                <button type="button" onClick={() => remove(r.id)} disabled={busyId === r.id} className="adm-btn sm danger">
+                  {busyId === r.id ? 'กำลังลบ…' : 'ลบ'}
                 </button>
               </div>
-            </div>
+            </article>
           ))}
         </div>
       )}
-    </div>
+
+      <AdminSheet
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        eyebrow="admin · reviews"
+        title="เพิ่มรีวิว"
+        sub="บันทึกแทนผู้เข้าร่วม"
+        width={560}
+        footer={
+          <>
+            <button type="button" className="adm-btn" onClick={() => setFormOpen(false)}>
+              ยกเลิก
+            </button>
+            <button type="button" className="adm-btn teal" onClick={create} disabled={saving}>
+              {saving ? 'กำลังบันทึก…' : 'เพิ่มรีวิว'}
+            </button>
+          </>
+        }
+      >
+        <SheetSection n={1} title="รายละเอียดรีวิว">
+          {err && <div className="adm-notice" style={{ background: '#fde4e1', color: '#a3261a', borderRadius: 14 }}>{err}</div>}
+          <div className="adm-field">
+            <label htmlFor="rv-ws">กิจกรรม</label>
+            <select id="rv-ws" value={wsId} onChange={(e) => setWsId(e.target.value)}>
+              <option value="">— เลือกกิจกรรม —</option>
+              {workshops.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="adm-field">
+            <label htmlFor="rv-user">ผู้เข้าร่วม</label>
+            <select id="rv-user" value={userId} onChange={(e) => setUserId(e.target.value)}>
+              <option value="">— เลือกผู้เข้าร่วม —</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="adm-field">
+            <span className="adm-field-label">คะแนน</span>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setRating(n)}
+                  style={{ fontSize: 28, lineHeight: 1, background: 'none', border: 0, cursor: 'pointer', color: n <= rating ? '#f5b301' : '#d9d2c2' }}
+                  aria-label={`${n} ดาว`}
+                >
+                  ★
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="adm-field">
+            <label htmlFor="rv-text">ความคิดเห็น</label>
+            <textarea id="rv-text" value={comment} onChange={(e) => setComment(e.target.value)} rows={4} placeholder="ข้อความรีวิว..." />
+          </div>
+        </SheetSection>
+      </AdminSheet>
+    </>
   );
 }

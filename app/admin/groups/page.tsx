@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { PageLoader } from '@/components/design/PageLoader';
+import { AdminHead, AdminSearch, AdminChips, Badge } from '@/components/admin/AdminShell';
 import { fmtDate, sqliteToMs } from '@/lib/datetime';
 import type { AdminGroupRow } from '@/app/api/admin/groups/route';
 
@@ -69,127 +70,135 @@ export default function AdminGroupsPage() {
 
   if (!rows && !loadError) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 256 }}>
         <PageLoader />
       </div>
     );
   }
 
   return (
-    <div>
-      <h1 className="text-2xl font-semibold mb-1">การจองแบบกลุ่ม</h1>
-      <p className="text-sm text-gray mb-6">
-        ผู้จองซื้อที่นั่งทีเดียวหลายที่ แล้วส่งลิงก์ชวนเพื่อน — ดูว่าใครจอง กี่ที่ และเพื่อนคนไหนกดรับสิทธิ์แล้ว
-      </p>
+    <>
+      <AdminHead
+        eyebrow="admin · groups"
+        title="จองแบบกลุ่ม"
+        sub="ผู้จองซื้อที่นั่งทีเดียวหลายที่ แล้วส่งลิงก์ชวนเพื่อน — ดูว่าใครจอง กี่ที่ และเพื่อนคนไหนกดรับสิทธิ์แล้ว"
+      />
 
       {loadError ? (
-        <div className="card text-center py-10 text-gray">โหลดข้อมูลไม่สำเร็จ</div>
+        <div className="adm-card adm-empty">โหลดข้อมูลไม่สำเร็จ</div>
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-3 mb-4">
-            <div className="flex flex-wrap gap-2">
-              {FILTERS.map((f) => (
-                <button
-                  key={f.key}
-                  type="button"
-                  onClick={() => setFilter(f.key)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                    filter === f.key ? 'bg-primary text-white' : 'bg-surface text-gray hover:text-dark'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-            <input
-              type="text"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="ค้นหาชื่อ เบอร์ อีเมล หรือกิจกรรม..."
-              className="input-field sm:max-w-xs"
-            />
+          <div className="adm-toolbar">
+            <AdminSearch value={q} onChange={setQ} placeholder="ค้นหาชื่อ เบอร์ อีเมล หรือกิจกรรม" />
+            <AdminChips value={filter} onChange={setFilter} items={FILTERS} />
           </div>
 
           {shown.length === 0 ? (
-            <div className="card text-center py-12 text-gray text-sm">
-              {rows && rows.length === 0 ? 'ยังไม่มีการจองแบบกลุ่ม' : 'ไม่พบรายการที่ตรงกับที่ค้นหา'}
+            <div className="adm-card adm-empty">
+              {rows && rows.length === 0 ? 'ยังไม่มีการจองแบบกลุ่ม' : 'ไม่พบการจองแบบกลุ่ม'}
             </div>
           ) : (
-            <div className="flex flex-col gap-3">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {shown.map((g) => {
                 const joined = joinedOf(g);
                 const taken = joined + 1;
                 const full = taken >= g.group_size;
                 const isPaid = paid(g);
                 const cancelled = g.status === 'cancelled' || g.payment_status === 'expired';
+                const pct = g.group_size ? Math.min(100, (taken / g.group_size) * 100) : 0;
                 return (
-                  <div key={g.id} className="card !p-0 overflow-hidden">
-                    <div className="flex flex-wrap items-center gap-2 px-5 py-3 bg-surface/60 border-b border-gray-lighter">
-                      <span className={`adm-pill ${cancelled ? 'adm-pill-cancel' : isPaid ? 'adm-pill-open' : 'adm-pill-draft'}`}>
-                        {cancelled ? 'ยกเลิก / หมดเวลา' : isPaid ? 'ชำระแล้ว' : 'รอชำระ'}
-                      </span>
-                      {isPaid && !cancelled && (
-                        <span className={`adm-pill ${full ? 'adm-pill-ended' : 'adm-pill-closed'}`}>{full ? 'ครบกลุ่ม' : 'ยังรับเพื่อนได้'}</span>
-                      )}
-                      {g.kind === 'private' && <span className="adm-pill adm-pill-closed">ล็อกรอบส่วนตัว</span>}
-                      <Link href={`/admin/workshops/${g.workshop_id}/attendance`} className="text-sm font-medium text-dark hover:text-primary hover:underline">
-                        {g.workshop_title || 'ไม่พบกิจกรรม'}
-                      </Link>
-                      {g.workshop_date && (
-                        <span className="text-xs text-gray">
-                          · {fmtDate(g.workshop_date, 'th', 'medium')}
-                          {g.time_start ? ` · ${g.time_start}–${g.time_end}` : ''}
-                        </span>
-                      )}
-                      <span className="ml-auto text-sm font-semibold text-dark">
-                        {taken}/{g.group_size} คน
-                      </span>
+                  <article key={g.id} className="adm-card">
+                    <div className="adm-group-head">
+                      <div className="adm-badges">
+                        <Badge tone={cancelled ? 'bad' : isPaid ? 'ok' : 'warn'}>
+                          {cancelled ? 'ยกเลิก / หมดเวลา' : isPaid ? 'ชำระแล้ว' : 'รอชำระ'}
+                        </Badge>
+                        {isPaid && !cancelled && <Badge tone={full ? 'info' : 'mute'}>{full ? 'ครบกลุ่ม' : 'ยังรับเพื่อนได้'}</Badge>}
+                        {g.kind === 'private' && <Badge tone="teal">ล็อกรอบส่วนตัว</Badge>}
+                      </div>
+                      <div className="adm-group-title">
+                        <div style={{ minWidth: 0 }}>
+                          <Link href={`/admin/workshops/${g.workshop_id}/attendance`} className="adm-link-title">
+                            {g.workshop_title || 'ไม่พบกิจกรรม'}
+                          </Link>
+                          {g.workshop_date && (
+                            <div className="adm-meta" style={{ marginTop: 2 }}>
+                              {fmtDate(g.workshop_date, 'th', 'medium')}
+                              {g.time_start ? ` · ${g.time_start}–${g.time_end}` : ''}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ minWidth: 140 }}>
+                          <div style={{ fontSize: 13, textAlign: 'right' }}>
+                            <b>{taken}</b>
+                            <span className="adm-meta"> / {g.group_size} คน</span>
+                          </div>
+                          <div className="adm-progress-bar">
+                            <span style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="grid gap-5 px-5 py-4 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+                    <div className="adm-group-body">
                       <div>
-                        <div className="text-[11px] uppercase tracking-wider text-gray mb-1">ผู้จอง (1 ที่นั่ง)</div>
-                        <div className="text-sm font-medium text-dark">{g.booker.name}</div>
-                        <div className="text-xs text-gray mt-0.5">{[g.booker.phone, g.booker.email].filter(Boolean).join(' · ') || '—'}</div>
-                        <div className="text-xs text-gray mt-2">
+                        <div className="adm-label" style={{ marginBottom: 6 }}>
+                          ผู้จอง · 1 ที่นั่ง
+                        </div>
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>{g.booker.name}</div>
+                        <div className="adm-meta" style={{ marginTop: 2 }}>
+                          {[g.booker.phone, g.booker.email].filter(Boolean).join(' · ') || '—'}
+                        </div>
+                        <div className="adm-meta" style={{ marginTop: 8 }}>
                           {g.tier_label ? `${g.tier_label} · ` : ''}
                           {g.amount != null ? `฿${Math.round(g.amount).toLocaleString()}` : '—'}
                         </div>
                       </div>
                       <div>
-                        <div className="text-[11px] uppercase tracking-wider text-gray mb-1">
-                          เพื่อนที่รับสิทธิ์แล้ว ({joined}/{Math.max(0, g.group_size - 1)})
+                        <div className="adm-label" style={{ marginBottom: 6 }}>
+                          เพื่อนที่รับสิทธิ์ ({joined}/{Math.max(0, g.group_size - 1)})
                         </div>
                         {g.members.length === 0 ? (
-                          <div className="text-sm text-gray italic">ยังไม่มีเพื่อนกดรับสิทธิ์</div>
+                          <div className="adm-meta" style={{ fontSize: 13.5 }}>
+                            ยังไม่มีเพื่อนกดรับสิทธิ์
+                          </div>
                         ) : (
-                          <ol className="flex flex-col gap-2">
+                          <ol className="adm-members">
                             {g.members.map((m, i) => (
-                              <li key={m.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm">
-                                <span className="text-xs text-gray w-5">{i + 1}.</span>
-                                <span className={`font-medium ${m.status === 'cancelled' ? 'line-through text-gray' : 'text-dark'}`}>{m.name}</span>
-                                <span className="text-xs text-gray">{[m.phone, m.email].filter(Boolean).join(' · ')}</span>
-                                <span className="text-xs text-gray">รับสิทธิ์ {fmtStamp(m.created_at)}</span>
-                                {m.attended ? <span className="adm-pill adm-pill-open">มาแล้ว</span> : null}
-                                {m.status === 'cancelled' && <span className="adm-pill adm-pill-cancel">ยกเลิก</span>}
+                              <li key={m.id}>
+                                <span className="adm-mono adm-meta" style={{ fontSize: 12, width: 18, flexShrink: 0 }}>
+                                  {i + 1}.
+                                </span>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <b style={{ fontWeight: 600, textDecoration: m.status === 'cancelled' ? 'line-through' : undefined }}>{m.name}</b>{' '}
+                                  {m.attended ? <span style={{ fontSize: 11.5, fontWeight: 600, color: '#0b6b4f' }}>· มาแล้ว</span> : null}
+                                  {m.status === 'cancelled' && <span style={{ fontSize: 11.5, fontWeight: 600, color: '#a3261a' }}> · ยกเลิก</span>}
+                                  <div className="adm-meta" style={{ fontSize: 12 }}>
+                                    {[m.phone, m.email].filter(Boolean).join(' · ') || '—'} · รับสิทธิ์ {fmtStamp(m.created_at)}
+                                  </div>
+                                </div>
                               </li>
                             ))}
                           </ol>
                         )}
                         {isPaid && !cancelled && !full && (
-                          <div className="text-xs text-gray mt-2">ยังว่างอีก {g.group_size - taken} ที่ — รอเพื่อนกดลิงก์ชวน</div>
+                          <div style={{ fontSize: 12.5, color: '#7a5200', marginTop: 8 }}>
+                            ยังว่างอีก {g.group_size - taken} ที่ — รอเพื่อนกดลิงก์ชวน
+                          </div>
                         )}
                       </div>
                     </div>
 
-                    <div className="px-5 pb-4 text-xs text-gray">จองเมื่อ {fmtStamp(g.created_at)}</div>
-                  </div>
+                    <div className="adm-meta" style={{ padding: '0 20px 14px', fontSize: 12 }}>
+                      จองเมื่อ {fmtStamp(g.created_at)}
+                    </div>
+                  </article>
                 );
               })}
             </div>
           )}
         </>
       )}
-    </div>
+    </>
   );
 }

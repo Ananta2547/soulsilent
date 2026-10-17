@@ -1,6 +1,7 @@
 'use client';
 
 import { PageLoader } from '@/components/design/PageLoader';
+import { AdminHead } from '@/components/admin/AdminShell';
 
 import { useEffect, useState } from 'react';
 
@@ -12,6 +13,14 @@ interface MonthlyData {
 
 interface RevenueData {
   soulsilent: { total: number; count: number; monthly: MonthlyData[] };
+}
+
+const TH_MONTH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+
+/** "2026-10" → "ต.ค. 2569". */
+function monthLabel(m: string): string {
+  const [y, mo] = m.split('-').map(Number);
+  return y && mo ? `${TH_MONTH[mo - 1]} ${y + 543}` : m;
 }
 
 export default function AdminRevenuePage() {
@@ -33,139 +42,80 @@ export default function AdminRevenuePage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 256 }}>
         <PageLoader />
       </div>
     );
   }
   if (!data) {
-    return (
-      <div className="card text-center py-12">
-        <p className="text-gray text-sm">โหลดข้อมูลรายรับไม่สำเร็จ · ตรวจสอบว่าเข้าสู่ระบบในฐานะ admin แล้ว</p>
-      </div>
-    );
+    return <div className="adm-card adm-empty">โหลดข้อมูลรายรับไม่สำเร็จ · ตรวจสอบว่าเข้าสู่ระบบในฐานะ admin แล้ว</div>;
   }
 
-  const sortedMonths = data.soulsilent.monthly.map((m) => m.month).sort().reverse();
-  const wsMap = new Map(data.soulsilent.monthly.map((m) => [m.month, m]));
-  const maxMonthTotal = Math.max(...sortedMonths.map((m) => wsMap.get(m)?.total || 0), 1);
+  const months = [...data.soulsilent.monthly].sort((a, b) => (a.month < b.month ? 1 : -1));
+  const max = Math.max(...months.map((m) => m.total), 1);
+  const avg = months.length ? Math.round(data.soulsilent.total / months.length) : 0;
+  const best = months.reduce<MonthlyData | null>((b, m) => (!b || m.total > b.total ? m : b), null);
 
   return (
-    <div className="space-y-8">
-      <header>
-        <p className="text-xs font-mono text-primary tracking-[.2em] uppercase mb-2">
-          revenue · summary
-        </p>
-        <h1 className="font-heading text-3xl text-dark">สรุปรายรับ</h1>
-        <p className="text-sm text-gray mt-1">รายรับจากการจองกิจกรรม</p>
-      </header>
+    <>
+      <AdminHead eyebrow="admin · revenue" title="รายรับ" sub="รายรับจากการจองกิจกรรม (ยอดที่ชำระแล้ว)" />
 
-      {/* Big totals */}
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <StatBig label="รายรับรวมทั้งหมด" value={data.soulsilent.total} meta={`${data.soulsilent.count} รายการ`} tone="dark" />
-        <StatBig label="soulsilent" sublabel="การจองกิจกรรม" value={data.soulsilent.total} meta={`${data.soulsilent.count} การจอง`} tone="primary" dot />
+      <section className="adm-kpis" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))' }}>
+        <div className="adm-kpi">
+          <div className="adm-label" style={{ fontSize: 11 }}>
+            รายรับรวม
+          </div>
+          <div className="adm-kpi-value" style={{ color: 'var(--teal)', fontSize: 32 }}>
+            ฿{data.soulsilent.total.toLocaleString()}
+          </div>
+          <div className="adm-kpi-sub">
+            {data.soulsilent.count.toLocaleString()} การจอง · {months.length} เดือน
+          </div>
+        </div>
+        <div className="adm-kpi">
+          <div className="adm-label" style={{ fontSize: 11 }}>
+            เฉลี่ยต่อเดือน
+          </div>
+          <div className="adm-kpi-value" style={{ fontSize: 32 }}>
+            ฿{avg.toLocaleString()}
+          </div>
+        </div>
+        <div className="adm-kpi">
+          <div className="adm-label" style={{ fontSize: 11 }}>
+            เดือนที่สูงสุด
+          </div>
+          <div className="adm-kpi-value" style={{ fontSize: 32 }}>
+            ฿{(best?.total || 0).toLocaleString()}
+          </div>
+          <div className="adm-kpi-sub">{best ? monthLabel(best.month) : '—'}</div>
+        </div>
       </section>
 
-      {/* Monthly bars */}
-      <section className="card !p-6">
-        <h2 className="font-heading text-lg text-dark mb-6">รายรับรายเดือน</h2>
-        {sortedMonths.length === 0 ? (
-          <p className="text-sm text-gray text-center py-8">ยังไม่มีข้อมูลรายรับ</p>
+      <section className="adm-card">
+        <div className="adm-card-head" style={{ paddingBottom: 8 }}>
+          <h2 className="adm-h2">รายรับรายเดือน</h2>
+        </div>
+        {months.length === 0 ? (
+          <p className="adm-empty">ยังไม่มีข้อมูลรายรับ</p>
         ) : (
-          <div className="space-y-4">
-            {sortedMonths.map((month) => {
-              const wsTotal = wsMap.get(month)?.total || 0;
-              const wsPct = (wsTotal / maxMonthTotal) * 100;
-              return (
-                <div key={month}>
-                  <div className="flex items-center justify-between mb-1.5 text-xs">
-                    <span className="font-mono text-gray tracking-wider">{month}</span>
-                    <span className="font-mono text-dark font-medium">฿{wsTotal.toLocaleString()}</span>
-                  </div>
-                  <div className="flex h-3 bg-gray-lighter/60 rounded-full overflow-hidden">
-                    {wsPct > 0 && (
-                      <div className="bg-primary h-full transition-all duration-500" style={{ width: `${wsPct}%` }} title={`กิจกรรม ฿${wsTotal.toLocaleString()}`} />
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          months.map((m) => (
+            <div key={m.month} className="adm-row adm-month">
+              <span className="adm-mono" style={{ fontSize: 12.5 }}>
+                {monthLabel(m.month)}
+              </span>
+              <div className="adm-month-bar" title={`฿${m.total.toLocaleString()}`}>
+                <span style={{ width: `${(m.total / max) * 100}%` }} />
+              </div>
+              <span style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                <b style={{ fontWeight: 600 }}>฿{m.total.toLocaleString()}</b>
+                <span className="adm-meta" style={{ fontSize: 12, marginLeft: 6 }}>
+                  {m.count} จอง
+                </span>
+              </span>
+            </div>
+          ))
         )}
       </section>
-
-      {/* Detail table */}
-      <section className="card !p-0 overflow-hidden">
-        <div className="p-5 border-b border-gray-lighter">
-          <h2 className="font-heading text-lg text-dark">รายละเอียดรายเดือน</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-surface">
-              <tr>
-                <th className="text-left py-3 px-5 text-gray font-medium">เดือน</th>
-                <th className="text-right py-3 px-5 text-gray font-medium">กิจกรรม</th>
-                <th className="text-right py-3 px-5 text-gray font-medium">รวม</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedMonths.map((month) => {
-                const ws = wsMap.get(month);
-                return (
-                  <tr key={month} className="border-t border-gray-lighter hover:bg-surface/50">
-                    <td className="py-3 px-5 text-dark font-mono text-xs">{month}</td>
-                    <td className="py-3 px-5 text-right">
-                      <span className="text-primary font-medium">฿{(ws?.total || 0).toLocaleString()}</span>
-                      <span className="text-gray text-xs ml-1.5">({ws?.count || 0})</span>
-                    </td>
-                    <td className="py-3 px-5 text-right text-dark font-bold">฿{(ws?.total || 0).toLocaleString()}</td>
-                  </tr>
-                );
-              })}
-              {sortedMonths.length === 0 && (
-                <tr>
-                  <td colSpan={3} className="py-8 text-center text-gray">ยังไม่มีข้อมูลรายรับ</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function StatBig({
-  label,
-  sublabel,
-  value,
-  meta,
-  tone,
-  dot,
-}: {
-  label: string;
-  sublabel?: string;
-  value: number;
-  meta: string;
-  tone: 'dark' | 'primary';
-  dot?: boolean;
-}) {
-  const valueColor = tone === 'primary' ? 'text-primary' : 'text-dark';
-  return (
-    <div className="card !p-6 flex flex-col gap-3">
-      <div className="flex items-center gap-2 min-h-[20px]">
-        {dot && <span className="w-2.5 h-2.5 rounded-full bg-primary" />}
-        <span className="text-sm font-medium text-dark">{label}</span>
-      </div>
-      <div
-        className={`font-heading text-4xl leading-none ${valueColor} truncate`}
-        style={{ fontFamily: 'Archivo Black, Mitr, sans-serif', letterSpacing: '-0.025em' }}
-      >
-        ฿{value.toLocaleString()}
-      </div>
-      <div className="text-xs text-gray font-mono uppercase tracking-wider">
-        {sublabel ? `${sublabel} · ${meta}` : meta}
-      </div>
-    </div>
+    </>
   );
 }
