@@ -3,7 +3,6 @@
 import { PageLoader } from '@/components/design/PageLoader';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import type { DayTime, Location, Workshop, ApplicationQuestion } from '@/lib/types';
 import { parseImageMeta } from '@/lib/image-meta';
 import { parseSchedule, parseInstructorIds, parseDashboardAccess, getWorkshopStatusBadge, hasWorkshopEnded } from '@/lib/workshop-utils';
@@ -15,6 +14,7 @@ import {
 } from './_components/WorkshopForm';
 import { ApplicationFormBuilder } from './_components/ApplicationFormBuilder';
 import { PayoutManager } from './_components/PayoutManager';
+import { AdminHead, AdminSearch, AdminChips, Badge, RowMenu, type MenuItem, type Tone } from '@/components/admin/AdminShell';
 
 type ModalState =
   | { mode: 'create' }
@@ -44,6 +44,7 @@ export default function AdminWorkshopsPage() {
   const [loadingEdit, setLoadingEdit] = useState<string | null>(null);
   const [formDirty, setFormDirty] = useState(false);
   const [pendingClose, setPendingClose] = useState(false);
+  const [query, setQuery] = useState('');
 
   async function fetchAll() {
     setLoadError(false);
@@ -68,6 +69,11 @@ export default function AdminWorkshopsPage() {
   useEffect(() => {
     (async () => {
       await fetchAll();
+      // /admin/workshops?new=1 (the overview's "+ เพิ่มกิจกรรม") opens the form.
+      if (new URLSearchParams(window.location.search).get('new') === '1') {
+        setModal({ mode: 'create' });
+        window.history.replaceState({}, '', '/admin/workshops');
+      }
     })();
   }, []);
 
@@ -192,211 +198,202 @@ export default function AdminWorkshopsPage() {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4 text-muted">
         <p>โหลดข้อมูลไม่สำเร็จ</p>
-        <button onClick={() => { setLoading(true); fetchAll(); }} className="border border-primary text-primary rounded-full px-6 py-2 text-sm font-semibold">ลองใหม่</button>
+        <button onClick={() => { setLoading(true); fetchAll(); }} className="adm-btn white">ลองใหม่</button>
       </div>
     );
   }
 
   const isRound = (w: Workshop) => w.master_kind === 'round';
   const roundCount = workshops.filter(isRound).length;
-  const shownWorkshops = kindFilter === 'all' ? workshops : workshops.filter((w) => (kindFilter === 'round' ? isRound(w) : !isRound(w)));
+  const q = query.trim().toLowerCase();
+  const shownWorkshops = workshops
+    .filter((w) => (kindFilter === 'all' ? true : kindFilter === 'round' ? isRound(w) : !isRound(w)))
+    .filter((w) => {
+      if (!q) return true;
+      const loc = locations.find((l) => l.id === w.location_id);
+      return [w.title, w.location, loc?.name, loc?.province].some((s) => (s || '').toLowerCase().includes(q));
+    });
   const KIND_TABS: { key: 'all' | 'single' | 'round'; label: string; n: number }[] = [
     { key: 'all', label: 'ทั้งหมด', n: workshops.length },
     { key: 'single', label: 'กิจกรรมเดี่ยว', n: workshops.length - roundCount },
     { key: 'round', label: 'แบบรอบ', n: roundCount },
   ];
 
-  return (
-    <div className="space-y-6">
-      <header className="flex items-end justify-between gap-4 flex-wrap">
-        <div>
-          <p className="text-xs font-mono text-primary tracking-[.2em] uppercase mb-2">
-            admin · workshops · overview
-          </p>
-          <h1 className="font-heading text-3xl text-dark">จัดการกิจกรรม</h1>
-          <p className="text-sm text-gray mt-1">ทั้งหมด {workshops.length} รายการ</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setModal({ mode: 'create' })}
-          className="btn-primary text-sm"
-        >
-          + เพิ่มกิจกรรม
-        </button>
-      </header>
+  // What visitors actually see: an active workshop past its close date or
+  // start reads "ปิดรับ" on the site too.
+  const statusOf = (ws: Workshop): { label: string; tone: Tone } =>
+    ws.status === 'draft'
+      ? { label: 'แบบร่าง', tone: 'warn' }
+      : ws.status === 'cancelled'
+        ? { label: 'ยกเลิก', tone: 'bad' }
+        : ws.status === 'completed' || hasWorkshopEnded(ws)
+          ? { label: 'จบแล้ว', tone: 'info' }
+          : getWorkshopStatusBadge(ws).open
+            ? { label: 'เปิดจอง', tone: 'ok' }
+            : { label: 'ปิดรับ', tone: 'mute' };
 
-      <div className="flex flex-wrap gap-2" role="tablist" aria-label="ประเภทกิจกรรม">
-        {KIND_TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            role="tab"
-            aria-selected={kindFilter === t.key}
-            onClick={() => setKindFilter(t.key)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              kindFilter === t.key ? 'bg-primary text-white' : 'bg-white text-gray hover:text-dark'
-            }`}
-          >
-            {t.label} <span className={kindFilter === t.key ? 'text-white/80' : 'text-gray'}>· {t.n}</span>
+  const rowOf = (ws: Workshop) => {
+    const loc = locations.find((l) => l.id === ws.location_id);
+    const where = loc ? `${loc.name} (${loc.province})` : ws.location || '—';
+    const when = `${new Date(ws.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })} · ${ws.time_start}–${ws.time_end}`;
+    const booked = ws.booking_count ?? 0;
+    const pct = ws.max_participants ? Math.min(100, (booked / ws.max_participants) * 100) : 0;
+    const menu: MenuItem[] = [
+      ...(ws.admission_type === 'selection' ? [{ label: 'ผู้สมัคร (คัดเลือก)', href: `/admin/workshops/${ws.id}/applicants` }] : []),
+      { label: 'เช็คชื่อ', href: `/admin/workshops/${ws.id}/attendance` },
+      { label: 'บัตรเชิญ', href: `/admin/workshops/${ws.id}/invites` },
+      {
+        label: 'ฟอร์มสมัคร',
+        onClick: () =>
+          setModal({ mode: 'application', id: ws.id, title: ws.title, questions: safeParseArray<ApplicationQuestion>(ws.application_form, []) }),
+      },
+      { label: 'เงินโอน (Payout)', onClick: () => setModal({ mode: 'payout', id: ws.id, title: ws.title, workshop: ws }) },
+      { label: 'ลบกิจกรรม', danger: true, onClick: () => handleDelete(ws.id) },
+    ];
+    const star = (
+      <button
+        type="button"
+        onClick={() => toggleFeatured(ws.id, !ws.featured)}
+        aria-pressed={!!ws.featured}
+        title={ws.featured ? 'เอาดาวออก (ไม่แสดงหน้าแรก)' : 'ติดดาว — แสดงในการ์ดหน้าแรก'}
+        className={`adm-star${ws.featured ? ' is-on' : ''}`}
+      >
+        {ws.featured ? '★' : '☆'}
+      </button>
+    );
+    const edit = (
+      <button type="button" className="adm-btn sm" onClick={() => openEdit(ws.id)} disabled={loadingEdit === ws.id}>
+        {loadingEdit === ws.id ? 'กำลังโหลด…' : 'แก้ไข'}
+      </button>
+    );
+    const progress = (
+      <div className="adm-progress">
+        <div style={{ fontSize: 13 }}>
+          <b>{booked}</b>
+          <span className="adm-meta"> / {ws.max_participants} คน</span>
+        </div>
+        <div className="adm-progress-bar">
+          <span style={{ width: `${pct}%`, background: pct >= 100 ? 'var(--accent-dark)' : undefined }} />
+        </div>
+      </div>
+    );
+    return { where, when, st: statusOf(ws), menu, star, edit, progress };
+  };
+
+  return (
+    <>
+      <AdminHead
+        eyebrow="admin · workshops"
+        title="กิจกรรม (รอบ)"
+        sub={`ทั้งหมด ${workshops.length} รายการ · ติดดาวเพื่อแสดงในการ์ดหน้าแรก`}
+        actions={
+          <button type="button" onClick={() => setModal({ mode: 'create' })} className="adm-btn teal">
+            + เพิ่มกิจกรรม
           </button>
-        ))}
+        }
+      />
+
+      <div className="adm-toolbar">
+        <AdminSearch value={query} onChange={setQuery} placeholder="ค้นหาชื่อกิจกรรมหรือสถานที่" />
+        <AdminChips value={kindFilter} onChange={setKindFilter} items={KIND_TABS} />
       </div>
 
-      <div className="card !p-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-surface">
-              <tr>
-                <th className="text-left py-3 px-4 text-gray font-medium">ชื่อ</th>
-                <th className="text-left py-3 px-4 text-gray font-medium">วันที่</th>
-                <th className="text-left py-3 px-4 text-gray font-medium">เวลา</th>
-                <th className="text-left py-3 px-4 text-gray font-medium">สถานที่</th>
-                <th className="text-left py-3 px-4 text-gray font-medium">ราคา</th>
-                <th className="text-left py-3 px-4 text-gray font-medium">สถานะ</th>
-                <th className="text-center py-3 px-4 text-gray font-medium">ผู้สมัคร</th>
-                <th className="text-right py-3 px-4 text-gray font-medium">จัดการ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {shownWorkshops.map((ws) => {
-                const loc = locations.find((l) => l.id === ws.location_id);
-                return (
-                  <tr key={ws.id} className="border-t border-gray-lighter hover:bg-surface/50">
-                    <td className="py-3 px-4 text-dark font-medium max-w-[200px] truncate">
-                      {ws.title}
-                    </td>
-                    <td className="py-3 px-4 text-gray">
-                      {new Date(ws.date).toLocaleDateString('th-TH', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                      })}
-                    </td>
-                    <td className="py-3 px-4 text-gray">
-                      {ws.time_start}-{ws.time_end}
-                    </td>
-                    <td className="py-3 px-4 text-gray max-w-[180px] truncate">
-                      {loc ? `${loc.name} (${loc.province})` : ws.location || '-'}
-                    </td>
-                    <td className="py-3 px-4 text-dark font-medium">
-                      ฿{ws.price.toLocaleString()}
-                    </td>
-                    <td className="py-3 px-4">
-                      {(() => {
-                        // What visitors actually see: an active workshop past its
-                        // close date or start reads "ปิดรับ" on the site too.
-                        const st =
-                          ws.status === 'draft'
-                            ? { label: 'แบบร่าง', cls: 'adm-pill adm-pill-draft' }
-                            : ws.status === 'cancelled'
-                              ? { label: 'ยกเลิก', cls: 'adm-pill adm-pill-cancel' }
-                              : ws.status === 'completed' || hasWorkshopEnded(ws)
-                                ? { label: 'จบแล้ว', cls: 'adm-pill adm-pill-ended' }
-                                : getWorkshopStatusBadge(ws).open
-                                  ? { label: 'เปิดจอง', cls: 'adm-pill adm-pill-open' }
-                                  : { label: 'ปิดรับ', cls: 'adm-pill adm-pill-closed' };
-                        return <span className={st.cls}>{st.label}</span>;
-                      })()}
-                    </td>
-                    <td className="py-3 px-4 text-center whitespace-nowrap">
-                      <span className="text-dark font-semibold">{ws.booking_count ?? 0}</span>
-                      <span className="text-gray"> / {ws.max_participants} คน</span>
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => toggleFeatured(ws.id, !ws.featured)}
-                          aria-pressed={!!ws.featured}
-                          title={ws.featured ? 'เอาดาวออก (ไม่แสดงหน้าแรก)' : 'ติดดาว — แสดงในการ์ดหน้าแรก'}
-                          className="leading-none"
-                          style={{ background: 'transparent', border: 0, cursor: 'pointer', fontSize: 16, lineHeight: 1, color: ws.featured ? '#f5c243' : '#cbd0cf' }}
-                        >
-                          {ws.featured ? '★' : '☆'}
-                        </button>
-                        {ws.admission_type === 'selection' && (
-                          <Link
-                            href={`/admin/workshops/${ws.id}/applicants`}
-                            className="text-dark text-xs font-medium hover:text-primary hover:underline"
-                          >
-                            ผู้สมัคร
-                          </Link>
-                        )}
-                        <Link
-                          href={`/admin/workshops/${ws.id}/attendance`}
-                          className="text-dark text-xs font-medium hover:text-primary hover:underline"
-                        >
-                          เช็คชื่อ
-                        </Link>
-                        <Link
-                          href={`/admin/workshops/${ws.id}/invites`}
-                          className="text-dark text-xs font-medium hover:text-primary hover:underline"
-                        >
-                          บัตรเชิญ
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setModal({
-                              mode: 'application',
-                              id: ws.id,
-                              title: ws.title,
-                              questions: safeParseArray<ApplicationQuestion>(ws.application_form, []),
-                            })
-                          }
-                          className="text-dark text-xs font-medium hover:text-primary hover:underline"
-                        >
-                          ฟอร์มสมัคร
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setModal({ mode: 'payout', id: ws.id, title: ws.title, workshop: ws })}
-                          className="text-dark text-xs font-medium hover:text-primary hover:underline"
-                        >
-                          เงินโอน
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openEdit(ws.id)}
-                          disabled={loadingEdit === ws.id}
-                          className="text-primary text-xs font-medium hover:underline disabled:opacity-50"
-                        >
-                          {loadingEdit === ws.id ? 'กำลังโหลด...' : 'แก้ไข'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(ws.id)}
-                          className="text-red-500 text-xs font-medium hover:underline"
-                        >
-                          ลบ
-                        </button>
-                      </div>
-                    </td>
+      <div className="adm-card">
+        {shownWorkshops.length > 0 && (
+          <>
+            <div className="adm-table-wrap has-cards">
+              <table className="adm-table">
+                <thead>
+                  <tr>
+                    <th>กิจกรรม</th>
+                    <th>วัน · เวลา</th>
+                    <th className="num">ราคา</th>
+                    <th>สถานะ</th>
+                    <th>ผู้สมัคร</th>
+                    <th aria-label="หน้าแรก">★</th>
+                    <th />
                   </tr>
+                </thead>
+                <tbody>
+                  {shownWorkshops.map((ws) => {
+                    const r = rowOf(ws);
+                    return (
+                      <tr key={ws.id}>
+                        <td>
+                          <div className="adm-cell-title">
+                            <div style={{ minWidth: 0 }}>
+                              <b>{ws.title}</b>
+                              <small>{r.where}</small>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ whiteSpace: 'nowrap' }}>{r.when}</td>
+                        <td className="num" style={{ fontWeight: 600 }}>
+                          {ws.price ? `฿${ws.price.toLocaleString()}` : 'ฟรี'}
+                        </td>
+                        <td>
+                          <Badge tone={r.st.tone}>{r.st.label}</Badge>
+                        </td>
+                        <td>{r.progress}</td>
+                        <td>{r.star}</td>
+                        <td className="act">
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            {r.edit}
+                            <RowMenu items={r.menu} />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="adm-mcards">
+              {shownWorkshops.map((ws) => {
+                const r = rowOf(ws);
+                return (
+                  <div key={ws.id} className="adm-mcard">
+                    <div className="adm-mcard-top">
+                      <div>
+                        <div className="adm-mcard-title">{ws.title}</div>
+                        <div className="adm-mcard-sub">{r.when}</div>
+                      </div>
+                      {r.star}
+                    </div>
+                    <div className="adm-badges">
+                      <Badge tone={r.st.tone}>{r.st.label}</Badge>
+                      <Badge tone="mute">{ws.price ? `฿${ws.price.toLocaleString()}` : 'ฟรี'}</Badge>
+                    </div>
+                    <div className="adm-meta">{r.where}</div>
+                    {r.progress}
+                    <div className="adm-mcard-acts">
+                      {r.edit}
+                      <RowMenu items={r.menu} />
+                    </div>
+                  </div>
                 );
               })}
-              {workshops.length > 0 && shownWorkshops.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="py-8 text-center text-gray">ไม่มีกิจกรรมในประเภทนี้</td>
-                </tr>
-              )}
-              {workshops.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="py-8 text-center text-gray">
-                    ยังไม่มีกิจกรรม —{' '}
-                    <button
-                      type="button"
-                      onClick={() => setModal({ mode: 'create' })}
-                      className="text-primary hover:underline"
-                    >
-                      เพิ่มกิจกรรมแรก
-                    </button>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          </>
+        )}
+        {workshops.length > 0 && shownWorkshops.length === 0 && (
+          <div className="adm-empty">
+            <p style={{ margin: '0 0 12px' }}>ไม่พบรายการที่ตรงกับเงื่อนไข</p>
+            {query && (
+              <button type="button" className="adm-btn sm" onClick={() => setQuery('')}>
+                ล้างคำค้นหา
+              </button>
+            )}
+          </div>
+        )}
+        {workshops.length === 0 && (
+          <div className="adm-empty">
+            ยังไม่มีกิจกรรม —{' '}
+            <button type="button" onClick={() => setModal({ mode: 'create' })} className="adm-btn sm teal">
+              เพิ่มกิจกรรมแรก
+            </button>
+          </div>
+        )}
       </div>
 
       <AdminFormModal
@@ -453,6 +450,6 @@ export default function AdminWorkshopsPage() {
           />
         ) : null}
       </AdminFormModal>
-    </div>
+    </>
   );
 }

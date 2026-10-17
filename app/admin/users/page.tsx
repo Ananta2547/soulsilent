@@ -1,7 +1,7 @@
 'use client';
 
 import { EXTRA_ROLES, rolesOf } from '@/lib/roles';
-import { MultiSelect } from '@/components/admin/MultiSelect';
+import { AdminHead, AdminSearch, AdminChips, AdminSheet, SheetSection, Badge, RowMenu, type MenuItem } from '@/components/admin/AdminShell';
 
 /** Everything the picker offers: admin on top, then the extras. */
 const ROLE_OPTIONS = [
@@ -54,6 +54,7 @@ export default function AdminUsersPage() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('all');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
 
   async function fetchUsers() {
     try {
@@ -73,7 +74,11 @@ export default function AdminUsersPage() {
     }
   }
 
-  useEffect(() => { fetchUsers(); }, []);
+  useEffect(() => {
+    (async () => {
+      await fetchUsers();
+    })();
+  }, []);
 
   async function handleUpdateRole(userId: string) {
     await fetch(`/api/users/${userId}`, {
@@ -135,220 +140,248 @@ export default function AdminUsersPage() {
 
   if (authError) {
     return (
-      <div className="card text-center py-12">
-        <p className="text-dark font-medium mb-1">โหลดข้อมูลผู้ใช้ไม่สำเร็จ</p>
-        <p className="text-gray text-sm mb-4">{authError}</p>
-        <a href="/auth/login?redirect=/admin/users" className="btn-primary text-sm">
+      <div className="adm-card adm-empty">
+        <p style={{ color: 'var(--ink)', fontWeight: 600, margin: '0 0 4px' }}>โหลดข้อมูลผู้ใช้ไม่สำเร็จ</p>
+        <p style={{ margin: '0 0 16px' }}>{authError}</p>
+        <a href="/auth/login?redirect=/admin/users" className="adm-btn teal">
           เข้าสู่ระบบใหม่
         </a>
       </div>
     );
   }
 
-  const tabs: { key: Tab; label: string }[] = [
-    { key: 'all', label: `ทั้งหมด (${counts.all})` },
-    { key: 'suspended', label: `ระงับ (${counts.suspended})` },
-    { key: 'pending_deletion', label: `ลบภายใน 30 วัน (${counts.pending_deletion})` },
-  ];
+  const q = query.trim().toLowerCase();
+  const found = shown.filter((u) => !q || [u.name, u.nickname, u.email].some((s) => (s || '').toLowerCase().includes(q)));
+  const editing = users.find((u) => u.id === editingId) || null;
+
+  const rowOf = (user: User) => {
+    const status = statusOf(user);
+    const left = status === 'pending_deletion' ? daysLeft(user.deleted_at) : null;
+    const owner = isOwnerEmail(user.email);
+    // Display name = the nickname users edit everywhere else, falling back to
+    // the registration name; the full name shows underneath when it differs.
+    const display = (user.nickname && user.nickname.trim()) || user.name;
+    const full = user.nickname && user.nickname.trim() !== user.name ? user.name : '';
+    const roles = rolesOf(user).filter((r) => r !== 'user');
+    const roleBadges =
+      roles.length === 0 ? (
+        <Badge tone="mute">user</Badge>
+      ) : (
+        roles.map((r) => (
+          <Badge key={r} tone={r === 'admin' ? 'bad' : 'teal'}>
+            {ROLE_LABEL[r] || r}
+          </Badge>
+        ))
+      );
+    const statusBadge = owner ? (
+      <Badge tone="teal">เจ้าของระบบ</Badge>
+    ) : status === 'suspended' ? (
+      <Badge tone="bad">ระงับ</Badge>
+    ) : status === 'pending_deletion' ? (
+      <Badge tone="warn">รอลบ{left != null ? ` · ${left} วัน` : ''}</Badge>
+    ) : (
+      <Badge tone="ok">ปกติ</Badge>
+    );
+    const menu: MenuItem[] = owner
+      ? []
+      : [
+          status === 'active'
+            ? { label: 'ระงับบัญชี', danger: true, onClick: () => setStatus(user.id, 'suspended'), disabled: busyId === user.id }
+            : status === 'suspended'
+              ? { label: 'ยกเลิกระงับ', onClick: () => setStatus(user.id, 'active'), disabled: busyId === user.id }
+              : { label: 'กู้คืนบัญชี', onClick: () => setStatus(user.id, 'active'), disabled: busyId === user.id },
+        ];
+    const editBtn = owner ? (
+      <span className="adm-meta" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="5" y="11" width="14" height="10" rx="2" strokeWidth={1.8} />
+          <path strokeLinecap="round" strokeWidth={1.8} d="M8 11V7a4 4 0 1 1 8 0v4" />
+        </svg>
+        ล็อกไว้
+      </span>
+    ) : (
+      <button
+        type="button"
+        className="adm-btn sm"
+        onClick={() => {
+          setEditingId(user.id);
+          setEditRoles(rolesOf(user).filter((r) => r !== 'user'));
+        }}
+      >
+        แก้ไขบทบาท
+      </button>
+    );
+    const team = (
+      <button
+        type="button"
+        onClick={() => toggleTeam(user)}
+        disabled={busyId === user.id}
+        title={user.is_team ? 'นำออกจากทีม About' : 'เพิ่มเข้าทีม About'}
+        className={`adm-star${user.is_team ? ' is-on' : ''}`}
+        aria-pressed={!!user.is_team}
+      >
+        {user.is_team ? '★' : '☆'}
+      </button>
+    );
+    const joined = new Date(sqliteToMs(user.created_at)).toLocaleDateString('th-TH');
+    return { display, full, roleBadges, statusBadge, menu, editBtn, team, joined };
+  };
 
   return (
-    <div className="space-y-6">
-      <header>
-        <p className="text-xs font-mono text-primary tracking-[.2em] uppercase mb-2">
-          admin · users
-        </p>
-        <h1 className="font-heading text-3xl text-dark">จัดการผู้ใช้งาน</h1>
-        <p className="text-sm text-gray mt-1">
-          ทั้งหมด {users.length} คน · กด แก้ไข แล้วติ๊ก role ได้หลายอัน (admin / ผู้จัด / ผู้จัดรอบ)
-        </p>
-      </header>
+    <>
+      <AdminHead
+        eyebrow="admin · users"
+        title="ผู้ใช้งาน"
+        sub={`${users.length} คน · กำหนดสิทธิ์ admin / ผู้จัด / ผู้จัดรอบ ได้จากปุ่ม แก้ไขบทบาท · ★ = แสดงในทีมหน้า About`}
+      />
 
-      <div className="flex items-center gap-2 flex-wrap">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={
-              tab === t.key
-                ? 'btn-primary text-sm !py-1.5'
-                : 'btn-ghost text-sm !py-1.5'
-            }
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="adm-toolbar">
+        <AdminSearch value={query} onChange={setQuery} placeholder="ค้นหาชื่อหรืออีเมล" />
+        <AdminChips
+          value={tab}
+          onChange={setTab}
+          items={[
+            { key: 'all', label: 'ทั้งหมด', n: counts.all },
+            { key: 'suspended', label: 'ระงับ', n: counts.suspended },
+            { key: 'pending_deletion', label: 'รอลบ', n: counts.pending_deletion },
+          ]}
+        />
       </div>
 
-      <div className="card !p-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-surface">
-              <tr>
-                <th className="text-left py-3 px-4 text-gray font-medium">ชื่อ</th>
-                <th className="text-left py-3 px-4 text-gray font-medium">อีเมล</th>
-                <th className="text-left py-3 px-4 text-gray font-medium">บทบาท</th>
-                <th className="text-left py-3 px-4 text-gray font-medium">สถานะ</th>
-                <th className="text-center py-3 px-4 text-gray font-medium">ทีม About</th>
-                <th className="text-left py-3 px-4 text-gray font-medium">วันที่สมัคร</th>
-                <th className="text-right py-3 px-4 text-gray font-medium">จัดการ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="py-10 text-center text-gray text-sm">
-                    ไม่มีผู้ใช้ในหมวดนี้
-                  </td>
-                </tr>
-              )}
-              {shown.map((user) => {
-                const status = statusOf(user);
-                const left = status === 'pending_deletion' ? daysLeft(user.deleted_at) : null;
-                const owner = isOwnerEmail(user.email);
+      <div className="adm-card">
+        {found.length === 0 ? (
+          <div className="adm-empty">
+            <p style={{ margin: '0 0 12px' }}>ไม่พบรายการที่ตรงกับเงื่อนไข</p>
+            {query && (
+              <button type="button" className="adm-btn sm" onClick={() => setQuery('')}>
+                ล้างคำค้นหา
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="adm-table-wrap has-cards">
+              <table className="adm-table">
+                <thead>
+                  <tr>
+                    <th>ผู้ใช้</th>
+                    <th>บทบาท</th>
+                    <th>สถานะ</th>
+                    <th title="แสดงในทีมหน้า About">ทีม</th>
+                    <th>สมัครเมื่อ</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {found.map((user) => {
+                    const r = rowOf(user);
+                    return (
+                      <tr key={user.id}>
+                        <td>
+                          <div className="adm-cell-title">
+                            <span className="adm-avatar">{(r.display || '?').charAt(0).toUpperCase()}</span>
+                            <div style={{ minWidth: 0 }}>
+                              <b>{r.display}</b>
+                              <small className="adm-mono" style={{ fontSize: 12 }}>
+                                {user.email}
+                                {r.full ? ` · ${r.full}` : ''}
+                              </small>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="adm-badges">{r.roleBadges}</div>
+                        </td>
+                        <td>{r.statusBadge}</td>
+                        <td>{r.team}</td>
+                        <td className="adm-meta" style={{ whiteSpace: 'nowrap' }}>
+                          {r.joined}
+                        </td>
+                        <td className="act">
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            {r.editBtn}
+                            <RowMenu items={r.menu} />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="adm-mcards">
+              {found.map((user) => {
+                const r = rowOf(user);
                 return (
-                <tr key={user.id} className="border-t border-gray-lighter hover:bg-surface/50">
-                  <td className="py-3 px-4">
-                    {(() => {
-                      // Display name = the nickname users edit everywhere else,
-                      // falling back to the registration name. Show the full name
-                      // underneath when it differs, so admin always sees the
-                      // latest of both.
-                      const display = (user.nickname && user.nickname.trim()) || user.name;
-                      const showFull = !!user.nickname && user.nickname.trim() !== user.name;
-                      return (
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
-                            <span className="text-primary font-medium text-xs">
-                              {(display || '?').charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                          <div className="min-w-0">
-                            <span className="text-dark font-medium block truncate">{display}</span>
-                            {showFull && <span className="text-gray text-xs block truncate">{user.name}</span>}
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </td>
-                  <td className="py-3 px-4 text-gray">{user.email}</td>
-                  <td className="py-3 px-4">
-                    {editingId === user.id && !owner ? (
-                      <div className="flex items-center gap-2 min-w-[260px]">
-                        <MultiSelect
-                          className="flex-1"
-                          options={ROLE_OPTIONS}
-                          value={editRoles}
-                          onChange={setEditRoles}
-                          placeholder="ผู้เข้าร่วม (ไม่มี role พิเศษ)"
-                          summary={(c) => c.map((o) => o.label).join(' · ')}
-                        />
-                        <button onClick={() => handleUpdateRole(user.id)} className="text-primary text-xs font-medium whitespace-nowrap">บันทึก</button>
-                        <button onClick={() => setEditingId(null)} className="text-gray text-xs">ยกเลิก</button>
+                  <div key={user.id} className="adm-mcard">
+                    <div className="adm-mcard-top">
+                      <span className="adm-avatar" style={{ width: 40, height: 40, fontSize: 14 }}>
+                        {(r.display || '?').charAt(0).toUpperCase()}
+                      </span>
+                      <div>
+                        <div className="adm-mcard-title">{r.display}</div>
+                        <div className="adm-mcard-sub">{user.email}</div>
                       </div>
-                    ) : (
-                      <span className="inline-flex flex-wrap gap-1">
-                        {rolesOf(user).length === 1 && rolesOf(user)[0] === 'user' ? (
-                          <span className="badge bg-gray-lighter text-gray">user</span>
-                        ) : (
-                          rolesOf(user)
-                            .filter((r) => r !== 'user')
-                            .map((r) => (
-                              <span
-                                key={r}
-                                className={r === 'admin' ? 'badge-danger' : r === 'teacher' ? 'badge-primary' : 'badge'}
-                                style={r === 'session_host' ? { background: '#e6f4f1', color: '#0f766e' } : undefined}
-                              >
-                                {ROLE_LABEL[r] || r}
-                              </span>
-                            ))
-                        )}
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-3 px-4">
-                    {status === 'suspended' ? (
-                      <span className="badge-danger">ระงับ</span>
-                    ) : status === 'pending_deletion' ? (
-                      <span className="badge" style={{ background: '#fdf2da', color: '#8a6a16' }}>
-                        รอลบ{left != null ? ` · ${left} วัน` : ''}
-                      </span>
-                    ) : (
-                      <span className="badge" style={{ background: '#e6f4f1', color: '#0f766e' }}>ปกติ</span>
-                    )}
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    <button
-                      type="button"
-                      onClick={() => toggleTeam(user)}
-                      disabled={busyId === user.id}
-                      title={user.is_team ? 'นำออกจากทีม About' : 'เพิ่มเข้าทีม About'}
-                      className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
-                        user.is_team
-                          ? 'bg-primary/10 text-primary hover:bg-primary/20'
-                          : 'bg-gray-lighter/60 text-gray hover:bg-gray-lighter'
-                      }`}
-                    >
-                      <svg className="w-3.5 h-3.5" fill={user.is_team ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.196-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                      </svg>
-                      {user.is_team ? 'อยู่ในทีม' : 'เพิ่ม'}
-                    </button>
-                  </td>
-                  <td className="py-3 px-4 text-gray text-xs">
-                    {new Date(user.created_at).toLocaleDateString('th-TH')}
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    {owner ? (
-                      <span className="inline-flex items-center gap-1 text-gray text-xs font-medium">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <rect x="5" y="11" width="14" height="10" rx="2" strokeWidth={1.8} />
-                          <path strokeLinecap="round" strokeWidth={1.8} d="M8 11V7a4 4 0 1 1 8 0v4" />
-                        </svg>
-                        เจ้าของระบบ
-                      </span>
-                    ) : (
-                    <div className="flex items-center justify-end gap-3">
-                      <button
-                        onClick={() => { setEditingId(user.id); setEditRoles(rolesOf(user).filter((r) => r !== 'user')); }}
-                        className="text-primary text-xs font-medium hover:underline"
-                      >
-                        แก้ไข
-                      </button>
-                      {status === 'active' ? (
-                        <button
-                          onClick={() => setStatus(user.id, 'suspended')}
-                          disabled={busyId === user.id}
-                          className="text-red-500 text-xs font-medium hover:underline disabled:opacity-50"
-                        >
-                          ระงับบัญชี
-                        </button>
-                      ) : status === 'suspended' ? (
-                        <button
-                          onClick={() => setStatus(user.id, 'active')}
-                          disabled={busyId === user.id}
-                          className="text-primary text-xs font-medium hover:underline disabled:opacity-50"
-                        >
-                          ยกเลิกระงับ
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => setStatus(user.id, 'active')}
-                          disabled={busyId === user.id}
-                          className="text-primary text-xs font-medium hover:underline disabled:opacity-50"
-                        >
-                          กู้คืนบัญชี
-                        </button>
-                      )}
+                      {r.team}
                     </div>
-                    )}
-                  </td>
-                </tr>
+                    <div className="adm-badges">
+                      {r.statusBadge}
+                      {r.roleBadges}
+                    </div>
+                    <div className="adm-meta">สมัครเมื่อ {r.joined}{r.full ? ` · ${r.full}` : ''}</div>
+                    <div className="adm-mcard-acts">
+                      {r.editBtn}
+                      <RowMenu items={r.menu} />
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          </>
+        )}
       </div>
-    </div>
+
+      <AdminSheet
+        open={!!editing}
+        onClose={() => setEditingId(null)}
+        eyebrow="admin · users"
+        title="แก้ไขบทบาท"
+        sub={editing ? `${(editing.nickname && editing.nickname.trim()) || editing.name} · ${editing.email}` : undefined}
+        width={520}
+        footer={
+          <>
+            <button type="button" className="adm-btn" onClick={() => setEditingId(null)}>
+              ยกเลิก
+            </button>
+            <button type="button" className="adm-btn teal" onClick={() => editing && handleUpdateRole(editing.id)}>
+              บันทึก
+            </button>
+          </>
+        }
+      >
+        <SheetSection n={1} title="บทบาท">
+          <p className="adm-hint" style={{ marginTop: -8 }}>
+            ไม่ติ๊กเลย = ผู้เข้าร่วมทั่วไป · เลือกได้หลายบทบาท
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: '0 -14px' }}>
+            {ROLE_OPTIONS.map((o) => (
+              <label key={o.value} className="adm-check">
+                <input
+                  type="checkbox"
+                  checked={editRoles.includes(o.value)}
+                  onChange={(e) =>
+                    setEditRoles((rs) => (e.target.checked ? [...rs, o.value] : rs.filter((x) => x !== o.value)))
+                  }
+                />
+                <div>
+                  <b>{o.label}</b>
+                  {o.hint && <span>{o.hint}</span>}
+                </div>
+              </label>
+            ))}
+          </div>
+        </SheetSection>
+      </AdminSheet>
+    </>
   );
 }

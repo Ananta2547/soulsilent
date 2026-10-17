@@ -1,10 +1,11 @@
 'use client';
 
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { PageLoader } from '@/components/design/PageLoader';
+import { AdminPager, Badge, type Tone } from '@/components/admin/AdminShell';
 import { sqliteToMs } from '@/lib/datetime';
 import type { AppStats } from '@/app/api/admin/app-stats/route';
-
-import { useEffect, useState } from 'react';
 
 interface Booking {
   id: string;
@@ -17,31 +18,44 @@ interface Booking {
 
 interface Stats {
   totalUsers: number;
+  /** Accounts that asked to be deleted and are inside the 30-day window. */
+  pendingDeletion: number;
   totalWorkshops: number;
+  openWorkshops: number;
   workshopRevenue: number;
   /** Newest-first, unpaged. Both boxes below page through this one list. */
   bookings: Booking[];
 }
 
 /** Rows per page in each box. */
-const BOOKINGS_PER_PAGE = 5;
+const BOOKINGS_PER_PAGE = 6;
 const ACTIVITY_PER_PAGE = 10;
 
 interface ApiResp {
-  users?: { id: string }[];
-  workshops?: { id: string }[];
+  users?: { id: string; account_status?: string | null }[];
+  workshops?: { id: string; status?: string }[];
   bookings?: Booking[];
   soulsilent?: { total: number };
 }
 
+const BOOKING_TONE: Record<string, { label: string; tone: Tone }> = {
+  confirmed: { label: 'ยืนยัน', tone: 'ok' },
+  pending: { label: 'รอชำระ', tone: 'warn' },
+  cancelled: { label: 'ยกเลิก', tone: 'bad' },
+};
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [app, setApp] = useState<AppStats | null>(null);
+  const [orphans, setOrphans] = useState(0);
+  const [name, setName] = useState('');
   const [loading, setLoading] = useState(true);
   // Paging is per box and client-side: the dashboard already holds every
   // booking, so switching pages never refetches or navigates.
   const [bookingsPage, setBookingsPage] = useState(1);
   const [activityPage, setActivityPage] = useState(1);
+  /** Today, read once on the client, for the greeting and "new today". */
+  const [today] = useState(() => new Date());
 
   useEffect(() => {
     async function fetchStats() {
@@ -62,7 +76,9 @@ export default function AdminDashboard() {
 
         setStats({
           totalUsers: users.users?.length || 0,
+          pendingDeletion: (users.users || []).filter((u) => u.account_status === 'pending_deletion').length,
           totalWorkshops: workshops.workshops?.length || 0,
+          openWorkshops: (workshops.workshops || []).filter((w) => w.status === 'active').length,
           workshopRevenue: revenue.soulsilent?.total || 0,
           // GET /api/bookings already sorts by created_at DESC for admins.
           bookings: bookings.bookings || [],
@@ -74,288 +90,233 @@ export default function AdminDashboard() {
       }
     }
     fetchStats();
-    // The app card loads on its own so a failure never blanks the dashboard.
+    // The side pieces load on their own so a failure never blanks the dashboard.
     fetch('/api/admin/app-stats')
       .then((r) => (r.ok ? (r.json() as Promise<AppStats>) : null))
       .then(setApp)
+      .catch(() => {});
+    fetch('/api/admin/orphan-payments')
+      .then((r) => (r.ok ? (r.json() as Promise<{ unresolved?: number }>) : null))
+      .then((d) => setOrphans(d?.unresolved || 0))
+      .catch(() => {});
+    fetch('/api/auth/me')
+      .then((r) => (r.ok ? (r.json() as Promise<{ user?: { name?: string; nickname?: string | null } | null }>) : null))
+      .then((d) => setName(d?.user?.nickname || d?.user?.name || ''))
       .catch(() => {});
   }, []);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 256 }}>
         <PageLoader />
       </div>
     );
   }
 
-  const totalRevenue = stats?.workshopRevenue || 0;
   const allBookings = stats?.bookings || [];
-
   const bookingsPageCount = Math.max(1, Math.ceil(allBookings.length / BOOKINGS_PER_PAGE));
-  const pagedBookings = allBookings.slice(
-    (bookingsPage - 1) * BOOKINGS_PER_PAGE,
-    bookingsPage * BOOKINGS_PER_PAGE,
-  );
-
+  const pagedBookings = allBookings.slice((bookingsPage - 1) * BOOKINGS_PER_PAGE, bookingsPage * BOOKINGS_PER_PAGE);
   const activityPageCount = Math.max(1, Math.ceil(allBookings.length / ACTIVITY_PER_PAGE));
-  const pagedActivity = allBookings.slice(
-    (activityPage - 1) * ACTIVITY_PER_PAGE,
-    activityPage * ACTIVITY_PER_PAGE,
-  );
+  const pagedActivity = allBookings.slice((activityPage - 1) * ACTIVITY_PER_PAGE, activityPage * ACTIVITY_PER_PAGE);
 
-  const statCards = [
-    { label: 'ผู้ใช้งาน', value: stats?.totalUsers || 0, suffix: 'คน', icon: UsersIcon, tint: 'bg-blue-50 text-blue-600' },
-    { label: 'กิจกรรม', value: stats?.totalWorkshops || 0, suffix: 'รายการ', icon: WorkshopIcon, tint: 'bg-primary/10 text-primary' },
-    { label: 'รายรับรวม', value: totalRevenue, suffix: 'บาท', icon: MoneyIcon, tint: 'bg-emerald-50 text-emerald-600', money: true },
+  const pendingPay = allBookings.filter((b) => b.status === 'pending').length;
+  const todayKey = dayKey(today);
+  const newToday = allBookings.filter((b) => dayKey(toDate(b.created_at)) === todayKey).length;
+  const attention = [
+    { n: orphans, label: 'เงินเข้าที่ต้องตรวจ', href: '/admin/payments', bg: '#fde4e1', color: '#a3261a' },
+    { n: pendingPay, label: 'การจองที่รอชำระเงิน', href: '/admin/workshops', bg: '#fdf1d3', color: '#7a5200' },
+    { n: stats?.pendingDeletion || 0, label: 'บัญชีที่ขอลบ (ภายใน 30 วัน)', href: '/admin/users', bg: '#eceeed', color: '#4c5755' },
+  ].filter((a) => a.n > 0);
+
+  const kpis: { label: string; value: string; sub: string; href?: string; title?: string; bg: string; color: string; d: string; d2?: string }[] = [
+    {
+      label: 'ผู้ใช้งาน',
+      value: (stats?.totalUsers || 0).toLocaleString(),
+      sub: 'บัญชีทั้งหมด',
+      href: '/admin/users',
+      bg: '#e3eefc',
+      color: '#1f5fae',
+      d: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z',
+    },
+    {
+      label: 'กิจกรรม',
+      value: (stats?.totalWorkshops || 0).toLocaleString(),
+      sub: `เปิดอยู่ ${(stats?.openWorkshops || 0).toLocaleString()} รอบ`,
+      href: '/admin/workshops',
+      bg: 'var(--teal-50)',
+      color: 'var(--teal-deep)',
+      d: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+    },
+    {
+      label: 'รายรับรวม',
+      value: `฿${(stats?.workshopRevenue || 0).toLocaleString()}`,
+      sub: `${allBookings.filter((b) => b.status === 'confirmed').length.toLocaleString()} การจองที่ยืนยัน`,
+      href: '/admin/revenue',
+      bg: '#dff3ec',
+      color: '#0b6b4f',
+      d: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+    },
     {
       label: 'ติดตั้งแอป',
-      value: app?.installs || 0,
-      suffix: `เครื่อง · 30 วันล่าสุด +${(app?.installs30d || 0).toLocaleString()}`,
-      detail: app
-        ? [
-            `เปิดแอป ${app.opens30d.toLocaleString()} ครั้ง ใน 30 วัน`,
-            `เปิดแจ้งเตือน ${app.pushMembers.toLocaleString()} คน (${app.pushDevices.toLocaleString()} เครื่อง)`,
-            `ส่งแจ้งเตือน ${app.sent30d.toLocaleString()} ครั้ง ใน 30 วัน`,
-          ]
+      value: (app?.installs || 0).toLocaleString(),
+      sub: app
+        ? `+${app.installs30d.toLocaleString()} ใน 30 วัน · แจ้งเตือน ${app.pushMembers.toLocaleString()} คน`
+        : 'เครื่องที่ติดตั้ง',
+      title: app
+        ? `เปิดแอป ${app.opens30d.toLocaleString()} ครั้ง · ${app.pushDevices.toLocaleString()} เครื่องเปิดแจ้งเตือน · ส่งแจ้งเตือน ${app.sent30d.toLocaleString()} ครั้ง (30 วัน)`
         : undefined,
-      icon: AppIcon,
-      tint: 'bg-amber-50 text-amber-600',
+      bg: '#fdf1d3',
+      color: '#7a5200',
+      d: 'M9 3.5h6a2 2 0 012 2v13a2 2 0 01-2 2H9a2 2 0 01-2-2v-13a2 2 0 012-2z',
+      d2: 'M11 17.5h2',
     },
   ];
 
   return (
-    <div className="space-y-8">
-      <header>
-        <p className="text-xs font-mono text-primary tracking-[.2em] uppercase mb-2">
-          admin · overview
-        </p>
-        <h1 className="font-heading text-3xl text-dark">ภาพรวม</h1>
-        <p className="text-sm text-gray mt-1">สถิติทั้งหมด ณ ปัจจุบัน</p>
-      </header>
+    <>
+      <section className="adm-hello">
+        <span className="adm-hello-o1" aria-hidden="true" />
+        <span className="adm-hello-o2" aria-hidden="true" />
+        <div className="adm-hello-text">
+          <p className="adm-eyebrow" style={{ color: '#8fd3c9', marginBottom: 10 }}>
+            admin · {today.toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+          </p>
+          <h1 className="adm-h1">สวัสดี{name ? ` ${name}` : ''}</h1>
+          <p className="adm-hello-line">
+            {newToday > 0 ? `วันนี้มีการจองใหม่ ${newToday} รายการ` : 'วันนี้ยังไม่มีการจองใหม่'}
+            {attention.length > 0 ? ` · มี ${attention.length} เรื่องรอจัดการ` : ' · ไม่มีงานค้าง'}
+          </p>
+          <span className="adm-hello-hand">have a quiet day ✺</span>
+        </div>
+        <div className="adm-hello-acts">
+          <Link href="/admin/workshops?new=1" className="adm-btn accent">
+            + เพิ่มกิจกรรม
+          </Link>
+          <Link href="/admin/revenue" className="adm-btn glass">
+            ดูรายรับ →
+          </Link>
+        </div>
+      </section>
 
-      {/* Stat cards */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {statCards.map((s) => {
-          const Icon = s.icon;
-          return (
-            <div key={s.label} className="card !p-5">
-              <div className="flex items-start justify-between mb-4">
-                <span className={`w-10 h-10 rounded-xl flex items-center justify-center ${s.tint}`}>
-                  <Icon />
+      <section className="adm-kpis">
+        {kpis.map((k) => {
+          const inner = (
+            <>
+              <div className="adm-kpi-top">
+                <span className="adm-label" style={{ fontSize: 11 }}>
+                  {k.label}
+                </span>
+                <span className="adm-kpi-icon" style={{ background: k.bg, color: k.color }}>
+                  <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d={k.d} />
+                    {k.d2 && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d={k.d2} />}
+                  </svg>
                 </span>
               </div>
-              <div className="font-mono text-[11px] tracking-[.12em] uppercase text-gray mb-1">
-                {s.label}
-              </div>
-              <div
-                className="text-3xl text-dark leading-none truncate"
-                style={{ fontFamily: 'Archivo Black, Mitr, sans-serif', letterSpacing: '-0.025em' }}
-              >
-                {s.money ? `฿${s.value.toLocaleString()}` : s.value.toLocaleString()}
-              </div>
-              <div className="text-xs text-gray mt-1">{s.suffix}</div>
-              {'detail' in s && s.detail && (
-                <div className="text-[11px] text-gray mt-2 leading-relaxed">
-                  {s.detail.map((d) => (
-                    <div key={d}>{d}</div>
-                  ))}
-                </div>
-              )}
+              <div className="adm-kpi-value">{k.value}</div>
+              <div className="adm-kpi-sub">{k.sub}</div>
+            </>
+          );
+          return k.href ? (
+            <Link key={k.label} href={k.href} className="adm-kpi">
+              {inner}
+            </Link>
+          ) : (
+            <div key={k.label} className="adm-kpi" title={k.title}>
+              {inner}
             </div>
           );
         })}
       </section>
 
-      {/* Recent bookings */}
-      <section className="card !p-0 overflow-hidden">
-        <div className="p-5 border-b border-gray-lighter flex items-baseline justify-between gap-3">
-          <h2 className="font-heading text-lg text-dark">การจองล่าสุด</h2>
-          <span className="text-xs text-gray">ทั้งหมด {allBookings.length} รายการ</span>
-        </div>
-        {pagedBookings.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-surface">
-                <tr>
-                  <th className="text-left py-3 px-5 text-gray font-medium">กิจกรรม</th>
-                  <th className="text-left py-3 px-5 text-gray font-medium">ผู้จอง</th>
-                  <th className="text-right py-3 px-5 text-gray font-medium">จำนวน</th>
-                  <th className="text-left py-3 px-5 text-gray font-medium">สถานะ</th>
-                  <th className="text-right py-3 px-5 text-gray font-medium">วันที่</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pagedBookings.map((b) => (
-                  <tr key={b.id} className="border-t border-gray-lighter hover:bg-surface/50">
-                    <td className="py-3 px-5 text-dark font-medium max-w-[200px] truncate">
-                      {b.workshop_title || '—'}
-                    </td>
-                    <td className="py-3 px-5 text-gray">{b.user_name || '—'}</td>
-                    <td className="py-3 px-5 text-right text-dark font-medium">
-                      ฿{b.amount?.toLocaleString()}
-                    </td>
-                    <td className="py-3 px-5">
-                      <span
-                        className={
-                          b.status === 'confirmed'
-                            ? 'badge-success'
-                            : b.status === 'cancelled'
-                              ? 'badge-danger'
-                              : 'badge-accent'
-                        }
-                      >
-                        {b.status === 'confirmed'
-                          ? 'ยืนยัน'
-                          : b.status === 'pending'
-                            ? 'รอชำระ'
-                            : b.status === 'cancelled'
-                              ? 'ยกเลิก'
-                              : b.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-5 text-right text-gray text-xs whitespace-nowrap">
-                      {fmtDayTime(b.created_at)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <Pager page={bookingsPage} pageCount={bookingsPageCount} onChange={setBookingsPage} />
+      <div className="adm-two">
+        <section className="adm-card">
+          <div className="adm-card-head">
+            <h2 className="adm-h2">การจองล่าสุด</h2>
+            <span className="adm-meta">ทั้งหมด {allBookings.length.toLocaleString()} รายการ</span>
           </div>
-        ) : (
-          <p className="text-gray text-sm py-8 text-center">ยังไม่มีการจอง</p>
-        )}
-      </section>
+          {pagedBookings.length > 0 ? (
+            <>
+              {pagedBookings.map((b) => {
+                const t = BOOKING_TONE[b.status] || { label: b.status, tone: 'mute' as Tone };
+                return (
+                  <div key={b.id} className="adm-row adm-line">
+                    <div className="adm-line-main">
+                      <b>{b.workshop_title || '—'}</b>
+                      <small>
+                        {b.user_name || '—'} · {fmtDayTime(b.created_at)}
+                      </small>
+                    </div>
+                    <div className="adm-line-side">
+                      <b>฿{(b.amount || 0).toLocaleString()}</b>
+                      <Badge tone={t.tone}>{t.label}</Badge>
+                    </div>
+                  </div>
+                );
+              })}
+              <AdminPager page={bookingsPage} pageCount={bookingsPageCount} onChange={setBookingsPage} />
+            </>
+          ) : (
+            <p className="adm-empty">ยังไม่มีการจอง</p>
+          )}
+        </section>
 
-      {/* Registration activity log — who applied to what, when. Grouped by day
-          so bursts of sign-ups are obvious at a glance. */}
-      <section className="card !p-0 overflow-hidden">
-        <div className="p-5 border-b border-gray-lighter flex items-baseline justify-between gap-3">
-          <div>
-            <h2 className="font-heading text-lg text-dark">ความเคลื่อนไหวการสมัคร</h2>
-            <p className="text-xs text-gray mt-0.5">
-              ใหม่ล่าสุดอยู่บนสุด · ทั้งหมด {allBookings.length} รายการ
-            </p>
-          </div>
-          <span className="font-mono text-[11px] tracking-[.12em] uppercase text-gray">
-            activity log
-          </span>
-        </div>
-
-        {pagedActivity.length > 0 ? (
-          <>
-          <ol className="divide-y divide-gray-lighter">
-            {groupByDay(pagedActivity).map(([dayLabel, rows]) => (
-              <li key={dayLabel}>
-                <div className="flex items-center gap-3 px-5 py-2 bg-surface">
-                  <span className="text-xs font-medium text-dark">{dayLabel}</span>
-                  <span className="text-[11px] text-gray">{rows.length} รายการ</span>
-                </div>
-                <ol>
-                  {rows.map((b) => (
-                    <li
-                      key={b.id}
-                      className="flex items-start gap-3 px-5 py-3 border-t border-gray-lighter hover:bg-surface/50"
-                    >
-                      <span className="font-mono text-xs text-gray tabular-nums pt-0.5 w-12 shrink-0">
-                        {fmtClock(b.created_at)}
-                      </span>
-                      <span className="text-sm text-dark min-w-0">
-                        <span className="font-medium">{b.user_name || 'ไม่ทราบชื่อ'}</span>
-                        <span className="text-gray"> สมัคร </span>
-                        <span className="font-medium">{b.workshop_title || 'ไม่ทราบกิจกรรม'}</span>
-                      </span>
-                      {b.status === 'cancelled' && (
-                        <span className="badge-danger ml-auto shrink-0">ยกเลิก</span>
-                      )}
-                    </li>
-                  ))}
-                </ol>
-              </li>
+        <div className="adm-stack">
+          <section className="adm-card">
+            <div className="adm-card-head">
+              <h2 className="adm-h2">ต้องจัดการ</h2>
+            </div>
+            {attention.map((a) => (
+              <Link key={a.label} href={a.href} className="adm-row adm-todo">
+                <span className="adm-todo-n" style={{ background: a.bg, color: a.color }}>
+                  {a.n}
+                </span>
+                <span style={{ flex: 1 }}>{a.label}</span>
+                <span className="adm-meta">›</span>
+              </Link>
             ))}
-          </ol>
-          <Pager page={activityPage} pageCount={activityPageCount} onChange={setActivityPage} />
-          </>
-        ) : (
-          <p className="text-gray text-sm py-8 text-center">ยังไม่มีความเคลื่อนไหว</p>
-        )}
-      </section>
-    </div>
-  );
-}
+            {attention.length === 0 && (
+              <p className="adm-meta" style={{ padding: '0 20px 20px', margin: 0, fontSize: 14 }}>
+                ไม่มีงานค้าง ✺
+              </p>
+            )}
+          </section>
 
-/** `< 1 2 3 >` pager. Renders nothing for a single page. Long runs collapse to
- *  a window around the current page with ellipses, so the row never wraps. */
-function Pager({
-  page,
-  pageCount,
-  onChange,
-}: {
-  page: number;
-  pageCount: number;
-  onChange: (p: number) => void;
-}) {
-  if (pageCount <= 1) return null;
-
-  const pages: (number | 'gap')[] = [];
-  const window = 1; // pages either side of the current one
-  for (let p = 1; p <= pageCount; p++) {
-    const near = Math.abs(p - page) <= window;
-    if (p === 1 || p === pageCount || near) pages.push(p);
-    else if (pages[pages.length - 1] !== 'gap') pages.push('gap');
-  }
-
-  const arrow =
-    'w-8 h-8 rounded-lg border border-gray-lighter text-gray hover:text-dark hover:border-gray disabled:opacity-40 disabled:hover:text-gray disabled:hover:border-gray-lighter disabled:cursor-not-allowed flex items-center justify-center';
-
-  return (
-    <nav
-      className="flex items-center justify-center gap-1.5 px-5 py-4 border-t border-gray-lighter"
-      aria-label="เปลี่ยนหน้า"
-    >
-      <button
-        type="button"
-        onClick={() => onChange(Math.max(1, page - 1))}
-        disabled={page === 1}
-        aria-label="ก่อนหน้า"
-        className={arrow}
-      >
-        ‹
-      </button>
-
-      {pages.map((p, i) =>
-        p === 'gap' ? (
-          <span key={`gap-${i}`} className="px-1 text-gray text-sm select-none">
-            …
-          </span>
-        ) : (
-          <button
-            key={p}
-            type="button"
-            onClick={() => onChange(p)}
-            aria-current={p === page ? 'page' : undefined}
-            className={`w-8 h-8 rounded-lg text-sm flex items-center justify-center border ${
-              p === page
-                ? 'bg-primary text-white border-primary font-medium'
-                : 'border-gray-lighter text-gray hover:text-dark hover:border-gray'
-            }`}
-          >
-            {p}
-          </button>
-        ),
-      )}
-
-      <button
-        type="button"
-        onClick={() => onChange(Math.min(pageCount, page + 1))}
-        disabled={page === pageCount}
-        aria-label="ถัดไป"
-        className={arrow}
-      >
-        ›
-      </button>
-    </nav>
+          <section className="adm-card">
+            <div className="adm-card-head">
+              <h2 className="adm-h2">ความเคลื่อนไหวการสมัคร</h2>
+              <span className="adm-label">LIVE</span>
+            </div>
+            {pagedActivity.length > 0 ? (
+              <>
+                {groupByDay(pagedActivity).map(([day, rows]) => (
+                  <div key={day}>
+                    <div className="adm-row adm-day">
+                      <b>{day}</b>
+                      <span className="adm-meta">{rows.length} รายการ</span>
+                    </div>
+                    {rows.map((b) => (
+                      <div key={b.id} className="adm-row adm-act">
+                        <span className="adm-mono adm-act-clock">{fmtClock(b.created_at)}</span>
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <b style={{ fontWeight: 600 }}>{b.user_name || 'ไม่ทราบชื่อ'}</b>
+                          <span className="adm-meta" style={{ fontSize: 13.5 }}> สมัคร </span>
+                          {b.workshop_title || 'ไม่ทราบกิจกรรม'}
+                        </span>
+                        {b.status === 'cancelled' && <span className="adm-act-cancel">ยกเลิก</span>}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+                <AdminPager page={activityPage} pageCount={activityPageCount} onChange={setActivityPage} />
+              </>
+            ) : (
+              <p className="adm-empty">ยังไม่มีความเคลื่อนไหว</p>
+            )}
+          </section>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -365,7 +326,11 @@ function toDate(v: string): Date {
   return new Date(sqliteToMs(v));
 }
 
-/** "15 ส.ค. 2569 เวลา 18:03 น." — same clock as the activity log below. */
+function dayKey(d: Date): string {
+  return Number.isNaN(d.getTime()) ? '' : `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+/** "15 ส.ค. 2569 เวลา 18:03 น." — same clock as the activity log. */
 function fmtDayTime(v: string): string {
   const d = toDate(v);
   if (Number.isNaN(d.getTime())) return '—';
@@ -386,49 +351,10 @@ function groupByDay(rows: Booking[]): [string, Booking[]][] {
     const d = toDate(r.created_at);
     const label = Number.isNaN(d.getTime())
       ? 'ไม่ทราบวันที่'
-      : d.toLocaleDateString('th-TH', {
-          weekday: 'short',
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric',
-        });
+      : d.toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
     const last = out[out.length - 1];
     if (last && last[0] === label) last[1].push(r);
     else out.push([label, [r]]);
   }
   return out;
-}
-
-/* Inline icons (avoid emoji rendering inconsistencies) */
-function UsersIcon() {
-  return (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-    </svg>
-  );
-}
-function WorkshopIcon() {
-  return (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-    </svg>
-  );
-}
-function AppIcon() {
-  return (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <rect x="7" y="2.5" width="10" height="19" rx="2.5" strokeWidth={1.5} />
-      <path strokeLinecap="round" strokeWidth={1.5} d="M11 18.5h2" />
-    </svg>
-  );
-}
-function MoneyIcon() {
-  return (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  );
 }
