@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
+import { AdminHead } from '@/components/admin/AdminShell';
 import type { Workshop } from '@/lib/types';
 import { fmtDateTime } from '@/lib/datetime';
 import { formatTravel, type TravelInfo } from '@/lib/travel';
@@ -124,15 +124,15 @@ export default function ApplicantsPage() {
     Math.max(0, ...rows.filter((r) => r.app_status === 'waitlisted' && r.waitlist_rank != null).map((r) => r.waitlist_rank as number)) + 1;
 
   return (
-    <div className="max-w-5xl mx-auto p-6">
-      <Link href="/admin/workshops" className="text-sm text-gray hover:text-primary hover:underline">
-        ← กลับไปจัดการกิจกรรม
-      </Link>
-      <h1 className="text-2xl font-bold text-dark mt-2 mb-1">ผู้สมัคร — {workshop?.title}</h1>
-      <p className="text-sm text-gray mb-4">
-        ที่นั่ง {workshop?.max_participants} · ประกาศผล {fmt(workshop?.announce_at ?? null)} · ยืนยันตัวจริงภายใน{' '}
-        {fmt(workshop?.confirm_main_by ?? null)} · ยืนยันตัวสำรองภายใน {fmt(workshop?.confirm_waitlist_by ?? null)}
-      </p>
+    <div>
+      <div style={{ marginBottom: 20 }}>
+        <AdminHead
+          back={{ href: '/admin/workshops', label: 'กลับไปรายการกิจกรรม' }}
+          eyebrow="admin · applicants"
+          title={`ผู้สมัคร · ${workshop?.title ?? ''}`}
+          sub={`ที่นั่ง ${workshop?.max_participants ?? '—'} · ประกาศผล ${fmt(workshop?.announce_at ?? null)} · ยืนยันตัวจริงภายใน ${fmt(workshop?.confirm_main_by ?? null)} · ยืนยันตัวสำรองภายใน ${fmt(workshop?.confirm_waitlist_by ?? null)}`}
+        />
+      </div>
 
       <div className="flex flex-wrap gap-2 mb-5 text-xs">
         <span className="badge bg-gray-lighter text-gray">รอพิจารณา {counts.applied}</span>

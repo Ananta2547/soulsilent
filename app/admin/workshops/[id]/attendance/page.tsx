@@ -2,9 +2,8 @@
 
 import { PageLoader } from '@/components/design/PageLoader';
 
-import { Fragment, useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
 import type { DayTime, Workshop } from '@/lib/types';
 import { getWorkshopDays, safeParseArray } from '@/lib/workshop-utils';
 import { formatTravel, type TravelInfo } from '@/lib/travel';
@@ -12,6 +11,7 @@ import { PdpaBadge } from '@/components/workshops/PdpaBadge';
 import { RefundSlipModal } from '@/components/admin/RefundSlipModal';
 import { FacilitatorNote } from '@/components/admin/FacilitatorNote';
 import { applicantName } from '@/lib/applicant';
+import { AdminHead, Badge } from '@/components/admin/AdminShell';
 
 type BookingRow = {
   id: string;
@@ -244,270 +244,152 @@ export default function AttendancePage() {
   const activeDt = dayTimes.find((d) => d.date === days[day]);
 
   return (
-    <div className="space-y-6">
-      <header>
-        <Link
-          href="/admin/workshops"
-          className="text-xs font-mono text-gray hover:text-primary tracking-wider uppercase"
-        >
-          ← กลับไปรายการกิจกรรม
-        </Link>
-        <p className="text-xs font-mono text-primary tracking-[.2em] uppercase mt-3 mb-2">
-          admin · attendance
-        </p>
-        <h1 className="font-heading text-3xl text-dark">เช็คชื่อ · {workshop.title}</h1>
-        <p className="text-sm text-gray mt-1">
-          {isMultiDay ? (
-            <>
-              {fmtDMY(days[0])}–{fmtDMY(days[days.length - 1])} · {days.length} วัน · {bookings.length} ผู้ลงทะเบียน
-            </>
-          ) : (
-            <>
-              {new Date(workshop.date).toLocaleDateString('th-TH', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-              })}{' '}
-              · {workshop.time_start}–{workshop.time_end} · {bookings.length} ผู้ลงทะเบียน
-            </>
-          )}
-        </p>
-      </header>
+    <>
+      <AdminHead
+        back={{ href: '/admin/workshops', label: 'กลับไปรายการกิจกรรม' }}
+        eyebrow="admin · attendance"
+        title={`เช็คชื่อ · ${workshop.title}`}
+        sub={
+          isMultiDay
+            ? `${fmtDMY(days[0])}–${fmtDMY(days[days.length - 1])} · ${days.length} วัน · ${bookings.length} ผู้ลงทะเบียน`
+            : `${new Date(workshop.date).toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · ${workshop.time_start}–${workshop.time_end} · ${bookings.length} ผู้ลงทะเบียน`
+        }
+        actions={
+          <button type="button" onClick={() => setShowAdd(true)} className="adm-btn teal">
+            + เพิ่มผู้เข้าร่วม
+          </button>
+        }
+      />
 
       {/* Day selector — only for multi-day workshops */}
       {isMultiDay && (
-        <section>
-          <p className="text-xs font-mono text-gray tracking-wider uppercase mb-2">เลือกวันที่เช็คชื่อ</p>
-          <div className="flex gap-2 flex-wrap">
-            {days.map((d, i) => {
-              const on = i === day;
-              return (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setActiveDay(i)}
-                  className={`px-4 py-2 rounded-xl border text-sm font-medium transition ${
-                    on
-                      ? 'border-primary bg-primary text-white'
-                      : 'border-gray-lighter bg-white text-dark hover:border-primary/40'
-                  }`}
-                >
-                  <span className="block">วันที่ {i + 1}</span>
-                  <span className={`block text-xs ${on ? 'text-white/80' : 'text-gray'}`}>{fmtDMY(d)}</span>
-                </button>
-              );
-            })}
+        <div>
+          <p className="adm-label" style={{ fontSize: 11, margin: '0 0 8px' }}>
+            เลือกวันที่เช็คชื่อ
+          </p>
+          <div className="adm-daytabs">
+            {days.map((d, i) => (
+              <button key={d} type="button" onClick={() => setActiveDay(i)} className={`adm-daytab${i === day ? ' is-on' : ''}`} aria-pressed={i === day}>
+                <b>วันที่ {i + 1}</b>
+                <span>{fmtDMY(d)}</span>
+              </button>
+            ))}
           </div>
-        </section>
+        </div>
       )}
 
       {/* Quick stats */}
-      {isMultiDay ? (
-        <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <StatTile label={`เช็คอินแล้ว · ${fmtDMY(days[day])}${activeDt ? ` · ${activeDt.time_start}–${activeDt.time_end}` : ''}`} value={presentToday} tint="bg-emerald-50 text-emerald-700" />
-          <StatTile label="ยังไม่เช็คอิน" value={absentToday} tint="bg-gray-50 text-gray" />
-        </section>
-      ) : (
-        <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <StatTile label="มาเข้าร่วม" value={attended} tint="bg-emerald-50 text-emerald-700" />
-          <StatTile label="ไม่ได้มา" value={missed} tint="bg-orange-50 text-orange-700" />
-          <StatTile label="ยังไม่ตรวจ" value={unmarked} tint="bg-gray-50 text-gray" />
-        </section>
-      )}
-
-      {/* Add walk-in participant */}
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={() => setShowAdd(true)}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 transition"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          เพิ่มผู้เข้าร่วม
-        </button>
-      </div>
-
-      {/* Table */}
-      <div className="card !p-0 overflow-hidden">
-        {bookings.length === 0 ? (
-          <p className="text-gray text-sm py-10 text-center">ยังไม่มีผู้ที่ชำระเงินสำหรับกิจกรรมนี้</p>
+      <section className="adm-kpis" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))' }}>
+        {isMultiDay ? (
+          <>
+            <StatTile label={`เช็คอินแล้ว · ${fmtDMY(days[day])}${activeDt ? ` · ${activeDt.time_start}–${activeDt.time_end}` : ''}`} value={presentToday} tone="ok" />
+            <StatTile label="ยังไม่เช็คอิน" value={absentToday} tone="mute" />
+          </>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-surface">
-                <tr>
-                  <th className="text-left py-3 px-5 text-gray font-medium">ผู้เข้าร่วม</th>
-                  <th className="text-left py-3 px-5 text-gray font-medium">อีเมล</th>
-                  <th className="text-center py-3 px-5 text-gray font-medium">ใบสมัคร</th>
-                  <th className="text-right py-3 px-5 text-gray font-medium">จำนวน</th>
-                  <th className="text-center py-3 px-5 text-gray font-medium">
-                    {isMultiDay ? `เช็คอิน · วันที่ ${day + 1}` : 'การเข้าร่วม'}
-                  </th>
-                  {showSlipCol && (
-                    <th className="text-center py-3 px-5 text-gray font-medium">{slipNoun}</th>
-                  )}
-                  <th className="text-right py-3 px-5 text-gray font-medium">จัดการ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bookings.map((b) => {
-                  const busy = pendingIds.has(b.id);
-                  const open = openId === b.id;
-                  return (
-                    <Fragment key={b.id}>
-                      <tr className="border-t border-gray-lighter">
-                        <td className="py-3 px-5 text-dark font-medium">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {/* The name on the application, not the account's
-                                display name — see lib/applicant.ts. */}
-                            <span>{applicantName(b.application_json, b.user_name)}</span>
-                            <PdpaBadge applicationJson={b.application_json} />
-                            {b.status === 'cancelled' && (
-                              <span className="text-[11px] font-medium text-red-600 bg-red-50 rounded-full px-2 py-0.5">
-                                ยกเลิกแล้ว
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-3 px-5 text-gray text-xs">{b.user_email || '—'}</td>
-                        <td className="py-3 px-5 text-center">
-                          <button
-                            type="button"
-                            onClick={() => setOpenId(open ? null : b.id)}
-                            className="text-xs font-medium text-primary hover:underline"
-                          >
-                            {open ? 'ซ่อน' : 'ดูใบสมัคร'}
-                          </button>
-                        </td>
-                        <td className="py-3 px-5 text-right text-dark font-medium">
-                          ฿{b.amount.toLocaleString()}
-                        </td>
-                        <td className="py-3 px-5">
-                          {isMultiDay ? (
-                            (() => {
-                              const present = parseAttendance(b.attendance_json)[String(day)] === 1;
-                              return (
-                                <div className="flex items-center justify-center">
-                                  <button
-                                    type="button"
-                                    disabled={busy}
-                                    onClick={() => markDay(b.id, day, !present)}
-                                    title={present ? 'คลิกเพื่อยกเลิกเช็คอิน' : 'คลิกเพื่อเช็คอิน'}
-                                    className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-medium transition-colors disabled:opacity-50 ${
-                                      present
-                                        ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                                        : 'bg-primary/10 text-primary hover:bg-primary/20'
-                                    }`}
-                                  >
-                                    {present ? (
-                                      <>
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.4} d="M5 13l4 4L19 7" /></svg>
-                                        เช็คอินแล้ว
-                                      </>
-                                    ) : (
-                                      'เช็คอิน'
-                                    )}
-                                  </button>
-                                </div>
-                              );
-                            })()
-                          ) : (
-                            <div className="flex items-center justify-center gap-2">
-                              <AttendChip label="มา" active={b.attended === 1} disabled={busy} tone="green" onClick={() => mark(b.id, 1)} />
-                              <AttendChip label="ไม่มา" active={b.attended === 0} disabled={busy} tone="orange" onClick={() => mark(b.id, 0)} />
-                              <AttendChip label="—" active={b.attended == null} disabled={busy} tone="gray" onClick={() => mark(b.id, null)} />
-                            </div>
-                          )}
-                        </td>
-                        {showSlipCol && (
-                          <td className="py-3 px-5">
-                            {(() => {
-                              // Any secured participant (paid or confirmed) can get
-                              // a refund slip — the amount may be ฿0 for manually
-                              // added or free-confirmed seats and that's fine.
-                              const applicable = b.payment_status === 'paid' || b.status === 'confirmed';
-                              if (!applicable) {
-                                return <div className="text-center text-gray text-xs">—</div>;
-                              }
-                              return (
-                                <div className="flex items-center justify-center gap-2">
-                                  {b.refund_slip_url ? (
-                                    <>
-                                      <a
-                                        href={b.refund_slip_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center justify-center w-9 h-11 rounded-md overflow-hidden border border-gray-lighter shrink-0 bg-cream"
-                                        title="ดูสลิป"
-                                      >
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={b.refund_slip_url} alt="slip" className="max-w-full max-h-full object-contain" />
-                                      </a>
-                                      <button
-                                        type="button"
-                                        onClick={() => setSlipFor(b)}
-                                        className="text-xs font-medium text-primary hover:underline"
-                                      >
-                                        แก้ไข
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={() => setSlipFor(b)}
-                                      className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                                    >
-                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                      </svg>
-                                      {isDeposit ? 'แนบสลิปคืนมัดจำ' : 'แนบสลิปคืนเงิน'}
-                                    </button>
-                                  )}
-                                </div>
-                              );
-                            })()}
-                          </td>
-                        )}
-                        <td className="py-3 px-5 text-right">
-                          {b.status === 'cancelled' ? (
-                            <span className="text-xs text-gray">—</span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => setRemoveFor(b)}
-                              disabled={busy}
-                              className="text-xs font-medium text-red-600 hover:underline disabled:opacity-50"
-                            >
-                              เอาออก
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                      {open && (
-                        <tr className="bg-surface/50">
-                          <td colSpan={showSlipCol ? 7 : 6} className="px-5 py-4 border-t border-gray-lighter">
-                            <ApplicationDetail json={b.application_json} />
-                            <FacilitatorNote
-                              // Remount per booking so the textarea always
-                              // starts from that participant's saved note.
-                              key={b.id}
-                              initial={b.facilitator_note ?? null}
-                              endpoint={`/api/bookings/${b.id}`}
-                            />
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <StatTile label="มาเข้าร่วม" value={attended} tone="ok" />
+            <StatTile label="ไม่ได้มา" value={missed} tone="warn" />
+            <StatTile label="ยังไม่ตรวจ" value={unmarked} tone="mute" />
+          </>
         )}
-      </div>
+      </section>
+
+      <section className="adm-card">
+        {bookings.length === 0 ? (
+          <p className="adm-empty">ยังไม่มีผู้ที่ชำระเงินสำหรับกิจกรรมนี้</p>
+        ) : (
+          bookings.map((b, idx) => {
+            const busy = pendingIds.has(b.id);
+            const open = openId === b.id;
+            // The name on the application, not the account's display name —
+            // see lib/applicant.ts.
+            const name = applicantName(b.application_json, b.user_name);
+            // Any secured participant (paid or confirmed) can get a refund slip
+            // — the amount may be ฿0 for manually added or free-confirmed seats.
+            const slipOk = showSlipCol && (b.payment_status === 'paid' || b.status === 'confirmed');
+            const present = isMultiDay && parseAttendance(b.attendance_json)[String(day)] === 1;
+            return (
+              <div key={b.id} className="adm-att" style={{ borderTop: idx ? '1px solid var(--adm-line)' : 0, opacity: b.status === 'cancelled' ? 0.6 : 1 }}>
+                <div className="adm-att-row">
+                  <div className="adm-att-who">
+                    <span className="adm-avatar" style={{ width: 40, height: 40, fontSize: 14 }}>
+                      {(name || '?').charAt(0).toUpperCase()}
+                    </span>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontWeight: 600, fontSize: 15 }}>{name}</span>
+                        <PdpaBadge applicationJson={b.application_json} />
+                        {b.status === 'cancelled' && <Badge tone="bad">ยกเลิกแล้ว</Badge>}
+                      </div>
+                      <div className="adm-meta" style={{ marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {b.user_email || '—'} · <span className="adm-mono">฿{b.amount.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {isMultiDay ? (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => markDay(b.id, day, !present)}
+                      title={present ? 'คลิกเพื่อยกเลิกเช็คอิน' : 'คลิกเพื่อเช็คอิน'}
+                      className={`adm-btn${present ? ' teal' : ' soft'}`}
+                      style={{ minHeight: 42 }}
+                    >
+                      {present ? '✓ เช็คอินแล้ว' : 'เช็คอิน'}
+                    </button>
+                  ) : (
+                    <div role="group" aria-label="การเข้าร่วม" className="adm-seg">
+                      <AttendChip label="มา" active={b.attended === 1} disabled={busy} tone="green" onClick={() => mark(b.id, 1)} />
+                      <AttendChip label="ไม่มา" active={b.attended === 0} disabled={busy} tone="orange" onClick={() => mark(b.id, 0)} />
+                      <AttendChip label="—" active={b.attended == null} disabled={busy} tone="gray" onClick={() => mark(b.id, null)} />
+                    </div>
+                  )}
+
+                  <div className="adm-att-acts">
+                    <button type="button" onClick={() => setOpenId(open ? null : b.id)} className="adm-btn sm" aria-expanded={open}>
+                      {open ? 'ซ่อนใบสมัคร' : 'ดูใบสมัคร'}
+                    </button>
+                    {slipOk &&
+                      (b.refund_slip_url ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <a href={b.refund_slip_url} target="_blank" rel="noopener noreferrer" className="adm-thumb" style={{ width: 30, height: 36 }} title="ดูสลิป">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={b.refund_slip_url} alt="slip" />
+                          </a>
+                          <button type="button" onClick={() => setSlipFor(b)} className="adm-btn sm soft">
+                            แก้{slipNoun}
+                          </button>
+                        </span>
+                      ) : (
+                        <button type="button" onClick={() => setSlipFor(b)} className="adm-btn sm soft">
+                          + แนบ{slipNoun}
+                        </button>
+                      ))}
+                    {b.status !== 'cancelled' && (
+                      <button type="button" onClick={() => setRemoveFor(b)} disabled={busy} className="adm-btn sm danger">
+                        เอาออก
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {open && (
+                  <div className="adm-att-detail">
+                    <ApplicationDetail json={b.application_json} />
+                    <FacilitatorNote
+                      // Remount per booking so the textarea always starts from
+                      // that participant's saved note.
+                      key={b.id}
+                      initial={b.facilitator_note ?? null}
+                      endpoint={`/api/bookings/${b.id}`}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </section>
 
       {slipFor && (
         <RefundSlipModal
@@ -556,9 +438,10 @@ export default function AttendancePage() {
           }}
         />
       )}
-    </div>
+    </>
   );
 }
+
 
 type UserHit = { id: string; name: string | null; email: string | null };
 
@@ -826,24 +709,16 @@ function ApplicationDetail({ json }: { json: string | null }) {
   );
 }
 
-function StatTile({
-  label,
-  value,
-  tint,
-}: {
-  label: string;
-  value: number;
-  tint: string;
-}) {
+function StatTile({ label, value, tone }: { label: string; value: number; tone: 'ok' | 'warn' | 'mute' }) {
+  const [bg, color] = tone === 'ok' ? ['#dff3ec', '#0b6b4f'] : tone === 'warn' ? ['#fdf1d3', '#7a5200'] : ['#eceeed', '#4c5755'];
   return (
-    <div className="card !p-4">
-      <div className="mono text-[11px] tracking-[.12em] uppercase text-gray mb-1">{label}</div>
-      <div
-        className={`inline-flex items-center justify-center rounded-xl px-3 py-1 text-2xl font-bold ${tint}`}
-        style={{ fontFamily: 'Archivo Black, Mitr, sans-serif', letterSpacing: '-.02em' }}
-      >
+    <div className="adm-kpi adm-stat">
+      <span className="adm-label" style={{ fontSize: 11, lineHeight: '16px' }}>
+        {label}
+      </span>
+      <span className="adm-stat-value" style={{ background: bg, color }}>
         {value}
-      </div>
+      </span>
     </div>
   );
 }
@@ -861,24 +736,15 @@ function AttendChip({
   tone: 'green' | 'orange' | 'gray';
   onClick: () => void;
 }) {
-  const toneClass =
-    tone === 'green'
-      ? active
-        ? 'bg-emerald-600 text-white'
-        : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-      : tone === 'orange'
-        ? active
-          ? 'bg-orange-600 text-white'
-          : 'bg-orange-50 text-orange-700 hover:bg-orange-100'
-        : active
-          ? 'bg-gray text-white'
-          : 'bg-gray-lighter/50 text-gray hover:bg-gray-lighter';
+  const on = tone === 'green' ? ['#0b6b4f', '#fff'] : tone === 'orange' ? ['#c75f17', '#fff'] : ['#4c5755', '#fff'];
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${toneClass} disabled:opacity-50`}
+      aria-pressed={active}
+      className="adm-seg-btn"
+      style={active ? { background: on[0], color: on[1] } : undefined}
     >
       {label}
     </button>
