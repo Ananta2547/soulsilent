@@ -53,6 +53,8 @@ export default function AdminUsersPage() {
   const [editRoles, setEditRoles] = useState<string[]>([]);
   const [authError, setAuthError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('all');
+  /** Role filter: 'all', a role key, or 'user' for no special role. */
+  const [roleTab, setRoleTab] = useState<string>('all');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
 
@@ -152,7 +154,17 @@ export default function AdminUsersPage() {
   }
 
   const q = query.trim().toLowerCase();
-  const found = shown.filter((u) => !q || [u.name, u.nickname, u.email].some((s) => (s || '').toLowerCase().includes(q)));
+  // A person can hold several roles, so they count (and show) under each one.
+  const specialRoles = (u: User) => rolesOf(u).filter((r) => r !== 'user');
+  const hasRole = (u: User, key: string) => (key === 'all' ? true : key === 'user' ? specialRoles(u).length === 0 : (specialRoles(u) as string[]).includes(key));
+  const roleChips = [
+    { key: 'all', label: 'ทุกบทบาท', n: shown.length },
+    ...ROLE_OPTIONS.map((o) => ({ key: o.value, label: o.label, n: shown.filter((u) => hasRole(u, o.value)).length })),
+    { key: 'user', label: 'ผู้เข้าร่วม', n: shown.filter((u) => hasRole(u, 'user')).length },
+  ];
+  const found = shown
+    .filter((u) => hasRole(u, roleTab))
+    .filter((u) => !q || [u.name, u.nickname, u.email].some((s) => (s || '').toLowerCase().includes(q)));
   const editing = users.find((u) => u.id === editingId) || null;
 
   const rowOf = (user: User) => {
@@ -247,6 +259,13 @@ export default function AdminUsersPage() {
             { key: 'pending_deletion', label: 'รอลบ', n: counts.pending_deletion },
           ]}
         />
+      </div>
+
+      <div className="adm-toolbar" style={{ marginTop: -8 }}>
+        <span className="adm-label" style={{ fontSize: 11 }}>
+          บทบาท
+        </span>
+        <AdminChips value={roleTab} onChange={setRoleTab} items={roleChips} />
       </div>
 
       <div className="adm-card">
