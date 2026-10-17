@@ -214,6 +214,9 @@ a.adm-round:hover { background: var(--cream); text-decoration: none; color: var(
 .adm-round b { font-weight: 600; }
 .adm-thumb { border-radius: 12px; background: var(--cream); overflow: hidden; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .adm-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.adm-tag { display: inline-flex; align-items: center; gap: 4px; padding: 4px 6px 4px 12px; border-radius: 999px; background: var(--teal-50); color: var(--teal-deep); font-size: 12.5px; font-weight: 600; }
+.adm-tag button { width: 20px; height: 20px; border-radius: 50%; border: 0; background: transparent; color: inherit; cursor: pointer; }
+.adm-tag button:hover { background: #fde4e1; color: #a3261a; }
 .adm-review { padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; }
 .adm-review-top { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
 .adm-review-stars { font-size: 15px; letter-spacing: 2px; line-height: 1; padding-top: 4px; }
@@ -239,7 +242,7 @@ a.adm-round:hover { background: var(--cream); text-decoration: none; color: var(
 /* ---------- fields (also restyles the legacy .input-field) ---------- */
 .adm .input-field,
 .adm input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=color]):not([type=range]):not([type=hidden]),
-.adm select,
+.adm select:not(.art-vis),
 .adm textarea {
   width: 100%;
   min-height: 44px;
@@ -258,7 +261,7 @@ a.adm-round:hover { background: var(--cream); text-decoration: none; color: var(
 .adm textarea { resize: vertical; }
 .adm .input-field:focus,
 .adm input:not([type=checkbox]):not([type=radio]):focus,
-.adm select:focus,
+.adm select:not(.art-vis):focus,
 .adm textarea:focus { background-color: #fff; box-shadow: inset 0 0 0 2px var(--teal); }
 .adm input[type=checkbox], .adm input[type=radio] { accent-color: var(--teal); }
 .adm-field label, .adm-field > .adm-field-label { display: block; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
