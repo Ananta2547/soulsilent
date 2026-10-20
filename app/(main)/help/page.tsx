@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { useLang, T, tr, pick, type Lang } from '@/lib/i18n';
 import { Reveal } from '@/components/design/Reveal';
 import { Btn } from '@/components/design/RippleButton';
+import { HOLD_MINUTES, REFUND } from '@/lib/policy';
 
 type L = { th: string; en: string };
 
@@ -35,8 +36,22 @@ const HELP_FAQ: { cat: L; items: { q: L; a: L }[] }[] = [
       {
         q: { th: 'จ่ายเงินช่องทางไหนได้บ้าง?', en: 'What payment methods do you accept?' },
         a: {
-          th: 'พร้อมเพย์, โอนผ่านธนาคาร และบัตรเครดิต/เดบิต สถานะ “รอชำระเงิน” จะถือที่นั่งไว้ 24 ชั่วโมง',
-          en: 'PromptPay, bank transfer and credit/debit cards. A “Pending payment” booking holds your seat for 24 hours.',
+          th: `สแกน QR พร้อมเพย์ หรือบัตรเครดิต/เดบิต เมื่อกดจอง ระบบจะถือที่นั่งไว้ให้ ${HOLD_MINUTES} นาทีเพื่อรอชำระเงิน`,
+          en: `PromptPay QR or credit/debit card. When you book, your seat is held for ${HOLD_MINUTES} minutes while you pay.`,
+        },
+      },
+      {
+        q: { th: 'ยกเลิกแล้วได้เงินคืนไหม?', en: 'Can I get a refund if I cancel?' },
+        a: {
+          th: `ยกเลิกก่อนวันกิจกรรม ${REFUND.fullDays} วันขึ้นไปได้เงินคืนเต็มจำนวน (หักค่าธรรมเนียมการชำระเงิน) ${REFUND.partialDays}–${REFUND.fullDays - 1} วันได้คืน ${REFUND.partialPercent}% และถ้าผู้จัดยกเลิกกิจกรรม คุณได้เงินคืนเต็มจำนวน ดูรายละเอียดที่หน้าข้อกำหนดการใช้งาน หัวข้อการยกเลิกและการคืนเงิน`,
+          en: `Cancel ${REFUND.fullDays}+ days before for a full refund (less the payment fee), ${REFUND.partialDays}–${REFUND.fullDays - 1} days before for ${REFUND.partialPercent}%. If the host cancels, you get everything back. See “Cancellation and refunds” in our terms.`,
+        },
+      },
+      {
+        q: { th: 'ไปไม่ได้แล้ว ให้เพื่อนไปแทนได้ไหม?', en: 'Can a friend go in my place?' },
+        a: {
+          th: 'ได้ โอนสิทธิ์ให้เพื่อนได้จากหน้า “การจองของฉัน” ก่อนกิจกรรมเริ่ม ไม่มีค่าใช้จ่าย',
+          en: 'Yes. Transfer your seat from “My bookings” before the journey starts, free of charge.',
         },
       },
     ],

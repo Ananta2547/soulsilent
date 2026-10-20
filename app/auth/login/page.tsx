@@ -181,6 +181,8 @@ function LoginPageInner() {
               onChange={(e) => setEmail(e.target.value)}
               className="field"
               placeholder={tr(lang, 'อีเมล', 'Email')}
+              aria-label={tr(lang, 'อีเมล', 'Email')}
+              autoComplete="email"
               required
               style={{ marginBottom: 10 }}
             />
@@ -190,9 +192,16 @@ function LoginPageInner() {
               onChange={(e) => setPassword(e.target.value)}
               className="field"
               placeholder={tr(lang, 'รหัสผ่าน', 'Password')}
+              aria-label={tr(lang, 'รหัสผ่าน', 'Password')}
+              autoComplete="current-password"
               required
-              style={{ marginBottom: 16 }}
+              style={{ marginBottom: 8 }}
             />
+            <div style={{ textAlign: 'right', marginBottom: 14 }}>
+              <Link href="/auth/forgot-password" style={{ fontSize: 13, color: 'var(--teal-deep)', fontWeight: 600, textDecoration: 'none' }}>
+                {tr(lang, 'ลืมรหัสผ่าน?', 'Forgot password?')}
+              </Link>
+            </div>
             <Btn
               kind="teal"
               type="submit"

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useLang, T, tr } from '@/lib/i18n';
 import { Btn } from '@/components/design/RippleButton';
+import { MIN_PASSWORD } from '@/lib/policy';
 
 export default function ResetPasswordPage() {
   return (
@@ -46,8 +47,8 @@ function ResetInner() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
-    if (pw.length < 6) {
-      setError(tr(lang, 'รหัสผ่านอย่างน้อย 6 ตัวอักษร', 'Password must be at least 6 characters'));
+    if (pw.length < MIN_PASSWORD) {
+      setError(tr(lang, `รหัสผ่านอย่างน้อย ${MIN_PASSWORD} ตัวอักษร`, `Password must be at least ${MIN_PASSWORD} characters`));
       return;
     }
     if (pw !== confirm) {
@@ -130,8 +131,8 @@ function ResetInner() {
               )}
 
               <form onSubmit={submit}>
-                <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} className="field" placeholder={tr(lang, 'รหัสผ่านใหม่', 'New password')} minLength={6} required style={{ marginBottom: 10 }} />
-                <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className="field" placeholder={tr(lang, 'ยืนยันรหัสผ่านใหม่', 'Confirm new password')} required style={{ marginBottom: 16 }} />
+                <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} className="field" placeholder={tr(lang, `รหัสผ่านใหม่ (อย่างน้อย ${MIN_PASSWORD} ตัว)`, `New password (min ${MIN_PASSWORD})`)} autoComplete="new-password" minLength={MIN_PASSWORD} required style={{ marginBottom: 10 }} />
+                <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className="field" placeholder={tr(lang, 'ยืนยันรหัสผ่านใหม่', 'Confirm new password')} autoComplete="new-password" required style={{ marginBottom: 16 }} />
                 <Btn kind="teal" type="submit" disabled={loading} style={{ width: '100%', justifyContent: 'center' }}>
                   {loading ? tr(lang, 'กำลังบันทึก...', 'Saving...') : tr(lang, 'ตั้งรหัสผ่านใหม่', 'Update password')} <span className="mono">→</span>
                 </Btn>

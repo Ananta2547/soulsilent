@@ -1,0 +1,40 @@
+/* /terms and /privacy (components/legal/LegalDoc.tsx). */
+main:has(.legal-page) { background: var(--cream); }
+
+.legal-page { padding: 56px 0 88px; color: var(--ink); }
+.legal-wrap { max-width: 760px; }
+.legal-eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--teal); font-weight: 700; margin-bottom: 12px; }
+.legal-title { font-size: clamp(28px, 5vw, 40px); line-height: 1.25; margin: 0 0 10px; }
+.legal-updated { font-size: 13.5px; color: var(--muted); margin: 0 0 24px; }
+.legal-intro { font-size: 15.5px; line-height: 1.8; }
+.legal-intro p { margin: 0 0 12px; }
+
+.legal-toc { margin: 28px 0 8px; padding: 20px 22px; background: #fff; border-radius: 18px; border: 1px solid rgba(13, 30, 29, .08); }
+.legal-toc-h { font-weight: 700; font-size: 14px; margin-bottom: 8px; }
+.legal-toc ol { margin: 0; padding-left: 22px; columns: 2; column-gap: 28px; font-size: 14px; line-height: 1.9; }
+.legal-toc a { color: var(--teal-deep); text-decoration: none; }
+.legal-toc a:hover { text-decoration: underline; }
+
+.legal-sec { padding-top: 32px; scroll-margin-top: 88px; font-size: 15px; line-height: 1.85; }
+.legal-sec h2 { font-family: var(--font-display-th); font-weight: 500; font-size: 21px; line-height: 1.4; margin: 0 0 12px; }
+.legal-sec h2 span { color: var(--teal); }
+.legal-sec h3 { font-size: 15.5px; font-weight: 700; margin: 18px 0 6px; }
+.legal-sec p { margin: 0 0 12px; }
+.legal-sec ul, .legal-sec ol { margin: 0 0 12px; padding-left: 22px; }
+.legal-sec li { margin-bottom: 6px; }
+.legal-sec a { color: var(--teal-deep); }
+
+.legal-table { width: 100%; border-collapse: collapse; margin: 6px 0 14px; font-size: 14px; background: #fff; border-radius: 14px; overflow: hidden; }
+.legal-table th, .legal-table td { text-align: left; padding: 10px 14px; border-bottom: 1px solid rgba(13, 30, 29, .08); vertical-align: top; }
+.legal-table th { background: var(--teal-deep); color: #fff; font-weight: 600; }
+.legal-table tr:last-child td { border-bottom: 0; }
+
+.legal-note { padding: 14px 16px; border-radius: 14px; background: #fff7dc; border: 1px solid #f1d98a; font-size: 14px; margin: 6px 0 14px; }
+.legal-other { margin-top: 40px; font-size: 14.5px; color: var(--muted); }
+.legal-other a { color: var(--teal-deep); font-weight: 600; }
+
+@media (max-width: 760px) {
+  .legal-page { padding: 36px 0 64px; }
+  .legal-toc ol { columns: 1; }
+  .legal-table th, .legal-table td { padding: 9px 10px; }
+}

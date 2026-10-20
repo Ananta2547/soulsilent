@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       const verifyLink = `${siteUrl}/auth/verify-email?token=${encodeURIComponent(verifyToken)}`;
       const { sent } = await sendEmail({
         to: user.email,
-        subject: 'ยืนยันอีเมลของคุณ · soulsilent',
+        subject: 'ยืนยันอีเมลของคุณ · AllSoulLearn',
         html: emailTemplate({
           heading: 'ยืนยันอีเมลของคุณ',
           body: `กดปุ่มด้านล่างเพื่อยืนยันว่า ${user.email} เป็นอีเมลของคุณจริง แล้วเข้าสู่ระบบได้เลย`,

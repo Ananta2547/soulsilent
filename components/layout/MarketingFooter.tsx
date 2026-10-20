@@ -22,6 +22,12 @@ const FOOTER_NAV = [
   { label: 'ช่วยเหลือ', href: '/help' },
 ];
 
+const LEGAL_NAV = [
+  { label: 'ข้อกำหนดการใช้งาน', href: '/terms' },
+  { label: 'นโยบายความเป็นส่วนตัว', href: '/privacy' },
+  { label: 'การยกเลิกและคืนเงิน', href: '/terms#refund' },
+];
+
 export function MarketingFooter() {
   const be = new Date().getFullYear() + 543;
   return (
@@ -48,7 +54,7 @@ export function MarketingFooter() {
         <div className="container" style={{ paddingTop: 48, paddingBottom: 28 }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div style={{ maxWidth: 280 }}>
-              <span style={{ fontFamily: 'Mitr', fontWeight: 500, fontSize: 19, color: '#fff' }}>soulsilent<span style={{ color: 'var(--teal)' }}>.</span></span>
+              <span style={{ fontFamily: 'Mitr', fontWeight: 500, fontSize: 19, color: '#fff' }}>AllSoulLearn<span style={{ color: 'var(--teal)' }}>.</span></span>
               <p style={{ margin: '16px 0 0', fontSize: 13.5, lineHeight: 1.65, color: 'rgba(255,255,255,.55)' }}>เรียนรู้นอกห้องเรียน — workshop · camp · organize</p>
             </div>
             <nav style={{ display: 'flex', flexWrap: 'wrap', gap: 28 }}>
@@ -59,8 +65,12 @@ export function MarketingFooter() {
           </div>
           <div style={{ height: 1, background: 'rgba(255,255,255,.12)', margin: '36px 0 24px' }} />
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, justifyContent: 'space-between', alignItems: 'center' }}>
-            <div className="mono" style={{ fontSize: 11.5, color: 'rgba(255,255,255,.5)' }}>© {be} soulsilent. สงวนลิขสิทธิ์.</div>
-            <div className="mono" style={{ fontSize: 11.5, color: 'rgba(255,255,255,.35)' }}>allsoullearn.com</div>
+            <div className="mono" style={{ fontSize: 11.5, color: 'rgba(255,255,255,.5)' }}>© {be} AllSoulLearn. สงวนลิขสิทธิ์.</div>
+            <nav aria-label="นโยบาย" style={{ display: 'flex', flexWrap: 'wrap', gap: 18, fontSize: 12.5 }}>
+              {LEGAL_NAV.map((l) => (
+                <Link key={l.href} href={l.href} style={{ color: 'rgba(255,255,255,.7)' }}>{l.label}</Link>
+              ))}
+            </nav>
           </div>
         </div>
       </div>

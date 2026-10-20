@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useLang, T, tr } from '@/lib/i18n';
 import { Btn } from '@/components/design/RippleButton';
 import { AllSoulLearnLogo } from '@/components/layout/AllSoulLearnLogo';
+import { MIN_PASSWORD } from '@/lib/policy';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -14,6 +15,8 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  /** Ticked "I accept the terms and the privacy policy". */
+  const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState<{ email: string; devLink?: string } | null>(null);
@@ -34,12 +37,16 @@ export default function RegisterPage() {
       setError('รูปแบบอีเมลไม่ถูกต้อง');
       return;
     }
-    if (password.length < 6) {
-      setError('กรุณากรอกรหัสผ่านอย่างน้อย 6 ตัวอักษร');
+    if (password.length < MIN_PASSWORD) {
+      setError(tr(lang, `กรุณากรอกรหัสผ่านอย่างน้อย ${MIN_PASSWORD} ตัวอักษร`, `Password must be at least ${MIN_PASSWORD} characters`));
       return;
     }
     if (password !== confirmPassword) {
       setError(tr(lang, 'รหัสผ่านไม่ตรงกัน', 'Passwords do not match'));
+      return;
+    }
+    if (!accepted) {
+      setError(tr(lang, 'กรุณายอมรับข้อกำหนดการใช้งานและนโยบายความเป็นส่วนตัว', 'Please accept the terms and the privacy policy'));
       return;
     }
     setLoading(true);
@@ -141,6 +148,8 @@ export default function RegisterPage() {
               onChange={(e) => setName(e.target.value)}
               className="field"
               placeholder={tr(lang, 'ชื่อของคุณ', 'Your name')}
+              aria-label={tr(lang, 'ชื่อของคุณ', 'Your name')}
+              autoComplete="name"
               required
               style={{ marginBottom: 10 }}
             />
@@ -150,6 +159,8 @@ export default function RegisterPage() {
               onChange={(e) => setEmail(e.target.value)}
               className="field"
               placeholder={tr(lang, 'อีเมล', 'Email')}
+              aria-label={tr(lang, 'อีเมล', 'Email')}
+              autoComplete="email"
               required
               style={{ marginBottom: 10 }}
             />
@@ -158,8 +169,10 @@ export default function RegisterPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="field"
-              placeholder={tr(lang, 'รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)', 'Password (min 6 chars)')}
-              minLength={6}
+              placeholder={tr(lang, `รหัสผ่าน (อย่างน้อย ${MIN_PASSWORD} ตัวอักษร)`, `Password (min ${MIN_PASSWORD} chars)`)}
+              aria-label={tr(lang, 'รหัสผ่าน', 'Password')}
+              autoComplete="new-password"
+              minLength={MIN_PASSWORD}
               required
               style={{ marginBottom: 10 }}
             />
@@ -169,9 +182,29 @@ export default function RegisterPage() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="field"
               placeholder={tr(lang, 'ยืนยันรหัสผ่าน', 'Confirm password')}
+              aria-label={tr(lang, 'ยืนยันรหัสผ่าน', 'Confirm password')}
+              autoComplete="new-password"
               required
-              style={{ marginBottom: 16 }}
+              style={{ marginBottom: 14 }}
             />
+            <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13, lineHeight: 1.6, color: 'var(--ink-soft)', marginBottom: 16, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={accepted}
+                onChange={(e) => setAccepted(e.target.checked)}
+                style={{ width: 18, height: 18, marginTop: 2, flexShrink: 0, accentColor: 'var(--teal)' }}
+              />
+              <span>
+                {tr(lang, 'ฉันอ่านและยอมรับ', 'I have read and accept the ')}
+                <Link href="/terms" target="_blank" style={{ color: 'var(--teal-deep)', textDecoration: 'underline' }}>
+                  {tr(lang, 'ข้อกำหนดการใช้งาน', 'Terms of Service')}
+                </Link>
+                {tr(lang, ' และ', ' and the ')}
+                <Link href="/privacy" target="_blank" style={{ color: 'var(--teal-deep)', textDecoration: 'underline' }}>
+                  {tr(lang, 'นโยบายความเป็นส่วนตัว', 'Privacy Policy')}
+                </Link>
+              </span>
+            </label>
             <Btn
               kind="teal"
               type="submit"
@@ -202,6 +235,12 @@ export default function RegisterPage() {
             </svg>
             {tr(lang, 'สมัครด้วย Google', 'Sign up with Google')}
           </a>
+          <p style={{ textAlign: 'center', margin: '10px 0 0', fontSize: 11.5, lineHeight: 1.6, color: 'var(--muted)' }}>
+            {tr(lang, 'การสมัครด้วย Google ถือว่าคุณยอมรับ', 'Signing up with Google means you accept the ')}
+            <Link href="/terms" style={{ color: 'var(--teal-deep)' }}>{tr(lang, 'ข้อกำหนดการใช้งาน', 'Terms')}</Link>
+            {tr(lang, ' และ', ' and ')}
+            <Link href="/privacy" style={{ color: 'var(--teal-deep)' }}>{tr(lang, 'นโยบายความเป็นส่วนตัว', 'Privacy Policy')}</Link>
+          </p>
 
           <p style={{ textAlign: 'center', marginTop: 22, fontSize: 13, color: 'var(--muted)' }}>
             {tr(lang, 'มีบัญชีอยู่แล้ว?', 'Already have an account?')}{' '}

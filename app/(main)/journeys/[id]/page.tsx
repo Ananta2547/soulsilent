@@ -34,6 +34,7 @@ import {
   canAccessTeacherDashboard,
 } from '@/lib/workshop-utils';
 import { hasAnyRole } from '@/lib/roles';
+import { REFUND } from '@/lib/policy';
 import { learnServerClock } from '@/lib/server-clock';
 import { visibleAppStatus } from '@/lib/selection-status';
 import { GiftModal } from '@/components/workshops/GiftModal';
@@ -1658,13 +1659,22 @@ function BookingCardContent({
       >
         {[
           tr(lang, 'จองที่นั่งทันที · ชำระเงินภายใน 10 นาที', 'Seat held instantly · pay within 10 minutes'),
-          tr(lang, 'ที่นั่งจำกัด · ชำระแล้วไม่คืนเงิน', 'Limited seats · paid bookings non-refundable'),
+          tr(
+            lang,
+            `ยกเลิกก่อน ${REFUND.fullDays} วัน รับเงินคืน · ไปไม่ได้โอนสิทธิ์ได้`,
+            `Cancel ${REFUND.fullDays} days ahead for a refund · or transfer your seat`,
+          ),
         ].map((line) => (
           <li key={line} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ color: 'var(--teal)', fontWeight: 700, flexShrink: 0 }}>✓</span>
             {line}
           </li>
         ))}
+        <li style={{ paddingLeft: 20 }}>
+          <Link href="/terms#refund" style={{ color: 'var(--teal-deep)', textDecoration: 'underline' }}>
+            {tr(lang, 'อ่านนโยบายการยกเลิกและคืนเงิน', 'Read the cancellation and refund policy')}
+          </Link>
+        </li>
       </ul>
     </>
   );

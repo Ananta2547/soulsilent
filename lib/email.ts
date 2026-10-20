@@ -17,7 +17,7 @@ type SendArgs = {
 export async function sendEmail({ to, subject, html }: SendArgs): Promise<{ ok: boolean; sent: boolean; error?: string }> {
   const env = await getEnv();
   const apiKey = env.RESEND_API_KEY;
-  const from = env.EMAIL_FROM || 'soulsilent <onboarding@resend.dev>';
+  const from = env.EMAIL_FROM || 'AllSoulLearn <onboarding@resend.dev>';
 
   if (!apiKey) {
     console.info(`[email:skipped — no RESEND_API_KEY] to=${to} subject="${subject}"`);
@@ -51,8 +51,8 @@ export function emailTemplate(opts: {
   return `<!doctype html><html><body style="margin:0;background:#f6f1e6;font-family:'IBM Plex Sans Thai','Noto Sans Thai','Leelawadee UI',Arial,sans-serif;color:#0d1e1d;">
   <div style="max-width:480px;margin:0 auto;padding:40px 24px;">
     <div style="display:inline-flex;align-items:center;gap:8px;margin-bottom:28px;">
-      <span style="width:30px;height:30px;border-radius:50%;background:#0d8a7e;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:600;">s</span>
-      <span style="font-size:18px;font-weight:600;">soulsilent<span style="color:#0d8a7e;">.</span></span>
+      <span style="width:30px;height:30px;border-radius:50%;background:#0d8a7e;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:600;">A</span>
+      <span style="font-size:18px;font-weight:600;">AllSoulLearn<span style="color:#0d8a7e;">.</span></span>
     </div>
     <div style="background:#fff;border-radius:20px;padding:32px;">
       <h1 style="font-size:22px;margin:0 0 14px;">${heading}</h1>
@@ -60,6 +60,6 @@ export function emailTemplate(opts: {
       <a href="${ctaHref}" style="display:inline-block;background:#0d8a7e;color:#fff;text-decoration:none;padding:13px 24px;border-radius:999px;font-weight:600;font-size:15px;">${ctaLabel}</a>
       ${footnote ? `<p style="font-size:12px;color:#6a7a78;margin:24px 0 0;line-height:1.6;">${footnote}</p>` : ''}
     </div>
-    <p style="font-size:11px;color:#9aa8a6;text-align:center;margin:24px 0 0;">© 2026 soulsilent · learn outside the room</p>
+    <p style="font-size:11px;color:#9aa8a6;text-align:center;margin:24px 0 0;">© ${new Date().getFullYear() + 543} AllSoulLearn · เรียนรู้นอกห้องเรียน</p>
   </div></body></html>`;
 }

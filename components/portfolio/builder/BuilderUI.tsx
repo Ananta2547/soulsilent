@@ -98,7 +98,7 @@ export function DesignTopBar({
         <span className="mark">s</span>
         <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
           <span className="word">
-            soulsilent<span className="dot">.</span>
+            AllSoulLearn<span className="dot">.</span>
           </span>
           <span className="back">← back</span>
         </span>

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { MIN_PASSWORD } from '@/lib/policy';
 import { v4 as uuid } from 'uuid';
 import { getDB, getEnv } from '@/lib/db';
 import { hashPassword, createToken } from '@/lib/auth';
@@ -16,8 +17,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'กรุณากรอกข้อมูลให้ครบ' }, { status: 400 });
     }
 
-    if (password.length < 6) {
-      return NextResponse.json({ error: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร' }, { status: 400 });
+    if (password.length < MIN_PASSWORD) {
+      return NextResponse.json({ error: `รหัสผ่านต้องมีอย่างน้อย ${MIN_PASSWORD} ตัวอักษร` }, { status: 400 });
     }
 
     const db = await getDB();
@@ -54,9 +55,9 @@ export async function POST(request: Request) {
       const verifyLink = `${siteUrl}/auth/verify-email?token=${encodeURIComponent(verifyToken)}`;
       const { sent } = await sendEmail({
         to: email,
-        subject: 'ยืนยันอีเมลของคุณ · soulsilent',
+        subject: 'ยืนยันอีเมลของคุณ · AllSoulLearn',
         html: emailTemplate({
-          heading: 'ยินดีต้อนรับสู่ soulsilent',
+          heading: 'ยินดีต้อนรับสู่ AllSoulLearn',
           body: `สวัสดี ${name} — ขอบคุณที่สมัครสมาชิก กดปุ่มด้านล่างเพื่อยืนยันว่า ${email} เป็นอีเมลของคุณจริง`,
           ctaLabel: 'ยืนยันอีเมล',
           ctaHref: verifyLink,

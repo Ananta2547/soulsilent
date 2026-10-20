@@ -41,7 +41,9 @@ export async function createResetToken(sub: string, nonce: string): Promise<stri
   return new SignJWT({ sub, scope: 'pwreset', nonce })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime(TOKEN_EXPIRY)
+    // Short: anyone can request one from the forgot-password form, and the
+    // email sits in an inbox. (Sign-in tokens use TOKEN_EXPIRY.)
+    .setExpirationTime('1h')
     .sign(await getSecret());
 }
 

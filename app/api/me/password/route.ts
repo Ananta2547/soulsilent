@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { MIN_PASSWORD } from '@/lib/policy';
 import { getDB } from '@/lib/db';
 import { getCurrentUser, hashPassword, verifyPassword } from '@/lib/auth';
 import type { User } from '@/lib/types';
@@ -16,8 +17,8 @@ export async function PUT(request: Request) {
   };
 
   const newPassword = body.new_password || '';
-  if (newPassword.length < 6) {
-    return NextResponse.json({ error: 'รหัสผ่านใหม่อย่างน้อย 6 ตัวอักษร' }, { status: 400 });
+  if (newPassword.length < MIN_PASSWORD) {
+    return NextResponse.json({ error: `รหัสผ่านใหม่อย่างน้อย ${MIN_PASSWORD} ตัวอักษร` }, { status: 400 });
   }
 
   const db = await getDB();

@@ -42,7 +42,7 @@ export async function POST() {
 
   const { sent } = await sendEmail({
     to: user.email,
-    subject: 'ยืนยันอีเมลของคุณ · soulsilent',
+    subject: 'ยืนยันอีเมลของคุณ · AllSoulLearn',
     html: emailTemplate({
       heading: 'ยืนยันอีเมลของคุณ',
       body: `สวัสดี ${user.name} — กดปุ่มด้านล่างเพื่อยืนยันว่า ${user.email} เป็นอีเมลของคุณจริง เพื่อปลดล็อกการยืนยันตัวตนของบัญชี`,

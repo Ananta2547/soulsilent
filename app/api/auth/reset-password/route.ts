@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { MIN_PASSWORD } from '@/lib/policy';
 import { getDB } from '@/lib/db';
 import { verifyResetToken, hashPassword } from '@/lib/auth';
 
@@ -32,8 +33,8 @@ export async function POST(request: Request) {
   if (!token) {
     return NextResponse.json({ error: 'ลิงก์ไม่ถูกต้อง' }, { status: 400 });
   }
-  if (!password || password.length < 6) {
-    return NextResponse.json({ error: 'รหัสผ่านอย่างน้อย 6 ตัวอักษร' }, { status: 400 });
+  if (!password || password.length < MIN_PASSWORD) {
+    return NextResponse.json({ error: `รหัสผ่านอย่างน้อย ${MIN_PASSWORD} ตัวอักษร` }, { status: 400 });
   }
 
   const payload = await verifyResetToken(token);

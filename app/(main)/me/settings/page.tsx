@@ -136,7 +136,7 @@ function SettingsHub() {
       {/* Page head */}
       <div className="page-head" style={{ marginBottom: 30 }}>
         <div className="crumbs">
-          <Link href="/">soulsilent</Link>
+          <Link href="/">AllSoulLearn</Link>
           <span>/</span>
           {tr(lang, 'ตั้งค่า', 'Settings')}
         </div>

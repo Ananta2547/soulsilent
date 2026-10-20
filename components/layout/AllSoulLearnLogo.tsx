@@ -22,13 +22,17 @@ export function AllSoulLearnLogo({
       role="img"
       aria-label={title}
     >
+      {/* The "A" is a drawn triangle, so the text below reads "llSoulLearn":
+          the title gives the whole name to readers and crawlers, and the text
+          is hidden from them. */}
+      <title>{title}</title>
       <path
         d="M31,50 L43.7,50 L70.9,120 L3,120 Z M36.95,69.8 L47.1,91.4 L24.9,104.2 Z"
         fill={ink}
         fillRule="evenodd"
         strokeLinejoin="round"
       />
-      <text x="73.7" y="120" style={{ fontFamily: "'Poppins',Mitr, sans-serif", fontSize: 100 }}>
+      <text x="73.7" y="120" aria-hidden="true" style={{ fontFamily: "'Poppins',Mitr, sans-serif", fontSize: 100 }}>
         <tspan style={{ fontWeight: 700 }} fill={ink}>ll</tspan>
         <tspan style={{ fontWeight: 700 }} fill={teal}>Soul</tspan>
         <tspan style={{ fontWeight: 500 }} fill={ink}>Learn</tspan>
