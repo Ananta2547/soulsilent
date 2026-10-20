@@ -403,7 +403,9 @@ function createdAtMs(w: { created_at?: string | null }): number {
  *  "Open" uses the effective badge so a started (auto-closed) workshop sinks
  *  into the Closed group. */
 export function compareWorkshopsForListing(a: Workshop, b: Workshop, now: Date = serverNow()): number {
-  const rank = (w: Workshop) => (isNewWorkshop(w, now) ? 0 : getWorkshopStatusBadge(w, now).open ? 1 : 2);
+  // "New" only lifts a journey that is still open: a closed one goes with the
+  // closed, however recently it was created.
+  const rank = (w: Workshop) => (!getWorkshopStatusBadge(w, now).open ? 2 : isNewWorkshop(w, now) ? 0 : 1);
   const ra = rank(a);
   const diff = ra - rank(b);
   if (diff !== 0) return diff;

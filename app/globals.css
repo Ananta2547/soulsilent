@@ -692,6 +692,7 @@ body {
   text-decoration: none;
   font-size: 14px;
   font-weight: 500;
+  white-space: nowrap;
   padding: 6px 10px;
   border-radius: 8px;
   transition: 0.18s ease;
@@ -880,8 +881,9 @@ body {
 .show-sm { display: none; }
 
 /* hide-sm / show-sm are a matched pair (desktop nav vs. hamburger) and MUST
-   flip at the same width — otherwise both render at once. */
-@media (max-width: 760px) {
+   flip at the same width — otherwise both render at once. 880px, not 760:
+   between the two the header's links wrapped onto two or three lines. */
+@media (max-width: 880px) {
   .hide-sm { display: none !important; }
   .show-sm { display: inherit; }
 }
@@ -3281,7 +3283,7 @@ body {
    sets `display`, and it is declared after .show-sm, so without this pair the
    menu button reappears on desktop beside the full nav. */
 .nav-icon-btn.show-sm { display: none; }
-@media (max-width: 760px) {
+@media (max-width: 880px) {
   .nav-icon-btn.show-sm { display: inline-flex; }
 }
 

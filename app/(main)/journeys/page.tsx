@@ -241,7 +241,7 @@ function WorkshopsListingInner() {
           </div>
           {tags.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <span className="mono" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '.1em' }}>#TAGS</span>
+              <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 600 }}>แท็ก</span>
               {tags.map((t) => {
                 const on = tagFilter === t;
                 return (

@@ -4,11 +4,23 @@ import { LangProvider } from '@/lib/i18n';
 import { DataLoadingProvider, DataLoadingScreen } from '@/components/design/DataLoading';
 import { PwaRegister } from '@/components/pwa/PwaRegister';
 import { APPLE_SPLASH } from '@/components/pwa/splash';
+import { DEFAULT_OG_IMAGE, SITE_DESCRIPTION, SITE_NAME, SITE_ORIGIN } from '@/lib/seo';
 
 export const metadata: Metadata = {
-  title: 'AllSoulLearn · learn outside the room',
-  description: 'Workshop · Camp · Organize — เรียนรู้นอกห้องเรียน',
+  metadataBase: new URL(SITE_ORIGIN),
+  // Pages set their own title; the template adds the brand after it.
+  title: { default: 'AllSoulLearn · เรียนรู้นอกห้องเรียน', template: '%s · AllSoulLearn' },
+  description: SITE_DESCRIPTION,
   applicationName: 'AllSoulLearn',
+  openGraph: {
+    type: 'website',
+    siteName: SITE_NAME,
+    locale: 'th_TH',
+    title: 'AllSoulLearn · เรียนรู้นอกห้องเรียน',
+    description: SITE_DESCRIPTION,
+    images: [{ url: DEFAULT_OG_IMAGE, width: 512, height: 512, alt: 'AllSoulLearn' }],
+  },
+  twitter: { card: 'summary_large_image' },
   // Installed on iPhone/iPad (Add to Home Screen): full screen, own icon/title.
   appleWebApp: { capable: true, title: 'AllSoulLearn', statusBarStyle: 'default', startupImage: APPLE_SPLASH },
   icons: { apple: '/icons/apple-touch-icon.png' },

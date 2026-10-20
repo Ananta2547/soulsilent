@@ -7,7 +7,8 @@ import { useLang } from '@/lib/i18n';
 import { Icon } from '@/components/design/Icon';
 import { useLoadingTracker } from '@/components/design/DataLoading';
 import { getEffectivePrice, hasWorkshopEnded, getWorkshopCardStatus, isNewWorkshop, isWorkshopFull, compareWorkshopsForListing } from '@/lib/workshop-utils';
-import { learnServerClock } from '@/lib/server-clock';
+import { learnServerClock, learnServerTime } from '@/lib/server-clock';
+import type { HomeBundle, PublicReview } from '@/lib/home-bundle';
 import { categoryLabel, formatArticleDate } from '@/lib/article-utils';
 import { cardPos } from '@/lib/article-card';
 
@@ -92,16 +93,6 @@ function abbrevName(full: string | null): string {
   return `${parts[0]} ${parts[parts.length - 1][0]}.`;
 }
 
-type PublicReview = {
-  id: string;
-  rating: number;
-  comment: string | null;
-  user_name: string | null;
-  workshop_id: string | null;
-  workshop_title: string | null;
-  master_id: string | null;
-};
-
 /** /api/stats — base seed + live DB counts. */
 type SiteStats = { workshops: number; participants: number; locations: number };
 
@@ -118,14 +109,9 @@ const FAN_SLOTS = [
   { x: 336, y: 34, r: 15, z: 1, g: 'linear-gradient(158deg,#fb923c,#ea580c)' },
 ];
 
-/** Curated fallback tickets — used to fill the fan when there aren't 5 live workshops. */
-const SAMPLE_TICKETS: Ticket[] = [
-  { id: null, cat: 'ART · ศิลปะ', title: 'Field\nSketch', subtitle: 'เดินวาดเมืองเก่า', date: '22 ก.ค. 69', price: '฿1,290', latin: true, image: null },
-  { id: null, cat: 'PRINT · สิ่งพิมพ์', title: 'Zine\nLab', subtitle: 'หนังสือทำมือเล่มแรก', date: '30 ก.ค. 69', price: '฿1,590', latin: true, image: null },
-  { id: null, cat: 'CAMP · แคมป์', title: 'Quiet\nCamp', subtitle: 'สองวันกับความเงียบ', date: '5–6 ส.ค. 69', price: '฿3,900', latin: true, image: null },
-  { id: null, cat: 'WRITE · เขียน', title: 'Morning\nPages', subtitle: 'เขียนก่อนโลกตื่น', date: '9 ส.ค. 69', price: 'ฟรี', latin: true, image: null },
-  { id: null, cat: 'CRAFT · คราฟต์', title: 'Slow\nCoffee', subtitle: 'ชงกาแฟช้า ๆ', date: '12 ส.ค. 69', price: '฿890', latin: true, image: null },
-];
+/** Fills a fan slot when there aren't 5 live journeys. It names no event,
+ *  date or price: made-up ones read as real listings. */
+const SOON_TICKET: Ticket = { id: null, cat: 'ALLSOULLEARN', title: 'Coming\nSoon', subtitle: 'กิจกรรมใหม่เร็ว ๆ นี้', date: '', price: 'เร็ว ๆ นี้', latin: true, image: null };
 
 function ticketFromWorkshop(w: Workshop): Ticket {
   const eff = getEffectivePrice(w);
@@ -175,7 +161,7 @@ function FanCard({ slot, index, ticket, onEnter }: { slot: (typeof FAN_SLOTS)[nu
     >
       {ticket.image && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={ticket.image} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        <img src={ticket.image} alt={ticket.title.replace(/\n/g, ' ')} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
       )}
       {!posterOnly && (
         <div
@@ -233,7 +219,7 @@ function FanCard({ slot, index, ticket, onEnter }: { slot: (typeof FAN_SLOTS)[nu
   );
 }
 
-function Hero({ workshops }: { workshops: Workshop[] }) {
+function Hero({ workshops, fill }: { workshops: Workshop[]; fill: Workshop[] }) {
   const fanRef = useRef<HTMLDivElement>(null);
 
   // Fill the 5-slot fan with starred workshops, newest first, placed so the
@@ -246,12 +232,18 @@ function Hero({ workshops }: { workshops: Workshop[] }) {
     const sorted = [...workshops]
       .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
       .slice(0, 5);
+    // Fewer than 5 starred: top up with other open journeys, soonest first.
+    const starred = new Set(sorted.map((w) => w.id));
+    const extra = [...fill]
+      .filter((w) => !starred.has(w.id))
+      .sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+      .slice(0, 5 - sorted.length);
     const bySlot: (Ticket | undefined)[] = new Array(5);
-    sorted.forEach((w, rank) => {
+    [...sorted, ...extra].forEach((w, rank) => {
       bySlot[RANK_TO_SLOT[rank]] = ticketFromWorkshop(w);
     });
-    return Array.from({ length: 5 }, (_, i) => bySlot[i] ?? SAMPLE_TICKETS[i]);
-  }, [workshops]);
+    return Array.from({ length: 5 }, (_, i) => bySlot[i] ?? SOON_TICKET);
+  }, [workshops, fill]);
 
   /**
    * Spread siblings apart + lift the hovered card. The hovered card rises,
@@ -673,12 +665,6 @@ function ArticlesSection({ lead, side, categories }: { lead?: Article; side: Art
 
 /* ---------------- Reviews ---------------- */
 
-const SAMPLE_REVIEWS: { name: string; workshop: string; quote: string }[] = [
-  { name: 'พลอย · นักออกแบบ', workshop: 'Zine Lab #03', quote: 'มาด้วยความคาดหวังว่าจะได้ "เทคนิค" กลับไปได้ "ตัวเอง" เป็นวันที่เงียบที่สุดในรอบหลายเดือน' },
-  { name: 'เปา · นักศึกษาปี 2', workshop: 'Quiet Camp #01', quote: 'เรียนหนัก เครียด แทบไม่ได้ออกไปไหนเลย สองวันนี้ทำให้รู้ว่าหายใจช้า ๆ ก็เป็นการเรียนรู้ได้' },
-  { name: 'ตี้ · ฟรีแลนซ์', workshop: 'Field Sketch · Charoenkrung', quote: 'ครั้งแรกที่วาดรูปนอกบ้านโดยไม่กลัวคนมอง กลับบ้านมาวาดต่อทุกวัน' },
-];
-
 /** Small hand-placed tilt per review card (deg), cycled by index. */
 const REV_TILT = [-2, 1.5, -1.3, 2, -0.9, 1.7, -1.6, 1.2, -2, 0.9];
 
@@ -690,10 +676,10 @@ function ReviewsSection({ reviews }: { reviews: PublicReview[] }) {
      track carry the whole "there is more, swipe" message. */
   const [active, setActive] = useState(0);
 
-  const cards =
-    reviews.length > 0
-      ? reviews.slice(0, 10).map((r) => ({ key: r.id, name: abbrevName(r.user_name), workshop: r.workshop_title || '', workshopId: r.workshop_id, quote: r.comment || '', rating: Math.max(1, Math.min(5, r.rating || 5)) }))
-      : SAMPLE_REVIEWS.map((r, i) => ({ key: `s${i}`, name: r.name, workshop: r.workshop, workshopId: null as string | null, quote: r.quote, rating: 5 }));
+  // Only real reviews: the section is not rendered at all without any.
+  const cards = reviews
+    .slice(0, 10)
+    .map((r) => ({ key: r.id, name: abbrevName(r.user_name), workshop: r.workshop_title || '', workshopId: r.workshop_id, quote: r.comment || '', rating: Math.max(1, Math.min(5, r.rating || 5)) }));
 
   useEffect(() => {
     const el = trackRef.current;
@@ -856,19 +842,28 @@ function StatsSection({ stats }: { stats: SiteStats }) {
 
 /* ---------------- Page ---------------- */
 
-export default function HomePage() {
-  const [workshops, setWorkshops] = useState<Workshop[]>([]);
-  const [featuredWorkshops, setFeaturedWorkshops] = useState<Workshop[]>([]);
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [articleCategories, setArticleCategories] = useState<ArticleCategory[]>([]);
-  const [reviews, setReviews] = useState<PublicReview[]>([]);
-  const [stats, setStats] = useState<SiteStats>({ workshops: 11, participants: 125, locations: 0 });
+/** `initial` is the bundle the server read for this request (app/(main)/page),
+ *  so the first HTML already shows the live data. It is null only when that
+ *  read failed; the page then fetches /api/home itself. */
+export function HomeClient({ initial }: { initial: (HomeBundle & { at: number }) | null }) {
+  const [workshops, setWorkshops] = useState<Workshop[]>(initial?.workshops || []);
+  const [featuredWorkshops, setFeaturedWorkshops] = useState<Workshop[]>(initial?.featured || []);
+  const [articles, setArticles] = useState<Article[]>(initial?.articles || []);
+  const [articleCategories, setArticleCategories] = useState<ArticleCategory[]>(initial?.categories || []);
+  const [reviews, setReviews] = useState<PublicReview[]>(initial?.reviews || []);
+  const [stats, setStats] = useState<SiteStats>(initial?.stats || { workshops: 0, participants: 0, locations: 0 });
 
   // Every request the home page needs is tracked, so the loading screen's bar
   // moves as each one lands and the screen clears on the last of them.
   const track = useLoadingTracker();
 
   useEffect(() => {
+    if (initial) {
+      // No response header to learn the server clock from: use the time the
+      // server read the data at.
+      learnServerTime(initial.at);
+      return;
+    }
     // One request, one D1 batch, for everything below the fold — the six
     // pieces used to be six round trips fired after hydration.
     track(
@@ -891,21 +886,21 @@ export default function HomePage() {
           setArticles(d.articles || []);
           setArticleCategories(d.categories || []);
           setReviews(d.reviews || []);
-          setStats({ workshops: d.stats?.workshops ?? 11, participants: d.stats?.participants ?? 125, locations: d.stats?.locations ?? 0 });
+          setStats({ workshops: d.stats?.workshops ?? 0, participants: d.stats?.participants ?? 0, locations: d.stats?.locations ?? 0 });
         })
         .catch(() => {}),
     );
-  }, [track]);
+  }, [track, initial]);
 
   const leadArticle = articles.find((a) => a.featured) || articles[0];
   const sideArticles = articles.filter((a) => a.id !== leadArticle?.id).slice(0, 3);
 
   return (
     <div className="home-dc">
-      <Hero workshops={featuredWorkshops} />
+      <Hero workshops={featuredWorkshops} fill={workshops} />
       <UpcomingEvents workshops={workshops} rounds={<RoundsSection workshops={workshops} />} />
       <ArticlesSection lead={leadArticle} side={sideArticles} categories={articleCategories} />
-      <ReviewsSection reviews={reviews} />
+      {reviews.length > 0 && <ReviewsSection reviews={reviews} />}
       <StatsSection stats={stats} />
     </div>
   );

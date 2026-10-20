@@ -18,7 +18,12 @@ let offsetMs = 0;
 export function learnServerClock(res: Response): void {
   const header = res.headers.get('date');
   if (!header) return;
-  const serverMs = Date.parse(header);
+  learnServerTime(Date.parse(header));
+}
+
+/** Same, from a server timestamp handed to the page directly (a server
+ *  component's props) instead of a response header. */
+export function learnServerTime(serverMs: number): void {
   if (!Number.isFinite(serverMs)) return;
   // The header has whole-second precision; ignore drift under a couple of
   // seconds so an accurate device clock is not nudged around by rounding.
