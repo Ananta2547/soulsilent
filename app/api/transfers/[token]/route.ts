@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth';
 import type { TicketTransfer } from '@/lib/transfers';
 import { hasWorkshopStarted } from '@/lib/workshop-utils';
 import type { Workshop } from '@/lib/types';
+import { publicWorkshop } from '@/lib/workshop-public';
 
 /**
  * GET /api/transfers/{token} — what the receiver needs to decide whether to
@@ -55,7 +56,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
     },
     // `online_url` belongs to whoever holds the seat, and the receiver does not
     // hold it yet — it reaches them from the workshop page once they claim.
-    workshop: { ...workshop, online_url: null },
+    workshop: publicWorkshop(workshop),
     claimable,
     unpaid: !secured,
     isSender: !!user && user.sub === tr.from_user_id,

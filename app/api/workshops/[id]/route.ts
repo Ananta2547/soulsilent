@@ -11,8 +11,9 @@ import {
 } from '@/lib/workshop-utils';
 import { normalizeOnlineFields } from '@/lib/online-platform';
 import type { Workshop, Location, User } from '@/lib/types';
+import { publicWorkshop } from '@/lib/workshop-public';
 
-type InstructorPublic = Pick<User, 'id' | 'name' | 'email' | 'role' | 'avatar_url'> & {
+type InstructorPublic = Pick<User, 'id' | 'name' | 'role' | 'avatar_url'> & {
   portfolio_id: string | null;
 };
 
@@ -29,7 +30,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       .bind(id)
       .first<Workshop>();
 
-    if (!workshop) {
+    // A draft is unpublished: only an admin may open it.
+    const viewer = await getCurrentUser();
+    const isAdmin = viewer?.role === 'admin';
+    if (!workshop || (workshop.status === 'draft' && !isAdmin)) {
       return NextResponse.json({ error: 'ไม่พบกิจกรรม' }, { status: 404 });
     }
 
@@ -59,7 +63,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         .prepare(
           // Display name = nickname (what the teacher edits in their profile)
           // falling back to the registration name — always the latest from users.
-          `SELECT u.id, COALESCE(NULLIF(TRIM(u.nickname), ''), u.name) AS name, u.email, u.role, u.avatar_url,
+          `SELECT u.id, COALESCE(NULLIF(TRIM(u.nickname), ''), u.name) AS name, u.role, u.avatar_url,
                   (SELECT p.id FROM portfolios p
                     WHERE p.user_id = u.id AND p.published = 1 LIMIT 1) AS portfolio_id
              FROM users u WHERE u.id IN (${placeholders})`
@@ -103,7 +107,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       parent_booking_id: string | null;
       group_claimed: number;
     } | null = null;
-    const user = await getCurrentUser();
+    const user = viewer;
     if (user) {
       userBooking = await db
         .prepare(
@@ -181,7 +185,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       // confirmed on a free/selection workshop). Everyone else — including
       // signed-out visitors and users with a pending hold — gets it stripped,
       // so the URL never reaches a browser that shouldn't have it.
-      workshop: { ...workshop, online_url: mayJoinOnline ? workshop.online_url : null },
+      // An admin gets the whole row (the edit form loads from here); everyone
+      // else the public columns only — see lib/workshop-public.
+      workshop: isAdmin
+        ? workshop
+        : { ...publicWorkshop(workshop), online_url: mayJoinOnline ? workshop.online_url : null },
       // The invite link exists from the moment the group is booked, but is
       // only handed out once the seats are actually paid for.
       groupInvite:

@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { v4 as uuid } from 'uuid';
 import { getDB } from '@/lib/db';
-import { requireAdmin } from '@/lib/auth';
+import { requireAdmin, getCurrentUser } from '@/lib/auth';
+import { publicWorkshop, PUBLIC_STATUSES } from '@/lib/workshop-public';
 import { normalizeInstructorIds } from '@/lib/workshop-utils';
 import { normalizeOnlineFields } from '@/lib/online-platform';
 import type { Workshop } from '@/lib/types';
@@ -25,8 +26,15 @@ export async function GET(request: Request) {
       }
     }
 
+    // Everyone but an admin gets published rows only, minus the private
+    // columns (payout, photo folder, meeting link) — see lib/workshop-public.
+    const isAdmin = (await getCurrentUser())?.role === 'admin';
+
     const where: string[] = [];
     const params: string[] = [];
+    if (!isAdmin) {
+      where.push(`status IN (${PUBLIC_STATUSES.map((s) => `'${s}'`).join(', ')})`);
+    }
 
     // Public pages show open + closed workshops, never drafts.
     if (url.searchParams.get('public') === '1') {
@@ -60,7 +68,8 @@ export async function GET(request: Request) {
     const stmt =
       params.length > 0 ? db.prepare(query).bind(...params) : db.prepare(query);
     const result = await stmt.all<Workshop>();
-    return NextResponse.json({ workshops: result.results });
+    const rows = result.results || [];
+    return NextResponse.json({ workshops: isAdmin ? rows : rows.map(publicWorkshop) });
   } catch (error) {
     console.error('Get workshops error:', error);
     return NextResponse.json({ error: 'เกิดข้อผิดพลาด' }, { status: 500 });

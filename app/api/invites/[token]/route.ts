@@ -5,6 +5,7 @@ import { partyFromBooking } from '@/lib/transfers';
 import { loadInvite } from '@/lib/invites';
 import { getWorkshopStatusBadge } from '@/lib/workshop-utils';
 import type { Workshop } from '@/lib/types';
+import { publicWorkshop } from '@/lib/workshop-public';
 
 /**
  * GET /api/invites/{token} — what a friend sees before joining a group: the
@@ -65,7 +66,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
     },
     // `online_url` belongs to whoever holds a seat, and the friend does not
     // hold one yet — it reaches them from the workshop page once they join.
-    workshop: { ...workshop, online_url: null },
+    workshop: publicWorkshop(workshop),
     claimable,
     unpaid: !secured,
     isBooker: !!user && user.sub === parent.user_id,

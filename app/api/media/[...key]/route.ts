@@ -1,5 +1,45 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { getFromR2 } from '@/lib/r2';
+import { getDB } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
+import { canAccessTeacherDashboard } from '@/lib/workshop-utils';
+
+const PRIVATE_PREFIXES = ['images/payout/', 'images/refund/'];
+
+function isPrivateKey(key: string): boolean {
+  return PRIVATE_PREFIXES.some((p) => key.startsWith(p));
+}
+
+/** Admins see every slip. A payout slip is also open to the hosts of its
+ *  workshop, and a refund slip to the person who was refunded. The key is
+ *  matched against the stored url and against the meta, which holds the
+ *  uncropped original's url. */
+async function maySeePrivate(key: string): Promise<boolean> {
+  const user = await getCurrentUser();
+  if (!user) return false;
+  if (user.role === 'admin') return true;
+  const url = `/api/media/${key}`;
+  const db = await getDB();
+  if (key.startsWith('images/payout/')) {
+    const rows = await db
+      .prepare(
+        `SELECT instructor_id, instructor_ids_json, dashboard_access_json FROM workshops
+          WHERE payout_slip_url = ?1 OR instr(COALESCE(payout_slip_meta, ''), ?1) > 0`
+      )
+      .bind(url)
+      .all<{ instructor_id: string | null; instructor_ids_json: string | null; dashboard_access_json: string | null }>();
+    return (rows.results || []).some((w) => canAccessTeacherDashboard(w, user.sub));
+  }
+  const row = await db
+    .prepare(
+      `SELECT 1 AS ok FROM bookings
+        WHERE user_id = ?2 AND (refund_slip_url = ?1 OR instr(COALESCE(refund_slip_meta, ''), ?1) > 0)
+        LIMIT 1`
+    )
+    .bind(url, user.sub)
+    .first<{ ok: number }>();
+  return !!row;
+}
 
 /**
  * GET /api/media/[...key]
@@ -17,6 +57,21 @@ import { getFromR2 } from '@/lib/r2';
 export async function GET(request: Request, { params }: { params: Promise<{ key: string[] }> }) {
   const { key: keyParts } = await params;
   const key = keyParts.join('/');
+
+  // Payout and refund slips are bank transfer receipts: never public, and
+  // never put in the shared edge cache (a cache hit would skip this check).
+  if (isPrivateKey(key)) {
+    if (!(await maySeePrivate(key))) return new Response('Not Found', { status: 404 });
+    const object = await getFromR2(key);
+    if (!object) return new Response('Not Found', { status: 404 });
+    return new Response(object.body as unknown as BodyInit, {
+      status: 200,
+      headers: {
+        'Content-Type': object.httpMetadata?.contentType || 'application/octet-stream',
+        'Cache-Control': 'private, no-store',
+      },
+    });
+  }
 
   const { ctx } = await getCloudflareContext();
   // DOM's CacheStorage type shadows the Workers one, which has `default`.
