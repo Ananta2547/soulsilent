@@ -127,6 +127,10 @@ type BookingRow = {
   amount: number;
   comp_kind: string | null;
   host_credit: number;
+  coupon_code: string | null;
+  list_amount: number | null;
+  discount_amount: number;
+  host_discount: number;
   collected: number;
   refunded: number;
   beam_payment_link_id: string | null;
@@ -182,6 +186,7 @@ export async function GET(request: Request) {
                   ${seatsOfRowSql('b', 'w.max_participants')} AS seats,
                   b.status, b.payment_status, b.app_status, b.cancel_reason, b.amount,
                   b.comp_kind, COALESCE(b.host_credit, 0) AS host_credit,
+                  b.coupon_code, b.list_amount, COALESCE(b.discount_amount, 0) AS discount_amount, COALESCE(b.host_discount, 0) AS host_discount,
                   CASE WHEN ${COLLECTED} THEN 1 ELSE 0 END AS collected,
                   CASE WHEN ${REFUNDED} THEN 1 ELSE 0 END AS refunded,
                   b.beam_payment_link_id, b.beam_qr_charge_id, b.beam_charge_id, b.stripe_payment_id,
@@ -234,6 +239,13 @@ export async function GET(request: Request) {
           // (not money the participant paid — kept out of amount/net_amount).
           comp_kind: b.comp_kind,
           asl_paid: b.collected === 1 ? Number(b.host_credit) || 0 : 0,
+          // Coupon: price before it, the discount, and who bore it. The ASL
+          // share is already inside asl_paid (paid to the host like a comp).
+          coupon_code: b.coupon_code,
+          list_amount: b.list_amount ?? null,
+          discount: Number(b.discount_amount) || 0,
+          host_discount: Number(b.host_discount) || 0,
+          asl_discount: (Number(b.discount_amount) || 0) - (Number(b.host_discount) || 0),
           transferred: Number(b.transferred) === 1,
         })),
       );

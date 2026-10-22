@@ -8,6 +8,7 @@ import { Reveal } from '@/components/design/Reveal';
 import { Btn } from '@/components/design/RippleButton';
 import { fmtDate as fmtDateOnly, fmtDateTime, sqliteToMs } from '@/lib/datetime';
 import { ApplicationConsentModal } from '@/components/workshops/ApplicationConsentModal';
+import { CheckoutModal } from '@/components/workshops/CheckoutPanel';
 import { isWorkshopOngoing, hasWorkshopEnded, getWorkshopStart, getWorkshopDays } from '@/lib/workshop-utils';
 import { useLoadingTracker } from '@/components/design/DataLoading';
 import './bookings.css';
@@ -452,6 +453,8 @@ export default function MyBookingsPage() {
   const [unauthorized, setUnauthorized] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [checkoutFor, setCheckoutFor] = useState<Booking | null>(null);
+  const [checkoutErr, setCheckoutErr] = useState<string | null>(null);
   const [thankYou, setThankYou] = useState(false);
   const [filter, setFilter] = useState<'all' | 'active' | 'done' | 'other'>('all');
   const [slipUrl, setSlipUrl] = useState<string | null>(null);
@@ -670,23 +673,38 @@ export default function MyBookingsPage() {
     }
   }
 
-  async function confirmSeat(b: Booking) {
+  // A selected applicant with something to pay goes through the checkout
+  // screen first (total + coupons); a free workshop confirms straight away.
+  function confirmSeat(b: Booking) {
+    if (b.ws_payment_type === 'free') {
+      postConfirm(b, null).then((e) => e && alert(e));
+      return;
+    }
+    setCheckoutErr(null);
+    setCheckoutFor(b);
+  }
+
+  /** Resolves to an error message, or null once confirmed / redirected. */
+  async function postConfirm(b: Booking, couponCode: string | null): Promise<string | null> {
     setConfirmingId(b.id);
     try {
-      const res = await fetch(`/api/bookings/${b.id}/confirm`, { method: 'POST' });
+      const res = await fetch(`/api/bookings/${b.id}/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ coupon_code: couponCode || undefined }),
+      });
       const data = (await res.json()) as { checkoutUrl?: string; error?: string };
-      if (!res.ok) {
-        alert(data.error || tr(lang, 'ยืนยันไม่สำเร็จ', 'Confirmation failed'));
-        return;
-      }
+      if (!res.ok) return data.error || tr(lang, 'ยืนยันไม่สำเร็จ', 'Confirmation failed');
       if (data.checkoutUrl) {
         window.location.assign(data.checkoutUrl);
-        return;
+        return null;
       }
-      // Free workshop → confirmed without payment.
+      // Free workshop or a 100% coupon → confirmed without payment.
+      setCheckoutFor(null);
       load();
+      return null;
     } catch {
-      alert(tr(lang, 'เกิดข้อผิดพลาด', 'Something went wrong'));
+      return tr(lang, 'เกิดข้อผิดพลาด', 'Something went wrong');
     } finally {
       setConfirmingId(null);
     }
@@ -1003,6 +1021,21 @@ export default function MyBookingsPage() {
           </div>
         )}
       </div>
+
+      {checkoutFor && (
+        <CheckoutModal
+          request={{ booking_id: checkoutFor.id }}
+          title={checkoutFor.workshop_title}
+          subtitle={tr(lang, 'ยืนยันสิทธิ์ผู้ได้รับคัดเลือก', 'Confirm your selected seat')}
+          itemLabel={checkoutFor.ws_payment_type === 'deposit' ? tr(lang, 'มัดจำ · 1 ที่นั่ง', 'Deposit · one seat') : tr(lang, '1 ที่นั่ง', 'One seat')}
+          busy={confirmingId === checkoutFor.id}
+          error={checkoutErr}
+          onClose={() => setCheckoutFor(null)}
+          onConfirm={async (code) => {
+            setCheckoutErr(await postConfirm(checkoutFor, code));
+          }}
+        />
+      )}
 
       {consentFor && (
         <ApplicationConsentModal

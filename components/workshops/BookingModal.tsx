@@ -3,7 +3,8 @@
 /* Pre-booking application popup, built from the "Application Popups" design.
  * Step 1 reviews the applicant's autofill data (or lists what is missing);
  * step 2 asks the workshop's questions, travel and PDPA consent; a paid
- * round then passes through the QR warning before the booking is created.
+ * round then goes on to the checkout screen (total, coupons, QR warning)
+ * before the booking is created.
  * Every screen is a cream shell with paper cards, a mono eyebrow, and a
  * closing band that says what happens next. */
 import { useEffect, useMemo, useState } from 'react';
@@ -14,6 +15,7 @@ import { getVault } from '@/lib/vault';
 import { getEffectivePrice } from '@/lib/workshop-utils';
 import { TRAVEL_OPTIONS, type TravelMethod } from '@/lib/travel';
 import type { ApplicationQuestion, Workshop } from '@/lib/types';
+import { CheckoutModal } from './CheckoutPanel';
 
 /** What POST /api/bookings returns; drives the post-submit popup. */
 export type BookingResult = {
@@ -92,11 +94,13 @@ export function BookingModal({
   privatePrice = null,
   tierLabel = null,
   groupSeats = 1,
+  tierId = null,
 }: {
   onClose: () => void;
   workshop: Workshop;
   submitting: boolean;
-  onSubmit: (application: unknown) => Promise<BookingResult>;
+  /** Creates the booking; `couponCode` comes from the checkout screen. */
+  onSubmit: (application: unknown, couponCode?: string | null) => Promise<BookingResult>;
   mode?: 'book' | 'claim';
   /** Session-based activities: 'private' takes the whole round at privatePrice. */
   bookingKind?: 'group' | 'private';
@@ -107,6 +111,8 @@ export function BookingModal({
   tierLabel?: string | null;
   /** Group tiers: how many seats this booking buys (the booker included). */
   groupSeats?: number;
+  /** The picked price tier, so the checkout prices what the booking will. */
+  tierId?: string | null;
 }) {
   const claiming = mode === 'claim';
   const { lang } = useLang();
@@ -202,8 +208,8 @@ export function BookingModal({
   // submits directly and the header stops promising a second step.
   const hasStep2 = !isOnline || questions.length > 0 || requireConsent;
 
-  // Anything that leads to a payment QR (paid / deposit) → the QR warning
-  // popup comes first and the booking is created only after the user confirms.
+  // Anything that leads to a payment QR (paid / deposit) → the checkout screen
+  // comes first and the booking is created only after the user confirms there.
   const willPay = !claiming && workshop.payment_type !== 'free' && workshop.admission_type !== 'selection';
   const isDepositType = workshop.payment_type === 'deposit';
   const seatPrice = getEffectivePrice(workshop).price;
@@ -216,7 +222,7 @@ export function BookingModal({
       ? tr(lang, 'ยืนยันรับสิทธิ์', 'Confirm and claim')
       : !willPay
         ? tr(lang, 'ส่งใบสมัคร', 'Submit application')
-        : tr(lang, 'ส่งใบสมัคร & ไปหน้าชำระเงิน', 'Submit & go to payment');
+        : tr(lang, 'ถัดไป · สรุปยอดชำระ', 'Next · review the total');
 
   function goNext() {
     if (incomplete) return;
@@ -224,7 +230,7 @@ export function BookingModal({
     setStep(2);
   }
 
-  // Holds the built application while the QR warning popup is shown — the booking
+  // Holds the built application while the checkout screen is shown — the booking
   // is NOT created until the user confirms, so Cancel leaves nothing in the DB and
   // takes no seat quota.
   const [pendingApp, setPendingApp] = useState<Record<string, unknown> | null>(null);
@@ -303,24 +309,24 @@ export function BookingModal({
     setResult(r);
   }
 
-  // Confirm from the QR warning popup → NOW create the booking (holds the seat +
-  // starts the 10-min countdown) and continue to payment.
-  async function confirmAndPay() {
+  // Confirm on the checkout screen → NOW create the booking (holds the seat +
+  // starts the 10-min countdown) and go straight to the QR. A coupon that
+  // brings the total to ฿0 confirms the seat with nothing to pay.
+  const [payErr, setPayErr] = useState<string | null>(null);
+  async function confirmAndPay(couponCode: string | null) {
     if (!pendingApp || paying) return;
-    setErr(null);
+    setPayErr(null);
     setPaying(true);
-    const r = await onSubmit(pendingApp);
+    const r = await onSubmit(pendingApp, couponCode);
     setPaying(false);
     if (r.error) {
-      setErr(r.error);
-      setPendingApp(null);
+      setPayErr(r.error);
       return;
     }
-    if (r.mode === 'paid' && r.checkoutUrl) {
+    if (r.checkoutUrl) {
       window.location.href = r.checkoutUrl;
       return;
     }
-    // deposit → the matching success popup (with its own Proceed-to-Payment button)
     setPendingApp(null);
     setResult(r);
   }
@@ -333,46 +339,30 @@ export function BookingModal({
         ? tr(lang, 'เหมาทั้งรอบ', 'the whole round')
         : tr(lang, '1 ที่นั่ง', 'one seat');
 
-  // ---- 4a · QR payment warning — shown BEFORE the booking is created ----
+  // ---- 4a · checkout — total, coupons and the QR warning, BEFORE the booking ----
   if (pendingApp) {
+    const item =
+      bookingKind === 'private'
+        ? tr(lang, `เหมารอบ${tierLabel ? ` · ${tierLabel}` : ''}`, `Whole round${tierLabel ? ` · ${tierLabel}` : ''}`)
+        : groupSeats > 1
+          ? tr(lang, `${tierLabel || 'แพ็กกลุ่ม'} · ${groupSeats} คน`, `${tierLabel || 'Group'} · ${groupSeats} people`)
+          : tierLabel || tr(lang, '1 ที่นั่ง', 'One seat');
     return (
-      <Shell onClose={() => !paying && setPendingApp(null)} maxWidth={440} paper>
-        <div style={{ background: 'var(--ink)', padding: '26px 26px 22px' }}>
-          <Eyebrow color="var(--accent)">{tr(lang, 'ก่อนไปหน้าชำระเงิน', 'Before the payment page')}</Eyebrow>
-          <h2 className="display-th" style={{ fontSize: 25, margin: '8px 0 0', color: '#fff', lineHeight: 1.18 }}>
-            {th ? <>QR ของคุณมีอายุ<br />10 นาที</> : <>Your QR lives<br />for 10 minutes</>}
-          </h2>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 14 }}>
-            <span className="display-th" style={{ fontSize: 44, color: 'var(--accent)', lineHeight: 1 }}>10:00</span>
-            <span className="mono" style={{ fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: '#9ab1ae' }}>{tr(lang, 'เริ่มนับเมื่อกดต่อไป', 'starts when you continue')}</span>
-          </div>
-        </div>
-        <div style={{ padding: '22px 26px 24px' }}>
-          {err && <ErrBox>{err}</ErrBox>}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 18 }}>
-            <Numbered n="1">{tr(lang, 'สแกนและโอนภายใน 10 นาที — ระบบจะยืนยันที่นั่งให้อัตโนมัติ', 'Scan and pay within 10 minutes — your seat is confirmed automatically.')}</Numbered>
-            <Numbered n="2">{tr(lang, 'อย่าบันทึกภาพ QR ไว้จ่ายทีหลัง และอย่าสแกนซ้ำ', 'Do not save the QR to pay later, and do not scan it twice.')}</Numbered>
-            <Numbered n="!" warn>
-              {th ? (
-                <>จ่ายช้าหรือจ่ายซ้ำ <b>เงินจะถูกตัดแต่ระบบไม่รับชำระ</b> และไม่ได้ที่นั่งเพิ่ม — ต้องรอธนาคารคืนเงิน</>
-              ) : (
-                <>A late or repeat payment <b>is taken by your bank but rejected by us</b> and grants no extra seat — you wait for the bank to refund it.</>
-              )}
-            </Numbered>
-          </div>
-          <div style={{ background: 'var(--cream)', borderRadius: 16, padding: '12px 15px', marginBottom: 18, fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.6 }}>
-            {tr(lang, 'กดยกเลิกได้ — ยังไม่มีการจองเกิดขึ้น และไม่กินที่นั่งของใคร', 'Cancel is safe — nothing is booked yet and no seat is taken.')}
-          </div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button type="button" onClick={() => setPendingApp(null)} disabled={paying} className="btn btn-paper" style={{ flex: 1, justifyContent: 'center', background: 'var(--cream)' }}>
-              {tr(lang, 'ยกเลิก', 'Cancel')}
-            </button>
-            <button type="button" onClick={confirmAndPay} disabled={paying} className="btn btn-ink" style={{ flex: 1.4, justifyContent: 'center' }}>
-              {paying ? tr(lang, 'กำลังดำเนินการ…', 'Processing…') : <>{tr(lang, 'รับทราบ ไปชำระเงิน', 'Got it, pay now')} <span className="mono">→</span></>}
-            </button>
-          </div>
-        </div>
-      </Shell>
+      <CheckoutModal
+        request={{ workshop_id: workshop.id, tier_id: tierId, group_size: groupSeats > 1 ? groupSeats : null }}
+        title={workshop.title}
+        subtitle={whenLine}
+        itemLabel={isDepositType ? tr(lang, `มัดจำ · ${item}`, `Deposit · ${item}`) : item}
+        busy={paying}
+        error={payErr}
+        onBack={() => {
+          setPayErr(null);
+          setPendingApp(null);
+        }}
+        backLabel={tr(lang, 'แก้ใบสมัคร', 'Edit application')}
+        onClose={onClose}
+        onConfirm={confirmAndPay}
+      />
     );
   }
 
@@ -812,31 +802,18 @@ export function BookingModal({
           </button>
         </div>
       ) : willPay ? (
-        <div style={{ background: 'var(--ink)', padding: '18px 22px 20px' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: 'rgba(245,194,67,.14)', borderRadius: 16, padding: '12px 14px', marginBottom: 14 }}>
-            <span style={{ fontSize: 15, lineHeight: 1.3 }}>⚠️</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', lineHeight: 1.45 }}>{tr(lang, 'หน้าถัดไปคือ QR ชำระเงิน — มีอายุ 10 นาที', 'Next is the payment QR — it lives 10 minutes')}</div>
-              <div style={{ fontSize: 12.5, color: '#d7e0df', lineHeight: 1.55, marginTop: 3 }}>{qrWarningText(lang)}</div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-            {step === 2 && (
-              <button type="button" onClick={() => setStep(1)} style={{ background: 'transparent', border: 0, color: '#9ab1ae', font: 'inherit', fontSize: 13.5, cursor: 'pointer', padding: '6px 0' }}>
-                ← {tr(lang, 'ย้อนกลับ', 'Back')}
-              </button>
-            )}
-            <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-              <Eyebrow color="#9ab1ae">{isDepositType ? tr(lang, 'มัดจำ', 'Deposit') : tr(lang, 'ยอดชำระ', 'Amount due')}</Eyebrow>
-              <div className="display-th" style={{ fontSize: 22, color: '#fff', lineHeight: 1.1 }}>
-                {baht(dueNow)}
-                {isDepositType && <span style={{ fontSize: 12, color: '#9ab1ae', marginLeft: 6 }}>{tr(lang, `จากยอดเต็ม ${baht(fullTotal)}`, `of ${baht(fullTotal)}`)}</span>}
-              </div>
-            </div>
-            <button type="button" onClick={submit} disabled={submitting} className="btn btn-teal" style={{ flex: '1 0 100%', justifyContent: 'center' }}>
-              {submitLabel} {!submitting && <span className="mono">→</span>}
+        <div style={{ background: 'var(--paper)', padding: '16px 22px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {step === 2 ? (
+            <button type="button" onClick={() => setStep(1)} className="btn btn-paper btn-sm" style={{ background: 'var(--cream)' }}>
+              ← {tr(lang, 'ย้อนกลับ', 'Back')}
             </button>
-          </div>
+          ) : (
+            editLink
+          )}
+          <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>{tr(lang, 'ใช้คูปองได้ในหน้าถัดไป', 'Coupons on the next screen')}</span>
+          <button type="button" onClick={submit} disabled={submitting} className="btn btn-ink" style={{ marginLeft: 'auto' }}>
+            {submitLabel} {!submitting && <span className="mono">→</span>}
+          </button>
         </div>
       ) : (
         <div style={{ background: 'var(--paper)', padding: '16px 22px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>

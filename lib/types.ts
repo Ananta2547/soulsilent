@@ -231,6 +231,13 @@ export interface Booking {
   booking_kind?: 'group' | 'private' | null;
   /** Name of the price tier picked, e.g. "นักเรียน" (migration 055). */
   booking_tier_label?: string | null;
+  /** Coupon used (migration 067, lib/coupons): the code, what the booking
+   *  would cost without it, the discount, and the host's share of that. */
+  coupon_id?: string | null;
+  coupon_code?: string | null;
+  list_amount?: number | null;
+  discount_amount?: number;
+  host_discount?: number;
   /** Stripe ids from before the move to Beam. Nothing writes these any more,
    *  but they are the record of what a past booking actually paid through and
    *  are kept for exactly that reason — a refund on one of these is issued from

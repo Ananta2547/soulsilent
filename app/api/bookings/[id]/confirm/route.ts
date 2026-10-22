@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDB, getEnv } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { HOLD_MINUTES } from '@/lib/holds';
-import { getEffectivePrice } from '@/lib/workshop-utils';
+import { applyCode, selectionPrice } from '@/lib/coupons';
 import { visibleAppStatus, confirmDeadlineFor } from '@/lib/selection';
 import type { Workshop, Booking } from '@/lib/types';
 
@@ -13,10 +13,11 @@ import type { Workshop, Booking } from '@/lib/types';
  * finalizes the booking; for deposit/paid it sets the confirmation and returns
  * our payment page so the user can pay within the round deadline.
  */
-export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireAuth();
     const { id } = await params;
+    const { coupon_code } = (await request.json().catch(() => ({}))) as { coupon_code?: string };
     const db = await getDB();
 
     const booking = await db
@@ -66,13 +67,30 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     }
 
     // DEPOSIT / PAID → record confirmation, hold the seat, send to checkout.
-    const fullPrice = getEffectivePrice(workshop).price;
-    const amount = paymentType === 'deposit' ? workshop.deposit_amount || 0 : fullPrice;
+    // The checkout screen may bring a coupon; it is checked again here.
+    const priced = await applyCode(db, coupon_code, { ...selectionPrice(workshop), workshop, userId: user.sub, excludeBookingId: id });
+    if (!priced.ok) return NextResponse.json({ error: priced.error }, { status: 400 });
+    const c = priced.cols;
+    const amount = c.amount;
+    if (amount <= 0) {
+      // A 100% coupon: nothing to pay, the seat is confirmed now.
+      await db
+        .prepare(
+          `UPDATE bookings SET confirmed_at = datetime('now'), status = 'confirmed', payment_status = 'paid', amount = 0, expires_at = NULL,
+             coupon_id = ?, coupon_code = ?, list_amount = ?, discount_amount = ?, host_discount = ?, host_credit = ?
+           WHERE id = ?`,
+        )
+        .bind(c.coupon_id, c.coupon_code, c.list_amount, c.discount_amount, c.host_discount, c.host_credit, id)
+        .run();
+      return NextResponse.json({ confirmed: true, mode: 'free' });
+    }
     await db
       .prepare(
-        "UPDATE bookings SET confirmed_at = datetime('now'), amount = ?, expires_at = datetime('now', ?) WHERE id = ?"
+        `UPDATE bookings SET confirmed_at = datetime('now'), amount = ?, expires_at = datetime('now', ?),
+           coupon_id = ?, coupon_code = ?, list_amount = ?, discount_amount = ?, host_discount = ?, host_credit = ?
+         WHERE id = ?`
       )
-      .bind(amount, `+${HOLD_MINUTES} minutes`, id)
+      .bind(amount, `+${HOLD_MINUTES} minutes`, c.coupon_id, c.coupon_code, c.list_amount, c.discount_amount, c.host_discount, c.host_credit, id)
       .run();
 
     const env = await getEnv();

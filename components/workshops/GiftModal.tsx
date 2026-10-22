@@ -5,6 +5,7 @@
 import { useState } from 'react';
 import { useLang, T, tr } from '@/lib/i18n';
 import { Btn } from '@/components/design/RippleButton';
+import { CheckoutModal } from './CheckoutPanel';
 
 const INPUT: React.CSSProperties = {
   width: '100%',
@@ -18,22 +19,55 @@ const INPUT: React.CSSProperties = {
 
 export function GiftModal({
   workshopTitle,
+  workshopId,
   submitting,
   onClose,
   onSubmit,
 }: {
   workshopTitle: string;
+  /** Prices the checkout screen that follows the recipient form. */
+  workshopId: string;
   submitting: boolean;
   onClose: () => void;
   /** Resolves to an error message, or null when the caller took over (payment). */
-  onSubmit: (recipient: { name: string; phone: string }) => Promise<string | null>;
+  onSubmit: (recipient: { name: string; phone: string }, couponCode?: string | null) => Promise<string | null>;
 }) {
   const { lang } = useLang();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [err, setErr] = useState<string | null>(null);
+  // Recipient checked → the checkout screen (total + coupons) before the QR.
+  const [checkout, setCheckout] = useState<{ name: string; phone: string } | null>(null);
+  const [payErr, setPayErr] = useState<string | null>(null);
 
-  async function submit() {
+  async function pay(couponCode: string | null) {
+    if (!checkout || submitting) return;
+    setPayErr(null);
+    const message = await onSubmit(checkout, couponCode);
+    if (message) setPayErr(message);
+  }
+
+  if (checkout) {
+    return (
+      <CheckoutModal
+        request={{ workshop_id: workshopId, gift: true }}
+        title={workshopTitle}
+        subtitle={tr(lang, `ของขวัญสำหรับ ${checkout.name}`, `A gift for ${checkout.name}`)}
+        itemLabel={tr(lang, 'ที่นั่งของขวัญ 1 ที่', 'One gift seat')}
+        busy={submitting}
+        error={payErr}
+        onBack={() => {
+          setPayErr(null);
+          setCheckout(null);
+        }}
+        backLabel={tr(lang, 'แก้ข้อมูลผู้รับ', 'Edit recipient')}
+        onClose={onClose}
+        onConfirm={pay}
+      />
+    );
+  }
+
+  function submit() {
     if (submitting) return;
     const n = name.trim();
     const p = phone.trim();
@@ -48,8 +82,7 @@ export function GiftModal({
       return;
     }
     setErr(null);
-    const message = await onSubmit({ name: n, phone: p });
-    if (message) setErr(message);
+    setCheckout({ name: n, phone: p });
   }
 
   return (
@@ -116,7 +149,7 @@ export function GiftModal({
             {tr(lang, 'ยกเลิก', 'Cancel')}
           </button>
           <Btn kind="teal" onClick={submit} disabled={submitting} style={{ flex: 1.4, justifyContent: 'center' }}>
-            {submitting ? tr(lang, 'กำลังดำเนินการ…', 'Processing…') : <>{tr(lang, 'ไปชำระเงิน', 'Continue to payment')} <span className="mono">→</span></>}
+            {submitting ? tr(lang, 'กำลังดำเนินการ…', 'Processing…') : <>{tr(lang, 'ถัดไป · สรุปยอด', 'Next · review the total')} <span className="mono">→</span></>}
           </Btn>
         </div>
       </div>

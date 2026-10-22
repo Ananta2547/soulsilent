@@ -244,14 +244,14 @@ function WorkshopDetailInner() {
     else setBookingOpen(true);
   }
 
-  async function submitChosen(application: unknown): Promise<BookingResult> {
+  async function submitChosen(application: unknown, couponCode?: string | null): Promise<BookingResult> {
     if (!chosen) return { error: 'no session' };
     setBooking(true);
     try {
       const res = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workshop_id: chosen.session.id, application, booking_kind: chosen.kind, tier_id: chosen.tier.id, group_size: chosen.seats }),
+        body: JSON.stringify({ workshop_id: chosen.session.id, application, booking_kind: chosen.kind, tier_id: chosen.tier.id, group_size: chosen.seats, coupon_code: couponCode || undefined }),
       });
       const data = (await res.json()) as BookingResult;
       if (!res.ok) {
@@ -265,13 +265,13 @@ function WorkshopDetailInner() {
     }
   }
 
-  async function handleBooking(application?: unknown): Promise<BookingResult> {
+  async function handleBooking(application?: unknown, couponCode?: string | null): Promise<BookingResult> {
     setBooking(true);
     try {
       const res = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workshop_id: id, application }),
+        body: JSON.stringify({ workshop_id: id, application, coupon_code: couponCode || undefined }),
       });
       const data = (await res.json()) as BookingResult;
       if (!res.ok) {
@@ -312,15 +312,15 @@ function WorkshopDetailInner() {
     else setLoginPromptOpen(true);
   }
 
-  async function submitGift(recipient: { name: string; phone: string }): Promise<string | null> {
+  async function submitGift(recipient: { name: string; phone: string }, couponCode?: string | null): Promise<string | null> {
     setBooking(true);
     try {
       const res = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workshop_id: id, gift: recipient }),
+        body: JSON.stringify({ workshop_id: id, gift: recipient, coupon_code: couponCode || undefined }),
       });
-      const data = (await res.json()) as { checkoutUrl?: string; claimUrl?: string; error?: string };
+      const data = (await res.json()) as { checkoutUrl?: string; claimUrl?: string; paid?: boolean; error?: string };
       if (!res.ok) {
         setBooking(false);
         return data.error || tr(lang, 'เกิดข้อผิดพลาด', 'Something went wrong');
@@ -332,7 +332,8 @@ function WorkshopDetailInner() {
         window.location.href = data.checkoutUrl;
         return null;
       }
-      // Free workshop → the seat is already secured, so hand over the link now.
+      // Nothing to pay (free workshop, or a 100% coupon) → the seat is already
+      // secured, so hand over the link now.
       setBooking(false);
       setGiftOpen(false);
       if (data.claimUrl) setTransferLink({ url: data.claimUrl, kind: 'gift', recipient: recipient.name });
@@ -1108,7 +1109,7 @@ function WorkshopDetailInner() {
           onClose={() => setBookingOpen(false)}
           workshop={workshop}
           submitting={booking}
-          onSubmit={(application) => handleBooking(application)}
+          onSubmit={(application, couponCode) => handleBooking(application, couponCode)}
         />
       )}
 
@@ -1134,12 +1135,14 @@ function WorkshopDetailInner() {
           tierLabel={chosen.tier.id === 'seat' ? null : chosen.tier.label}
           privatePrice={chosen.tier.id === 'seat' ? null : chosen.tier.mode === 'round' ? chosen.tier.price : chosen.tier.price * chosen.seats}
           groupSeats={chosen.seats}
+          tierId={chosen.tier.id}
         />
       )}
 
       {giftOpen && (
         <GiftModal
           workshopTitle={workshop.title}
+          workshopId={workshop.id}
           submitting={booking}
           onClose={() => setGiftOpen(false)}
           onSubmit={submitGift}

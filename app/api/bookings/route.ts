@@ -9,6 +9,7 @@ import { settleSelection, visibleAppStatus, confirmDeadlineFor, type SettleWorks
 import { expireStaleHolds, HOLD_MINUTES } from '@/lib/holds';
 import { claimUrl, newTransferToken, partyFromBooking } from '@/lib/transfers';
 import type { Workshop } from '@/lib/types';
+import { applyCode, type CouponColumns } from '@/lib/coupons';
 
 
 /** Whole years from a YYYY-MM-DD birthdate, or null. Mirrors the client. */
@@ -154,7 +155,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await requireAuth();
-    const { workshop_id, application, gift, booking_kind, tier_id, group_size } = (await request.json()) as {
+    const { workshop_id, application, gift, booking_kind, tier_id, group_size, coupon_code } = (await request.json()) as {
+      /** Coupon picked or typed at checkout (lib/coupons). Checked again here. */
+      coupon_code?: string;
       workshop_id: string;
       application?: unknown;
       /** Buying the seat for someone else — who it is meant for. The buyer
@@ -346,13 +349,30 @@ export async function POST(request: Request) {
           { status: 400 },
         );
       }
+      // A coupon on a gift comes off what the buyer pays.
+      const giftCoupon = await applyCode(db, coupon_code, {
+        flow: 'gift',
+        list: paymentType === 'deposit' ? giftAmount : workshop.price,
+        promo: giftAmount,
+        workshop,
+        userId: user.sub,
+      });
+      if (!giftCoupon.ok) return NextResponse.json({ error: giftCoupon.error }, { status: 400 });
+      const gc = giftCoupon.cols;
+      // A 100% coupon leaves nothing to pay: the gift is secured at once.
+      const giftFree = gc.amount <= 0;
       const bookingId = uuid();
       await db
         .prepare(
-          `INSERT INTO bookings (id, workshop_id, user_id, status, payment_status, amount, app_status, application_json, expires_at)
-           VALUES (?, ?, ?, 'pending', 'pending', ?, 'approved', NULL, datetime('now', ?))`,
+          `INSERT INTO bookings (id, workshop_id, user_id, status, payment_status, amount, app_status, application_json, expires_at,
+             coupon_id, coupon_code, list_amount, discount_amount, host_discount, host_credit)
+           VALUES (?, ?, ?, ?, ?, ?, 'approved', NULL, ${giftFree ? 'NULL' : "datetime('now', ?)"}, ?, ?, ?, ?, ?, ?)`,
         )
-        .bind(bookingId, workshop_id, user.sub, giftAmount, `+${HOLD_MINUTES} minutes`)
+        .bind(
+          ...[bookingId, workshop_id, user.sub, giftFree ? 'confirmed' : 'pending', giftFree ? 'paid' : 'pending', gc.amount],
+          ...(giftFree ? [] : [`+${HOLD_MINUTES} minutes`]),
+          gc.coupon_id, gc.coupon_code, gc.list_amount, gc.discount_amount, gc.host_discount, gc.host_credit,
+        )
         .run();
 
       const buyer = await db
@@ -376,9 +396,11 @@ export async function POST(request: Request) {
         bookingId,
         gift: true,
         mode: paymentType,
-        amount: giftAmount,
+        amount: gc.amount,
+        paid: giftFree,
         claimUrl: claimUrl(giftSite, token),
-        checkoutUrl: `${giftSite}/pay/${bookingId}`,
+        // A 100% coupon leaves nothing to pay: no QR, the link is handed over now.
+        checkoutUrl: giftFree ? undefined : `${giftSite}/pay/${bookingId}`,
         holdMinutes: HOLD_MINUTES,
       });
     }
@@ -421,8 +443,29 @@ export async function POST(request: Request) {
     //   paid    → full effective (promo-aware) price
     //   private → the master's whole-round price, promo-free
     const fullPrice = privatePrice != null ? privatePrice : tierPrice != null ? tierPrice : getEffectivePrice(workshop).price;
-    const chargeAmount =
+    const plainCharge =
       paymentType === 'free' ? 0 : paymentType === 'deposit' ? workshop.deposit_amount || 0 : fullPrice;
+
+    // Coupon from the checkout screen. Selection applicants use theirs when
+    // they confirm and pay (confirm route), not on the application.
+    let couponCols: CouponColumns = {
+      coupon_id: null, coupon_code: null, list_amount: null, discount_amount: 0, host_discount: 0, host_credit: 0, amount: plainCharge,
+    };
+    if (!isSelection && coupon_code && plainCharge > 0) {
+      // Before any promo: a tier or the deposit has none, a single seat's full price does.
+      const listPrice = paymentType === 'deposit' || privatePrice != null || tierPrice != null ? plainCharge : workshop.price;
+      const r = await applyCode(db, coupon_code, {
+        flow: paymentType === 'deposit' ? 'deposit' : seats > 1 || isPrivate ? 'group' : 'direct',
+        list: listPrice,
+        promo: plainCharge,
+        workshop,
+        userId: user.sub,
+        excludeBookingId: existing?.id ?? null,
+      });
+      if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
+      couponCols = r.cols;
+    }
+    const chargeAmount = couponCols.amount;
     const kindValue = isPrivate ? 'private' : 'group';
     // A group booking remembers how many seats it bought and mints the link
     // its members will follow; the link is only handed out once paid.
@@ -457,26 +500,29 @@ export async function POST(request: Request) {
           `UPDATE bookings SET status = ?, payment_status = ?, amount = ?, app_status = ?,
              application_json = COALESCE(?, application_json), booking_kind = ?, booking_tier_label = ?,
              group_size = ?, invite_token = COALESCE(invite_token, ?),
+             coupon_id = ?, coupon_code = ?, list_amount = ?, discount_amount = ?, host_discount = ?, host_credit = ?,
              expires_at = ${holdExpr ? "datetime('now', ?)" : 'NULL'}
            WHERE id = ?`
         )
         .bind(
-          ...(holdExpr
-            ? [rowStatus, rowPayment, chargeAmount, appStatus, applicationJson, kindValue, tierLabel, groupSize, inviteToken, holdExpr, bookingId]
-            : [rowStatus, rowPayment, chargeAmount, appStatus, applicationJson, kindValue, tierLabel, groupSize, inviteToken, bookingId])
+          rowStatus, rowPayment, chargeAmount, appStatus, applicationJson, kindValue, tierLabel, groupSize, inviteToken,
+          couponCols.coupon_id, couponCols.coupon_code, couponCols.list_amount, couponCols.discount_amount, couponCols.host_discount, couponCols.host_credit,
+          ...(holdExpr ? [holdExpr] : []),
+          bookingId,
         )
         .run();
     } else {
       bookingId = uuid();
       await db
         .prepare(
-          `INSERT INTO bookings (id, workshop_id, user_id, status, payment_status, amount, app_status, application_json, booking_kind, booking_tier_label, group_size, invite_token, expires_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${holdExpr ? "datetime('now', ?)" : 'NULL'})`
+          `INSERT INTO bookings (id, workshop_id, user_id, status, payment_status, amount, app_status, application_json, booking_kind, booking_tier_label, group_size, invite_token,
+             coupon_id, coupon_code, list_amount, discount_amount, host_discount, host_credit, expires_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${holdExpr ? "datetime('now', ?)" : 'NULL'})`
         )
         .bind(
-          ...(holdExpr
-            ? [bookingId, workshop_id, user.sub, rowStatus, rowPayment, chargeAmount, appStatus, applicationJson, kindValue, tierLabel, groupSize, inviteToken, holdExpr]
-            : [bookingId, workshop_id, user.sub, rowStatus, rowPayment, chargeAmount, appStatus, applicationJson, kindValue, tierLabel, groupSize, inviteToken])
+          bookingId, workshop_id, user.sub, rowStatus, rowPayment, chargeAmount, appStatus, applicationJson, kindValue, tierLabel, groupSize, inviteToken,
+          couponCols.coupon_id, couponCols.coupon_code, couponCols.list_amount, couponCols.discount_amount, couponCols.host_discount, couponCols.host_credit,
+          ...(holdExpr ? [holdExpr] : []),
         )
         .run();
     }
