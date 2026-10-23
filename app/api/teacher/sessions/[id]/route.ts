@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 import { getCurrentUserWithRoles } from '@/lib/auth';
 import { hasAnyRole } from '@/lib/roles';
+import { ONLINE_VENUE, isMeetingUrl, normalizeOnlineFields, venueRules } from '@/lib/online-platform';
 
 const TIME_RE = /^\d{2}:\d{2}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -16,13 +17,13 @@ async function loadOwned(id: string) {
   const db = await getDB();
   const w = await db
     .prepare(
-      `SELECT w.id, w.master_id, w.date, w.time_start, m.organizer, m.location_ids_json,
+      `SELECT w.id, w.master_id, w.date, w.time_start, w.is_online, m.organizer, m.location_ids_json,
               (SELECT COUNT(*) FROM bookings b WHERE b.workshop_id = w.id AND b.status != 'cancelled') AS live
          FROM workshops w LEFT JOIN workshop_masters m ON m.id = w.master_id
         WHERE w.id = ?`
     )
     .bind(id)
-    .first<{ id: string; master_id: string | null; date: string; time_start: string; organizer: string | null; location_ids_json: string | null; live: number }>();
+    .first<{ id: string; master_id: string | null; date: string; time_start: string; is_online: number | null; organizer: string | null; location_ids_json: string | null; live: number }>();
   if (!w || !w.master_id) return { error: NextResponse.json({ error: 'ไม่พบรอบนี้' }, { status: 404 }) };
   if (!u.roles.includes('admin') && w.organizer !== u.sub) {
     return { error: NextResponse.json({ error: 'ไม่มีสิทธิ์' }, { status: 403 }) };
@@ -38,7 +39,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const g = await loadOwned(id);
   if ('error' in g) return g.error;
   const { db, w } = g;
-  const body = (await request.json()) as { date?: string; time_start?: string; time_end?: string; location_id?: string; max_participants?: number };
+  const body = (await request.json()) as {
+    date?: string;
+    time_start?: string;
+    time_end?: string;
+    /** A venue id, or ONLINE_VENUE to run (or keep running) online. */
+    location_id?: string;
+    online_platform?: string | null;
+    online_platform_other?: string | null;
+    online_url?: string | null;
+    max_participants?: number;
+  };
 
   const date = body.date ?? w.date;
   const time_start = body.time_start ?? w.time_start;
@@ -62,18 +73,30 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (dup) return NextResponse.json({ error: 'มีรอบวันและเวลานี้อยู่แล้ว' }, { status: 409 });
   }
 
+  let allowed: string[] = [];
+  try {
+    const a = w.location_ids_json ? (JSON.parse(w.location_ids_json) as unknown) : [];
+    allowed = Array.isArray(a) ? (a as string[]) : [];
+  } catch {
+    allowed = [];
+  }
+  const rules = venueRules(allowed);
   let loc: { id: string; name: string; map_url: string | null } | null = null;
-  if (body.location_id) {
+  let online: ReturnType<typeof normalizeOnlineFields> | null = null;
+  if (body.location_id === ONLINE_VENUE) {
+    // Setting the room (or switching an onsite round online). A round that is
+    // already online may keep it even if the admin later unticked online.
+    if (!rules.online && !w.is_online) {
+      return NextResponse.json({ error: 'กิจกรรมนี้ Admin ยังไม่เปิดให้จัดออนไลน์' }, { status: 400 });
+    }
+    online = normalizeOnlineFields({ ...body, is_online: 1 });
+    if (online.url && !isMeetingUrl(online.url)) {
+      return NextResponse.json({ error: 'ลิงก์ห้องเรียนต้องขึ้นต้นด้วย https://' }, { status: 400 });
+    }
+  } else if (body.location_id) {
     loc = await db.prepare('SELECT id, name, map_url FROM locations WHERE id = ?').bind(body.location_id).first();
     if (!loc) return NextResponse.json({ error: 'ไม่พบสถานที่' }, { status: 400 });
-    let allowed: string[] = [];
-    try {
-      const a = w.location_ids_json ? (JSON.parse(w.location_ids_json) as unknown) : [];
-      allowed = Array.isArray(a) ? (a as string[]) : [];
-    } catch {
-      allowed = [];
-    }
-    if (allowed.length > 0 && !allowed.includes(loc.id)) {
+    if (!rules.anyPhysical && !rules.physicalIds.includes(loc.id)) {
       return NextResponse.json({ error: 'สถานที่นี้ไม่อยู่ในรายการที่ Admin กำหนดให้กิจกรรมนี้' }, { status: 400 });
     }
   }
@@ -86,7 +109,14 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const sets: string[] = ['date = ?', 'time_start = ?', "updated_at = datetime('now')"];
   const vals: unknown[] = [date, time_start];
   if (time_end != null) { sets.push('time_end = ?'); vals.push(time_end); }
-  if (loc) { sets.push('location = ?', 'location_id = ?', 'map_url = ?'); vals.push(loc.name, loc.id, loc.map_url); }
+  if (loc) {
+    sets.push('location = ?', 'location_id = ?', 'map_url = ?', 'is_online = 0', 'online_platform = NULL', 'online_platform_other = NULL', 'online_url = NULL');
+    vals.push(loc.name, loc.id, loc.map_url);
+  }
+  if (online) {
+    sets.push("location = 'Online'", 'location_id = NULL', 'map_url = NULL', 'is_online = 1', 'online_platform = ?', 'online_platform_other = ?', 'online_url = ?');
+    vals.push(online.platform, online.platform_other, online.url);
+  }
   if (seats != null) { sets.push('max_participants = ?'); vals.push(seats); }
   vals.push(id);
   await db.prepare(`UPDATE workshops SET ${sets.join(', ')} WHERE id = ?`).bind(...vals).run();

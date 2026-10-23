@@ -6,6 +6,7 @@ import { getCurrentUserWithRoles } from '@/lib/auth';
 import { hasAnyRole } from '@/lib/roles';
 import type { Workshop, WorkshopMaster } from '@/lib/types';
 import { bookableTiers, cardPrice } from '@/lib/pricing';
+import { ONLINE_VENUE, isMeetingUrl, normalizeOnlineFields, venueRules } from '@/lib/online-platform';
 
 /* The teacher's session manager. A master is the activity the admin wrote up
  * and handed to a teacher (workshop_masters.organizer); a round is one row in
@@ -58,6 +59,7 @@ export async function GET() {
     .prepare(
       `SELECT w.id, w.master_id, w.title, w.date, w.time_start, w.time_end, w.location_id, w.max_participants,
               w.status, w.created_by, l.name AS loc_name,
+              w.is_online, w.online_platform, w.online_platform_other, w.online_url,
               (SELECT COALESCE(SUM(${seatsOfRowSql('b', 'w.max_participants')}), 0) FROM bookings b WHERE b.workshop_id = w.id
                  AND b.status != 'cancelled' AND (b.payment_status = 'paid' OR b.status = 'confirmed')) AS booked
          FROM workshops w
@@ -93,7 +95,13 @@ type Body = {
   time_start?: string;
   time_end?: string;
   slots?: Slot[];
+  /** A venue id, or ONLINE_VENUE for an online round. */
   location_id: string;
+  /** Online rounds: the meeting room. Every round opened by this request
+   *  shares it; each round can be changed later. The link may stay empty. */
+  online_platform?: string | null;
+  online_platform_other?: string | null;
+  online_url?: string | null;
   max_participants?: number;
   /** 'once' (default) opens the picked day(s); 'daily' / 'weekly' open every
    *  matching day from `date` through `end_date`. */
@@ -191,15 +199,27 @@ export async function POST(request: Request) {
   if (cardPrice(bookableTiers(master)) == null) {
     return NextResponse.json({ error: 'Admin ยังไม่ได้ตั้งราคาให้กิจกรรมนี้' }, { status: 400 });
   }
-  const loc = await db
-    .prepare('SELECT id, name, map_url FROM locations WHERE id = ?')
-    .bind(body.location_id)
-    .first<{ id: string; name: string; map_url: string | null }>();
-  if (!loc) return NextResponse.json({ error: 'ไม่พบสถานที่' }, { status: 400 });
-  // The admin may have narrowed the venues this activity runs at.
-  const allowed = parseIds(master.location_ids_json);
-  if (allowed.length > 0 && !allowed.includes(loc.id)) {
-    return NextResponse.json({ error: 'สถานที่นี้ไม่อยู่ในรายการที่ Admin กำหนดให้กิจกรรมนี้' }, { status: 400 });
+  // The admin may have narrowed the venues this activity runs at, and only
+  // an activity they ticked "ออนไลน์" for may open online rounds.
+  const rules = venueRules(parseIds(master.location_ids_json));
+  let venue: Venue;
+  if (body.location_id === ONLINE_VENUE) {
+    if (!rules.online) return NextResponse.json({ error: 'กิจกรรมนี้ Admin ยังไม่เปิดให้จัดออนไลน์' }, { status: 400 });
+    const online = normalizeOnlineFields({ ...body, is_online: 1 });
+    if (online.url && !isMeetingUrl(online.url)) {
+      return NextResponse.json({ error: 'ลิงก์ห้องเรียนต้องขึ้นต้นด้วย https://' }, { status: 400 });
+    }
+    venue = { online };
+  } else {
+    const loc = await db
+      .prepare('SELECT id, name, map_url FROM locations WHERE id = ?')
+      .bind(body.location_id)
+      .first<{ id: string; name: string; map_url: string | null }>();
+    if (!loc) return NextResponse.json({ error: 'ไม่พบสถานที่' }, { status: 400 });
+    if (!rules.anyPhysical && !rules.physicalIds.includes(loc.id)) {
+      return NextResponse.json({ error: 'สถานที่นี้ไม่อยู่ในรายการที่ Admin กำหนดให้กิจกรรมนี้' }, { status: 400 });
+    }
+    venue = { loc };
   }
 
   const seats = Math.max(1, Math.round(Number(body.max_participants) || master.default_max_participants || 20));
@@ -231,23 +251,30 @@ export async function POST(request: Request) {
   for (const { date, slot } of toOpen) {
     const id = uuid();
     ids.push(id);
-    await insertRound(db, id, master, loc, date, slot, seats, u.sub);
+    await insertRound(db, id, master, venue, date, slot, seats, u.sub);
   }
 
   const first = await db.prepare('SELECT * FROM workshops WHERE id = ?').bind(ids[0]).first<Workshop>();
   return NextResponse.json({ round: first, created: ids.length, skipped, ids }, { status: 201 });
 }
 
+/** Where a round runs: a venue from `locations`, or an online room. */
+type Venue =
+  | { loc: { id: string; name: string; map_url: string | null } }
+  | { online: ReturnType<typeof normalizeOnlineFields> };
+
 async function insertRound(
   db: Awaited<ReturnType<typeof getDB>>,
   id: string,
   master: WorkshopMaster,
-  loc: { id: string; name: string; map_url: string | null },
+  venue: Venue,
   date: string,
   slot: Slot,
   seats: number,
   createdBy: string
 ) {
+  const loc = 'loc' in venue ? venue.loc : null;
+  const online = 'online' in venue ? venue.online : null;
   await db
     .prepare(
       `INSERT INTO workshops (
@@ -256,9 +283,10 @@ async function insertRound(
         schedule_json, learn_json, target_json, tags_json, map_url,
         max_participants, price, image_url, image_meta, status,
         admission_type, payment_type, deposit_amount, require_consent, master_id,
-        day_times_json, is_online, dashboard_access_json, created_by
+        day_times_json, is_online, online_platform, online_platform_other, online_url,
+        dashboard_access_json, created_by
        ) VALUES (?, ?, ?, ?, ?, 'one_day', ?, '[]', ?, ?, ?, ?, '[]', ?, ?, '[]', ?, ?, ?, ?, ?, 'active',
-                 'direct', 'paid', 0, 0, ?, '[]', 0, '[]', ?)`
+                 'direct', 'paid', 0, 0, ?, '[]', ?, ?, ?, ?, '[]', ?)`
     )
     .bind(
       id,
@@ -269,16 +297,22 @@ async function insertRound(
       date,
       slot.time_start,
       slot.time_end,
-      loc.name,
-      loc.id,
+      // Online rounds keep a readable "Online" for screens that only print
+      // `location`; is_online is what the site actually checks.
+      loc ? loc.name : 'Online',
+      loc ? loc.id : null,
       master.takeaways_json || '[]',
       master.target_json || '[]',
-      loc.map_url,
+      loc ? loc.map_url : null,
       seats,
       cardPrice(bookableTiers(master)) ?? 0,
       master.cover_image_url,
       master.cover_image_meta,
       master.id,
+      online ? 1 : 0,
+      online?.platform ?? null,
+      online?.platform_other ?? null,
+      online?.url ?? null,
       createdBy
     )
     .run();

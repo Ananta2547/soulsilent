@@ -10,6 +10,17 @@ import type { ImageMeta, WorkshopMaster } from '@/lib/types';
 import { AdmSelect } from '@/components/admin/pickers';
 import { SheetSection } from '@/components/admin/AdminShell';
 import { UnsavedDialog } from '@/components/admin/UnsavedDialog';
+import { ONLINE_VENUE, venueRules } from '@/lib/online-platform';
+
+/** What the host may pick, in words, from the ticked venues. */
+function venueHint(ids: string[]): string {
+  const r = venueRules(ids);
+  if (r.anyPhysical) return 'ไม่เลือกเลย = ให้ผู้จัดเลือกได้ทุกสถานที่ (ยกเว้นออนไลน์)';
+  const n = r.physicalIds.length;
+  if (r.online && n === 0) return 'จัดออนไลน์เท่านั้น';
+  if (r.online) return `เลือกแล้ว ${n} สถานที่ + ออนไลน์`;
+  return `เลือกแล้ว ${n} สถานที่`;
+}
 
 function toArr(json: string | null | undefined): string[] {
   try {
@@ -382,6 +393,18 @@ export function MasterForm({
           <p className="adm-hint" style={{ marginTop: -10 }}>
             ผู้จัดเลือกอีกครั้งตอนเปิดรอบ
           </p>
+          <div className="adm-checklist">
+            {/* Online is picked like a venue; the host adds the room link per round. */}
+            <label>
+              <input
+                type="checkbox"
+                checked={locationIds.includes(ONLINE_VENUE)}
+                onChange={(e) => setLocationIds((ids) => (e.target.checked ? [...ids, ONLINE_VENUE] : ids.filter((x) => x !== ONLINE_VENUE)))}
+              />
+              <span style={{ flex: 1, fontSize: 14 }}>ออนไลน์</span>
+              <span className="adm-meta">Zoom · Meet · Teams · อื่น ๆ</span>
+            </label>
+          </div>
           {locations.length === 0 ? (
             <p className="adm-soft-empty">ยังไม่มีสถานที่ในระบบ — เพิ่มได้ที่เมนู สถานที่</p>
           ) : (
@@ -400,7 +423,7 @@ export function MasterForm({
             </div>
           )}
           <p className="adm-hint" style={{ margin: 0 }}>
-            {locationIds.length ? `เลือกแล้ว ${locationIds.length} สถานที่` : 'ไม่เลือกเลย = ให้ผู้จัดเลือกได้ทุกสถานที่'}
+            {venueHint(locationIds)}
           </p>
         </SheetSection>
       )}

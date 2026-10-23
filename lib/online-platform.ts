@@ -45,6 +45,23 @@ export function normalizeOnlineFields(body: {
   };
 }
 
+/** Entry in a round master's `location_ids_json` that lets its rounds run
+ *  online. The host then picks it like a venue when opening a round. */
+export const ONLINE_VENUE = 'online';
+
+/** What a round master's venue list allows. An empty list keeps its old
+ *  meaning (any physical venue) and does not include online — online has to
+ *  be ticked on purpose. */
+export function venueRules(ids: string[]): { online: boolean; anyPhysical: boolean; physicalIds: string[] } {
+  const physicalIds = ids.filter((x) => x !== ONLINE_VENUE);
+  return { online: ids.includes(ONLINE_VENUE), anyPhysical: ids.length === 0, physicalIds };
+}
+
+/** A meeting link has to be a web address people can open. */
+export function isMeetingUrl(url: string): boolean {
+  return /^https?:\/\/\S+$/i.test(url.trim());
+}
+
 export function platformStyle(p: string | null | undefined): PlatformStyle {
   return ONLINE_PLATFORMS.find((x) => x.value === p) || ONLINE_PLATFORMS[3];
 }

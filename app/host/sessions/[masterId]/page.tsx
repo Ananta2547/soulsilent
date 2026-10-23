@@ -15,6 +15,7 @@ import type { WorkshopMaster } from '@/lib/types';
 import { bookableTiers, parseTiers, tierDesc } from '@/lib/pricing';
 import { useLang } from '@/lib/i18n';
 import { DOW_TH, IcoPin, SeatBar, TdbCalendar, baht, dateOf, fmtLong, fmtMed, fmtShort, monShort, monthOf, todayYmd, type Month } from '@/components/teacher/tdb';
+import { ONLINE_PLATFORMS, ONLINE_VENUE, isMeetingUrl, platformLabel, venueRules } from '@/lib/online-platform';
 
 type Round = {
   id: string;
@@ -25,6 +26,10 @@ type Round = {
   time_end: string;
   location_id: string | null;
   loc_name: string | null;
+  is_online: number | null;
+  online_platform: string | null;
+  online_platform_other: string | null;
+  online_url: string | null;
   max_participants: number;
   status: string;
   booked: number;
@@ -76,7 +81,11 @@ export default function TeacherMasterSessionsPage() {
   const [endDate, setEndDate] = useState('');
   const [weekdays, setWeekdays] = useState<number[]>([]);
   const [slots, setSlots] = useState<Slot[]>([{ time_start: '09:00', time_end: '12:00' }]);
+  // A venue id, or ONLINE_VENUE; the online room is only used for the latter.
   const [locationId, setLocationId] = useState('');
+  const [platform, setPlatform] = useState('zoom');
+  const [platformOther, setPlatformOther] = useState('');
+  const [meetUrl, setMeetUrl] = useState('');
   const [seats, setSeats] = useState('');
   const [popMonth, setPopMonth] = useState<Month>(monthOf(today));
   const [saving, setSaving] = useState(false);
@@ -133,8 +142,8 @@ export default function TeacherMasterSessionsPage() {
   const onDay = mine.filter((r) => r.date === day);
 
   // Venues the admin allowed for this activity; none listed = every venue.
-  const allowedLocs = useMemo(() => {
-    if (!data) return [];
+  // Online is offered only when the admin ticked it.
+  const rules = useMemo(() => {
     let ids: string[] = [];
     try {
       const a = master?.location_ids_json ? (JSON.parse(master.location_ids_json) as unknown) : [];
@@ -142,8 +151,14 @@ export default function TeacherMasterSessionsPage() {
     } catch {
       ids = [];
     }
-    return ids.length ? data.locations.filter((l) => ids.includes(l.id)) : data.locations;
-  }, [data, master]);
+    return venueRules(ids);
+  }, [master]);
+  const allowedLocs = useMemo(() => {
+    if (!data) return [];
+    return rules.anyPhysical ? data.locations : data.locations.filter((l) => rules.physicalIds.includes(l.id));
+  }, [data, rules]);
+  const onlineOk = rules.online;
+  const noVenue = allowedLocs.length === 0 && !onlineOk;
 
   function openAdd(onDate?: string) {
     if (!master) return;
@@ -154,7 +169,11 @@ export default function TeacherMasterSessionsPage() {
     setEndDate('');
     setWeekdays([]);
     setSlots([{ time_start: '09:00', time_end: '12:00' }]);
-    setLocationId(allowedLocs.length === 1 ? allowedLocs[0].id : '');
+    // Only one choice on offer → pick it.
+    setLocationId(allowedLocs.length === 1 && !onlineOk ? allowedLocs[0].id : allowedLocs.length === 0 && onlineOk ? ONLINE_VENUE : '');
+    setPlatform('zoom');
+    setPlatformOther('');
+    setMeetUrl('');
     setSeats(String(master.default_max_participants || 20));
     setPopMonth(monthOf(onDate || today));
     setError(null);
@@ -168,7 +187,10 @@ export default function TeacherMasterSessionsPage() {
     setDates([r.date]);
     setDate(r.date);
     setSlots([{ time_start: r.time_start, time_end: r.time_end }]);
-    setLocationId(r.location_id || '');
+    setLocationId(r.is_online ? ONLINE_VENUE : r.location_id || '');
+    setPlatform(r.online_platform || 'zoom');
+    setPlatformOther(r.online_platform_other || '');
+    setMeetUrl(r.online_url || '');
     setSeats(String(r.max_participants));
     setPopMonth(monthOf(r.date));
     setError(null);
@@ -188,7 +210,10 @@ export default function TeacherMasterSessionsPage() {
   const slotsOk = slots.length > 0 && slots.every((s) => s.time_start < s.time_end);
   const daysOk = days.length > 0;
   const priced = !!master && (master.price_group != null || parseTiers(master.price_tiers_json).length > 0);
-  const ready = !!master && daysOk && slotsOk && !!locationId && priced;
+  const isOnline = locationId === ONLINE_VENUE;
+  // The link may be left for later, but what is typed must be a web address.
+  const urlOk = !isOnline || !meetUrl.trim() || isMeetingUrl(meetUrl);
+  const ready = !!master && daysOk && slotsOk && !!locationId && urlOk && priced;
   const editLocked = !!editing && editing.booked > 0;
   let skip = 0;
   if (!editing) days.forEach((d) => slots.forEach((s) => mine.some((r) => r.date === d && r.time_start === s.time_start) && skip++));
@@ -205,6 +230,11 @@ export default function TeacherMasterSessionsPage() {
     else dayMsg = 'เลือกวันในสัปดาห์อย่างน้อย 1 วัน';
   }
   const loc = allowedLocs.find((l) => l.id === locationId) || data?.locations.find((l) => l.id === locationId) || null;
+  const venueName = isOnline ? `ออนไลน์ · ${platformLabel(platform, platformOther)}` : loc ? loc.name : null;
+  // Sent with every save; the API ignores it unless the round is online.
+  const onlineBody = isOnline
+    ? { online_platform: platform, online_platform_other: platform === 'other' ? platformOther.trim() : null, online_url: meetUrl.trim() || null }
+    : {};
   const dayList = days.length ? (days.length <= 4 ? days.map(fmtShort).join(', ') : `${days.slice(0, 3).map(fmtShort).join(', ')} และอีก ${days.length - 3} วัน`) : '—';
 
   async function submit() {
@@ -221,6 +251,7 @@ export default function TeacherMasterSessionsPage() {
             time_start: slots[0].time_start,
             time_end: slots[0].time_end,
             location_id: locationId || undefined,
+            ...onlineBody,
             max_participants: seatsNum || undefined,
           }),
         });
@@ -247,6 +278,7 @@ export default function TeacherMasterSessionsPage() {
           weekdays: repeat === 'weekly' ? weekdays : undefined,
           slots,
           location_id: locationId,
+          ...onlineBody,
           max_participants: seatsNum || undefined,
         }),
       });
@@ -307,6 +339,74 @@ export default function TeacherMasterSessionsPage() {
       </div>
     );
   }
+
+  // Venue tiles (online first when allowed) and, for online, the room.
+  // Shared by the desktop popup and the phone sheet.
+  const venuePicker = (phone: boolean) =>
+    noVenue ? (
+      <div className="tdb-note-warn">ยังไม่มีสถานที่ให้เลือกสำหรับกิจกรรมนี้ — ติดต่อ Admin ให้เพิ่มสถานที่</div>
+    ) : (
+      <>
+        <div className="tdb-locs" style={phone ? { gap: 6 } : undefined}>
+          {onlineOk && (
+            <button type="button" aria-pressed={isOnline} className={`tdb-loc ${isOnline ? 'on' : ''}`} onClick={() => setLocationId(ONLINE_VENUE)}>
+              <span className="dot">
+                <i />
+              </span>
+              <span style={{ minWidth: 0 }}>
+                <b>ออนไลน์</b>
+                <small>Zoom · Meet · Teams</small>
+              </span>
+            </button>
+          )}
+          {allowedLocs.map((l) => (
+            <button key={l.id} type="button" aria-pressed={locationId === l.id} className={`tdb-loc ${locationId === l.id ? 'on' : ''}`} onClick={() => setLocationId(l.id)}>
+              <span className="dot">
+                <i />
+              </span>
+              <span style={{ minWidth: 0 }}>
+                <b>{l.name}</b>
+                {l.province && <small>{l.province}</small>}
+              </span>
+            </button>
+          ))}
+        </div>
+        {isOnline && (
+          <div className="tdb-online">
+            <span className="tdb-mono-label" style={{ fontSize: 10 }}>แพลตฟอร์ม</span>
+            <div className="tdb-repeat" role="radiogroup" aria-label="แพลตฟอร์ม">
+              {ONLINE_PLATFORMS.map((p) => (
+                <button key={p.value} type="button" role="radio" aria-checked={platform === p.value} className={platform === p.value ? 'on' : ''} onClick={() => setPlatform(p.value)}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            {platform === 'other' && (
+              <input className="field" value={platformOther} onChange={(e) => setPlatformOther(e.target.value)} placeholder="ชื่อแพลตฟอร์ม เช่น Webex" aria-label="ชื่อแพลตฟอร์ม" />
+            )}
+            <span className="tdb-mono-label" style={{ fontSize: 10 }}>ลิงก์ห้องเรียน</span>
+            <input
+              className="field"
+              type="url"
+              inputMode="url"
+              value={meetUrl}
+              onChange={(e) => setMeetUrl(e.target.value)}
+              placeholder="https://zoom.us/j/…"
+              aria-label="ลิงก์ห้องเรียน"
+              aria-invalid={!urlOk}
+            />
+            <span style={{ fontSize: 12, lineHeight: 1.55, color: urlOk ? 'var(--muted)' : '#a04a14' }}>
+              {!urlOk
+                ? 'ลิงก์ต้องขึ้นต้นด้วย https://'
+                : !editing && total > 1
+                  ? `ใช้ลิงก์นี้กับทั้ง ${total} รอบ แก้แยกรายรอบได้ทีหลัง · เว้นว่างไว้ก่อนได้`
+                  : 'เว้นว่างไว้ก่อนได้ · ผู้จองเห็นปุ่มเข้าห้องเมื่อใส่ลิงก์แล้ว'}
+            </span>
+          </div>
+        )}
+      </>
+    );
+  const venueCheck = locationId ? 'เลือกสถานที่แล้ว' : noVenue ? 'ยังไม่มีสถานที่ — ติดต่อ Admin' : 'ยังไม่ได้เลือกสถานที่';
 
   const nx = upcoming[0];
   const bookedUp = upcoming.reduce((a, r) => a + r.booked, 0);
@@ -416,7 +516,8 @@ export default function TeacherMasterSessionsPage() {
                   <div className="tdb-round-info">
                     <span className="tdb-round-loc">
                       <IcoPin />
-                      {r.loc_name || 'ยังไม่ระบุสถานที่'}
+                      {r.is_online ? `ออนไลน์ · ${platformLabel(r.online_platform, r.online_platform_other)}` : r.loc_name || 'ยังไม่ระบุสถานที่'}
+                      {!!r.is_online && !r.online_url && <span className="tdb-warn-pill" style={{ marginLeft: 8 }}>ยังไม่มีลิงก์ห้อง</span>}
                     </span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <div style={{ flex: 1 }}>
@@ -698,25 +799,9 @@ export default function TeacherMasterSessionsPage() {
                 <div className="tdb-step-head">
                   <span className={`tdb-step-n ${locationId ? 'ok' : ''}`}>{locationId ? '✓' : '3'}</span>
                   <span className="tdb-step-t">สถานที่</span>
-                  {allowedLocs.length < data.locations.length && <span className="tdb-step-hint">Admin อนุญาต {allowedLocs.length} แห่ง</span>}
+                  {allowedLocs.length < data.locations.length && <span className="tdb-step-hint">Admin อนุญาต {allowedLocs.length} แห่ง{onlineOk ? ' + ออนไลน์' : ''}</span>}
                 </div>
-                {allowedLocs.length === 0 ? (
-                  <div className="tdb-note-warn">ยังไม่มีสถานที่ให้เลือกสำหรับกิจกรรมนี้ — ติดต่อ Admin ให้เพิ่มสถานที่</div>
-                ) : (
-                  <div className="tdb-locs">
-                    {allowedLocs.map((l) => (
-                      <button key={l.id} type="button" aria-pressed={locationId === l.id} className={`tdb-loc ${locationId === l.id ? 'on' : ''}`} onClick={() => setLocationId(l.id)}>
-                        <span className="dot">
-                          <i />
-                        </span>
-                        <span style={{ minWidth: 0 }}>
-                          <b>{l.name}</b>
-                          {l.province && <small>{l.province}</small>}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
+                {venuePicker(false)}
               </div>
 
               {/* Step 4 — seats */}
@@ -771,7 +856,7 @@ export default function TeacherMasterSessionsPage() {
                 </div>
                 <div>
                   <span className="k">สถานที่</span>
-                  <span className="v" style={{ color: loc ? 'var(--ink)' : 'var(--muted)' }}>{loc ? loc.name : '—'}</span>
+                  <span className="v" style={{ color: venueName ? 'var(--ink)' : 'var(--muted)' }}>{venueName || '—'}</span>
                 </div>
                 <div>
                   <span className="k">ที่นั่ง</span>
@@ -790,8 +875,14 @@ export default function TeacherMasterSessionsPage() {
                 </div>
                 <div className={`tdb-check ${locationId ? 'ok' : ''}`}>
                   <i>{locationId ? '✓' : ''}</i>
-                  <span>{locationId ? 'เลือกสถานที่แล้ว' : allowedLocs.length ? 'ยังไม่ได้เลือกสถานที่' : 'ยังไม่มีสถานที่ — ติดต่อ Admin'}</span>
+                  <span>{venueCheck}</span>
                 </div>
+                {!urlOk && (
+                  <div className="tdb-check bad">
+                    <i>!</i>
+                    <span>ลิงก์ห้องเรียนต้องขึ้นต้นด้วย https://</span>
+                  </div>
+                )}
                 {!priced && (
                   <div className="tdb-check bad">
                     <i>!</i>
@@ -1013,25 +1104,9 @@ export default function TeacherMasterSessionsPage() {
                     <div className="tdb-step-head" style={{ marginBottom: 10 }}>
                       <span className={`tdb-step-n ${locationId ? 'ok' : ''}`} style={{ width: 24, height: 24, fontSize: 11 }}>{locationId ? '✓' : '2'}</span>
                       <span className="tdb-step-t" style={{ fontSize: 16 }}>สถานที่</span>
-                      {allowedLocs.length < data.locations.length && <span style={{ fontSize: 12, color: 'var(--muted)' }}>Admin อนุญาต {allowedLocs.length} แห่ง</span>}
+                      {allowedLocs.length < data.locations.length && <span style={{ fontSize: 12, color: 'var(--muted)' }}>Admin อนุญาต {allowedLocs.length} แห่ง{onlineOk ? ' + ออนไลน์' : ''}</span>}
                     </div>
-                    {allowedLocs.length === 0 ? (
-                      <div className="tdb-note-warn">ยังไม่มีสถานที่ให้เลือกสำหรับกิจกรรมนี้ — ติดต่อ Admin ให้เพิ่มสถานที่</div>
-                    ) : (
-                      <div className="tdb-locs" style={{ gap: 6 }}>
-                        {allowedLocs.map((l) => (
-                          <button key={l.id} type="button" aria-pressed={locationId === l.id} className={`tdb-loc ${locationId === l.id ? 'on' : ''}`} onClick={() => setLocationId(l.id)}>
-                            <span className="dot">
-                              <i />
-                            </span>
-                            <span style={{ minWidth: 0 }}>
-                              <b>{l.name}</b>
-                              {l.province && <small>{l.province}</small>}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    {venuePicker(true)}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <span style={{ fontFamily: "'Mitr', sans-serif", fontSize: 16, flex: 1 }}>ที่นั่งต่อรอบ</span>
@@ -1053,7 +1128,8 @@ export default function TeacherMasterSessionsPage() {
                     <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>{editing ? 'แก้ไขรอบเดียว' : `${days.length} วัน × ${slots.length} ช่วงเวลา`}{skip ? ` · ข้าม ${skip}` : ''}</span>
                   </div>
                   {!slotsOk && <div className="tdb-check bad"><i>!</i><span>เวลาเริ่มต้องอยู่ก่อนเวลาจบ</span></div>}
-                  {!locationId && <div className="tdb-check bad"><i>!</i><span>{allowedLocs.length ? 'ยังไม่ได้เลือกสถานที่' : 'ยังไม่มีสถานที่ — ติดต่อ Admin'}</span></div>}
+                  {!locationId && <div className="tdb-check bad"><i>!</i><span>{venueCheck}</span></div>}
+                  {!urlOk && <div className="tdb-check bad"><i>!</i><span>ลิงก์ห้องเรียนต้องขึ้นต้นด้วย https://</span></div>}
                   {!priced && <div className="tdb-check bad"><i>!</i><span>Admin ยังไม่ได้ตั้งราคา — ติดต่อ Admin ก่อนเปิดรอบ</span></div>}
                   {error && <div className="tdb-note-warn">{error}</div>}
                   <button type="button" className="btn btn-teal" onClick={submit} disabled={!ready || saving} style={{ justifyContent: 'center', padding: 16, opacity: ready ? 1 : 0.45 }}>
@@ -1085,7 +1161,7 @@ export default function TeacherMasterSessionsPage() {
                 {confirmR.time_start}–{confirmR.time_end}
               </span>
               <span style={{ fontSize: 13.5 }}>{fmtLong(confirmR.date)}</span>
-              {confirmR.loc_name && <span style={{ fontSize: 13, color: 'var(--muted)' }}>{confirmR.loc_name}</span>}
+              {(confirmR.is_online || confirmR.loc_name) && <span style={{ fontSize: 13, color: 'var(--muted)' }}>{confirmR.is_online ? 'ออนไลน์' : confirmR.loc_name}</span>}
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
               <button type="button" className="tdb-soft-btn" style={{ padding: '12px 20px', fontSize: 14 }} onClick={() => setConfirmR(null)}>
