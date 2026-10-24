@@ -331,7 +331,7 @@ export default function TeacherMasterSessionsPage() {
     const res = await fetch(`/api/teacher/sessions/${r.id}/cancel`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ move_ids: [] }),
+      body: JSON.stringify({ moves: [] }),
     });
     const d = (await res.json()) as { error?: string };
     setToast(res.ok ? 'ยกเลิกรอบแล้ว' : d.error || 'ยกเลิกไม่สำเร็จ');

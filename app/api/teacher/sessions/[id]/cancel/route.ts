@@ -173,8 +173,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   });
 }
 
-/** POST { move_ids, target: { round_id } | { date } } — cancel the round,
- *  move the listed parties and send everyone else to the refund list. */
+/** POST { moves: [{ id, round_id } | { id, date }] } — cancel the round,
+ *  move each listed party to its own round (an existing one, or a new one
+ *  opened on that date; parties sent to the same new date share it) and send
+ *  everyone else to the refund list. */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const g = await loadOwned(id);
@@ -185,81 +187,94 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'รอบนี้เริ่มไปแล้ว — ยกเลิกไม่ได้ ติดต่อ Admin' }, { status: 400 });
   }
 
-  const body = (await request.json().catch(() => ({}))) as { move_ids?: string[]; target?: { round_id?: string; date?: string } };
+  const body = (await request.json().catch(() => ({}))) as { moves?: { id?: string; round_id?: string; date?: string }[] };
   const parties = await partiesOf(db, id);
-  const moveIds = [...new Set((body.move_ids || []).map(String))];
-  const moving = parties.filter((p) => moveIds.includes(p.id));
-  if (moving.length !== moveIds.length) {
+  const moves = (body.moves || []).filter((m) => m && m.id);
+  const ids = moves.map((m) => String(m.id));
+  if (new Set(ids).size !== ids.length || moves.some((m) => !parties.some((p) => p.id === m.id))) {
     return NextResponse.json({ error: 'รายชื่อที่จะย้ายไม่ตรงกับผู้จองในรอบนี้ — โหลดหน้าใหม่แล้วลองอีกครั้ง' }, { status: 409 });
   }
 
-  let targetId: string | null = null;
-  let targetLabel = '';
-  let openNew: string | null = null;
-  if (moving.length > 0) {
-    const need = moving.reduce((a, p) => a + (p.kind === 'private' ? 0 : p.seats), 0);
-    const hasPrivate = moving.some((p) => p.kind === 'private');
-    if (body.target?.round_id) {
-      const t = (await targetsOf(db, w)).find((x) => x.id === body.target!.round_id);
-      if (!t) return NextResponse.json({ error: 'ไม่พบรอบปลายทาง หรือรอบนั้นเริ่มไปแล้ว' }, { status: 400 });
-      if (hasPrivate && (!t.empty || moving.length > 1)) {
-        return NextResponse.json({ error: 'การจองเหมารอบย้ายได้เฉพาะไปรอบที่ยังไม่มีใครจอง และย้ายแยกจากคนอื่น' }, { status: 400 });
+  // Group the moves by destination, then check each destination once.
+  type Dest = { key: string; roundId: string; date: string; time: string; open: boolean; parties: Party[] };
+  const dests = new Map<string, Dest>();
+  const targets = moves.length ? await targetsOf(db, w) : [];
+  const today = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+  for (const m of moves) {
+    const p = parties.find((x) => x.id === m.id)!;
+    let key: string;
+    if (m.round_id) {
+      key = `r:${m.round_id}`;
+      if (!dests.has(key)) {
+        const t = targets.find((x) => x.id === m.round_id);
+        if (!t) return NextResponse.json({ error: 'ไม่พบรอบปลายทาง หรือรอบนั้นเริ่มไปแล้ว' }, { status: 400 });
+        dests.set(key, { key, roundId: t.id, date: t.date, time: t.time_start, open: false, parties: [] });
       }
-      if (!hasPrivate && t.free < need) {
-        return NextResponse.json({ error: `รอบปลายทางเหลือ ${t.free} ที่ แต่ต้องย้าย ${need} ที่` }, { status: 400 });
+    } else if (m.date && DATE_RE.test(m.date)) {
+      key = `d:${m.date}`;
+      if (!dests.has(key)) {
+        if (m.date < today) return NextResponse.json({ error: 'เปิดรอบย้อนหลังไม่ได้' }, { status: 400 });
+        if (m.date === w.date) return NextResponse.json({ error: 'เลือกวันอื่นที่ไม่ใช่วันเดิม' }, { status: 400 });
+        const dup = await db
+          .prepare("SELECT id FROM workshops WHERE master_id = ? AND date = ? AND time_start = ? AND status != 'cancelled'")
+          .bind(w.master_id, m.date, w.time_start)
+          .first<{ id: string }>();
+        if (dup) return NextResponse.json({ error: `วันที่ ${m.date} มีรอบเวลาเดียวกันอยู่แล้ว — เลือกรอบนั้นจากรายการแทน` }, { status: 409 });
+        dests.set(key, { key, roundId: uuid(), date: m.date, time: w.time_start, open: true, parties: [] });
       }
-      targetId = t.id;
-      targetLabel = `${t.date} ${t.time_start}`;
-    } else if (body.target?.date && DATE_RE.test(body.target.date)) {
-      const date = body.target.date;
-      const today = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
-      if (date < today) return NextResponse.json({ error: 'เปิดรอบย้อนหลังไม่ได้' }, { status: 400 });
-      if (date === w.date) return NextResponse.json({ error: 'เลือกวันอื่นที่ไม่ใช่วันเดิม' }, { status: 400 });
-      const dup = await db
-        .prepare("SELECT id FROM workshops WHERE master_id = ? AND date = ? AND time_start = ? AND status != 'cancelled'")
-        .bind(w.master_id, date, w.time_start)
-        .first<{ id: string }>();
-      if (dup) return NextResponse.json({ error: 'วันนั้นมีรอบเวลาเดียวกันอยู่แล้ว — เลือกรอบนั้นจากรายการแทน' }, { status: 409 });
-      openNew = date;
-      targetId = uuid();
-      targetLabel = `${date} ${w.time_start}`;
     } else {
-      return NextResponse.json({ error: 'เลือกรอบหรือวันที่จะย้ายไป' }, { status: 400 });
+      return NextResponse.json({ error: `เลือกรอบหรือวันที่จะย้าย ${p.name} ไป` }, { status: 400 });
+    }
+    dests.get(key)!.parties.push(p);
+  }
+  for (const d of dests.values()) {
+    const hasPrivate = d.parties.some((p) => p.kind === 'private');
+    if (hasPrivate && d.parties.length > 1) {
+      return NextResponse.json({ error: 'การจองเหมารอบต้องย้ายไปรอบของตัวเอง ไม่รวมกับคนอื่น' }, { status: 400 });
+    }
+    if (d.open) continue;
+    const t = targets.find((x) => x.id === d.roundId)!;
+    const need = d.parties.reduce((a, p) => a + p.seats, 0);
+    if (hasPrivate && !t.empty) {
+      return NextResponse.json({ error: 'การจองเหมารอบย้ายได้เฉพาะไปรอบที่ยังไม่มีใครจอง' }, { status: 400 });
+    }
+    if (!hasPrivate && t.free < need) {
+      return NextResponse.json({ error: `รอบ ${t.date} ${t.time_start} เหลือ ${t.free} ที่ แต่ต้องย้าย ${need} ที่` }, { status: 400 });
     }
   }
 
   const stmts = [];
-  if (openNew && targetId) {
-    // Same activity, time, venue and room as the cancelled round, on the new day.
-    const need = moving.reduce((a, p) => a + p.seats, 0);
-    stmts.push(
-      db
-        .prepare(
-          `INSERT INTO workshops (
-             id, title, description, instructor_id, instructor_ids_json, workshop_type, date, dates_json, time_start, time_end,
-             location, location_id, schedule_json, learn_json, target_json, tags_json, map_url, max_participants, price,
-             image_url, image_meta, status, admission_type, payment_type, deposit_amount, require_consent, master_id,
-             day_times_json, is_online, online_platform, online_platform_other, online_url, dashboard_access_json, created_by)
-           SELECT ?, title, description, instructor_id, instructor_ids_json, workshop_type, ?, '[]', time_start, time_end,
-             location, location_id, schedule_json, learn_json, target_json, tags_json, map_url, MAX(max_participants, ?), price,
-             image_url, image_meta, 'active', admission_type, payment_type, deposit_amount, require_consent, master_id,
-             '[]', is_online, online_platform, online_platform_other, online_url, dashboard_access_json, ?
-             FROM workshops WHERE id = ?`,
-        )
-        .bind(targetId, openNew, need, u.sub, id),
-    );
-  }
-  if (moving.length > 0 && targetId) {
-    const ph = moving.map(() => '?').join(',');
-    const ids = moving.map((p) => p.id);
+  for (const d of dests.values()) {
+    const pids = d.parties.map((p) => p.id);
+    const ph = pids.map(() => '?').join(',');
+    if (d.open) {
+      // Same activity, time, venue and room as the cancelled round, on the new day.
+      const need = d.parties.reduce((a, p) => a + p.seats, 0);
+      stmts.push(
+        db
+          .prepare(
+            `INSERT INTO workshops (
+               id, title, description, instructor_id, instructor_ids_json, workshop_type, date, dates_json, time_start, time_end,
+               location, location_id, schedule_json, learn_json, target_json, tags_json, map_url, max_participants, price,
+               image_url, image_meta, status, admission_type, payment_type, deposit_amount, require_consent, master_id,
+               day_times_json, is_online, online_platform, online_platform_other, online_url, dashboard_access_json, created_by)
+             SELECT ?, title, description, instructor_id, instructor_ids_json, workshop_type, ?, '[]', time_start, time_end,
+               location, location_id, schedule_json, learn_json, target_json, tags_json, map_url, MAX(max_participants, ?), price,
+               image_url, image_meta, 'active', admission_type, payment_type, deposit_amount, require_consent, master_id,
+               '[]', is_online, online_platform, online_platform_other, online_url, dashboard_access_json, ?
+               FROM workshops WHERE id = ?`,
+          )
+          .bind(d.roundId, d.date, need, u.sub, id),
+      );
+    }
     stmts.push(
       db
         .prepare(
           `UPDATE bookings SET workshop_id = ?, moved_from = ?, moved_at = datetime('now'), attended = NULL, attendance_json = NULL
             WHERE status != 'cancelled' AND (id IN (${ph}) OR parent_booking_id IN (${ph}))`,
         )
-        .bind(targetId, id, ...ids, ...ids),
-      db.prepare(`UPDATE ticket_transfers SET workshop_id = ? WHERE booking_id IN (${ph})`).bind(targetId, ...ids),
+        .bind(d.roundId, id, ...pids, ...pids),
+      db.prepare(`UPDATE ticket_transfers SET workshop_id = ? WHERE booking_id IN (${ph})`).bind(d.roundId, ...pids),
     );
   }
   // Everyone left — refunded parties, their members and unpaid holds.
@@ -279,37 +294,38 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   // Tell the people who moved where their seat is now. Refunded seats hear
   // from the push cron, which announces every cancelled round.
-  if (moving.length > 0 && targetId) {
-    const ph = moving.map(() => '?').join(',');
-    const ids = moving.map((p) => p.id);
-    const who =
-      (
-        await db
-          .prepare(`SELECT DISTINCT user_id FROM bookings WHERE user_id IS NOT NULL AND (id IN (${ph}) OR parent_booking_id IN (${ph}))`)
-          .bind(...ids, ...ids)
-          .all<{ user_id: string }>()
-      ).results || [];
+  if (dests.size > 0) {
     const env = (await getEnv()) as unknown as Parameters<typeof sendPushToUser>[1];
-    const [d, t] = targetLabel.split(' ');
-    const when = new Date(d + 'T00:00:00').toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
-    for (const x of who) {
-      try {
-        await sendPushToUser(
-          db,
-          env,
-          x.user_id,
-          {
-            title: `ย้ายรอบ: ${w.title}`,
-            body: `ผู้จัดย้ายที่นั่งของคุณไปรอบ ${when} ${t} น. — ไม่สะดวกขอคืนเงินได้ที่หน้าการจอง`,
-            url: '/me/bookings',
-            tag: `moved-${x.user_id}-${id}`,
-          },
-          { urgency: 'high' },
-        );
-      } catch {}
+    for (const d of dests.values()) {
+      const pids = d.parties.map((p) => p.id);
+      const ph = pids.map(() => '?').join(',');
+      const who =
+        (
+          await db
+            .prepare(`SELECT DISTINCT user_id FROM bookings WHERE user_id IS NOT NULL AND (id IN (${ph}) OR parent_booking_id IN (${ph}))`)
+            .bind(...pids, ...pids)
+            .all<{ user_id: string }>()
+        ).results || [];
+      const when = new Date(d.date + 'T00:00:00').toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+      for (const x of who) {
+        try {
+          await sendPushToUser(
+            db,
+            env,
+            x.user_id,
+            {
+              title: `ย้ายรอบ: ${w.title}`,
+              body: `ผู้จัดย้ายที่นั่งของคุณไปรอบ ${when} ${d.time} น. — ไม่สะดวกขอคืนเงินได้ที่หน้าการจอง`,
+              url: '/me/bookings',
+              tag: `moved-${x.user_id}-${id}`,
+            },
+            { urgency: 'high' },
+          );
+        } catch {}
+      }
     }
   }
 
-  const refunded = parties.filter((p) => !moveIds.includes(p.id) && p.amount > 0).length;
-  return NextResponse.json({ ok: true, moved: moving.length, refunded, target: targetId, opened: !!openNew });
+  const refunded = parties.filter((p) => !ids.includes(p.id) && p.amount > 0).length;
+  return NextResponse.json({ ok: true, moved: moves.length, refunded, opened: [...dests.values()].filter((d) => d.open).length });
 }
