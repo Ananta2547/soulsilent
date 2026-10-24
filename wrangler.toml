@@ -62,6 +62,10 @@ SITE_URL = "https://allsoullearn.com"
 BEAM_MERCHANT_ID = "allsoullearn-vg1ez5"
 # Verified Resend "from" address (allsoullearn.com verified 2026-08-03).
 EMAIL_FROM = "soulsilent <noreply@allsoullearn.com>"
+# Web push (app notifications) public key — not secret; the private half is
+# the VAPID_PRIVATE_KEY secret (set 24 Oct 2026). Production's own pair,
+# separate from preview's. CRON_JOBS is unset, so the cron runs both jobs.
+VAPID_PUBLIC_KEY = "BJp6i18Z1UfGWg5SKJUHdH-RAOVfDcuvObh-JbLsVnIwKyGM18zR3HsSzQz7azlzizuQ93k-WXP2wBXgotztxyQ"
 
 # Run the Worker near the D1 database rather than at the visitor's colo: every
 # request makes several D1 round trips, and those are far shorter than the one
