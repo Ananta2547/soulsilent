@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDB, getEnv } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
-import { KIND_LABEL, METHOD_LABEL, applyTxEffects, checkManual, emailVoucher, insertTx, syncBeamPayments, type MoneyTx, type TxKind, type TxMethod } from '@/lib/ledger';
+import { KIND_LABEL, METHOD_LABEL, applyTxEffects, checkManual, emailProblem, emailVoucher, insertTx, type EmailResult, syncBeamPayments, type MoneyTx, type TxKind, type TxMethod } from '@/lib/ledger';
 
 type Row = MoneyTx & { category_name: string | null; workshop_title: string | null; workshop_date: string | null };
 
@@ -135,12 +135,12 @@ export async function POST(request: Request) {
       throw e;
     }
     await applyTxEffects(db, tx);
-    let emailed = false;
+    let mail: EmailResult = { status: 'no_email' };
     if (body.send_email !== false) {
       const env = await getEnv();
-      emailed = await emailVoucher(db, tx, env.SITE_URL || new URL(request.url).origin);
+      mail = await emailVoucher(db, tx, env.SITE_URL || new URL(request.url).origin);
     }
-    return NextResponse.json({ tx, emailed });
+    return NextResponse.json({ tx, emailed: mail.status === 'sent', email_problem: emailProblem(mail) });
   } catch (error) {
     const msg = (error as Error).message;
     if (msg === 'Unauthorized' || msg === 'Forbidden') return NextResponse.json({ error: msg }, { status: 403 });

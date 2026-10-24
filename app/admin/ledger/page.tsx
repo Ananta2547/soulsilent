@@ -98,9 +98,10 @@ export default function AdminLedgerPage() {
 
   async function resend(t: Row) {
     const r = await fetch(`/api/admin/ledger/${t.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'email' }) });
-    const d = (await r.json()) as { sent?: boolean; error?: string };
+    const d = (await r.json()) as { sent?: boolean; email_problem?: string | null; error?: string };
     if (!r.ok) return adminAlert('ส่งไม่ได้', d.error);
-    adminToast(d.sent ? `ส่งอีเมลถึง ${t.payee_email} แล้ว` : 'ระบบอีเมลยังไม่ได้ตั้งค่า — ส่งไม่ออก');
+    if (!d.sent) return adminAlert('อีเมลยังไม่ออก', d.email_problem || undefined);
+    adminToast(`ส่งอีเมลถึง ${t.payee_email} แล้ว`);
     load();
   }
 

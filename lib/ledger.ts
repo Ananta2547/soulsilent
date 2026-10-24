@@ -335,13 +335,17 @@ export async function applyTxEffects(db: D1Database, tx: MoneyTx): Promise<void>
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
+/** sent · not_configured (no RESEND_API_KEY on this Worker) · failed (Resend
+ *  refused, `error` says why) · no_email (nothing to send to). */
+export type EmailResult = { status: 'sent' | 'not_configured' | 'failed' | 'no_email'; error?: string };
+
 /** Email the payee the voucher link. The voucher is reachable only by this
  *  link; it is never listed on the website. */
-export async function emailVoucher(db: D1Database, tx: MoneyTx, siteUrl: string): Promise<boolean> {
-  if (tx.direction !== 'out' || !tx.payee_email) return false;
+export async function emailVoucher(db: D1Database, tx: MoneyTx, siteUrl: string): Promise<EmailResult> {
+  if (tx.direction !== 'out' || !tx.payee_email) return { status: 'no_email' };
   const { sendEmail, emailTemplate } = await import('@/lib/email');
   const what = tx.kind === 'refund' ? 'คืนเงินค่ากิจกรรม' : tx.kind === 'host_payout' ? 'โอนรายได้ผู้จัด' : 'ชำระเงิน';
-  const { sent } = await sendEmail({
+  const { ok, sent, error } = await sendEmail({
     to: tx.payee_email,
     subject: `${what} ${fmtBaht(tx.net)} · ${ISSUER.name}`,
     html: emailTemplate({
@@ -354,6 +358,14 @@ export async function emailVoucher(db: D1Database, tx: MoneyTx, siteUrl: string)
       footnote: 'ลิงก์นี้เป็นของคุณคนเดียว โปรดเก็บอีเมลนี้ไว้เป็นหลักฐาน',
     }),
   });
-  if (sent) await db.prepare("UPDATE money_tx SET emailed_at = datetime('now') WHERE id = ?").bind(tx.id).run();
-  return sent;
+  if (!sent) return ok ? { status: 'not_configured' } : { status: 'failed', error };
+  await db.prepare("UPDATE money_tx SET emailed_at = datetime('now') WHERE id = ?").bind(tx.id).run();
+  return { status: 'sent' };
+}
+
+/** What admin reads when the voucher email did not go out. */
+export function emailProblem(r: EmailResult): string | null {
+  if (r.status === 'not_configured') return 'ระบบส่งอีเมลยังไม่ได้ตั้งค่าบนเซิร์ฟเวอร์นี้ (ไม่มี RESEND_API_KEY) — บันทึกแล้ว แต่ผู้รับยังไม่ได้อีเมล';
+  if (r.status === 'failed') return `ส่งอีเมลไม่สำเร็จ: ${r.error || 'ไม่ทราบสาเหตุ'} — บันทึกแล้ว กด "ส่งอีกครั้ง" ได้ในหน้าบัญชีการเงิน`;
+  return null;
 }

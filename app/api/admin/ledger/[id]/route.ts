@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDB, getEnv } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
-import { emailVoucher, type MoneyTx } from '@/lib/ledger';
+import { emailProblem, emailVoucher, type MoneyTx } from '@/lib/ledger';
 
 /** PATCH /api/admin/ledger/[id]
  *  { action: 'void', reason } — cancel a row (never deleted; keeps who/when/why)
@@ -38,8 +38,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       if (tx.status !== 'done') return NextResponse.json({ error: 'รายการนี้ถูกยกเลิกแล้ว' }, { status: 400 });
       if (!tx.payee_email) return NextResponse.json({ error: 'ไม่มีอีเมลผู้รับ' }, { status: 400 });
       const env = await getEnv();
-      const sent = await emailVoucher(db, tx, env.SITE_URL || new URL(request.url).origin);
-      return NextResponse.json({ sent });
+      const mail = await emailVoucher(db, tx, env.SITE_URL || new URL(request.url).origin);
+      return NextResponse.json({ sent: mail.status === 'sent', email_problem: emailProblem(mail) });
     }
     return NextResponse.json({ error: 'unknown action' }, { status: 400 });
   } catch (error) {

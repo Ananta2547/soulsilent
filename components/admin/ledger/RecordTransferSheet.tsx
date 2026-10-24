@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import type { ImageMeta } from '@/lib/types';
 import { ImageUploader } from '@/components/admin/image/ImageUploader';
 import { ASPECTS } from '@/lib/image-aspects';
-import { AdminSheet } from '@/components/admin/AdminShell';
+import { AdminSheet, adminAlert } from '@/components/admin/AdminShell';
 
 export type TransferKind = 'refund' | 'host_payout' | 'expense';
 
@@ -109,11 +109,13 @@ export function RecordTransferSheet({
           send_email: sendEmail,
         }),
       });
-      const data = (await res.json()) as { tx?: SavedTx; emailed?: boolean; error?: string };
+      const data = (await res.json()) as { tx?: SavedTx; emailed?: boolean; email_problem?: string | null; error?: string };
       if (!res.ok || !data.tx) {
         setError(data.error || 'บันทึกไม่สำเร็จ');
         return;
       }
+      // Saved either way; say plainly when the payee did not get the email.
+      if (data.email_problem) await adminAlert(`บันทึก ${data.tx.doc_no} แล้ว`, data.email_problem);
       onSaved(data.tx, !!data.emailed);
     } catch {
       setError('เชื่อมต่อไม่ได้');
