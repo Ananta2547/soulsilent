@@ -1091,7 +1091,7 @@ function DayStrip({
               <button key={t} type="button" className={`tdb-strip-tile ${sel ? 'sel' : n ? 'has' : ''} ${t === today ? 'today' : ''}`} aria-pressed={sel} onClick={() => onPick(t)}>
                 <span className="dow">{DOW_TH[dateOf(t).getDay()]}</span>
                 <span className="num">{dateOf(t).getDate()}</span>
-                {n > 0 && <span className="mark">{n} รอบ</span>}
+                {n > 0 && <span className="cnt">{n} รอบ</span>}
                 {t === today && <span className="dot" />}
               </button>
             );

@@ -645,7 +645,8 @@ a.tdb-round:hover { color: var(--ink); background: #eaf6f4; }
 .tdb-strip-tile:active { transform: scale(.95); }
 .tdb-strip-tile .dow { font-size: 12.5px; color: var(--muted); }
 .tdb-strip-tile .num { font-family: 'Archivo Black', 'Mitr', sans-serif; font-size: 19px; line-height: 1.1; color: var(--ink); }
-.tdb-strip-tile .mark { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .04em; color: var(--teal); }
+/* Not .mark: that name is the yellow highlighter in globals.css. */
+.tdb-strip-tile .cnt { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .04em; color: var(--teal); }
 .tdb-strip-tile .dot { position: absolute; top: 9px; right: 10px; width: 6px; height: 6px; border-radius: 99px; background: var(--accent); }
 .tdb-strip-tile.today .num { color: var(--teal); }
 .tdb-strip-tile.has { background: #eaf6f4; }
@@ -654,7 +655,7 @@ a.tdb-round:hover { color: var(--ink); background: #eaf6f4; }
 .tdb-strip-tile.sel:hover { transform: none; }
 .tdb-strip-tile.sel .dow { color: #a5d9d1; }
 .tdb-strip-tile.sel .num { color: #fff; }
-.tdb-strip-tile.sel .mark { color: var(--accent); }
+.tdb-strip-tile.sel .cnt { color: var(--accent); }
 .tdb-strip-cal {
   flex-shrink: 0; width: 58px; height: 58px; border-radius: 999px; border: 0; background: #fff; color: var(--teal); padding: 0;
   display: flex; align-items: center; justify-content: center; cursor: pointer;
