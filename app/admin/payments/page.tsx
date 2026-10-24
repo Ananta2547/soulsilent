@@ -17,6 +17,19 @@ interface Orphan {
   created_at: string;
 }
 
+interface Refund {
+  id: string;
+  workshop_id: string;
+  amount: number;
+  cancel_reason: string;
+  name: string;
+  user_email: string | null;
+  user_phone: string | null;
+  workshop_title: string;
+  workshop_date: string;
+  workshop_time: string;
+}
+
 const REASON_LABEL: Record<string, string> = {
   duplicate: 'จ่ายซ้ำ (ที่นั่งจ่ายแล้ว)',
   late_cancelled: 'จ่ายหลังหมดเวลา (booking ยกเลิก)',
@@ -27,6 +40,16 @@ export default function AdminPaymentsPage() {
   const [items, setItems] = useState<Orphan[] | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  // Seats in cancelled rounds (or moved seats whose member asked for the
+  // refund) still waiting for admin to transfer the money and attach a slip.
+  const [refunds, setRefunds] = useState<Refund[] | null>(null);
+
+  useEffect(() => {
+    fetch('/api/admin/refunds')
+      .then(async (r) => ((await r.json()) as { items?: Refund[] }).items || [])
+      .then(setRefunds)
+      .catch(() => setRefunds([]));
+  }, []);
 
   function load(all: boolean) {
     fetch(`/api/admin/orphan-payments${all ? '?all=1' : ''}`)
@@ -65,6 +88,45 @@ export default function AdminPaymentsPage() {
         title="ตรวจเงินเข้า"
         sub="เงินที่เข้า Beam แต่ไม่ตรงกับการจองที่ต้องจ่าย — จ่าย QR หลังหมดเวลา หรือจ่ายซ้ำ"
       />
+
+      {refunds && refunds.length > 0 && (
+        <section style={{ marginBottom: 28 }}>
+          <div className="adm-card-head" style={{ padding: '0 2px 12px' }}>
+            <h3 className="adm-h">รอคืนเงินให้ผู้จอง</h3>
+            <span className="adm-meta">
+              {refunds.length} รายการ · ฿{refunds.reduce((a, r) => a + r.amount, 0).toLocaleString()}
+            </span>
+          </div>
+          <div className="adm-notice" style={{ marginBottom: 12 }}>
+            รอบที่ถูกยกเลิก (รวมที่ผู้จัดยกเลิกเอง) และคนที่ถูกย้ายรอบแต่ขอคืนเงินแทน — โอนคืนตามยอดที่จ่ายจริง แล้วแนบสลิปในหน้าเช็คชื่อของรอบนั้น
+            รายการจะหายไปเองเมื่อแนบสลิปแล้ว
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {refunds.map((r) => (
+              <article key={r.id} className="adm-card adm-orphan">
+                <div style={{ flex: '1 1 140px', minWidth: 0 }}>
+                  <div className="adm-orphan-amount">฿{r.amount.toLocaleString()}</div>
+                  <div className="adm-meta" style={{ fontSize: 12, marginTop: 4 }}>
+                    {r.workshop_date} {r.workshop_time}
+                  </div>
+                </div>
+                <div style={{ flex: '2 1 260px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
+                  <Badge tone={r.cancel_reason === 'refund_requested' ? 'warn' : 'bad'}>
+                    {r.cancel_reason === 'refund_requested' ? 'ย้ายรอบแล้วขอคืนเงิน' : 'รอบถูกยกเลิก'}
+                  </Badge>
+                  <div style={{ fontWeight: 600 }}>{r.name}</div>
+                  <div className="adm-meta" style={{ wordBreak: 'break-all' }}>
+                    {[r.user_email, r.user_phone].filter(Boolean).join(' · ') || '—'} · {r.workshop_title}
+                  </div>
+                </div>
+                <a className="adm-btn teal" href={`/admin/workshops/${r.workshop_id}/attendance`}>
+                  แนบสลิปคืนเงิน →
+                </a>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="adm-notice">
         ระบบ<b>คืนเงินอัตโนมัติ</b>ให้รายการที่จ่าย QR หลังหมดเวลาหรือจ่ายซ้ำแล้ว — ที่ค้างในนี้คือรายการที่คืนอัตโนมัติไม่สำเร็จ

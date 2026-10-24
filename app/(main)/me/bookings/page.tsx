@@ -49,6 +49,11 @@ type Booking = {
   // Per-day check-in map { "0":1, ... } for multi-day/part events.
   attendance_json?: string | null;
   attended?: number | null;
+  // The host cancelled the round this seat was in and moved it here
+  // (migration 068); "YYYY-MM-DD HH:MM" of the old round.
+  moved_from?: string | null;
+  moved_from_when?: string | null;
+  parent_booking_id?: string | null;
 };
 
 /** Shared date/time shape for a booking's workshop (ongoing / ended / start). */
@@ -79,12 +84,26 @@ function cancelRemark(reason: string | null | undefined, lang: 'th' | 'en'): str
     case 'incomplete_days': return tr(lang, 'เงื่อนไขเวลาเข้าร่วมไม่ครบถ้วน', 'Attendance requirement not met');
     case 'workshop_changed': return tr(lang, 'กิจกรรมมีการเปลี่ยนแปลงกำหนดการ', 'The event schedule was changed');
     case 'refunded': return tr(lang, 'ดำเนินการไม่สำเร็จ', 'Not completed');
+    case 'refund_requested': return tr(lang, 'คุณขอคืนเงินแทนการย้ายรอบ · กำลังคืนเงิน', 'You chose a refund over the moved round · refund in progress');
     case 'late_refunded':
       return tr(lang, 'ชำระเงินหลังหมดเวลา · คืนเงินแล้ว', 'Paid after the deadline · refunded');
     case 'late_refund_pending':
       return tr(lang, 'ชำระเงินหลังหมดเวลา · กำลังคืนเงิน', 'Paid after the deadline · refund in progress');
     default: return null;
   }
+}
+
+/** True once the event has started (a moved seat can no longer be refunded). */
+function bookingStarted(b: Booking): boolean {
+  if (!b.ws_date) return false;
+  return getWorkshopStart(wsShape(b)).getTime() <= Date.now();
+}
+
+/** "12 ต.ค. 10:00" from the old round's "YYYY-MM-DD HH:MM". */
+function movedWhen(s: string): string {
+  const [d, t] = s.split(' ');
+  const date = new Date(d + 'T00:00:00');
+  return `${date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}${t ? ` ${t}` : ''}`;
 }
 
 /** True while a booking's workshop is currently taking place. */
@@ -452,6 +471,10 @@ export default function MyBookingsPage() {
   const [verifyFailed, setVerifyFailed] = useState(false);
   const [unauthorized, setUnauthorized] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  // "ไม่สะดวก ขอคืนเงิน" on a seat the host moved: asks before cancelling.
+  const [refundAsk, setRefundAsk] = useState<Booking | null>(null);
+  const [refundBusy, setRefundBusy] = useState(false);
+  const [refundErr, setRefundErr] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [checkoutFor, setCheckoutFor] = useState<Booking | null>(null);
   const [checkoutErr, setCheckoutErr] = useState<string | null>(null);
@@ -946,6 +969,9 @@ export default function MyBookingsPage() {
                           <span className="mb-created">{tr(lang, 'จองเมื่อ', 'Booked')} {created}</span>
                           <span className={`mb-price${t.struck ? ' is-struck' : ''}`}>{price}</span>
                         </div>
+                        {b.moved_from && b.status !== 'cancelled' && (
+                          <div className="mb-moved">{tr(lang, 'ผู้จัดย้ายรอบให้ — ดูรายละเอียดด้านหลัง', 'The host moved your round — see the back')}</div>
+                        )}
                         <div className="mb-live-wrap">
                           <div className="mb-live">
                             <span className="mb-live-dot" />
@@ -997,7 +1023,22 @@ export default function MyBookingsPage() {
                         <dd className="mb-fact-amount">{price}</dd>
                       </dl>
                       <p className="mb-back-note">{t.note}</p>
+                      {b.moved_from && b.status !== 'cancelled' && (
+                        <p className="mb-back-note mb-moved-note">
+                          {tr(
+                            lang,
+                            `ผู้จัดยกเลิกรอบเดิม${b.moved_from_when ? ` (${movedWhen(b.moved_from_when)})` : ''} และย้ายที่นั่งของคุณมารอบนี้ ไม่สะดวกขอคืนเงินแทนได้จนกว่ารอบนี้จะเริ่ม`,
+                            `The host cancelled your original round${b.moved_from_when ? ` (${movedWhen(b.moved_from_when)})` : ''} and moved your seat here. You can take a refund instead until this round starts.`,
+                          )}
+                        </p>
+                      )}
                       <div className="mb-back-actions">
+                        {b.moved_from && b.status !== 'cancelled' && !b.parent_booking_id && !bookingStarted(b) && (
+                          <button type="button" className="mb-act is-glass" onClick={() => setRefundAsk(b)}>
+                            <span className="mb-act-long">{tr(lang, 'ไม่สะดวก ขอคืนเงิน', 'Refund instead')}</span>
+                            <span className="mb-act-short">{tr(lang, 'ขอคืนเงิน', 'Refund')}</span>
+                          </button>
+                        )}
                         {f.owesPayment && (
                           <button type="button" className="mb-act is-glass" onClick={() => cancel(b)} disabled={cancellingId === b.id}>
                             {cancellingId === b.id ? tr(lang, 'กำลังยกเลิก...', 'Cancelling...') : tr(lang, 'ยกเลิกการจอง', 'Cancel booking')}
@@ -1162,6 +1203,58 @@ export default function MyBookingsPage() {
           </div>
         );
       })()}
+
+      {refundAsk && (
+        <div className="mb-modal" onMouseDown={(e) => { if (e.target === e.currentTarget && !refundBusy) setRefundAsk(null); }}>
+          <div className="mb-modal-card" style={{ maxWidth: 460, padding: '30px 28px' }}>
+            <div className="mb-modal-icon" style={{ background: '#fdf1e7', color: '#a04a14' }}>↩</div>
+            <h2 className="display-th" style={{ fontSize: 22, margin: '0 0 10px' }}>
+              {tr(lang, 'ขอคืนเงินแทนรอบใหม่?', 'Take a refund instead?')}
+            </h2>
+            <p style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.65, margin: '0 0 8px' }}>
+              {tr(
+                lang,
+                `ที่นั่งใน "${refundAsk.workshop_title}" จะถูกยกเลิก${refundAsk.amount > 0 ? ` และทีมงานจะโอนคืน ฿${Math.round(refundAsk.amount).toLocaleString()} ตามยอดที่จ่ายจริง` : ''}`,
+                `Your seat in "${refundAsk.workshop_title}" will be cancelled${refundAsk.amount > 0 ? ` and we will transfer back ฿${Math.round(refundAsk.amount).toLocaleString()}, the amount you paid` : ''}.`,
+              )}
+            </p>
+            <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, margin: '0 0 20px' }}>
+              {tr(lang, 'ถ้าเป็นการจองกลุ่ม ที่นั่งของเพื่อนในกลุ่มจะถูกยกเลิกด้วย · ทำแล้วย้อนกลับไม่ได้', 'For a group, your friends’ seats are cancelled too. This cannot be undone.')}
+            </p>
+            {refundErr && <p style={{ color: '#b3261e', fontSize: 13, margin: '0 0 12px' }}>{refundErr}</p>}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button type="button" className="btn btn-paper" style={{ flex: 1, justifyContent: 'center' }} disabled={refundBusy} onClick={() => setRefundAsk(null)}>
+                {tr(lang, 'ไปรอบใหม่', 'Keep the new round')}
+              </button>
+              <button
+                type="button"
+                className="btn"
+                style={{ flex: 1, justifyContent: 'center', background: '#a04a14', color: '#fff' }}
+                disabled={refundBusy}
+                onClick={async () => {
+                  setRefundBusy(true);
+                  setRefundErr(null);
+                  try {
+                    const res = await fetch(`/api/bookings/${refundAsk.id}/refund-request`, { method: 'POST' });
+                    const d = (await res.json()) as { error?: string };
+                    if (!res.ok) setRefundErr(d.error || tr(lang, 'ขอคืนเงินไม่สำเร็จ', 'Refund request failed'));
+                    else {
+                      setRefundAsk(null);
+                      load();
+                    }
+                  } catch {
+                    setRefundErr(tr(lang, 'เกิดข้อผิดพลาด', 'Something went wrong'));
+                  } finally {
+                    setRefundBusy(false);
+                  }
+                }}
+              >
+                {refundBusy ? tr(lang, 'กำลังส่ง…', 'Sending…') : tr(lang, 'ขอคืนเงิน', 'Request refund')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {thankYou && (
         <div className="mb-modal" onMouseDown={(e) => { if (e.target === e.currentTarget) setThankYou(false); }}>

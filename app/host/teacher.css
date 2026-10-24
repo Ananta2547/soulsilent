@@ -672,6 +672,77 @@ a.tdb-round:hover { color: var(--ink); background: #eaf6f4; }
 .tdb-strip-today:active { transform: scale(.95); }
 .tdb-strip-brk { display: none; order: 1; flex-basis: 100%; height: 0; }
 
+/* ---------- cancel a round with paid seats: refund or move ---------- */
+.tdb-cx { max-width: 760px; padding: 28px 32px; display: flex; flex-direction: column; gap: 16px; }
+.tdb-cx-head { display: flex; gap: 12px; align-items: flex-start; }
+.tdb-cx-head h2 { font-family: 'Mitr', sans-serif; font-weight: 500; font-size: 24px; line-height: 1.2; margin: 8px 0 0; }
+.tdb-cx-head p { margin: 6px 0 0; font-size: 13.5px; color: var(--muted); }
+.tdb-cx-body { display: flex; flex-direction: column; gap: 10px; }
+.tdb-cx-zonehead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+.tdb-cx-zone {
+  display: flex; flex-direction: column; gap: 8px; min-height: 76px; padding: 10px; border-radius: 20px;
+  background: var(--cream); box-shadow: inset 0 0 0 1.5px transparent; transition: background .2s, box-shadow .2s;
+}
+.tdb-cx-zone.move { background: #eaf6f4; }
+.tdb-cx-zone.move.idle { background: transparent; box-shadow: inset 0 0 0 1.5px #a5d9d1; }
+.tdb-cx-zone.over { box-shadow: inset 0 0 0 2px var(--teal); background: #d4ece8; }
+.tdb-cx-empty { margin: auto; padding: 16px 10px; text-align: center; font-size: 13px; color: var(--muted); }
+.tdb-cx-card {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 8px; border-radius: 16px; background: #fff; cursor: grab;
+  box-shadow: 0 1px 0 rgba(13,30,29,.04); transition: box-shadow .2s, transform .2s cubic-bezier(.2,.7,.2,1);
+}
+.tdb-cx-card:hover { box-shadow: 0 12px 24px -16px rgba(13,30,29,.35); transform: translateY(-1px); }
+.tdb-cx-card:active { cursor: grabbing; }
+.tdb-cx-card { user-select: none; }
+.tdb-cx-card.lifted { opacity: .35; }
+/* The handle a finger drags from — the browser must not scroll from it. */
+.tdb-cx-grip { color: #b5c2c0; font-size: 13px; letter-spacing: -2px; padding: 8px 4px; user-select: none; touch-action: none; cursor: grab; }
+.tdb-cx-ghost {
+  position: fixed; z-index: 300; pointer-events: none; transform: translate(-20px, -50%) rotate(-2deg);
+  background: #fff; border-radius: 14px; padding: 10px 16px; font-size: 14px; font-weight: 600; color: var(--ink);
+  box-shadow: 0 18px 40px -14px rgba(13,30,29,.45), 0 0 0 2px var(--teal); white-space: nowrap;
+}
+.tdb-cx-av {
+  width: 38px; height: 38px; border-radius: 999px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  background: var(--cream); color: var(--teal-deep); font-family: 'Mitr', sans-serif; font-weight: 500; font-size: 15px;
+}
+.tdb-cx-who { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.tdb-cx-who b { font-size: 14.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tdb-cx-who small { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tdb-cx-flip {
+  flex-shrink: 0; border: 0; border-radius: 999px; padding: 8px 14px; background: var(--cream); color: var(--ink);
+  font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.tdb-cx-flip:hover { background: var(--cream-deep); }
+.tdb-cx-zone.move .tdb-cx-flip { background: #fff; }
+.tdb-cx-hint { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--muted); }
+.tdb-cx-targets { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.tdb-cx-target {
+  border: 0; border-radius: 16px; padding: 12px 14px; background: var(--cream); color: var(--ink); font: inherit; text-align: left;
+  display: flex; flex-direction: column; gap: 3px; cursor: pointer; transition: background .2s;
+}
+.tdb-cx-target:hover:not(:disabled) { background: var(--cream-deep); }
+.tdb-cx-target b { font-size: 14px; font-weight: 600; }
+.tdb-cx-target small { font-size: 12px; color: var(--muted); }
+.tdb-cx-target .free { font-family: var(--font-mono); font-size: 11px; color: var(--teal-deep); margin-top: 2px; }
+.tdb-cx-target.new { box-shadow: inset 0 0 0 1.5px #a5d9d1; background: transparent; }
+.tdb-cx-target.on { background: var(--teal); color: #fff; box-shadow: none; }
+.tdb-cx-target.on small, .tdb-cx-target.on .free { color: #d4ece8; }
+.tdb-cx-target:disabled { opacity: .45; cursor: not-allowed; }
+.tdb-cx-cal { max-width: 380px; }
+.tdb-cx-foot { display: flex; flex-direction: column; gap: 10px; padding-top: 14px; box-shadow: inset 0 1px 0 rgba(13,30,29,.08); }
+.tdb-cx-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.tdb-cx-go { background: #a04a14; color: #fff; padding: 12px 22px; font-size: 14px; }
+.tdb-cx-go:hover:not(:disabled) { background: #7d3a10; }
+.tdb-cx-go:disabled { opacity: .45; cursor: not-allowed; }
+@media (max-width: 760px) {
+  .tdb-cx { padding: 6px 16px calc(18px + env(safe-area-inset-bottom)); gap: 12px; }
+  .tdb-cx-head h2 { font-size: 20px; }
+  .tdb-cx-card { padding: 8px 10px 8px 4px; gap: 8px; }
+  .tdb-cx-grip { font-size: 16px; padding: 10px 6px; }
+  .tdb-cx-actions > * { flex: 1; justify-content: center; }
+}
+
 /* The month grid folds open under the strip; the day's rounds follow. */
 .tdb-stack { display: flex; flex-direction: column; gap: 22px; }
 .tdb-calwrap {

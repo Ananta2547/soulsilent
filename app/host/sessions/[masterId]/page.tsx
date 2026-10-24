@@ -19,6 +19,7 @@ import { bookableTiers, parseTiers, tierDesc } from '@/lib/pricing';
 import { useLang } from '@/lib/i18n';
 import { DOW_TH, IcoPin, SeatBar, TH_MONTHS, TdbCalendar, addDays, baht, dateOf, fmtLong, fmtMed, fmtShort, monShort, monthOf, todayYmd, ymdOf, type Month } from '@/components/teacher/tdb';
 import { ONLINE_PLATFORMS, ONLINE_VENUE, isMeetingUrl, platformLabel, venueRules } from '@/lib/online-platform';
+import { CancelRoundModal } from './_components/CancelRoundModal';
 
 type Round = {
   id: string;
@@ -94,6 +95,8 @@ export default function TeacherMasterSessionsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmR, setConfirmR] = useState<Round | null>(null);
+  // A round with paid seats: refund or move them (CancelRoundModal).
+  const [cancelFor, setCancelFor] = useState<Round | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   const load = () =>
@@ -323,7 +326,13 @@ export default function TeacherMasterSessionsPage() {
     if (!confirmR) return;
     const r = confirmR;
     setConfirmR(null);
-    const res = await fetch(`/api/teacher/sessions/${r.id}`, { method: 'DELETE' });
+    // Same route as a round with paid seats, with nobody to move — it also
+    // clears holds still waiting for payment, which DELETE refuses.
+    const res = await fetch(`/api/teacher/sessions/${r.id}/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ move_ids: [] }),
+    });
     const d = (await res.json()) as { error?: string };
     setToast(res.ok ? 'ยกเลิกรอบแล้ว' : d.error || 'ยกเลิกไม่สำเร็จ');
     if (res.ok) await load();
@@ -559,9 +568,10 @@ export default function TeacherMasterSessionsPage() {
                       ยกเลิกรอบ
                     </button>
                   ) : r.date >= today ? (
-                    <span className="tdb-hide-phone" style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--muted)' }}>
-                      มีผู้จองแล้ว · ยกเลิกไม่ได้
-                    </span>
+                    // Paid seats: choose who is refunded and who moves.
+                    <button type="button" className="tdb-link-danger" onClick={() => setCancelFor(r)}>
+                      ยกเลิก / ย้ายรอบ
+                    </button>
                   ) : null}
                 </div>
               </div>
@@ -924,6 +934,20 @@ export default function TeacherMasterSessionsPage() {
         </div>
       )}
 
+
+      {/* ============ cancel a round with paid seats: refund or move ============ */}
+      {cancelFor && (
+        <CancelRoundModal
+          roundId={cancelFor.id}
+          marks={marks}
+          onClose={() => setCancelFor(null)}
+          onDone={async (msg) => {
+            setCancelFor(null);
+            setToast(msg);
+            await load();
+          }}
+        />
+      )}
 
       {/* ============ confirm cancel ============ */}
       {confirmR && (

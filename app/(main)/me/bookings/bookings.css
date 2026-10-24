@@ -117,6 +117,9 @@ main:has(.mb-page) { background: var(--cream); }
 .mb-facts dt { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; opacity: .55; padding-top: 2px; }
 .mb-facts dd { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .mb-back-note { margin: 0; font-size: 12.5px; line-height: 1.55; color: rgba(255,255,255,.72); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; }
+/* A seat the host moved from a cancelled round (front line + back note). */
+.mb-back-note.mb-moved-note { color: var(--accent); }
+.mb-moved { align-self: flex-start; margin-top: 6px; font-size: 11.5px; font-weight: 600; color: #8a5a00; background: #fcefcf; border-radius: 999px; padding: 3px 10px; }
 .mb-back-actions { margin-top: auto; display: flex; gap: 8px; }
 .mb-back-actions .mb-act { padding: 0 10px; }
 .mb-act.is-glass { background: rgba(255,255,255,.1); color: #fff; }
