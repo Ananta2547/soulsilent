@@ -76,6 +76,7 @@
 @keyframes tdbFade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes tdbRailIn { from { transform: translateX(-40px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes tdbSheetUp { from { transform: translateY(60px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes tdbDrop { from { opacity: 0; transform: translateY(-6px) scale(.97); } to { opacity: 1; transform: none; } }
 @keyframes tdbDrawerIn { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
 
 /* ---------- page head ---------- */
@@ -450,7 +451,8 @@ a.tdb-round:hover { color: var(--ink); background: #eaf6f4; }
 .tdb-note-ok { font-size: 12.5px; color: var(--teal-deep); background: #eaf6f4; border-radius: 12px; padding: 9px 12px; }
 .tdb-note-warn { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.55; color: #a04a14; background: #fde7d3; border-radius: 14px; padding: 12px 14px; }
 @media (max-width: 760px) {
-  .tdb-add { border-radius: 28px 28px 0 0; }
+  /* One sheet scrolls as a whole: form, then the summary under it. */
+  .tdb-add { border-radius: 28px 28px 0 0; overflow-x: hidden; overflow-y: auto; }
   .tdb-add-form { padding: 22px 20px 8px; flex-basis: 100%; }
   .tdb-add-sum { flex-basis: 100%; min-width: 0; padding: 20px; gap: 14px; }
   .tdb-sum-big b { font-size: 44px; }
@@ -577,34 +579,124 @@ a.tdb-round:hover { color: var(--ink); background: #eaf6f4; }
   .tdb-savebar { bottom: 12px; }
 }
 
-/* add-round sheet on phones — two steps, "Teacher Mobile App" add / add2 */
-.tdb-sheet-back { position: fixed; inset: 0; z-index: 100; background: rgba(13,30,29,.55); animation: tdbFade .2s ease; }
-.tdb-sheet {
-  position: absolute; left: 0; right: 0; top: 54px; bottom: 0; background: #fff; border-radius: 28px 28px 0 0;
-  display: flex; flex-direction: column; animation: tdbSheetUp .35s cubic-bezier(.2,.7,.2,1);
+/* add-round popup on phones: the same dialog as a bottom sheet ("Host
+   Dashboard"), with a grab handle above the form. */
+.tdb-grab { flex-basis: 100%; display: flex; justify-content: center; padding-top: 10px; }
+.tdb-grab::before { content: ''; width: 40px; height: 5px; border-radius: 99px; background: var(--cream-deep); }
+
+/* ---------- day strip on a round master ("Host Dashboard" 02) ---------- */
+.tdb-strip { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 22px; width: 100%; }
+.tdb-strip-scrim { position: fixed; inset: 0; z-index: 50; }
+.tdb-strip-pick { position: relative; flex-shrink: 0; }
+.tdb-strip-pill {
+  display: inline-flex; align-items: center; gap: 14px; height: 58px; padding: 0 18px 0 22px; border: 0; border-radius: 999px;
+  background: #e8e6da; font-family: 'Mitr', sans-serif; font-weight: 500; font-size: 17px; color: var(--ink); cursor: pointer;
+  transition: background .2s, box-shadow .2s, transform .18s cubic-bezier(.2,.7,.2,1);
 }
-.tdb-sheet-grab { width: 40px; height: 5px; border-radius: 99px; background: var(--cream-deep); margin: 10px auto 0; flex-shrink: 0; }
-.tdb-sheet-head { padding: 14px 20px 10px; display: flex; gap: 12px; align-items: flex-start; }
-.tdb-sheet-eyebrow { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .2em; color: var(--teal); }
-.tdb-sheet-body { flex: 1; overflow-y: auto; padding: 0 20px 16px; }
-.tdb-sheet-repeat { display: flex; margin: 0 0 14px; }
-.tdb-sheet-repeat button { flex: 1; padding: 9px 0; font-size: 13px; }
-.tdb-sheet-dow { flex-wrap: nowrap; margin-bottom: 14px; }
-.tdb-sheet-dow button { flex: 1; width: auto; height: 42px; font-size: 13px; }
-.tdb-sheet-box { background: var(--cream); border-radius: 14px; padding: 10px 12px; display: block; }
-.tdb-sheet-foot { padding: 14px 20px calc(18px + env(safe-area-inset-bottom)); box-shadow: 0 -1px 0 rgba(13,30,29,.08); display: flex; align-items: center; gap: 12px; }
-.tdb-sheet-preset {
-  flex: 1; border: 0; font: inherit; border-radius: 16px; padding: 9px 4px; display: flex; flex-direction: column; gap: 1px;
-  align-items: center; cursor: pointer; background: var(--cream); color: var(--ink);
+.tdb-strip-pill.year { font-family: 'Archivo Black', 'Mitr', sans-serif; font-weight: 400; font-size: 18px; }
+.tdb-strip-pill:hover { background: #fff; }
+.tdb-strip-pill:active { transform: scale(.97); }
+.tdb-strip-pill.on { background: #fff; box-shadow: inset 0 0 0 2px var(--teal); }
+.tdb-strip-pill svg { transition: transform .28s cubic-bezier(.2,.7,.2,1); }
+.tdb-strip-pill.on svg { transform: rotate(180deg); }
+.tdb-strip-pop {
+  position: absolute; top: calc(100% + 8px); left: 0; z-index: 60; background: #fff; border-radius: 20px; padding: 10px;
+  box-shadow: 0 24px 48px -18px rgba(13,30,29,.35), 0 0 0 1px rgba(13,30,29,.06);
+  animation: tdbDrop .22s cubic-bezier(.2,.7,.2,1); transform-origin: top left;
 }
-.tdb-sheet-preset b { font-size: 13px; }
-.tdb-sheet-preset span { font-family: var(--font-mono); font-size: 10px; opacity: .85; }
-.tdb-sheet-preset.on { background: var(--teal); color: #fff; }
-.tdb-sheet-slot { gap: 6px; padding: 8px 10px; border-radius: 14px; }
-.tdb-sheet-slot select { padding: 7px 4px; }
-.tdb-sheet-sum {
-  padding: 14px 20px calc(18px + env(safe-area-inset-bottom)); background: var(--cream); border-radius: 24px 24px 0 0;
-  display: flex; flex-direction: column; gap: 10px;
+.tdb-strip-pop.months { width: 320px; max-width: calc(100vw - 40px); }
+.tdb-strip-pop.years { width: 150px; padding: 8px; display: flex; flex-direction: column; gap: 2px; }
+.tdb-strip-pop-label { font-family: var(--font-mono); font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); padding: 6px 8px 10px; }
+.tdb-strip-months { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.tdb-strip-opt {
+  position: relative; border: 0; border-radius: 12px; padding: 11px 6px; font: inherit; font-size: 13.5px; font-weight: 500;
+  background: transparent; color: var(--ink); cursor: pointer; transition: background .15s, transform .15s cubic-bezier(.2,.7,.2,1);
+}
+.tdb-strip-opt:hover { background: var(--cream); }
+.tdb-strip-opt:active { transform: scale(.95); }
+.tdb-strip-opt.now { color: var(--teal); }
+.tdb-strip-opt.on { background: var(--teal); color: #fff; font-weight: 600; }
+.tdb-strip-opt .dot { position: absolute; top: 6px; right: 7px; width: 5px; height: 5px; border-radius: 99px; background: var(--teal); }
+.tdb-strip-opt.on .dot { background: var(--accent); }
+.tdb-strip-opt.year { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; font-family: 'Archivo Black', 'Mitr', sans-serif; font-size: 16px; font-weight: 400; }
+.tdb-strip-opt .be { font-family: var(--font-mono); font-size: 10px; opacity: .7; }
+.tdb-strip-arrow {
+  flex-shrink: 0; width: 50px; height: 50px; border-radius: 999px; border: 0; background: #e8e6da; color: var(--ink);
+  font-size: 17px; line-height: 1; padding: 0; cursor: pointer; transition: background .2s, transform .18s cubic-bezier(.2,.7,.2,1);
+}
+.tdb-strip-arrow:hover { background: #fff; }
+.tdb-strip-arrow.prev:hover { transform: translateX(-2px); }
+.tdb-strip-arrow.next:hover { transform: translateX(2px); }
+.tdb-strip-arrow:active { transform: scale(.9); }
+/* Nine tiles, five in view: the track sits two tiles left so the picked day
+   (the fifth tile) is in the middle, with a soft fade at both edges. */
+.tdb-strip-view {
+  flex: 1 1 320px; min-width: 0; overflow: hidden; padding: 10px 0 22px; margin: -10px 0 -22px;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+}
+.tdb-strip-track { display: flex; gap: 8px; transform: translateX(calc(-40% - 3.2px)); will-change: transform; }
+.tdb-strip-tile {
+  flex: 0 0 calc((100% - 32px) / 5); position: relative; height: 80px; border: 0; border-radius: 16px; background: #e8e6da;
+  padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-family: inherit;
+  transition: background .25s, box-shadow .3s cubic-bezier(.2,.7,.2,1), transform .2s cubic-bezier(.2,.7,.2,1);
+}
+.tdb-strip-tile:hover { background: #d4ece8; transform: translateY(-3px); }
+.tdb-strip-tile:active { transform: scale(.95); }
+.tdb-strip-tile .dow { font-size: 12.5px; color: var(--muted); }
+.tdb-strip-tile .num { font-family: 'Archivo Black', 'Mitr', sans-serif; font-size: 19px; line-height: 1.1; color: var(--ink); }
+.tdb-strip-tile .mark { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .04em; color: var(--teal); }
+.tdb-strip-tile .dot { position: absolute; top: 9px; right: 10px; width: 6px; height: 6px; border-radius: 99px; background: var(--accent); }
+.tdb-strip-tile.today .num { color: var(--teal); }
+.tdb-strip-tile.has { background: #eaf6f4; }
+.tdb-strip-tile.has .num { color: var(--teal-deep); }
+.tdb-strip-tile.sel { background: var(--teal); box-shadow: 0 10px 22px -12px rgba(13,138,126,.9); }
+.tdb-strip-tile.sel:hover { transform: none; }
+.tdb-strip-tile.sel .dow { color: #a5d9d1; }
+.tdb-strip-tile.sel .num { color: #fff; }
+.tdb-strip-tile.sel .mark { color: var(--accent); }
+.tdb-strip-cal {
+  flex-shrink: 0; width: 58px; height: 58px; border-radius: 999px; border: 0; background: #fff; color: var(--teal); padding: 0;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  transition: background .2s, transform .2s cubic-bezier(.2,.7,.2,1), box-shadow .2s;
+}
+.tdb-strip-cal:hover { background: #eaf6f4; transform: translateY(-2px); box-shadow: 0 12px 24px -14px rgba(13,30,29,.35); }
+.tdb-strip-cal:active { transform: scale(.92); }
+.tdb-strip-cal.on { background: var(--teal); color: #fff; }
+.tdb-strip-today {
+  flex-shrink: 0; height: 58px; padding: 0 24px; border: 0; border-radius: 999px; background: var(--ink); color: #fff;
+  font-family: 'Mitr', sans-serif; font-weight: 500; font-size: 16px; cursor: pointer; transition: background .2s, transform .18s cubic-bezier(.2,.7,.2,1);
+}
+.tdb-strip-today:hover { background: var(--teal); }
+.tdb-strip-today:active { transform: scale(.95); }
+.tdb-strip-brk { display: none; order: 1; flex-basis: 100%; height: 0; }
+
+/* The month grid folds open under the strip; the day's rounds follow. */
+.tdb-stack { display: flex; flex-direction: column; gap: 22px; }
+.tdb-calwrap {
+  display: grid; grid-template-rows: 0fr; opacity: 0; margin-top: -22px;
+  transition: grid-template-rows .5s cubic-bezier(.2,.7,.2,1), opacity .35s ease, margin-top .5s cubic-bezier(.2,.7,.2,1);
+}
+.tdb-calwrap > div { min-height: 0; overflow: hidden; }
+.tdb-calwrap .tdb-cal { transform: translateY(-16px); transition: transform .5s cubic-bezier(.2,.7,.2,1); }
+.tdb-calwrap.open { grid-template-rows: 1fr; opacity: 1; margin-top: 0; }
+.tdb-calwrap.open .tdb-cal { transform: none; }
+
+@media (max-width: 760px) {
+  .tdb-strip { gap: 8px; margin-bottom: 14px; }
+  /* Row 1: month, year, calendar, today. Row 2: ‹ strip ›. */
+  .tdb-strip-pick, .tdb-strip-cal, .tdb-strip-today { order: 1; }
+  .tdb-strip-arrow, .tdb-strip-view { order: 2; }
+  .tdb-strip-brk { display: block; }
+  .tdb-strip-pill { height: 44px; padding: 0 14px 0 16px; gap: 8px; font-size: 15px; }
+  .tdb-strip-pill.year { font-size: 15px; }
+  .tdb-strip-arrow { width: 34px; height: 34px; }
+  .tdb-strip-view { flex: 1 1 0; }
+  .tdb-strip-tile { height: 66px; border-radius: 14px; }
+  .tdb-strip-tile .num { font-size: 16px; }
+  .tdb-strip-cal { width: 44px; height: 44px; margin-left: auto; }
+  .tdb-strip-today { height: 44px; padding: 0 16px; }
+  .tdb-calwrap .tdb-legend { display: none; }
 }
 
 /* overview + reviews */

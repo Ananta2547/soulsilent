@@ -9,8 +9,22 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { Workshop, WorkshopMaster } from '@/lib/types';
 import { PAY_PILL, Pill, SeatBar, fmtShort, todayYmd } from '@/components/teacher/tdb';
+import { platformLabel } from '@/lib/online-platform';
 
-type Round = { id: string; master_id: string; date: string; time_start: string; time_end: string; loc_name: string | null; max_participants: number; status: string; booked: number };
+type Round = {
+  id: string;
+  master_id: string;
+  date: string;
+  time_start: string;
+  time_end: string;
+  loc_name: string | null;
+  is_online: number | null;
+  online_platform: string | null;
+  online_platform_other: string | null;
+  max_participants: number;
+  status: string;
+  booked: number;
+};
 type Data = { masters: WorkshopMaster[]; rounds: Round[]; payout: Record<string, string | null> };
 type Kind = 'none' | 'ended' | 'open';
 
@@ -127,7 +141,7 @@ export default function TeacherSessionsPage() {
                       <span className="tdb-mono-label" style={{ fontSize: 10 }}>{ended ? 'รอบล่าสุด' : 'รอบถัดไป'}</span>
                       <span style={{ fontSize: 14, fontWeight: 600 }}>
                         {fmtShort(rep.date)} · {rep.time_start}–{rep.time_end}
-                        {rep.loc_name ? ` · ${rep.loc_name}` : ''}
+                        {rep.is_online ? ` · ออนไลน์ · ${platformLabel(rep.online_platform, rep.online_platform_other)}` : rep.loc_name ? ` · ${rep.loc_name}` : ''}
                       </span>
                       <SeatBar booked={rep.booked} max={rep.max_participants} full={false} />
                     </div>

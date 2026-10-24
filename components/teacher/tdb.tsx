@@ -49,6 +49,8 @@ type CalProps = {
   sub?: string;
   subUnit?: string;
   onToday?: () => void;
+  /** Adds a × beside the month arrows (the folding calendar on a round master). */
+  onClose?: () => void;
   children?: ReactNode;
 };
 
@@ -121,6 +123,11 @@ export function TdbCalendar(p: CalProps) {
               </button>
               <button type="button" className="tdb-round-btn" onClick={() => step(-1)} aria-label="เดือนก่อน">‹</button>
               <button type="button" className="tdb-round-btn" onClick={() => step(1)} aria-label="เดือนถัดไป">›</button>
+              {p.onClose && (
+                <button type="button" className="tdb-round-btn" onClick={p.onClose} aria-label="ปิดปฏิทิน" style={{ marginLeft: 6, fontSize: 19 }}>
+                  ×
+                </button>
+              )}
             </div>
           </>
         )}
