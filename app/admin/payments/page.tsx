@@ -2,7 +2,8 @@
 
 import { PageLoader } from '@/components/design/PageLoader';
 import { useEffect, useState } from 'react';
-import { AdminHead, AdminChips, Badge } from '@/components/admin/AdminShell';
+import { AdminHead, AdminChips, Badge, adminToast } from '@/components/admin/AdminShell';
+import { RecordTransferSheet } from '@/components/admin/ledger/RecordTransferSheet';
 
 interface Orphan {
   id: string;
@@ -41,15 +42,17 @@ export default function AdminPaymentsPage() {
   const [showAll, setShowAll] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   // Seats in cancelled rounds (or moved seats whose member asked for the
-  // refund) still waiting for admin to transfer the money and attach a slip.
+  // refund) still waiting for admin to transfer the money and record it.
   const [refunds, setRefunds] = useState<Refund[] | null>(null);
+  const [refundFor, setRefundFor] = useState<Refund | null>(null);
 
-  useEffect(() => {
+  function loadRefunds() {
     fetch('/api/admin/refunds')
       .then(async (r) => ((await r.json()) as { items?: Refund[] }).items || [])
       .then(setRefunds)
       .catch(() => setRefunds([]));
-  }, []);
+  }
+  useEffect(loadRefunds, []);
 
   function load(all: boolean) {
     fetch(`/api/admin/orphan-payments${all ? '?all=1' : ''}`)
@@ -98,8 +101,8 @@ export default function AdminPaymentsPage() {
             </span>
           </div>
           <div className="adm-notice" style={{ marginBottom: 12 }}>
-            รอบที่ถูกยกเลิก (รวมที่ผู้จัดยกเลิกเอง) และคนที่ถูกย้ายรอบแต่ขอคืนเงินแทน — โอนคืนตามยอดที่จ่ายจริง แล้วแนบสลิปในหน้าเช็คชื่อของรอบนั้น
-            รายการจะหายไปเองเมื่อแนบสลิปแล้ว
+            รอบที่ถูกยกเลิก (รวมที่ผู้จัดยกเลิกเอง) และคนที่ถูกย้ายรอบแต่ขอคืนเงินแทน — โอนคืนตามยอดที่จ่ายจริง แล้วกด &ldquo;บันทึกการโอนคืน&rdquo;
+            พร้อมเลขอ้างอิงจากแอปธนาคาร รายการจะหายไปเอง และผู้จองได้อีเมลพร้อมใบสำคัญจ่าย
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {refunds.map((r) => (
@@ -119,13 +122,33 @@ export default function AdminPaymentsPage() {
                     {[r.user_email, r.user_phone].filter(Boolean).join(' · ') || '—'} · {r.workshop_title}
                   </div>
                 </div>
-                <a className="adm-btn teal" href={`/admin/workshops/${r.workshop_id}/attendance`}>
-                  แนบสลิปคืนเงิน →
-                </a>
+                <button type="button" className="adm-btn teal" onClick={() => setRefundFor(r)}>
+                  บันทึกการโอนคืน
+                </button>
               </article>
             ))}
           </div>
         </section>
+      )}
+
+      {refundFor && (
+        <RecordTransferSheet
+          lockKind
+          preset={{
+            kind: 'refund',
+            booking_id: refundFor.id,
+            gross: refundFor.amount,
+            payee_name: refundFor.name,
+            payee_email: refundFor.user_email,
+            description: `คืนเงิน · ${refundFor.workshop_title}`,
+          }}
+          onClose={() => setRefundFor(null)}
+          onSaved={(tx, emailed) => {
+            setRefundFor(null);
+            adminToast(`บันทึก ${tx.doc_no} แล้ว${emailed ? ' · ส่งอีเมลแล้ว' : ''}`);
+            loadRefunds();
+          }}
+        />
       )}
 
       <div className="adm-notice">

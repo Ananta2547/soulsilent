@@ -8,7 +8,7 @@ import type { DayTime, Workshop } from '@/lib/types';
 import { getWorkshopDays, safeParseArray } from '@/lib/workshop-utils';
 import { formatTravel, type TravelInfo } from '@/lib/travel';
 import { PdpaBadge } from '@/components/workshops/PdpaBadge';
-import { RefundSlipModal } from '@/components/admin/RefundSlipModal';
+import { RecordTransferSheet } from '@/components/admin/ledger/RecordTransferSheet';
 import { FacilitatorNote } from '@/components/admin/FacilitatorNote';
 import { applicantName } from '@/lib/applicant';
 import { adminAlert, AdminHead, AdminSheet, Badge } from '@/components/admin/AdminShell';
@@ -27,6 +27,8 @@ type BookingRow = {
   attendance_json: string | null;
   refund_slip_url: string | null;
   refund_slip_meta: string | null;
+  /** Ledger document of the refund transfer, once recorded. */
+  refund_doc?: string | null;
   created_at: string;
 };
 
@@ -233,7 +235,7 @@ export default function AttendancePage() {
   // the payment model — "คืนมัดจำ" for deposit, "คืนเงิน" otherwise. Admin can
   // attach to any paid participant without cancelling the whole event first.
   const showSlipCol = workshop.payment_type !== 'free';
-  const slipNoun = isDeposit ? 'สลิปคืนมัดจำ' : 'สลิปคืนเงิน';
+  const slipNoun = isDeposit ? 'การโอนคืนมัดจำ' : 'การโอนคืนเงิน';
 
   // Per-day (active session) stats for multi-day workshops.
   const day = Math.min(activeDay, Math.max(0, days.length - 1));
@@ -351,19 +353,19 @@ export default function AttendancePage() {
                       {open ? 'ซ่อนใบสมัคร' : 'ดูใบสมัคร'}
                     </button>
                     {slipOk &&
-                      (b.refund_slip_url ? (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                          <a href={b.refund_slip_url} target="_blank" rel="noopener noreferrer" className="adm-thumb" style={{ width: 30, height: 36 }} title="ดูสลิป">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={b.refund_slip_url} alt="slip" />
-                          </a>
-                          <button type="button" onClick={() => setSlipFor(b)} className="adm-btn sm soft">
-                            แก้{slipNoun}
-                          </button>
-                        </span>
+                      (b.refund_doc ? (
+                        <a href={`/admin/ledger?q=${encodeURIComponent(b.refund_doc)}`} className="adm-btn sm soft" title="ดูในบัญชีการเงิน">
+                          ✓ คืนแล้ว · {b.refund_doc}
+                        </a>
+                      ) : b.refund_slip_url ? (
+                        // A slip attached before the ledger existed (admin-only file).
+                        <a href={b.refund_slip_url} target="_blank" rel="noopener noreferrer" className="adm-thumb" style={{ width: 30, height: 36 }} title="สลิปเดิม (ก่อนมีบัญชีการเงิน)">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={b.refund_slip_url} alt="slip" />
+                        </a>
                       ) : (
                         <button type="button" onClick={() => setSlipFor(b)} className="adm-btn sm soft">
-                          + แนบ{slipNoun}
+                          + บันทึก{slipNoun}
                         </button>
                       ))}
                     {b.status !== 'cancelled' && (
@@ -392,24 +394,22 @@ export default function AttendancePage() {
       </section>
 
       {slipFor && (
-        <RefundSlipModal
-          booking={slipFor}
-          title={slipNoun}
-          autoCancels={!isDeposit}
+        <RecordTransferSheet
+          lockKind
+          preset={{
+            kind: 'refund',
+            booking_id: slipFor.id,
+            gross: slipFor.amount || undefined,
+            payee_name: applicantName(slipFor.application_json, slipFor.user_name),
+            payee_email: slipFor.user_email,
+            description: `${isDeposit ? 'คืนมัดจำ' : 'คืนเงิน'} · ${workshop.title}`,
+          }}
           onClose={() => setSlipFor(null)}
-          onSaved={(url, meta) => {
-            // A full refund (non-deposit) auto-cancels the booking server-side —
+          onSaved={(tx) => {
+            // A full refund (non-deposit) cancels the booking server-side —
             // mirror that locally so the row reflects it immediately.
-            const autoCancel = !!url && !isDeposit;
             const patch = (r: BookingRow) =>
-              r.id === slipFor.id
-                ? {
-                    ...r,
-                    refund_slip_url: url,
-                    refund_slip_meta: meta ? JSON.stringify(meta) : null,
-                    status: autoCancel ? 'cancelled' : r.status,
-                  }
-                : r;
+              r.id === slipFor.id ? { ...r, refund_doc: tx.doc_no, status: isDeposit ? r.status : 'cancelled' } : r;
             setBookings((rows) => rows.map(patch));
             setSlipFor(null);
           }}

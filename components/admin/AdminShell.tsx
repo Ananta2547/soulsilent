@@ -24,6 +24,7 @@ const I = {
   transfers: { href: '/admin/transfers', label: 'โอนย้ายสิทธิ์', d: 'M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4' },
   revenue: { href: '/admin/revenue', label: 'รายรับ', d: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
   coupons: { href: '/admin/coupons', label: 'คูปอง', d: 'M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z' },
+  ledger: { href: '/admin/ledger', label: 'บัญชีการเงิน', d: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
   payments: { href: '/admin/payments', label: 'ตรวจเงินเข้า', d: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' },
   export: { href: '/admin/finance-export', label: 'ทดสอบ Export API', d: 'M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0 0l-4-4m4 4l4-4' },
 } satisfies Record<string, Item>;
@@ -35,7 +36,7 @@ const GROUPS: [string, Key[]][] = [
   ['กิจกรรม', ['workshops', 'info', 'locations']],
   ['เนื้อหา', ['articles', 'reviews']],
   ['ผู้ใช้ & การจอง', ['users', 'groups', 'transfers']],
-  ['การเงิน', ['revenue', 'payments', 'coupons', 'export']],
+  ['การเงิน', ['revenue', 'ledger', 'payments', 'coupons', 'export']],
 ];
 
 const TABS: Key[] = ['overview', 'workshops', 'users', 'revenue'];

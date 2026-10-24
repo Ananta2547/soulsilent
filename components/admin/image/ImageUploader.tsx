@@ -5,7 +5,7 @@ import type { AspectSpec } from '@/lib/image-aspects';
 import type { CropBox, ImageMeta } from '@/lib/types';
 import { CropModal, type CropModalResult } from './CropModal';
 
-type Folder = 'workshop' | 'course' | 'location' | 'article' | 'avatar' | 'portfolio' | 'payout' | 'refund';
+type Folder = 'workshop' | 'course' | 'location' | 'article' | 'avatar' | 'portfolio' | 'payout' | 'refund' | 'ledger';
 
 type Props = {
   /** Final cropped image URL (or empty). */

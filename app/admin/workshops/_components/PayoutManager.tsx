@@ -1,16 +1,16 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import type { ImageMeta, Workshop } from '@/lib/types';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { Workshop } from '@/lib/types';
 import { computePayout } from '@/lib/workshop-utils';
 import { hostGrossOf } from '@/lib/comp';
-import { parseImageMeta } from '@/lib/image-meta';
-import { ImageUploader } from '@/components/admin/image/ImageUploader';
-import { ASPECTS } from '@/lib/image-aspects';
 import { AdmSelect } from '@/components/admin/pickers';
-import { SheetSection } from '@/components/admin/AdminShell';
+import { SheetSection, adminToast } from '@/components/admin/AdminShell';
+import { RecordTransferSheet } from '@/components/admin/ledger/RecordTransferSheet';
 
 const baht = (n: number) => '฿' + Math.round(n).toLocaleString();
+
+type PayoutTx = { id: string; doc_no: string; net: number; occurred_at: string; ref_id: string | null; legacy: number; kind: string };
 
 export function PayoutManager({
   workshop,
@@ -25,13 +25,15 @@ export function PayoutManager({
   const [dValue, setDValue] = useState<number>(workshop.payout_deduction_value || 0);
   const [status, setStatus] = useState<'pending' | 'paid'>(workshop.payout_status || 'pending');
   const [remark, setRemark] = useState(workshop.payout_remark || '');
-  const [slipUrl, setSlipUrl] = useState(workshop.payout_slip_url || '');
-  const [slipMeta, setSlipMeta] = useState<ImageMeta | null>(parseImageMeta(workshop.payout_slip_meta));
 
   const [gross, setGross] = useState<number | null>(null);
   const [paidCount, setPaidCount] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The host-payout transfers recorded in the ledger for this round.
+  const [txs, setTxs] = useState<PayoutTx[] | null>(null);
+  const [host, setHost] = useState<{ name: string | null; email: string | null } | null>(null);
+  const [recording, setRecording] = useState(false);
 
   // Gross revenue = sum of paid bookings for this workshop.
   useEffect(() => {
@@ -49,7 +51,21 @@ export function PayoutManager({
     })();
   }, [workshop.id]);
 
+  const loadTxs = useCallback(() => {
+    fetch(`/api/admin/ledger?workshop_id=${workshop.id}&kind=host_payout`)
+      .then(async (r) => (await r.json()) as { items?: PayoutTx[]; host?: { name: string | null; email: string | null } | null })
+      .then((d) => {
+        setTxs(d.items || []);
+        setHost(d.host || null);
+      })
+      .catch(() => setTxs([]));
+  }, [workshop.id]);
+  useEffect(() => {
+    loadTxs();
+  }, [loadTxs]);
+
   const { deduction, net } = useMemo(() => computePayout(gross || 0, dType, dValue), [gross, dType, dValue]);
+  const transferred = (txs || []).reduce((s, t) => s + t.net, 0);
 
   async function save() {
     setSaving(true);
@@ -58,14 +74,7 @@ export function PayoutManager({
       const res = await fetch(`/api/workshops/${workshop.id}/payout`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          deduction_type: dType,
-          deduction_value: dValue,
-          status,
-          remark,
-          slip_url: slipUrl || null,
-          slip_meta: slipMeta,
-        }),
+        body: JSON.stringify({ deduction_type: dType, deduction_value: dValue, status, remark }),
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
@@ -132,6 +141,30 @@ export function PayoutManager({
       </SheetSection>
 
       <SheetSection n={3} title="การโอน">
+        {txs === null ? (
+          <p className="adm-meta">กำลังโหลด…</p>
+        ) : txs.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {txs.map((t) => (
+              <a key={t.id} href={`/admin/ledger?q=${encodeURIComponent(t.doc_no)}`} className="adm-notice" style={{ margin: 0, textDecoration: 'none', color: 'inherit' }}>
+                ✓ โอนแล้ว <b>{baht(t.net)}</b> · {t.doc_no} · {t.occurred_at.replace('T', ' ')}
+                {t.ref_id ? <> · <span className="adm-mono">{t.ref_id}</span></> : t.legacy ? ' · รายการเก่า' : ''}
+              </a>
+            ))}
+            {transferred + 0.5 < net && (
+              <p className="adm-hint" style={{ margin: 0 }}>
+                ยังขาดอีก {baht(net - transferred)} จากยอดสุทธิ
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="adm-hint" style={{ marginTop: 0 }}>
+            ยังไม่มีบันทึกการโอน — โอนเงินให้ผู้จัดแล้วกด “บันทึกการโอน” พร้อมเลขอ้างอิงจากแอปธนาคาร ระบบจะตั้งสถานะเป็นโอนแล้ว และส่งใบสำคัญจ่ายทางอีเมล
+          </p>
+        )}
+        <button type="button" className="adm-btn teal" style={{ alignSelf: 'flex-start' }} onClick={() => setRecording(true)} disabled={gross == null}>
+          + บันทึกการโอน
+        </button>
         <div className="adm-field">
           <label>สถานะการโอน</label>
           <AdmSelect value={status} onChange={(e) => setStatus(e.target.value as typeof status)} aria-label="สถานะการโอน">
@@ -139,20 +172,9 @@ export function PayoutManager({
             <option value="paid">โอนแล้ว</option>
           </AdmSelect>
         </div>
-        <ImageUploader
-          label="สลิปโอนเงิน"
-          folder="payout"
-          primary={ASPECTS.PAYOUT_SLIP}
-          value={slipUrl}
-          meta={slipMeta}
-          onChange={({ url, meta }) => {
-            setSlipUrl(url);
-            setSlipMeta(meta);
-          }}
-        />
         <div className="adm-field">
           <label htmlFor="po-remark">หมายเหตุ (ถึงผู้จัด)</label>
-          <textarea id="po-remark" value={remark} onChange={(e) => setRemark(e.target.value)} rows={3} placeholder="เช่น โอนผ่าน พร้อมเพย์ วันที่…" />
+          <textarea id="po-remark" value={remark} onChange={(e) => setRemark(e.target.value)} rows={3} placeholder="เช่น โอนแล้ว รายละเอียดในอีเมล" />
         </div>
       </SheetSection>
 
@@ -164,6 +186,27 @@ export function PayoutManager({
           {saving ? 'กำลังบันทึก…' : 'บันทึก Payout'}
         </button>
       </div>
+
+      {recording && (
+        <RecordTransferSheet
+          lockKind
+          preset={{
+            kind: 'host_payout',
+            workshop_id: workshop.id,
+            gross: Math.max(0, Math.round((net - transferred) * 100) / 100) || undefined,
+            payee_name: host?.name,
+            payee_email: host?.email,
+            description: `รายได้รอบ ${workshop.title}`,
+          }}
+          onClose={() => setRecording(false)}
+          onSaved={(tx, emailed) => {
+            setRecording(false);
+            setStatus('paid');
+            adminToast(`บันทึก ${tx.doc_no} แล้ว${emailed ? ' · ส่งอีเมลแล้ว' : ''}`);
+            loadTxs();
+          }}
+        />
+      )}
     </div>
   );
 }

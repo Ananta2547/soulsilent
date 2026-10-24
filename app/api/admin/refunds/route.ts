@@ -4,9 +4,9 @@ import { requireAdmin } from '@/lib/auth';
 import { applicantName } from '@/lib/applicant';
 
 /** GET /api/admin/refunds — paid seats in a cancelled round (or whose member
- *  took the refund instead of a moved round) that still have no refund slip.
- *  Admin transfers the money and attaches the slip on the round's attendance
- *  page; a row leaves this list once its slip is there. */
+ *  took the refund instead of a moved round) that still have no refund recorded.
+ *  Admin transfers the money and records the transfer in the ledger (from the
+ *  payments page or the round attendance page); the row then leaves this list. */
 export async function GET() {
   try {
     await requireAdmin();
@@ -24,6 +24,7 @@ export async function GET() {
               WHERE b.status = 'cancelled' AND b.payment_status = 'paid' AND b.amount > 0
                 AND b.cancel_reason IN ('workshop_changed', 'refund_requested')
                 AND (b.refund_slip_url IS NULL OR b.refund_slip_url = '')
+                AND NOT EXISTS (SELECT 1 FROM money_tx t WHERE t.booking_id = b.id AND t.kind = 'refund' AND t.status = 'done')
               ORDER BY w.date DESC, b.created_at ASC
               LIMIT 300`,
           )

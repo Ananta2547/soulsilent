@@ -10,7 +10,6 @@ export type JourneyItem = {
   app_status: string;
   attended: number | null;
   attendance_json: string | null;
-  refund_slip_url: string | null;
   application_json: string | null;
   created_at: string;
   title: string;

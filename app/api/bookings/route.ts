@@ -72,13 +72,13 @@ export async function GET(request: Request) {
         // Display name = nickname (edited in the profile) falling back to the
         // registration name — the same rule used everywhere else.
         query =
-          'SELECT b.*, COALESCE(NULLIF(TRIM(u.nickname), \'\'), u.name) AS user_name, u.email as user_email, w.title as workshop_title FROM bookings b LEFT JOIN users u ON b.user_id = u.id LEFT JOIN workshops w ON b.workshop_id = w.id WHERE b.workshop_id = ? ORDER BY b.created_at DESC';
+          'SELECT b.*, COALESCE(NULLIF(TRIM(u.nickname), \'\'), u.name) AS user_name, u.email as user_email, w.title as workshop_title, (SELECT t.doc_no FROM money_tx t WHERE t.booking_id = b.id AND t.kind = \'refund\' AND t.status = \'done\' ORDER BY t.created_at DESC LIMIT 1) AS refund_doc FROM bookings b LEFT JOIN users u ON b.user_id = u.id LEFT JOIN workshops w ON b.workshop_id = w.id WHERE b.workshop_id = ? ORDER BY b.created_at DESC';
         bindings = [workshopId];
       } else {
         // Display name = nickname (edited in the profile) falling back to the
         // registration name — the same rule used everywhere else.
         query =
-          'SELECT b.*, COALESCE(NULLIF(TRIM(u.nickname), \'\'), u.name) AS user_name, u.email as user_email, w.title as workshop_title FROM bookings b LEFT JOIN users u ON b.user_id = u.id LEFT JOIN workshops w ON b.workshop_id = w.id ORDER BY b.created_at DESC';
+          'SELECT b.*, COALESCE(NULLIF(TRIM(u.nickname), \'\'), u.name) AS user_name, u.email as user_email, w.title as workshop_title, (SELECT t.doc_no FROM money_tx t WHERE t.booking_id = b.id AND t.kind = \'refund\' AND t.status = \'done\' ORDER BY t.created_at DESC LIMIT 1) AS refund_doc FROM bookings b LEFT JOIN users u ON b.user_id = u.id LEFT JOIN workshops w ON b.workshop_id = w.id ORDER BY b.created_at DESC';
         bindings = [];
       }
     } else {
@@ -105,7 +105,8 @@ export async function GET(request: Request) {
                 w.deposit_amount as ws_deposit_amount, w.announce_at as ws_announce_at,
                 w.confirm_main_by as ws_confirm_main_by, w.confirm_waitlist_by as ws_confirm_waitlist_by,
                 COALESCE(NULLIF(w.image_url, ''), m.cover_image_url) as ws_image_url,
-                (SELECT mw.date || ' ' || mw.time_start FROM workshops mw WHERE mw.id = b.moved_from) as moved_from_when
+                (SELECT mw.date || ' ' || mw.time_start FROM workshops mw WHERE mw.id = b.moved_from) as moved_from_when,
+                (SELECT t.doc_no FROM money_tx t WHERE t.booking_id = b.id AND t.kind = 'refund' AND t.status = 'done' ORDER BY t.created_at DESC LIMIT 1) AS refund_doc
          FROM bookings b LEFT JOIN workshops w ON b.workshop_id = w.id
          LEFT JOIN workshop_masters m ON m.id = w.master_id
          WHERE b.user_id = ? ORDER BY b.created_at DESC`;
@@ -126,7 +127,15 @@ export async function GET(request: Request) {
     // For the personal page, attach the user-visible (masked) status + the
     // confirm-by deadline so the UI doesn't need the round logic.
     const rows = (result.results || []).map((b) => {
-      if (!staffView) delete b.facilitator_note;
+      if (!staffView) {
+        delete b.facilitator_note;
+        // Transfer slips and ledger documents are admin-only; the participant
+        // sees "คืนเงินแล้ว" and gets the voucher link by email.
+        b.refunded = !!(b.refund_doc || b.refund_slip_url);
+        delete b.refund_slip_url;
+        delete b.refund_slip_meta;
+        delete b.refund_doc;
+      }
       const admission = (b.ws_admission_type as string) || 'direct';
       const w = {
         admission_type: admission as Workshop['admission_type'],

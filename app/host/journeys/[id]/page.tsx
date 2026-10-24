@@ -127,7 +127,6 @@ export default function TeacherCheckinPage() {
   const [noteDraft, setNoteDraft] = useState('');
   const [noteSaved, setNoteSaved] = useState(false);
   const [reviewOf, setReviewOf] = useState<string | null>(null);
-  const [slipOpen, setSlipOpen] = useState(false);
   const [qrBig, setQrBig] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [pvStars, setPvStars] = useState(0);
@@ -197,12 +196,11 @@ export default function TeacherCheckinPage() {
       if (qrBig) setQrBig(false);
       else if (previewOpen) setPreviewOpen(false);
       else if (reviewOf) setReviewOf(null);
-      else if (slipOpen) setSlipOpen(false);
       else if (drawerId) setDrawerId(null);
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [qrBig, previewOpen, reviewOf, slipOpen, drawerId]);
+  }, [qrBig, previewOpen, reviewOf, drawerId]);
 
   const bookings = useMemo(() => data?.bookings || [], [data]);
   const w = data?.workshop || null;
@@ -429,10 +427,8 @@ export default function TeacherCheckinPage() {
           {w.payout_remark}
         </div>
       )}
-      {w.payout_slip_url && (
-        <button type="button" onClick={() => setSlipOpen(true)} className="btn btn-ink btn-sm" style={{ justifyContent: 'center' }}>
-          ดูสลิปโอนเงิน <span className="mono">↗</span>
-        </button>
+      {payoutPaid && (
+        <div style={{ fontSize: 12.5, color: 'var(--teal-deep)', fontWeight: 600, textAlign: 'center' }}>✓ โอนแล้ว · รายละเอียดและใบสำคัญจ่ายส่งทางอีเมล</div>
       )}
     </div>
   );
@@ -1059,27 +1055,6 @@ export default function TeacherCheckinPage() {
                 </div>
               </>
             )}
-          </section>
-        </div>
-      )}
-
-      {/* ================= slip ================= */}
-      {slipOpen && w.payout_slip_url && (
-        <div className="tdb-backdrop center" style={{ zIndex: 120 }} onMouseDown={(e) => e.target === e.currentTarget && setSlipOpen(false)}>
-          <section className="tdb-modal" role="dialog" aria-modal="true" style={{ maxWidth: 460, padding: 22, display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h3 style={{ fontFamily: "'Mitr', sans-serif", fontWeight: 500, fontSize: 19, margin: 0, flex: 1 }}>สลิปโอนเงิน</h3>
-              <a href={w.payout_slip_url} target="_blank" rel="noopener noreferrer" className="tdb-soft-btn">
-                เปิดเต็มจอ ↗
-              </a>
-              <button type="button" className="tdb-x" onClick={() => setSlipOpen(false)} aria-label="ปิด">
-                ×
-              </button>
-            </div>
-            <div style={{ background: 'var(--cream)', borderRadius: 16, padding: 10, maxHeight: 'calc(100dvh - 180px)', overflow: 'auto', display: 'flex', justifyContent: 'center' }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={w.payout_slip_url} alt="สลิปโอนเงิน" style={{ maxWidth: '100%', height: 'auto', borderRadius: 8 }} />
-            </div>
           </section>
         </div>
       )}

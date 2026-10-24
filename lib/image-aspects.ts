@@ -41,6 +41,7 @@ export const ASPECTS = {
   // Slips are photos of a receipt — never crop them, keep the original shape.
   PAYOUT_SLIP: { label: 'สัดส่วนจริง · สลิปโอนเงิน' },
   REFUND_SLIP: { label: 'สัดส่วนจริง · สลิปคืนมัดจำ' },
+  LEDGER_SLIP: { label: 'สัดส่วนจริง · สลิป / ใบเสร็จ' },
 } satisfies Record<string, AspectSpec>;
 
 /** Pick the larger ratio (wider). Used to compute master crop when multiple

@@ -123,6 +123,7 @@ main:has(.mb-page) { background: var(--cream); }
 .mb-back-actions { margin-top: auto; display: flex; gap: 8px; }
 .mb-back-actions .mb-act { padding: 0 10px; }
 .mb-act.is-glass { background: rgba(255,255,255,.1); color: #fff; }
+.mb-back-note.mb-refunded { color: #7fe0c8; font-weight: 600; }
 .mb-act.is-paper { background: var(--paper); color: var(--ink); }
 
 /* ---------- modals ---------- */

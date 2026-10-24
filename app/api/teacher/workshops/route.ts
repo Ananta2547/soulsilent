@@ -34,5 +34,12 @@ export async function GET() {
     .bind(u.sub, u.sub)
     .all<Workshop & { booked: number }>();
 
-  return NextResponse.json({ workshops: rows.results || [] });
+  // Payout slips are admin-only.
+  const workshops = (rows.results || []).map((w) => {
+    const o: Partial<typeof w> = { ...w };
+    delete o.payout_slip_url;
+    delete o.payout_slip_meta;
+    return o;
+  });
+  return NextResponse.json({ workshops });
 }

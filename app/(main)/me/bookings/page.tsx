@@ -42,8 +42,9 @@ type Booking = {
   ws_admission_type?: string;
   ws_payment_type?: string;
   ws_announce_at?: string | null;
-  // Deposit-refund slip attached by admin (visible once uploaded).
-  refund_slip_url?: string | null;
+  // Admin has recorded the transfer back (ledger, or a slip from before it).
+  // The slip itself is admin-only; the voucher link goes out by email.
+  refunded?: boolean;
   // Why an unsuccessful booking ended (drives the red remark). See cancelRemark().
   cancel_reason?: string | null;
   // Per-day check-in map { "0":1, ... } for multi-day/part events.
@@ -326,7 +327,7 @@ function ticketOf(b: Booking, now: number, lang: 'th' | 'en'): Ticket {
 
   if (o.bucket === 'other') {
     const remark = cancelRemark(o.reason, lang) || '';
-    const refunded = b.payment_status === 'refunded';
+    const refunded = b.payment_status === 'refunded' || !!b.refunded;
     return {
       ...base,
       kind: refunded ? 'refunded' : 'other',
@@ -480,7 +481,6 @@ export default function MyBookingsPage() {
   const [checkoutErr, setCheckoutErr] = useState<string | null>(null);
   const [thankYou, setThankYou] = useState(false);
   const [filter, setFilter] = useState<'all' | 'active' | 'done' | 'other'>('all');
-  const [slipUrl, setSlipUrl] = useState<string | null>(null);
   const [consentFor, setConsentFor] = useState<Booking | null>(null);
   /** Tickets turned over to their back. Cleared when the tab changes. */
   const [flipped, setFlipped] = useState<Record<string, boolean>>({});
@@ -880,10 +880,10 @@ export default function MyBookingsPage() {
               const created = fmtDateOnly(sqliteToMs(b.created_at), lang);
               const eventDate = b.ws_date ? fmtDateTime(getWorkshopStart(wsShape(b)), lang) : '—';
               const busy = confirmingId === b.id;
-              const slipLabel =
+              const refundNote =
                 b.ws_payment_type === 'deposit'
-                  ? tr(lang, 'ดูสลิปคืนมัดจำ', 'View deposit refund slip')
-                  : tr(lang, 'ดูสลิปโอนเงินคืน', 'View refund slip');
+                  ? tr(lang, '↩ คืนมัดจำแล้ว · รายละเอียดอยู่ในอีเมล', '↩ Deposit returned · details in your email')
+                  : tr(lang, '↩ คืนเงินแล้ว · รายละเอียดอยู่ในอีเมล', '↩ Refunded · details in your email');
 
               // The one action on the front of the ticket.
               let act: { tone: 'teal' | 'soft' | 'accent' | 'ghost'; long: string; short: string; onClick?: () => void; href?: string; external?: boolean };
@@ -906,8 +906,6 @@ export default function MyBookingsPage() {
                 act = { tone: 'soft', long: tr(lang, 'เพิ่มลงปฏิทิน', 'Add to calendar'), short: tr(lang, 'เพิ่มลงปฏิทิน', 'Add to calendar'), href: `/api/bookings/${b.id}/calendar`, external: true };
               } else if (t.kind === 'paid_ongoing') {
                 act = { tone: 'accent', long: tr(lang, 'ดูใบสมัคร', 'View application'), short: tr(lang, 'ดูใบสมัคร', 'Application'), onClick: () => setConsentFor(b) };
-              } else if (b.refund_slip_url) {
-                act = { tone: 'soft', long: slipLabel, short: tr(lang, 'ดูสลิปคืนเงิน', 'Refund slip'), onClick: () => setSlipUrl(b.refund_slip_url || null) };
               } else {
                 act = { tone: 'ghost', long: `${tr(lang, 'ดูกิจกรรม', 'View journey')} →`, short: `${tr(lang, 'ดูกิจกรรม', 'View journey')} →`, href: `/journeys/${b.workshop_id}` };
               }
@@ -1032,6 +1030,7 @@ export default function MyBookingsPage() {
                           )}
                         </p>
                       )}
+                      {b.refunded && <p className="mb-back-note mb-refunded">{refundNote}</p>}
                       <div className="mb-back-actions">
                         {b.moved_from && b.status !== 'cancelled' && !b.parent_booking_id && !bookingStarted(b) && (
                           <button type="button" className="mb-act is-glass" onClick={() => setRefundAsk(b)}>
@@ -1042,12 +1041,6 @@ export default function MyBookingsPage() {
                         {f.owesPayment && (
                           <button type="button" className="mb-act is-glass" onClick={() => cancel(b)} disabled={cancellingId === b.id}>
                             {cancellingId === b.id ? tr(lang, 'กำลังยกเลิก...', 'Cancelling...') : tr(lang, 'ยกเลิกการจอง', 'Cancel booking')}
-                          </button>
-                        )}
-                        {b.refund_slip_url && (
-                          <button type="button" className="mb-act is-glass" onClick={() => setSlipUrl(b.refund_slip_url || null)}>
-                            <span className="mb-act-long">{slipLabel}</span>
-                            <span className="mb-act-short">{tr(lang, 'ดูสลิป', 'Slip')}</span>
                           </button>
                         )}
                         <button type="button" className="mb-act is-paper" onClick={toggle}>
@@ -1097,39 +1090,6 @@ export default function MyBookingsPage() {
             );
           }}
         />
-      )}
-
-      {slipUrl && (
-        <div
-          className="mb-modal"
-          style={{ background: 'rgba(13,30,29,.55)' }}
-          onMouseDown={(e) => { if (e.target === e.currentTarget) setSlipUrl(null); }}
-        >
-          <div className="mb-modal-card">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px' }}>
-              <span className="display-th" style={{ fontSize: 16 }}>
-                <T th="สลิปคืนมัดจำ" en="Refund slip" />
-              </span>
-              <button
-                type="button"
-                onClick={() => setSlipUrl(null)}
-                aria-label={tr(lang, 'ปิด', 'Close')}
-                style={{ width: 32, height: 32, borderRadius: '50%', border: 'none', background: 'var(--cream)', color: 'var(--ink)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-              >
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-            <div style={{ padding: '0 16px 12px', textAlign: 'center' }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={slipUrl} alt="refund slip" style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: 14, display: 'inline-block', background: 'var(--cream)' }} />
-            </div>
-            <div style={{ padding: '0 16px 16px', textAlign: 'center' }}>
-              <a href={slipUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12.5, color: 'var(--teal-deep)', fontWeight: 600, textDecoration: 'none' }}>
-                {tr(lang, 'เปิดรูปเต็ม ↗', 'Open full image ↗')}
-              </a>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Late payment → refund notice. Deliberately a modal, not a banner: the

@@ -16,7 +16,7 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
       userAgent: '*',
       allow: '/',
       // Accounts, tools and one-off links: nothing a search result should open.
-      disallow: ['/api/', '/admin', '/host', '/me', '/auth', '/pay', '/invite', '/claim', '/survey', '/portfolio'],
+      disallow: ['/api/', '/admin', '/host', '/me', '/auth', '/pay', '/invite', '/claim', '/survey', '/portfolio', '/voucher'],
     },
     sitemap: `${SITE_ORIGIN}/sitemap.xml`,
   };

@@ -501,3 +501,25 @@ a.adm-round:hover { background: var(--cream); text-decoration: none; color: var(
 .adm-form:has(> .adm-steps) { padding-top: 0; }
 /* A section that is just one old fieldset already has its title. */
 .adm .adm-form .adm-steps .adm-sec > .adm-sec-head + fieldset:last-child > legend { display: none; }
+
+/* ---------- money ledger (/admin/ledger + "บันทึกการโอน" sheet) ---------- */
+.ldg-form { padding: 20px 0; display: flex; flex-direction: column; gap: 14px; }
+.ldg-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 560px) { .ldg-row { grid-template-columns: 1fr; } }
+.ldg-sums { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.ldg-sum { padding: 16px 18px; }
+.ldg-sum-n { font-family: Mitr, sans-serif; font-size: 24px; line-height: 32px; margin-top: 4px; }
+.ldg-sum-n.in, .ldg-amt.in { color: #0b6b4f; }
+.ldg-sum-n.out, .ldg-amt.out { color: #a3261a; }
+.ldg-amt { font-weight: 600; font-variant-numeric: tabular-nums; }
+.ldg-amt.is-void { text-decoration: line-through; color: var(--muted); }
+.ldg-doc { background: none; border: 0; padding: 0; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+.ldg-dates { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; flex-direction: row; }
+.ldg-dates .adm-btn { flex: 0 0 auto; }
+.ldg-dl { display: grid; grid-template-columns: 130px 1fr; gap: 10px 14px; padding: 20px 0; margin: 0; font-size: 14px; }
+.ldg-dl dt { color: var(--muted); font-size: 13px; }
+.ldg-dl dd { margin: 0; min-width: 0; word-break: break-word; }
+.ldg-slip { display: block; margin-bottom: 20px; }
+.ldg-slip img { max-width: 100%; max-height: 420px; border-radius: 14px; box-shadow: var(--adm-ring); }
+.ldg-cat { display: flex; gap: 8px; align-items: center; }
+.ldg-cat input { flex: 1; }

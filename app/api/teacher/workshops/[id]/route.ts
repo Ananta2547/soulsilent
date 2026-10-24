@@ -80,5 +80,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     .reduce((s, b) => s + hostGrossOf(b as { amount?: number; host_credit?: number }), 0);
   const { deduction, net } = computePayout(gross, workshop.payout_deduction_type, workshop.payout_deduction_value);
 
-  return NextResponse.json({ workshop, bookings, finance: { gross, deduction, net } });
+  // The payout slip is admin-only; the host sees payout_status ("โอนแล้ว") and
+  // gets the voucher by email.
+  const shown: Partial<Workshop> = { ...workshop };
+  delete shown.payout_slip_url;
+  delete shown.payout_slip_meta;
+  return NextResponse.json({ workshop: shown, bookings, finance: { gross, deduction, net } });
 }

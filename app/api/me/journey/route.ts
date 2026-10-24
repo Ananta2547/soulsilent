@@ -23,7 +23,7 @@ export async function GET() {
     const rows = await db
       .prepare(
         `SELECT b.id AS booking_id, b.workshop_id, b.status, b.payment_status, b.app_status,
-                b.attended, b.attendance_json, b.refund_slip_url, b.application_json, b.journey_note, b.created_at,
+                b.attended, b.attendance_json, b.application_json, b.journey_note, b.created_at,
                 w.title, w.image_url, w.date, w.end_date, w.dates_json, w.workshop_type,
                 w.time_start, w.time_end, w.day_times_json, w.master_id,
                 w.require_consent, w.photos_drive_url,

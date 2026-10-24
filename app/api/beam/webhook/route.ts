@@ -9,6 +9,7 @@ import {
   parseReference,
   fetchPaymentLink,
 } from '@/lib/beam';
+import { recordBeam } from '@/lib/ledger';
 
 /**
  * POST /api/beam/webhook — Beam event receiver.
@@ -68,6 +69,29 @@ function readEventType(event: Record<string, unknown>): string {
  * reads "pending". Trusting the flags alone let a payment arriving after the
  * window confirm the booking and take a seat that had already been released.
  */
+/** Write a Beam movement to the money ledger. Beam amounts are in satang;
+ *  the ledger keeps baht. A ledger problem never fails the webhook — the
+ *  admin ledger page pulls in any payment missed here. */
+async function ledger(
+  db: D1Database,
+  kind: 'booking_payment' | 'refund',
+  ref: string | null,
+  satang: number,
+  bookingId: string | null,
+): Promise<void> {
+  if (!ref) return;
+  try {
+    let baht = satang / 100;
+    if (!(baht > 0) && bookingId && kind === 'booking_payment') {
+      const b = await db.prepare('SELECT amount FROM bookings WHERE id = ?').bind(bookingId).first<{ amount: number }>();
+      baht = Number(b?.amount) || 0;
+    }
+    await recordBeam(db, { kind, ref, amount: baht, bookingId });
+  } catch (e) {
+    console.error('Beam webhook: ledger write failed', ref, e);
+  }
+}
+
 function isLate(b: { status: string; payment_status: string; expires_at: string | null }): boolean {
   if (b.status === 'cancelled' || b.payment_status === 'expired') return true;
   if (b.payment_status === 'paid') return false;
@@ -321,6 +345,10 @@ export async function POST(request: Request) {
             console.log(`Beam webhook: charge ${chargeId} already claimed, nothing to do`);
             break;
           }
+          // The money did come in — log it; the refund that sends it back is
+          // logged when Beam confirms it. `unknown` is most likely another
+          // site's payment on the shared Beam account, so it stays out.
+          if (reason !== 'unknown') await ledger(db, 'booking_payment', chargeId, amount, bookingId);
 
           // Refund only money we can positively tie to one of our own bookings.
           // `unknown` means no matching row — which, on a shared Beam account,
@@ -369,6 +397,7 @@ export async function POST(request: Request) {
           )
           .bind(chargeId, booking!.id)
           .run();
+        await ledger(db, 'booking_payment', chargeId, amount, booking!.id);
         break;
       }
 
@@ -376,6 +405,7 @@ export async function POST(request: Request) {
         // The payload identifies the refund, not the charge it reverses, so
         // close the reconcile entry by booking rather than by charge id.
         if (bookingId) {
+          await ledger(db, 'refund', chargeId, pickNum(data, 'grossAmount', 'amount', 'netAmount'), bookingId);
           // A refund does NOT always mean this booking's own money went back.
           // When someone pays twice, the refund is of the SECOND charge while
           // the first still holds a confirmed seat — and closing by booking id
