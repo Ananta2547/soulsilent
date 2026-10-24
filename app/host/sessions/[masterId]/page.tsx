@@ -20,6 +20,7 @@ import { useLang } from '@/lib/i18n';
 import { DOW_TH, IcoPin, SeatBar, TH_MONTHS, TdbCalendar, addDays, baht, dateOf, fmtLong, fmtMed, fmtShort, monShort, monthOf, todayYmd, ymdOf, type Month } from '@/components/teacher/tdb';
 import { ONLINE_PLATFORMS, ONLINE_VENUE, isMeetingUrl, platformLabel, venueRules } from '@/lib/online-platform';
 import { CancelRoundModal } from './_components/CancelRoundModal';
+import { ApplicationModal } from './_components/ApplicationModal';
 
 type Round = {
   id: string;
@@ -97,6 +98,8 @@ export default function TeacherMasterSessionsPage() {
   const [confirmR, setConfirmR] = useState<Round | null>(null);
   // A round with paid seats: refund or move them (CancelRoundModal).
   const [cancelFor, setCancelFor] = useState<Round | null>(null);
+  // The activity's application form + PDPA (ApplicationModal).
+  const [appOpen, setAppOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   const load = () =>
@@ -427,6 +430,15 @@ export default function TeacherMasterSessionsPage() {
     );
   const venueCheck = locationId ? 'เลือกสถานที่แล้ว' : noVenue ? 'ยังไม่มีสถานที่ — ติดต่อ Admin' : 'ยังไม่ได้เลือกสถานที่';
 
+  const appCount = (() => {
+    try {
+      const q = JSON.parse(master.application_form || '[]') as unknown;
+      return Array.isArray(q) ? q.length : 0;
+    } catch {
+      return 0;
+    }
+  })();
+
   const nx = upcoming[0];
   const bookedUp = upcoming.reduce((a, r) => a + r.booked, 0);
   const capUp = upcoming.reduce((a, r) => a + r.max_participants, 0);
@@ -447,9 +459,18 @@ export default function TeacherMasterSessionsPage() {
             {!priced && <span className="tdb-warn-pill">⚠ Admin ยังไม่ได้ตั้งราคา</span>}
           </div>
         </div>
-        <button type="button" className="btn btn-teal" onClick={() => openAdd()}>
-          <span style={{ fontSize: 18, lineHeight: 1 }}>+</span> เพิ่มรอบ
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {/* The activity's application form + PDPA, used by every round. */}
+          <button type="button" className="btn btn-paper tdb-app-btn" onClick={() => setAppOpen(true)}>
+            ใบสมัคร & PDPA
+            <small>
+              {appCount} ข้อ{master.require_consent ? ' · PDPA' : ''}
+            </small>
+          </button>
+          <button type="button" className="btn btn-teal" onClick={() => openAdd()}>
+            <span style={{ fontSize: 18, lineHeight: 1 }}>+</span> เพิ่มรอบ
+          </button>
+        </div>
       </div>
 
       <div className="tdb-stats">
@@ -934,6 +955,19 @@ export default function TeacherMasterSessionsPage() {
         </div>
       )}
 
+
+      {appOpen && (
+        <ApplicationModal
+          master={master}
+          bookedRounds={upcoming.filter((r) => r.booked > 0).length}
+          onClose={() => setAppOpen(false)}
+          onSaved={async (msg) => {
+            setAppOpen(false);
+            setToast(msg);
+            await load();
+          }}
+        />
+      )}
 
       {/* ============ cancel a round with paid seats: refund or move ============ */}
       {cancelFor && (

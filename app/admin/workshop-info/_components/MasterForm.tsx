@@ -11,6 +11,17 @@ import { AdmSelect } from '@/components/admin/pickers';
 import { SheetSection } from '@/components/admin/AdminShell';
 import { UnsavedDialog } from '@/components/admin/UnsavedDialog';
 import { ONLINE_VENUE, venueRules } from '@/lib/online-platform';
+import { ApplicationEditor } from '@/components/workshops/ApplicationEditor';
+import type { ApplicationQuestion } from '@/lib/types';
+
+const toQuestions = (json: string | null | undefined): ApplicationQuestion[] => {
+  try {
+    const v = json ? (JSON.parse(json) as unknown) : [];
+    return Array.isArray(v) ? (v as ApplicationQuestion[]) : [];
+  } catch {
+    return [];
+  }
+};
 
 /** What the host may pick, in words, from the ticked venues. */
 function venueHint(ids: string[]): string {
@@ -134,6 +145,9 @@ export function MasterForm({
   const [locationIds, setLocationIds] = useState<string[]>(toArr(initial?.location_ids_json));
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Round activities: the application form + PDPA switch (migration 069).
+  const [questions, setQuestions] = useState<ApplicationQuestion[]>(() => toQuestions(initial?.application_form));
+  const [consent, setConsent] = useState(!!initial?.require_consent);
 
   // Unsaved-changes tracking: snapshot the loaded baseline once, then compare
   // the live fields against it so the modal can warn before discarding edits.
@@ -152,11 +166,13 @@ export function MasterForm({
         tiers: loadTiers(initial),
         defaultSeats: String(initial?.default_max_participants ?? 20),
         locationIds: toArr(initial?.location_ids_json),
+        questions: toQuestions(initial?.application_form),
+        consent: !!initial?.require_consent,
       }),
     [initial],
   );
   const dirty =
-    JSON.stringify({ title, organizer, description, coverUrl, coverMeta, target, takeaways, priceGroup, priceGroupBooking, tiers, defaultSeats, locationIds }) !== baseline;
+    JSON.stringify({ title, organizer, description, coverUrl, coverMeta, target, takeaways, priceGroup, priceGroupBooking, tiers, defaultSeats, locationIds, questions, consent }) !== baseline;
   useEffect(() => {
     onDirtyChange?.(dirty);
   }, [dirty, onDirtyChange]);
@@ -202,10 +218,25 @@ export function MasterForm({
           location_ids: locationIds,
         }),
       });
-      const data = (await res.json()) as { error?: string };
+      const data = (await res.json()) as { error?: string; id?: string };
       if (!res.ok) {
         setErr(data.error || 'บันทึกไม่สำเร็จ');
         return false;
+      }
+      // The form + PDPA go through the same route the host uses, so they
+      // reach the activity's upcoming rounds the same way.
+      const masterId = editingId || data.id;
+      if ((initial?.kind || kind) === 'round' && masterId) {
+        const r = await fetch(`/api/teacher/masters/${masterId}/application`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ questions, require_consent: consent }),
+        });
+        const a = (await r.json()) as { error?: string };
+        if (!r.ok) {
+          setErr(`บันทึกข้อมูลกิจกรรมแล้ว แต่ใบสมัครยังไม่บันทึก: ${a.error || 'เกิดข้อผิดพลาด'}`);
+          return false;
+        }
       }
       return true;
     } catch {
@@ -432,6 +463,15 @@ export function MasterForm({
         <ListField legend="เหมาะกับใคร (Target Audience)" items={target} onChange={setTarget} placeholder="เช่น คนที่อยากพักใจ..." />
         <ListField legend="ได้อะไรจากกิจกรรม" items={takeaways} onChange={setTakeaways} placeholder="เช่น เทคนิคการหายใจ..." />
       </SheetSection>
+
+      {isRound && (
+        <SheetSection n={5} title="ใบสมัคร & PDPA">
+          <p className="adm-hint" style={{ marginTop: -10 }}>
+            ผู้จัดแก้ได้เองในหน้าจัดรอบ · บันทึกแล้วใช้กับทุกรอบที่ยังไม่เริ่ม และรอบที่เปิดใหม่
+          </p>
+          <ApplicationEditor questions={questions} onQuestions={setQuestions} consent={consent} onConsent={setConsent} disabled={saving} />
+        </SheetSection>
+      )}
 
       <div className="adm-sticky-foot">
         <button type="button" onClick={onCancel} className="adm-btn">

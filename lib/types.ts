@@ -108,6 +108,10 @@ export interface WorkshopMaster {
   /** JSON string[] of locations.id the teacher may open rounds at; null or
    *  [] = any venue (migration 054). */
   location_ids_json?: string | null;
+  /** JSON ApplicationQuestion[] a round activity asks before booking, and its
+   *  PDPA photo/video consent switch; copied into each round (migration 069). */
+  application_form?: string | null;
+  require_consent?: number | null;
   created_at: string;
   updated_at: string;
   /** Joined (not a column): the organizer teacher's display name. */

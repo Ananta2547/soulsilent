@@ -284,9 +284,9 @@ async function insertRound(
         max_participants, price, image_url, image_meta, status,
         admission_type, payment_type, deposit_amount, require_consent, master_id,
         day_times_json, is_online, online_platform, online_platform_other, online_url,
-        dashboard_access_json, created_by
+        dashboard_access_json, created_by, application_form
        ) VALUES (?, ?, ?, ?, ?, 'one_day', ?, '[]', ?, ?, ?, ?, '[]', ?, ?, '[]', ?, ?, ?, ?, ?, 'active',
-                 'direct', 'paid', 0, 0, ?, '[]', ?, ?, ?, ?, '[]', ?)`
+                 'direct', 'paid', 0, ?, ?, '[]', ?, ?, ?, ?, '[]', ?, ?)`
     )
     .bind(
       id,
@@ -308,12 +308,15 @@ async function insertRound(
       cardPrice(bookableTiers(master)) ?? 0,
       master.cover_image_url,
       master.cover_image_meta,
+      // The activity's PDPA switch and application form (migration 069).
+      master.require_consent ? 1 : 0,
       master.id,
       online ? 1 : 0,
       online?.platform ?? null,
       online?.platform_other ?? null,
       online?.url ?? null,
-      createdBy
+      createdBy,
+      master.application_form || '[]'
     )
     .run();
 }
