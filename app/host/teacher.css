@@ -913,7 +913,8 @@ a.tdb-round:hover { color: var(--ink); background: #eaf6f4; }
 }
 /* Overview tab: one grid on desktop, a top-to-bottom list on a phone in the
    order the slide asks for (to-dos → rounds ahead → payout → cards → chart → insights). */
-.hd-ov { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); grid-template-areas: "todo todo" "cards cards" "chart pay" "up ins"; gap: 14px; }
+.hd-ov { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); grid-template-areas: "todo todo" "cards cards" "chart pay" "chart fee" "up ins"; gap: 14px; }
+.hd-ov > .a-fee { grid-area: fee; }
 .hd-ov > .a-todo { grid-area: todo; margin-bottom: 0; }
 .hd-ov > .a-cards { grid-area: cards; margin-bottom: 0; }
 .hd-ov > .a-chart { grid-area: chart; }
@@ -923,5 +924,5 @@ a.tdb-round:hover { color: var(--ink); background: #eaf6f4; }
 @media (max-width: 760px) {
   .hd-ov { display: flex; flex-direction: column; }
   .hd-ov > .a-todo { order: 1; } .hd-ov > .a-up { order: 2; } .hd-ov > .a-pay { order: 3; }
-  .hd-ov > .a-cards { order: 4; } .hd-ov > .a-chart { order: 5; } .hd-ov > .a-ins { order: 6; }
+  .hd-ov > .a-cards { order: 4; } .hd-ov > .a-chart { order: 5; } .hd-ov > .a-fee { order: 6; } .hd-ov > .a-ins { order: 7; }
 }

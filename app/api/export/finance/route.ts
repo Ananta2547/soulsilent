@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDB, getEnv } from '@/lib/db';
 import { seatsOfRowSql } from '@/lib/seats';
-import { computePayout } from '@/lib/workshop-utils';
+import { gpOfBooking, loadGp, roundFees, type GpBooking } from '@/lib/gp';
 
 /**
  * Read-only finance export for external tooling (the accounting app).
@@ -262,7 +262,7 @@ export async function GET(request: Request) {
           `SELECT w.id, w.title, w.date, w.end_date, w.time_start, w.time_end, w.category, w.status,
                   w.master_id, m.kind AS master_kind, w.admission_type, w.payment_type, w.deposit_amount,
                   w.price, w.promo_price, w.max_participants, w.instructor_id, w.instructor_ids_json,
-                  w.payout_deduction_type, w.payout_deduction_value, w.payout_status, w.payout_remark,
+                  w.fee_mode, w.payout_deduction_type, w.payout_deduction_value, w.payout_status, w.payout_remark,
                   CASE WHEN w.payout_slip_url IS NOT NULL THEN 1 ELSE 0 END AS payout_slip,
                   (SELECT COUNT(*) FROM bookings b WHERE b.workshop_id = w.id AND ${COLLECTED}) AS bookings,
                   (SELECT COALESCE(SUM(${seatsOfRowSql('b', 'w.max_participants')}), 0) FROM bookings b WHERE b.workshop_id = w.id AND ${COLLECTED}) AS seats_sold,
@@ -283,16 +283,32 @@ export async function GET(request: Request) {
           admission_type: string | null; payment_type: string | null; deposit_amount: number | null;
           price: number; promo_price: number | null; max_participants: number;
           instructor_id: string | null; instructor_ids_json: string | null;
-          payout_deduction_type: 'none' | 'fixed' | 'percent'; payout_deduction_value: number;
+          fee_mode: string | null; payout_deduction_type: 'none' | 'fixed' | 'percent'; payout_deduction_value: number;
           payout_status: string | null; payout_remark: string | null; payout_slip: number;
           bookings: number; seats_sold: number; gross: number; asl_paid: number; refunded: number; refunds: number; cancelled: number;
         }>();
-      const rows = (res.results || []).map((w) => {
+      // The fee per round: GP by the table (lib/gp), or admin's manual deduction.
+      const list = res.results || [];
+      const gp = await loadGp(db, list.map((w) => w.instructor_id));
+      const bks = list.length
+        ? (
+            await db
+              .prepare(
+                `SELECT workshop_id, id, amount, host_credit, paid_at, status, payment_status, group_size, booking_kind, parent_booking_id
+                   FROM bookings WHERE workshop_id IN (SELECT value FROM json_each(?))`,
+              )
+              .bind(JSON.stringify(list.map((w) => w.id)))
+              .all<GpBooking & { workshop_id: string }>()
+          ).results || []
+        : [];
+      const rows = list.map((w) => {
         const gross = Number(w.gross) || 0;
         const aslPaid = Number(w.asl_paid) || 0;
         // The host is paid on participants' money plus what ASL covers for
-        // invitation seats, both before the payout deduction.
-        const p = computePayout(gross + aslPaid, w.payout_deduction_type || 'none', Number(w.payout_deduction_value) || 0);
+        // invitation seats, both before the fee.
+        const mine = bks.filter((b) => b.workshop_id === w.id);
+        const p = roundFees(gp, w, mine);
+        const gpFee = Math.round(mine.filter((b) => b.status !== 'cancelled').reduce((s, b) => s + gpOfBooking(gp, w, b).gp, 0) * 100) / 100;
         return {
           workshop_id: w.id,
           title: w.title,
@@ -319,9 +335,11 @@ export async function GET(request: Request) {
           asl_paid: aslPaid,
           host_gross: gross + aslPaid,
           refunded: Number(w.refunded) || 0,
+          fee_mode: p.mode,
+          gp_fee: gpFee,
           payout_deduction_type: w.payout_deduction_type || 'none',
           payout_deduction_value: Number(w.payout_deduction_value) || 0,
-          payout_deduction: p.deduction,
+          payout_deduction: p.fee,
           payout_net: p.net,
           payout_status: w.payout_status,
           payout_remark: w.payout_remark,

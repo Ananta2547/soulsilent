@@ -46,7 +46,7 @@ type Row = {
   booking_tier_label?: string | null;
   group_claimed?: number;
 };
-type Finance = { gross: number; deduction: number; net: number };
+type Finance = { gross: number; deduction: number; net: number; mode?: 'gp' | 'manual' };
 type Data = { workshop: Workshop; bookings: Row[]; finance: Finance };
 type SurveyData = { survey: Survey | null; template: Survey | null; responses: SurveyResponse[] };
 type Tab = 'roster' | 'aar' | 'fin';
@@ -413,7 +413,7 @@ export default function TeacherCheckinPage() {
           <span className="mono">{baht(data.finance.gross)}</span>
         </div>
         <div className="tdb-fin-row">
-          <span style={{ color: 'var(--muted)' }}>หักค่าใช้จ่าย</span>
+          <span style={{ color: 'var(--muted)' }}>{data.finance.mode === 'manual' ? 'หักค่าใช้จ่าย' : 'ค่าธรรมเนียม GP'}</span>
           <span className="mono" style={{ color: '#a04a14' }}>− {baht(data.finance.deduction)}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '10px 0 0' }}>

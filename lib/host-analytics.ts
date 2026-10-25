@@ -1,5 +1,6 @@
 import { computePayout } from '@/lib/workshop-utils';
 import { applicantName } from '@/lib/applicant';
+import { feeStatus, gpOfBooking, loadGp, roundFees, type GpContext } from '@/lib/gp';
 
 /* The numbers behind the full Host Dashboard (slide deck 10, migration 071).
  *
@@ -20,6 +21,8 @@ const TH = 7 * 3600000;
 type WS = {
   id: string;
   title: string;
+  instructor_id: string | null;
+  fee_mode: string | null;
   master_id: string | null;
   master_title: string | null;
   master_kind: string | null;
@@ -77,6 +80,10 @@ export type HostData = {
   platformFirst: Map<string, number>;
   /** Paid bookings of this host's participants with other hosts (time only). */
   elsewhere: { user_id: string; paid_at: string }[];
+  /** GP rates for the hosts of these rounds (lib/gp). */
+  gp: GpContext;
+  /** This host's fee card: rate this month, and what more sales would bring. */
+  fee: ReturnType<typeof feeStatus>;
 };
 
 const OWNED = `(w.instructor_id = ?1 OR EXISTS (SELECT 1 FROM json_each(COALESCE(w.dashboard_access_json, '[]')) WHERE json_each.value = ?1))`;
@@ -86,7 +93,7 @@ export async function loadHostData(db: D1Database, hostId: string): Promise<Host
   const all = <T>(sql: string) => db.prepare(sql).bind(hostId).all<T>().then((r) => r.results || []);
   const [ws, bk, views, impressions, surveys, responses, reviews, payouts, refunds, links, clicks] = await Promise.all([
     all<WS>(
-      `SELECT w.id, w.title, w.master_id, m.title AS master_title, m.kind AS master_kind, w.date, w.end_date, w.time_start, w.time_end,
+      `SELECT w.id, w.title, w.instructor_id, w.fee_mode, w.master_id, m.title AS master_title, m.kind AS master_kind, w.date, w.end_date, w.time_start, w.time_end,
               w.max_participants, w.status, w.price, w.payment_type, w.created_at, w.payout_deduction_type, w.payout_deduction_value, w.payout_status
          FROM workshops w LEFT JOIN workshop_masters m ON m.id = w.master_id WHERE ${OWNED}`,
     ),
@@ -140,7 +147,10 @@ export async function loadHostData(db: D1Database, hostId: string): Promise<Host
     ),
   ]);
 
+  const gp = await loadGp(db, [hostId, ...ws.map((w) => w.instructor_id)]);
   return {
+    gp,
+    fee: feeStatus(gp, hostId),
     ws,
     bk,
     views,
@@ -246,9 +256,11 @@ export function computeAnalytics(d: HostData, r: Range, activity: string | null,
   const bk = d.bk.filter((b) => inScope.has(b.workshop_id));
   const bkAll = d.bk;
 
-  // Per-round deduction ratio, from what the round has collected so far.
+  // Manual rounds: admin's deduction as a ratio of what the round collected.
+  // Every other round pays GP per booking by the table (lib/gp).
   const ratio = new Map<string, number>();
   for (const w of wsAll) {
+    if (w.fee_mode !== 'manual') continue;
     const g = d.bk.filter((b) => b.workshop_id === w.id && isLive(b)).reduce((s, b) => s + gross(b), 0);
     const ded = g > 0 ? computePayout(g, w.payout_deduction_type || 'none', Number(w.payout_deduction_value) || 0).deduction : 0;
     ratio.set(w.id, g > 0 ? ded / g : w.payout_deduction_type === 'percent' ? (Number(w.payout_deduction_value) || 0) / 100 : 0);
@@ -260,12 +272,13 @@ export function computeAnalytics(d: HostData, r: Range, activity: string | null,
   for (const b of bk) {
     if (!wasCollected(b)) continue;
     const g = gross(b);
-    const rt = ratio.get(b.workshop_id) || 0;
+    const w = wsById.get(b.workshop_id)!;
+    const fee = w.fee_mode === 'manual' ? g * (ratio.get(b.workshop_id) || 0) : gpOfBooking(d.gp, w, b).gp;
     const paid = utcMs(b.paid_at);
-    events.push({ at: paid, amount: g, fee: g * rt, refund: false, b });
+    events.push({ at: paid, amount: g, fee, refund: false, b });
     if (b.status === 'cancelled' && g > 0) {
       const at = d.refundAt.get(b.id);
-      events.push({ at: at ? ledgerMs(at) : paid, amount: -g, fee: -g * rt, refund: true, b });
+      events.push({ at: at ? ledgerMs(at) : paid, amount: -g, fee: -fee, refund: true, b });
     }
   }
   const money = (from: number, to: number) => {
@@ -390,10 +403,7 @@ export function computeAnalytics(d: HostData, r: Range, activity: string | null,
 
   // Payouts as they really work today: admin transfers each round after it ends.
   const paidOut = new Set(d.payouts.filter((p) => p.status === 'done').map((p) => p.workshop_id));
-  const roundNet = (w: WS) => {
-    const g = d.bk.filter((b) => b.workshop_id === w.id && isLive(b)).reduce((s, b) => s + gross(b), 0);
-    return round2(computePayout(g, w.payout_deduction_type || 'none', Number(w.payout_deduction_value) || 0).net);
-  };
+  const roundNet = (w: WS) => roundFees(d.gp, w, d.bk.filter((b) => b.workshop_id === w.id)).net;
   const owed = ws
     .filter((w) => w.status !== 'cancelled' && wsEnd(w) < now && w.payout_status !== 'paid' && !paidOut.has(w.id))
     .map((w) => ({ id: w.id, title: w.title, date: w.date, net: roundNet(w) }))
@@ -647,7 +657,7 @@ export function computeAnalytics(d: HostData, r: Range, activity: string | null,
       .map((p) => ({ id: p.id, doc_no: p.doc_no, net: p.net, occurred_at: p.occurred_at, status: p.status, title: wsById.get(p.workshop_id)?.title || '—', date: wsById.get(p.workshop_id)?.date || null })),
     deductions: ws
       .filter((w) => w.status !== 'cancelled' && wsStart(w) >= now - 120 * DAY)
-      .map((w) => ({ id: w.id, title: w.title, date: w.date, type: w.payout_deduction_type || 'none', value: Number(w.payout_deduction_value) || 0 }))
+      .map((w) => ({ id: w.id, title: w.title, date: w.date, mode: w.fee_mode === 'manual' ? 'manual' : 'gp', type: w.payout_deduction_type || 'none', value: Number(w.payout_deduction_value) || 0, fee: roundFees(d.gp, w, d.bk.filter((b) => b.workshop_id === w.id)).fee }))
       .sort((a, b) => b.date.localeCompare(a.date))
       .slice(0, 40),
     vat: { last12: money(now - 365 * DAY, now + DAY).sales, threshold: 1800000 },
@@ -779,7 +789,7 @@ export function computeAnalytics(d: HostData, r: Range, activity: string | null,
   return {
     range: { from: r.from, to: r.to, days: r.days },
     activityOptions: [...new Map(wsAll.map((w) => [activityOf(w), activityTitle(w)])).entries()].map(([key, title]) => ({ key, title })),
-    overview: { cards, weekly, upcoming, payout, todo: todo.slice(0, 6), insights: insights.slice(0, 3) },
+    overview: { cards, weekly, upcoming, payout, todo: todo.slice(0, 6), insights: insights.slice(0, 3), fee: d.fee },
     rounds: roundsTab,
     people,
     money: moneyTab,

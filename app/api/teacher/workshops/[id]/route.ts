@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { hostGrossOf } from '@/lib/comp';
 import { getDB } from '@/lib/db';
 import { getCurrentUserWithRoles } from '@/lib/auth';
 import { hasAnyRole } from '@/lib/roles';
-import { computePayout, canAccessTeacherDashboard } from '@/lib/workshop-utils';
+import { canAccessTeacherDashboard } from '@/lib/workshop-utils';
+import { roundFeesById } from '@/lib/gp';
 import { settleSelection } from '@/lib/selection';
 import type { Workshop } from '@/lib/types';
 
@@ -71,19 +71,17 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
   // Orphans (parent cancelled or missing) still show, at the end.
   for (const m of members) if (!bookings.includes(m)) bookings.push(m);
-  // Finance counts only money actually collected.
-  const gross = bookings
-    .filter((b) => {
-      const r = b as { payment_status?: string; status?: string };
-      return r.payment_status === 'paid' || r.status === 'confirmed';
-    })
-    .reduce((s, b) => s + hostGrossOf(b as { amount?: number; host_credit?: number }), 0);
-  const { deduction, net } = computePayout(gross, workshop.payout_deduction_type, workshop.payout_deduction_value);
+  // Finance counts only money actually collected; the fee is GP by the table
+  // (lib/gp) unless admin set this round to a manual deduction.
+  const fees = await roundFeesById(db, id);
+  const gross = fees?.gross ?? 0;
+  const deduction = fees?.fee ?? 0;
+  const net = fees?.net ?? 0;
 
   // The payout slip is admin-only; the host sees payout_status ("โอนแล้ว") and
   // gets the voucher by email.
   const shown: Partial<Workshop> = { ...workshop };
   delete shown.payout_slip_url;
   delete shown.payout_slip_meta;
-  return NextResponse.json({ workshop: shown, bookings, finance: { gross, deduction, net } });
+  return NextResponse.json({ workshop: shown, bookings, finance: { gross, deduction, net, mode: fees?.mode ?? 'gp' } });
 }

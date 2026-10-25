@@ -47,7 +47,7 @@ export function OverviewTab({ a, onTab }: { a: Analytics; onTab: (t: string) => 
 
       <div className="hd-cards a-cards">
         <StatCard label="ยอดขาย" value={baht(c.sales.cur)} delta={<Delta cur={c.sales.cur} prev={c.sales.prev} kind="pct" />} onClick={() => onTab('money')} title="ยอดชำระสำเร็จตามวันที่ชำระ หักคืนเงินในช่วงที่คืน" />
-        <StatCard label="รายได้สุทธิ" value={baht(c.net.cur)} delta={<Delta cur={c.net.cur} prev={c.net.prev} kind="pct" />} onClick={() => onTab('money')} title="ยอดขาย − ยอดหักตามที่ตั้งไว้ในแต่ละรอบ" />
+        <StatCard label="รายได้สุทธิ" value={baht(c.net.cur)} delta={<Delta cur={c.net.cur} prev={c.net.prev} kind="pct" />} onClick={() => onTab('money')} title="ยอดขาย − ค่าธรรมเนียม GP" />
         <StatCard label="ที่นั่งที่ขาย" value={num(c.seats.cur, 0)} delta={<Delta cur={c.seats.cur} prev={c.seats.prev} kind="abs" />} onClick={() => onTab('rounds')} />
         <StatCard
           label="อัตราเต็มรอบ"
@@ -91,6 +91,8 @@ export function OverviewTab({ a, onTab }: { a: Analytics; onTab: (t: string) => 
           ดูรายละเอียด ›
         </button>
       </Panel>
+
+      <FeeCard fee={o.fee} />
 
       <Panel title="รอบที่จะถึง 7 วัน" sub={o.upcoming.length ? undefined : 'ไม่มีรอบใน 7 วันข้างหน้า'} className="a-up">
         {o.upcoming.map((u) => (
@@ -140,5 +142,40 @@ export function OverviewTab({ a, onTab }: { a: Analytics; onTab: (t: string) => 
         )}
       </Panel>
     </div>
+  );
+}
+
+/** The host's platform fee (GP): this month's rate per activity type, and how
+ *  much more this month would bring next month's rate down (lib/gp). */
+function FeeCard({ fee }: { fee: Analytics['overview']['fee'] }) {
+  return (
+    <Panel
+      title="ค่าธรรมเนียม GP"
+      sub={fee.started ? 'ขั้นตามยอดขายเดือนก่อน แยกเดี่ยว / แบบรอบ · รวมค่าชำระเงินแล้ว' : `เริ่มคิด ${thDay(fee.startsOn, true)} — การจองที่ชำระก่อนหน้านั้นไม่มี GP`}
+      className="a-fee"
+    >
+      {fee.founding && <p className="hd-insight" style={{ margin: '0 0 10px' }}>Founding Host — อัตราต่ำกว่าตาราง 1% (ไม่ต่ำกว่า 4%) ตลอดปี 2570</p>}
+      {fee.kinds.map((k) => (
+        <div key={k.kind} style={{ padding: '10px 0', borderTop: '1px solid rgba(13,30,29,.07)', fontSize: 13.5 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+            <span style={{ fontWeight: 600 }}>{k.kind === 'single' ? 'กิจกรรมเดี่ยว' : 'กิจกรรมแบบรอบ'}</span>
+            <span className="hd-big" style={{ fontSize: 22 }}>{fee.started ? k.rate : k.nextMonthRate}%</span>
+          </div>
+          <div className="hd-few">
+            {fee.started ? `เดือนนี้ · เดือนหน้า ${k.nextMonthRate}%` : 'ม.ค. 70 ถ้ายอดเท่าเดือนนี้'} · ยอดเดือนนี้ {baht(k.salesThisMonth)}
+          </div>
+          <div className="hd-few">
+            {k.step
+              ? fee.started
+                ? `ขายอีก ${baht(k.step.need)} เดือนหน้าได้ ${k.step.rate}%`
+                : `ถ้ายอด ธ.ค. 69 ถึง ${baht(k.salesThisMonth + k.step.need)} ม.ค. 70 ได้ ${k.step.rate}%`
+              : 'ขั้นต่ำสุดแล้ว'}
+          </div>
+          {fee.started && k.why && <div className="hd-few">{k.why}</div>}
+        </div>
+      ))}
+      {fee.roundZeroUntil && <p className="hd-few" style={{ marginTop: 8 }}>กิจกรรมแบบรอบ 0% ถึง {thDay(fee.roundZeroUntil, true)}</p>}
+      <p className="hd-few" style={{ marginTop: 8 }}>ส่วนของราคาต่อที่นั่งที่เกิน 3,000 บาท คิด 3% · กิจกรรมฟรี 0%</p>
+    </Panel>
   );
 }

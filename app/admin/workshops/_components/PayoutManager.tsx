@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Workshop } from '@/lib/types';
 import { computePayout } from '@/lib/workshop-utils';
-import { hostGrossOf } from '@/lib/comp';
 import { AdmSelect } from '@/components/admin/pickers';
 import { SheetSection, adminToast } from '@/components/admin/AdminShell';
 import { RecordTransferSheet } from '@/components/admin/ledger/RecordTransferSheet';
 
 const baht = (n: number) => '฿' + Math.round(n).toLocaleString();
 
+type GpBreakdown = { gross: number; gpFee: number; kind: string; lines: { id: string; rate: number; gp: number; gross: number }[] };
 type PayoutTx = { id: string; doc_no: string; net: number; occurred_at: string; ref_id: string | null; legacy: number; kind: string };
 
 export function PayoutManager({
@@ -21,13 +21,15 @@ export function PayoutManager({
   onSuccess: () => void;
   onCancel: () => void;
 }) {
+  // GP by the table is the default; "advanced" switches this round to
+  // admin's own deduction (none / fixed / percent).
+  const [manual, setManual] = useState(workshop.fee_mode === 'manual');
   const [dType, setDType] = useState<'none' | 'fixed' | 'percent'>(workshop.payout_deduction_type || 'none');
   const [dValue, setDValue] = useState<number>(workshop.payout_deduction_value || 0);
   const [status, setStatus] = useState<'pending' | 'paid'>(workshop.payout_status || 'pending');
   const [remark, setRemark] = useState(workshop.payout_remark || '');
 
-  const [gross, setGross] = useState<number | null>(null);
-  const [paidCount, setPaidCount] = useState(0);
+  const [gp, setGp] = useState<GpBreakdown | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The host-payout transfers recorded in the ledger for this round.
@@ -35,21 +37,15 @@ export function PayoutManager({
   const [host, setHost] = useState<{ name: string | null; email: string | null } | null>(null);
   const [recording, setRecording] = useState(false);
 
-  // Gross revenue = sum of paid bookings for this workshop.
+  // Gross and the GP of every paid booking, worked out on the server (lib/gp).
   useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch(`/api/bookings?workshop_id=${workshop.id}`);
-        const data = (await res.json()) as { bookings?: { amount: number; host_credit?: number; payment_status: string; status: string }[] };
-        const paid = (data.bookings || []).filter((b) => b.payment_status === 'paid' || b.status === 'confirmed');
-        setPaidCount(paid.length);
-        // Includes what ASL covers for invitation seats (lib/comp.ts).
-        setGross(paid.reduce((s, b) => s + hostGrossOf(b), 0));
-      } catch {
-        setGross(0);
-      }
-    })();
+    fetch(`/api/workshops/${workshop.id}/payout`)
+      .then(async (r) => (await r.json()) as GpBreakdown)
+      .then(setGp)
+      .catch(() => setGp({ gross: 0, gpFee: 0, lines: [], kind: 'single' }));
   }, [workshop.id]);
+  const gross = gp?.gross ?? null;
+  const paidCount = gp?.lines.length ?? 0;
 
   const loadTxs = useCallback(() => {
     fetch(`/api/admin/ledger?workshop_id=${workshop.id}&kind=host_payout`)
@@ -64,7 +60,12 @@ export function PayoutManager({
     loadTxs();
   }, [loadTxs]);
 
-  const { deduction, net } = useMemo(() => computePayout(gross || 0, dType, dValue), [gross, dType, dValue]);
+  const { deduction, net } = useMemo(() => {
+    if (manual) return computePayout(gross || 0, dType, dValue);
+    const fee = gp?.gpFee || 0;
+    return { deduction: fee, net: (gross || 0) - fee };
+  }, [manual, gross, dType, dValue, gp]);
+  const rates = [...new Set((gp?.lines || []).map((l) => l.rate))].sort((a, b) => a - b);
   const transferred = (txs || []).reduce((s, t) => s + t.net, 0);
 
   async function save() {
@@ -74,7 +75,7 @@ export function PayoutManager({
       const res = await fetch(`/api/workshops/${workshop.id}/payout`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deduction_type: dType, deduction_value: dValue, status, remark }),
+        body: JSON.stringify({ fee_mode: manual ? 'manual' : 'gp', deduction_type: dType, deduction_value: dValue, status, remark }),
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
@@ -105,7 +106,7 @@ export function PayoutManager({
             <small>{paidCount} คนชำระแล้ว</small>
           </div>
           <div>
-            <div className="adm-label">หักค่าใช้จ่าย</div>
+            <div className="adm-label">{manual ? 'หักค่าใช้จ่าย' : 'ค่าธรรมเนียม GP'}</div>
             <b style={{ color: '#c2410c' }}>− {baht(deduction)}</b>
           </div>
           <div className="is-net">
@@ -117,27 +118,46 @@ export function PayoutManager({
         </div>
       </SheetSection>
 
-      <SheetSection n={2} title="ค่าใช้จ่ายที่หัก">
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-          <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-            <AdmSelect value={dType} onChange={(e) => setDType(e.target.value as typeof dType)} aria-label="รูปแบบการหัก">
-              <option value="none">ไม่หัก</option>
-              <option value="fixed">จำนวนเงินคงที่ (บาท)</option>
-              <option value="percent">เปอร์เซ็นต์ (%)</option>
-            </AdmSelect>
+      <SheetSection n={2} title="ค่าธรรมเนียม">
+        {!manual && (
+          <div className="adm-notice" style={{ margin: '0 0 12px' }}>
+            GP ตามตารางค่าธรรมเนียม: <b>{baht(gp?.gpFee || 0)}</b>
+            {gp?.kind === 'free'
+              ? ' · กิจกรรมฟรี/มัดจำ ไม่มี GP'
+              : rates.length
+                ? ` · อัตรา ${rates.map((r) => `${r}%`).join(', ')} ตามวันที่ชำระของแต่ละการจอง`
+                : ''}
+            <div className="adm-meta" style={{ marginTop: 4 }}>
+              ขั้นตามยอดขายเดือนก่อนของผู้จัด · ส่วนที่เกิน 3,000 บาทต่อที่นั่งคิด 3% · การจองที่ชำระก่อน 1 ม.ค. 2570 = 0%
+            </div>
           </div>
-          {dType !== 'none' && (
-            <input
-              type="number"
-              min="0"
-              value={dValue}
-              onChange={(e) => setDValue(Number(e.target.value))}
-              style={{ flex: '0 1 160px', width: 160 }}
-              aria-label={dType === 'percent' ? 'เปอร์เซ็นต์' : 'จำนวนเงิน'}
-              placeholder={dType === 'percent' ? '0–100' : 'บาท'}
-            />
-          )}
-        </div>
+        )}
+        <label className="adm-check" style={{ padding: '6px 0' }}>
+          <input type="checkbox" checked={manual} onChange={(e) => setManual(e.target.checked)} />
+          <span>ตั้งค่าขั้นสูง — ใช้ยอดหักเองแทน GP (ไม่หัก / บาท / เปอร์เซ็นต์)</span>
+        </label>
+        {manual && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+              <AdmSelect value={dType} onChange={(e) => setDType(e.target.value as typeof dType)} aria-label="รูปแบบการหัก">
+                <option value="none">ไม่หัก</option>
+                <option value="fixed">จำนวนเงินคงที่ (บาท)</option>
+                <option value="percent">เปอร์เซ็นต์ (%)</option>
+              </AdmSelect>
+            </div>
+            {dType !== 'none' && (
+              <input
+                type="number"
+                min="0"
+                value={dValue}
+                onChange={(e) => setDValue(Number(e.target.value))}
+                style={{ flex: '0 1 160px', width: 160 }}
+                aria-label={dType === 'percent' ? 'เปอร์เซ็นต์' : 'จำนวนเงิน'}
+                placeholder={dType === 'percent' ? '0–100' : 'บาท'}
+              />
+            )}
+          </div>
+        )}
       </SheetSection>
 
       <SheetSection n={3} title="การโอน">

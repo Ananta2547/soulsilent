@@ -11,7 +11,7 @@ export function MoneyTab({ a }: { a: Analytics }) {
   const csvMonthly = () =>
     downloadCsv(
       `รายได้รายเดือน-${a.range.to}.csv`,
-      ['เดือน', 'ยอดขาย', 'ยอดหัก', 'คืนเงิน', 'รายได้สุทธิ', 'ที่นั่ง'],
+      ['เดือน', 'ยอดขาย', 'ค่าธรรมเนียม', 'คืนเงิน', 'รายได้สุทธิ', 'ที่นั่ง'],
       m.monthly.map((x) => [x.month, x.sales, x.fee, x.refunds, x.net, x.seats]),
     );
   const csvHistory = () =>
@@ -25,7 +25,7 @@ export function MoneyTab({ a }: { a: Analytics }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <Panel
         title="รายเดือน"
-        sub="ยอดขายนับตามวันที่ชำระ · คืนเงินหักในเดือนที่คืน · ยอดหักตามที่ตั้งไว้ในแต่ละรอบ"
+        sub="ยอดขายนับตามวันที่ชำระ · คืนเงินหักในเดือนที่คืน · ค่าธรรมเนียม GP ตามตาราง (หรือยอดหักที่ทีมงานตั้งเป็นกรณีพิเศษ)"
         right={
           <button type="button" className="hd-btn" onClick={csvMonthly}>
             ดาวน์โหลด CSV
@@ -36,7 +36,7 @@ export function MoneyTab({ a }: { a: Analytics }) {
           labels={m.monthly.map((x) => thMonth(x.month))}
           series={[
             { name: 'รายได้สุทธิ', color: 'var(--teal)', values: m.monthly.map((x) => x.net) },
-            { name: 'ยอดหัก', color: '#e3b23c', values: m.monthly.map((x) => x.fee) },
+            { name: 'ค่าธรรมเนียม', color: '#e3b23c', values: m.monthly.map((x) => x.fee) },
             { name: 'คืนเงิน', color: '#c86b5a', values: m.monthly.map((x) => x.refunds) },
           ]}
           format={baht}
@@ -47,7 +47,7 @@ export function MoneyTab({ a }: { a: Analytics }) {
               <tr>
                 <th>เดือน</th>
                 <th className="r">ยอดขาย</th>
-                <th className="r">ยอดหัก</th>
+                <th className="r">ค่าธรรมเนียม</th>
                 <th className="r">คืนเงิน</th>
                 <th className="r">รายได้สุทธิ</th>
               </tr>
@@ -136,7 +136,7 @@ export function MoneyTab({ a }: { a: Analytics }) {
       </Panel>
 
       <div className="hd-grid2 even">
-        <Panel title="ยอดหักของแต่ละรอบ" sub="ทีมงานตั้งไว้ในแต่ละรอบ (4 เดือนล่าสุดและรอบที่จะถึง)">
+        <Panel title="ค่าธรรมเนียมของแต่ละรอบ" sub="GP ตามตาราง หรือยอดหักที่ทีมงานตั้งเป็นกรณีพิเศษ (4 เดือนล่าสุดและรอบที่จะถึง)">
           {m.deductions.length === 0 ? (
             <p className="hd-few">ยังไม่มีรอบ</p>
           ) : (
@@ -144,7 +144,7 @@ export function MoneyTab({ a }: { a: Analytics }) {
               <div key={x.id} className="hd-row">
                 <span className="grow">{x.title}</span>
                 <span className="dim">{thDay(x.date, true)}</span>
-                <b>{DEDUCT(x.type, x.value)}</b>
+                <b>{x.mode === 'manual' ? `หักเอง ${DEDUCT(x.type, x.value)}` : `GP ${baht(x.fee)}`}</b>
               </div>
             ))
           )}

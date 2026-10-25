@@ -205,6 +205,8 @@ export interface Workshop {
   /** Optional link to a WorkshopMaster (this row is a session/round of it). */
   master_id: string | null;
   /** Organizer payout config + status. */
+  /** 'gp' = platform fee by the table (lib/gp) · 'manual' = admin's own deduction below (migration 073). */
+  fee_mode?: 'gp' | 'manual';
   payout_deduction_type: 'none' | 'fixed' | 'percent';
   payout_deduction_value: number;
   payout_status: 'pending' | 'paid';
