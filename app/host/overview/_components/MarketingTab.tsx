@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import type { Analytics } from '@/lib/host-analytics';
 import { SOURCE_LABEL, type Source } from '@/lib/attribution';
-import { HBars, Panel, baht, num, thDay } from './kit';
+import { Card, Dropdown, Empty, HBars, I, PAL, Sheet, Stack100, baht, thDay } from './kit';
 
 type Link = Analytics['marketing']['links'][number];
 type Report = { id: string; period_from: string; period_to: string; activity_title: string | null; created_at: string; expires_at: string; live: number; revoked: number };
@@ -20,10 +20,11 @@ const REPORT_FIGURES: { key: string; label: string }[] = [
   { key: 'rounds', label: 'จำนวนรอบที่จัด' },
   { key: 'ageBand', label: 'กลุ่มอายุหลัก' },
 ];
+const NO_UTM = { utm_source: '', utm_medium: '', utm_campaign: '' };
 
 /** Where bookings come from, the host's own links (with QR), and the
- *  one-page report for sponsors. */
-export function MarketingTab({ a, hostId, activity, onChanged }: { a: Analytics; hostId: string; activity: string; onChanged: () => void }) {
+ *  one-page report for sponsors. Creating either opens a sheet. */
+export function MarketingTab({ a, hostId, activity, onChanged, say }: { a: Analytics; hostId: string; activity: string; onChanged: () => void; say: (m: string) => void }) {
   const mk = a.marketing;
   const origin = typeof window === 'undefined' ? '' : window.location.origin;
   const urlOf = (l: Pick<Link, 'id' | 'target' | 'utm_source' | 'utm_medium' | 'utm_campaign'>) => {
@@ -34,15 +35,26 @@ export function MarketingTab({ a, hostId, activity, onChanged }: { a: Analytics;
     if (l.utm_campaign) q.set('utm_campaign', l.utm_campaign);
     return `${origin}${path}?${q}`;
   };
+  const targetOf = (k: string) => (k ? (k.startsWith('w:') ? k : `m:${k}`) : null);
 
-  // New link form
+  // New link sheet
+  const [linkOpen, setLinkOpen] = useState(false);
   const [label, setLabel] = useState('');
   const [target, setTarget] = useState('');
-  const [utm, setUtm] = useState({ utm_source: '', utm_medium: '', utm_campaign: '' });
+  const [withUtm, setWithUtm] = useState(false);
+  const [utm, setUtm] = useState(NO_UTM);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [qr, setQr] = useState<{ id: string; src: string } | null>(null);
-  const [copied, setCopied] = useState<string | null>(null);
+  const closeLink = useCallback(() => setLinkOpen(false), []);
+  const openLink = () => {
+    setLabel('');
+    setTarget('');
+    setWithUtm(false);
+    setUtm(NO_UTM);
+    setMsg(null);
+    setLinkOpen(true);
+  };
 
   async function createLink() {
     setBusy(true);
@@ -50,24 +62,24 @@ export function MarketingTab({ a, hostId, activity, onChanged }: { a: Analytics;
     const r = await fetch('/api/teacher/links', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label, target: target ? (target.startsWith('w:') ? target : `m:${target}`) : null, ...utm }),
+      body: JSON.stringify({ label, target: targetOf(target), ...(withUtm ? utm : NO_UTM) }),
     });
     const d = (await r.json()) as { error?: string };
     setBusy(false);
     if (!r.ok) return setMsg(d.error || 'สร้างลิงก์ไม่สำเร็จ');
-    setLabel('');
-    setUtm({ utm_source: '', utm_medium: '', utm_campaign: '' });
+    setLinkOpen(false);
     onChanged();
+    say('สร้างลิงก์แล้ว');
   }
   async function toggle(l: Link) {
     await fetch('/api/teacher/links', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: l.id, active: !l.active }) });
     onChanged();
+    say(l.active ? 'ปิดลิงก์แล้ว' : 'เปิดลิงก์แล้ว');
   }
   async function copy(l: Link) {
     try {
       await navigator.clipboard.writeText(urlOf(l));
-      setCopied(l.id);
-      setTimeout(() => setCopied(null), 1600);
+      say('คัดลอกลิงก์แล้ว');
     } catch {}
   }
   async function showQr(l: Link) {
@@ -75,11 +87,13 @@ export function MarketingTab({ a, hostId, activity, onChanged }: { a: Analytics;
     setQr({ id: l.id, src: await QRCode.toDataURL(urlOf(l), { width: 360, margin: 1 }) });
   }
 
-  // Sponsor report
+  // Sponsor report sheet
   const [reports, setReports] = useState<Report[] | null>(null);
+  const [repOpen, setRepOpen] = useState(false);
   const [pick, setPick] = useState<string[]>(['participants', 'repeat90', 'fill', 'csat', 'rounds']);
   const [intro, setIntro] = useState('');
   const [rmsg, setRmsg] = useState<string | null>(null);
+  const closeRep = useCallback(() => setRepOpen(false), []);
   const loadReports = useCallback(() => {
     fetch('/api/teacher/reports')
       .then(async (r) => ((await r.json()) as { items?: Report[] }).items || [])
@@ -91,154 +105,230 @@ export function MarketingTab({ a, hostId, activity, onChanged }: { a: Analytics;
   }, [loadReports]);
   async function makeReport() {
     setRmsg(null);
+    setBusy(true);
     const r = await fetch('/api/teacher/reports', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ from: a.range.from, to: a.range.to, activity: activity || null, show: pick, intro }),
     });
     const d = (await r.json()) as { id?: string; error?: string };
+    setBusy(false);
     if (!r.ok || !d.id) return setRmsg(d.error || 'สร้างรายงานไม่สำเร็จ');
+    setRepOpen(false);
     loadReports();
+    say('สร้างรายงานแล้ว');
     window.open(`/r/${d.id}`, '_blank', 'noopener');
   }
   async function revoke(id: string) {
     await fetch('/api/teacher/reports', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
     loadReports();
+    say('ยกเลิกรายงานแล้ว');
   }
 
+  const targetOpts = [{ key: '', label: 'หน้าโปรไฟล์ของฉัน' }, ...a.activityOptions.map((o) => ({ key: o.key, label: o.title }))];
+  const preview = decodeURIComponent(urlOf({ id: '…', target: targetOf(target), ...(withUtm ? utm : NO_UTM) }));
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div className="hd-grid2 even">
-        <Panel title="การจองมาจากไหน" sub="การจองที่ชำระในช่วงนี้ แยกตามแหล่งที่มา">
-          <HBars
-            rows={mk.sources.map((s) => ({
+    <div className="hx-stack">
+      <div className="hx-g g11">
+        <Card title="การจองมาจากไหน" sub="การจองที่ชำระในช่วงนี้ แยกตามแหล่งที่มา">
+          <Stack100
+            items={mk.sources.map((s, i) => ({
               label: s.source === 'unknown' ? 'ก่อนเริ่มเก็บข้อมูล' : SOURCE_LABEL[s.source as Source] || s.source,
               value: s.n,
-              note: s.share == null ? undefined : `${num(s.share, 0)}%`,
+              color: PAL[i % PAL.length],
             }))}
+            noneText="ยังไม่มีการจองในช่วงนี้"
           />
-        </Panel>
-        <Panel title="แคมเปญ (utm_campaign)" sub="จากลิงก์ที่ติดแท็ก UTM">
-          {mk.campaigns.length === 0 ? <p className="hd-few">ยังไม่มีการจองจากลิงก์ที่ติดแท็กแคมเปญ</p> : <HBars rows={mk.campaigns.map((c) => ({ label: c.campaign, value: c.n }))} />}
-        </Panel>
+        </Card>
+        <Card title="แคมเปญ (utm_campaign)" sub="จากลิงก์ที่ติดแท็ก UTM" delay={70}>
+          {mk.campaigns.length === 0 ? <Empty>ยังไม่มีการจองจากลิงก์ที่ติดแท็กแคมเปญ</Empty> : <HBars rows={mk.campaigns.map((c) => ({ label: c.campaign, value: c.n }))} />}
+        </Card>
       </div>
 
-      <Panel title="ลิงก์จองของคุณ" sub="แชร์ลิงก์นี้ในโพสต์ ไลน์ หรือพิมพ์ QR — การจองที่มาจากลิงก์จะนับเป็น 'ลิงก์ของคุณ' (จำไว้ 30 วัน)">
-        <div className="hd-form">
-          <label>
-            ชื่อลิงก์
-            <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="เช่น โพสต์เฟซบุ๊ก ต.ค." />
-          </label>
-          <label>
-            เปิดไปที่
-            <select value={target} onChange={(e) => setTarget(e.target.value)}>
-              <option value="">หน้าโปรไฟล์ของฉัน</option>
-              {a.activityOptions.map((o) => (
-                <option key={o.key} value={o.key}>
-                  {o.title}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            utm_source (ไม่บังคับ)
-            <input value={utm.utm_source} onChange={(e) => setUtm({ ...utm, utm_source: e.target.value })} placeholder="facebook" />
-          </label>
-          <label>
-            utm_campaign (ไม่บังคับ)
-            <input value={utm.utm_campaign} onChange={(e) => setUtm({ ...utm, utm_campaign: e.target.value })} placeholder="oct-promo" />
-          </label>
-          <button type="button" className="hd-btn teal" style={{ height: 38 }} disabled={busy || !label.trim()} onClick={createLink}>
-            + สร้างลิงก์
+      <Card
+        title="ลิงก์จองของคุณ"
+        sub="แชร์ในโพสต์ ไลน์ หรือพิมพ์ QR — การจองจากลิงก์นับเป็น 'ลิงก์ของคุณ' (จำไว้ 30 วัน)"
+        delay={140}
+        right={
+          <button type="button" className="hx-btn ink" onClick={openLink}>
+            {I.plus()}สร้างลิงก์
           </button>
-        </div>
-        {msg && <p style={{ color: '#a3261a', fontSize: 13 }}>{msg}</p>}
-        <div style={{ marginTop: 14 }}>
-          {mk.links.length === 0 && <p className="hd-few">ยังไม่มีลิงก์</p>}
-          {mk.links.map((l) => (
-            <div key={l.id} style={{ opacity: l.active ? 1 : 0.5 }}>
-              <div className="hd-row" style={{ flexWrap: 'wrap' }}>
-                <div className="grow" style={{ minWidth: 200 }}>
-                  <div>
-                    <b>{l.label}</b>
-                    {!l.active && <span className="hd-few"> · ปิดอยู่</span>}
-                  </div>
-                  <div className="dim" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {urlOf(l).replace(/^https?:\/\//, '')}
-                  </div>
-                </div>
-                <span className="dim">
-                  เข้า {l.clicks} · จอง {l.bookings} · {baht(l.sales)}
-                </span>
-                <button type="button" className="hd-btn" onClick={() => copy(l)}>
-                  {copied === l.id ? 'คัดลอกแล้ว ✓' : 'คัดลอก'}
-                </button>
-                <button type="button" className="hd-btn" onClick={() => showQr(l)}>
-                  QR
-                </button>
-                <button type="button" className="hd-btn" onClick={() => toggle(l)}>
-                  {l.active ? 'ปิด' : 'เปิด'}
-                </button>
-              </div>
-              {qr?.id === l.id && (
-                <div style={{ display: 'flex', gap: 14, alignItems: 'center', padding: '6px 0 12px' }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={qr.src} alt={`QR ${l.label}`} className="hd-qr" />
-                  <a className="hd-btn" href={qr.src} download={`qr-${l.label}.png`}>
-                    ดาวน์โหลด QR
-                  </a>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </Panel>
-
-      <Panel
-        title="รายงานสำหรับสปอนเซอร์และพาร์ตเนอร์"
-        sub={`Organizer Impact Summary หน้าเดียว จากช่วง ${thDay(a.range.from, true)} – ${thDay(a.range.to, true)}${activity ? ' · เฉพาะกิจกรรมที่เลือก' : ''} · ตัวเลขดึงจากระบบ แก้ไม่ได้ · มี QR ให้ตรวจฉบับจริง`}
+        }
       >
-        <div className="hd-checks">
-          {REPORT_FIGURES.map((f) => (
-            <label key={f.key}>
-              <input type="checkbox" checked={pick.includes(f.key)} onChange={(e) => setPick(e.target.checked ? [...pick, f.key] : pick.filter((k) => k !== f.key))} />
-              {f.label}
-            </label>
-          ))}
-        </div>
-        <div className="hd-form" style={{ gridTemplateColumns: '1fr auto' }}>
-          <label>
-            ข้อความแนะนำตัว (ไม่บังคับ)
-            <textarea value={intro} onChange={(e) => setIntro(e.target.value)} maxLength={400} placeholder="เช่น สตูดิโอเซรามิกในย่านอารีย์ เปิดสอนมาแล้ว 3 ปี" />
-          </label>
-          <button type="button" className="hd-btn teal" style={{ height: 38 }} onClick={makeReport} disabled={!pick.length}>
-            สร้างรายงาน
-          </button>
-        </div>
-        {rmsg && <p style={{ color: '#a3261a', fontSize: 13 }}>{rmsg}</p>}
-        <p className="hd-few">ตัวเลขที่มาจากคนน้อยกว่า 5 คนจะไม่ถูกใส่ในรายงาน · รายงานหมดอายุใน 180 วัน หรือกดยกเลิกได้</p>
-        {reports && reports.length > 0 && (
-          <div style={{ marginTop: 8 }}>
-            {reports.map((r) => (
-              <div key={r.id} className="hd-row" style={{ opacity: r.live ? 1 : 0.5 }}>
-                <span className="grow">
-                  {thDay(r.period_from, true)} – {thDay(r.period_to, true)}
-                  {r.activity_title ? ` · ${r.activity_title}` : ''}
-                </span>
-                <span className="dim">{r.live ? `ใช้ได้ถึง ${thDay(r.expires_at.slice(0, 10), true)}` : r.revoked ? 'ยกเลิกแล้ว' : 'หมดอายุ'}</span>
-                <a className="hd-btn" href={`/r/${r.id}`} target="_blank" rel="noopener noreferrer">
-                  เปิด
-                </a>
-                {r.live ? (
-                  <button type="button" className="hd-btn" onClick={() => revoke(r.id)}>
-                    ยกเลิก
-                  </button>
-                ) : null}
+        {mk.links.length === 0 ? (
+          <Empty>ยังไม่มีลิงก์</Empty>
+        ) : (
+          <div className="hx-links">
+            {mk.links.map((l) => (
+              <div key={l.id} className={`hx-link${l.active ? '' : ' off'}`}>
+                <div className="hx-link-top">
+                  <div className="main">
+                    <div>
+                      <b>{l.label}</b>
+                      <span className={`st ${l.active ? 'on' : 'off'}`}>{l.active ? 'เปิดอยู่' : 'ปิดอยู่'}</span>
+                    </div>
+                    <div className="url">{urlOf(l).replace(/^https?:\/\//, '')}</div>
+                    <div className="stats">
+                      เข้า {l.clicks} · จอง {l.bookings} · {baht(l.sales)}
+                    </div>
+                  </div>
+                  <div className="hx-link-acts">
+                    <button type="button" className="hx-btn icon white" onClick={() => copy(l)} aria-label="คัดลอกลิงก์" title="คัดลอกลิงก์">
+                      {I.copy()}
+                    </button>
+                    <button type="button" className="hx-btn icon white" onClick={() => showQr(l)} aria-label="QR" title="QR">
+                      {I.qr()}
+                    </button>
+                    <button type="button" className="hx-btn icon white" onClick={() => toggle(l)} aria-label={l.active ? 'ปิดลิงก์' : 'เปิดลิงก์'} title={l.active ? 'ปิดลิงก์' : 'เปิดลิงก์'}>
+                      {I.power()}
+                    </button>
+                  </div>
+                </div>
+                {qr?.id === l.id && (
+                  <div className="hx-link-qr">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={qr.src} alt={`QR ${l.label}`} />
+                    <a className="hx-btn white" href={qr.src} download={`qr-${l.label}.png`}>
+                      {I.down()}ดาวน์โหลด QR
+                    </a>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
-      </Panel>
+      </Card>
+
+      <Card
+        title="รายงานสำหรับสปอนเซอร์และพาร์ตเนอร์"
+        sub="Organizer Impact Summary หน้าเดียว · ตัวเลขดึงจากระบบ แก้ไม่ได้ · มี QR ให้ตรวจฉบับจริง"
+        delay={210}
+        right={
+          <button type="button" className="hx-btn ink" onClick={() => (setRmsg(null), setRepOpen(true))}>
+            {I.plus()}สร้างรายงาน
+          </button>
+        }
+      >
+        {!reports || reports.length === 0 ? (
+          <Empty>ยังไม่มีรายงาน</Empty>
+        ) : (
+          <div className="hx-rows">
+            {reports.map((r) => (
+              <div key={r.id} className="hx-row" style={{ opacity: r.live ? 1 : 0.5, flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+                  <div className="main">
+                    {thDay(r.period_from, true)} – {thDay(r.period_to, true)}
+                    {r.activity_title ? ` · ${r.activity_title}` : ''}
+                  </div>
+                  <div className="sub">{r.live ? `ใช้ได้ถึง ${thDay(r.expires_at.slice(0, 10), true)}` : r.revoked ? 'ยกเลิกแล้ว' : 'หมดอายุ'}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <a className="hx-btn white" href={`/r/${r.id}`} target="_blank" rel="noopener noreferrer">
+                    เปิด
+                  </a>
+                  {r.live ? (
+                    <button type="button" className="hx-btn danger" onClick={() => revoke(r.id)}>
+                      ยกเลิก
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      {linkOpen && (
+        <Sheet
+          title="สร้างลิงก์จอง"
+          onClose={closeLink}
+          footer={
+            <>
+              <button type="button" className="hx-btn" onClick={closeLink}>
+                ยกเลิก
+              </button>
+              <button type="button" className="hx-btn ink" disabled={busy || !label.trim()} onClick={createLink}>
+                สร้างลิงก์
+              </button>
+            </>
+          }
+        >
+          <label className="hx-field">
+            ชื่อลิงก์
+            <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="เช่น โพสต์เฟซบุ๊ก ต.ค." autoFocus />
+          </label>
+          <div className="hx-field">
+            เปิดไปที่
+            <Dropdown label={targetOpts.find((o) => o.key === target)?.label || 'หน้าโปรไฟล์ของฉัน'} options={targetOpts} value={target} onPick={setTarget} ariaLabel="เปิดไปที่" />
+          </div>
+          <button type="button" className="hx-link-btn" onClick={() => setWithUtm(!withUtm)} aria-expanded={withUtm}>
+            {withUtm ? '− ' : '+ '}ติดแท็ก UTM (ไม่บังคับ)
+          </button>
+          {withUtm && (
+            <>
+              <label className="hx-field">
+                utm_source
+                <input value={utm.utm_source} onChange={(e) => setUtm({ ...utm, utm_source: e.target.value })} placeholder="facebook" />
+              </label>
+              <label className="hx-field">
+                utm_campaign
+                <input value={utm.utm_campaign} onChange={(e) => setUtm({ ...utm, utm_campaign: e.target.value })} placeholder="oct-promo" />
+              </label>
+            </>
+          )}
+          <div className="hx-preview">
+            <span className="hx-label">ตัวอย่างลิงก์</span>
+            <div>{preview.replace(/^https?:\/\//, '')}</div>
+          </div>
+          {msg && <p className="hx-err">{msg}</p>}
+        </Sheet>
+      )}
+
+      {repOpen && (
+        <Sheet
+          title="สร้างรายงาน"
+          onClose={closeRep}
+          footer={
+            <>
+              <button type="button" className="hx-btn" onClick={closeRep}>
+                ยกเลิก
+              </button>
+              <button type="button" className="hx-btn ink" disabled={busy || !pick.length} onClick={makeReport}>
+                สร้างและเปิดรายงาน
+              </button>
+            </>
+          }
+        >
+          <div className="hx-preview">
+            <span className="hx-label">ช่วงข้อมูล</span>
+            <div>
+              {thDay(a.range.from, true)} – {thDay(a.range.to, true)}
+              {activity ? ` · ${a.activityOptions.find((o) => o.key === activity)?.title || 'กิจกรรมที่เลือก'}` : ' · ทุกกิจกรรม'}
+            </div>
+          </div>
+          <div className="hx-field">
+            ตัวเลขที่จะแสดง
+            <div className="hx-figs">
+              {REPORT_FIGURES.map((f) => {
+                const on = pick.includes(f.key);
+                return (
+                  <button key={f.key} type="button" className={`hx-fig${on ? ' on' : ''}`} aria-pressed={on} onClick={() => setPick(on ? pick.filter((k) => k !== f.key) : [...pick, f.key])}>
+                    {on && I.check(13)}
+                    {f.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <label className="hx-field">
+            ข้อความแนะนำตัว (ไม่บังคับ)
+            <textarea value={intro} onChange={(e) => setIntro(e.target.value)} maxLength={400} placeholder="เช่น สตูดิโอเซรามิกในย่านอารีย์ เปิดสอนมาแล้ว 3 ปี" />
+          </label>
+          <p className="hx-note">ตัวเลขที่มาจากคนน้อยกว่า 5 คนจะไม่ถูกใส่ในรายงาน · รายงานหมดอายุใน 180 วัน หรือกดยกเลิกได้</p>
+          {rmsg && <p className="hx-err">{rmsg}</p>}
+        </Sheet>
+      )}
     </div>
   );
 }

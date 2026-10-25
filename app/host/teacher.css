@@ -55,15 +55,20 @@
   .tdb-shell { flex-direction: column; }
   .tdb-rail { display: none; }
   .tdb-topbar {
-    position: sticky; top: 0; z-index: 40; height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 16px;
-    background: var(--cream);
+    position: sticky; top: 0; z-index: 40; height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 14px 0 18px;
+    background: rgba(246,241,230,.85); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid rgba(13,30,29,.06);
   }
+  .tdb-topbar-brand { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0; color: var(--ink); text-decoration: none; }
+  .tdb-topbar-name { font-family: 'Mitr', sans-serif; font-weight: 500; font-size: 15px; }
+  .tdb-topbar-name b { color: #f5c243; font-weight: 500; }
+  .tdb-topbar-pill { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .2em; color: var(--teal); padding: 3px 7px; border-radius: 999px; background: rgba(13,138,126,.1); }
+  .tdb-topbar-av { width: 34px; height: 34px; border-radius: 50%; background: var(--ink); color: #fff; display: flex; align-items: center; justify-content: center; font-family: 'Mitr', sans-serif; font-weight: 500; font-size: 14px; flex-shrink: 0; }
   .tdb-topbar-btn {
     width: 40px; height: 40px; border-radius: 999px; background: #fff; border: 0; display: flex; align-items: center; justify-content: center;
-    cursor: pointer; color: var(--ink); padding: 0; flex-shrink: 0;
+    cursor: pointer; color: var(--ink); padding: 0; flex-shrink: 0; box-shadow: 0 0 0 1px rgba(13,30,29,.08);
   }
   .tdb-topbar-title { flex: 1; min-width: 0; font-family: 'Mitr', sans-serif; font-weight: 500; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .tdb-topbar .tdb-brand-mark { width: 32px; height: 32px; font-size: 17px; }
+  .tdb-topbar .tdb-brand-mark { width: 30px; height: 30px; font-size: 17px; }
   .tdb-scrim { display: block; position: fixed; inset: 0; background: rgba(13,30,29,.45); z-index: 60; animation: tdbFade .2s ease; }
   .tdb-rail.open {
     display: flex; position: fixed; top: 0; bottom: 0; left: 0; width: 300px; z-index: 61; border-radius: 0 28px 28px 0;

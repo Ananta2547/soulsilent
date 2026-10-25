@@ -3,16 +3,18 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { Analytics } from '@/lib/host-analytics';
-import { Delta, Panel, StackBars, StatCard, baht, num, thDay } from './kit';
+import { Bars, Card, I, Kpis, baht, deltaOf, num, thDay } from './kit';
 
 const HIDDEN = 'hd_hidden_insights';
 
-/** The front page: what to do today, money coming in, and whether it's growing.
- *  On a phone it reads top to bottom: to-dos → rounds ahead → payout → figure
- *  cards (swipe) → chart → insights (layout in teacher.css, .hd-ov). */
-export function OverviewTab({ a, onTab }: { a: Analytics; onTab: (t: string) => void }) {
+/** The front page: a dark hero with net revenue and 12 weeks of sales, the
+ *  payout card beside it, five figure tiles, rounds ahead + the GP card, and
+ *  the insights strip. Things to do sit on top when there are any. */
+export function OverviewTab({ a, periodLabel, onTab }: { a: Analytics; periodLabel: string; onTab: (t: string) => void }) {
   const o = a.overview;
   const c = o.cards;
+  const fee = Math.max(0, c.sales.cur - c.net.cur);
+  const netDelta = deltaOf(c.net.cur, c.net.prev, 'pct');
   const [hidden, setHidden] = useState<string[]>([]);
   const [basis, setBasis] = useState<string | null>(null);
   useEffect(() => {
@@ -32,9 +34,9 @@ export function OverviewTab({ a, onTab }: { a: Analytics; onTab: (t: string) => 
   const insights = o.insights.filter((i) => !hidden.includes(i.id));
 
   return (
-    <div className="hd-ov">
+    <div className="hx-stack">
       {o.todo.length > 0 && (
-        <div className="hd-todo a-todo" role="status">
+        <div className="hx-todo" role="status">
           <b>⚠ {o.todo.length} เรื่องต้องทำ</b>
           {o.todo.map((t, i) => (
             <Link key={i} href={t.href} onClick={t.href.includes('tab=') ? (e) => (e.preventDefault(), onTab('marketing')) : undefined}>
@@ -45,136 +47,194 @@ export function OverviewTab({ a, onTab }: { a: Analytics; onTab: (t: string) => 
         </div>
       )}
 
-      <div className="hd-cards a-cards">
-        <StatCard label="ยอดขาย" value={baht(c.sales.cur)} delta={<Delta cur={c.sales.cur} prev={c.sales.prev} kind="pct" />} onClick={() => onTab('money')} title="ยอดชำระสำเร็จตามวันที่ชำระ หักคืนเงินในช่วงที่คืน" />
-        <StatCard label="รายได้สุทธิ" value={baht(c.net.cur)} delta={<Delta cur={c.net.cur} prev={c.net.prev} kind="pct" />} onClick={() => onTab('money')} title="ยอดขาย − ค่าธรรมเนียม GP" />
-        <StatCard label="ที่นั่งที่ขาย" value={num(c.seats.cur, 0)} delta={<Delta cur={c.seats.cur} prev={c.seats.prev} kind="abs" />} onClick={() => onTab('rounds')} />
-        <StatCard
-          label="อัตราเต็มรอบ"
-          value={c.fill.cur == null ? '—' : `${num(c.fill.cur, 0)}%`}
-          delta={<Delta cur={c.fill.cur} prev={c.fill.prev} kind="pt" />}
-          onClick={() => onTab('rounds')}
-          title="ที่นั่งขาย ÷ ความจุ ของรอบที่จัดในช่วงนี้"
-        />
-        <StatCard label="ผู้เข้าร่วมใหม่" value={num(c.newPeople.cur, 0)} delta={<Delta cur={c.newPeople.cur} prev={c.newPeople.prev} kind="abs" />} onClick={() => onTab('people')} title="คนที่เช็คอินกับคุณครั้งแรกในช่วงนี้" />
-        <StatCard
-          label="กลับมาซ้ำ 90 วัน"
-          value={c.repeat90.cur == null ? null : `${num(c.repeat90.cur, 0)}%`}
-          delta={c.repeat90.cur == null ? <span className="hd-few">จาก {c.repeat90.people} คน</span> : <Delta cur={c.repeat90.cur} prev={c.repeat90.prev} kind="pt" />}
-          onClick={() => onTab('people')}
-          title="ผู้เข้าร่วมครั้งแรกที่กลับมาจองกับคุณอีกภายใน 90 วัน (รุ่นที่ครบ 90 วันแล้วใน 3 เดือนล่าสุด)"
-        />
+      <div className="hx-g g84">
+        <section className="hx-dark">
+          <div className="glow" aria-hidden style={{ right: -80, top: -110, width: 300, height: 300, background: 'radial-gradient(circle, rgba(13,138,126,.55), transparent 70%)' }} />
+          <div className="hx-hero-top">
+            <div>
+              <span className="hx-label">รายได้สุทธิ · {periodLabel}</span>
+              <div className="hx-hero-num">{baht(c.net.cur)}</div>
+              <div className="hx-hero-meta">
+                <span className={`hx-chip-d ${netDelta.tone}`}>{netDelta.tone === 'ne' ? netDelta.text : `${netDelta.text} จากช่วงก่อน`}</span>
+                <span>
+                  ยอดขาย {baht(c.sales.cur)} · GP {baht(fee)}
+                </span>
+              </div>
+            </div>
+            <button type="button" className="hx-btn ghost-light" onClick={() => onTab('money')}>
+              ดูรายเดือน ›
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <span style={{ fontSize: 12.5, color: '#9aaba8' }}>ยอดขายรายสัปดาห์ · 12 สัปดาห์ล่าสุด</span>
+            <Bars
+              labels={o.weekly.map((w) => thDay(w.week))}
+              series={[
+                { name: 'แบบรอบ', color: '#3fb8a9', values: o.weekly.map((w) => w.rounds) },
+                { name: 'เดี่ยว', color: '#f5c243', values: o.weekly.map((w) => w.single) },
+              ]}
+              fmt={baht}
+              every={2}
+            />
+          </div>
+        </section>
+
+        <Card delay={70} style={{ height: '100%' }}>
+          <div>
+            <span className="hx-label">ยอดรอโอน</span>
+            <div className="hx-big" style={{ fontSize: 40, lineHeight: 1.1, marginTop: 8 }}>
+              {baht(o.payout.owed)}
+            </div>
+            <p className="hx-note" style={{ marginTop: 4 }}>
+              จาก {o.payout.owedRounds.length} รอบที่จบแล้ว · ทีมงานโอนให้หลังรอบจบ
+            </p>
+          </div>
+          <div className="hx-pay-rows">
+            <div>
+              <span className="k">ยังไม่ถึงกำหนด</span>
+              <b>
+                {baht(o.payout.notYet)} <small>· {o.payout.notYetRounds.length} รอบ</small>
+              </b>
+            </div>
+            <div>
+              <span className="k">โอนล่าสุด</span>
+              {o.payout.last ? (
+                <span style={{ textAlign: 'right' }}>
+                  <b>{baht(o.payout.last.net)}</b>
+                  <br />
+                  <span className="hx-mono">
+                    {thDay(o.payout.last.occurred_at.slice(0, 10), true)} · {o.payout.last.doc_no}
+                  </span>
+                </span>
+              ) : (
+                <span className="k">—</span>
+              )}
+            </div>
+          </div>
+          <button type="button" className="hx-btn ink wide" style={{ marginTop: 'auto' }} onClick={() => onTab('money')}>
+            รายได้และการโอน ›
+          </button>
+        </Card>
       </div>
 
-      <Panel title="ยอดขายรายสัปดาห์" sub="12 สัปดาห์ล่าสุด นับตามวันที่ชำระ · แยกกิจกรรมแบบรอบ / เดี่ยว" className="a-chart">
-        <StackBars
-          labels={o.weekly.map((w) => thDay(w.week))}
-          series={[
-            { name: 'แบบรอบ', color: 'var(--teal)', values: o.weekly.map((w) => w.rounds) },
-            { name: 'เดี่ยว', color: '#e3b23c', values: o.weekly.map((w) => w.single) },
-          ]}
-          format={baht}
-        />
-      </Panel>
+      <Kpis
+        items={[
+          { label: 'ยอดขาย', value: baht(c.sales.cur), delta: deltaOf(c.sales.cur, c.sales.prev, 'pct'), onClick: () => onTab('money'), title: 'ยอดชำระสำเร็จตามวันที่ชำระ หักคืนเงินในช่วงที่คืน' },
+          { label: 'ที่นั่งที่ขาย', value: num(c.seats.cur, 0), delta: deltaOf(c.seats.cur, c.seats.prev, 'abs'), onClick: () => onTab('rounds') },
+          { label: 'อัตราเต็มรอบ', value: c.fill.cur == null ? '—' : `${num(c.fill.cur, 0)}%`, delta: deltaOf(c.fill.cur, c.fill.prev, 'pt'), onClick: () => onTab('rounds'), title: 'ที่นั่งขาย ÷ ความจุ ของรอบที่จัดในช่วงนี้' },
+          { label: 'ผู้เข้าร่วมใหม่', value: num(c.newPeople.cur, 0), delta: deltaOf(c.newPeople.cur, c.newPeople.prev, 'abs'), onClick: () => onTab('people') },
+          {
+            label: 'กลับมาซ้ำ 90 วัน',
+            value: c.repeat90.cur == null ? null : `${num(c.repeat90.cur, 0)}%`,
+            delta: c.repeat90.cur == null ? `จาก ${c.repeat90.people} คน` : deltaOf(c.repeat90.cur, c.repeat90.prev, 'pt'),
+            onClick: () => onTab('people'),
+            title: 'ผู้เข้าร่วมครั้งแรกที่กลับมาจองกับคุณอีกภายใน 90 วัน',
+          },
+        ]}
+      />
 
-      <Panel title="ยอดรอโอน" sub="ทีมงานโอนรายได้ให้หลังรอบจบ" className="a-pay">
-        <div className="hd-big">{baht(o.payout.owed)}</div>
-        <p className="hd-few" style={{ margin: '4px 0 12px' }}>
-          จาก {o.payout.owedRounds.length} รอบที่จบแล้ว · ยังไม่ถึงกำหนด {baht(o.payout.notYet)} ({o.payout.notYetRounds.length} รอบที่ยังไม่จัด)
-        </p>
-        {o.payout.last && (
-          <p className="hd-few" style={{ margin: '0 0 12px' }}>
-            โอนล่าสุด {baht(o.payout.last.net)} · {thDay(o.payout.last.occurred_at.slice(0, 10), true)} · {o.payout.last.doc_no}
-          </p>
-        )}
-        <button type="button" className="hd-btn" onClick={() => onTab('money')}>
-          ดูรายละเอียด ›
-        </button>
-      </Panel>
-
-      <FeeCard fee={o.fee} />
-
-      <Panel title="รอบที่จะถึง 7 วัน" sub={o.upcoming.length ? undefined : 'ไม่มีรอบใน 7 วันข้างหน้า'} className="a-up">
-        {o.upcoming.map((u) => (
-          <div key={u.id} className="hd-row">
-            <div className="grow">
-              <div style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.title}</div>
-              <div className="dim">
-                {thDay(u.date)} · {u.time} น. · {u.sold}/{u.cap} ที่
-              </div>
-              <div className="hd-meter" style={{ marginTop: 6 }}>
-                <span style={{ width: `${Math.min(100, (u.sold / Math.max(1, u.cap)) * 100)}%` }} />
-              </div>
-            </div>
-            {u.action === 'checkin' ? (
-              <Link className="hd-btn teal" href={`/host/journeys/${u.id}`}>
-                เช็คชื่อ
+      <div className="hx-g g75">
+        <Card title="รอบที่จะถึง 7 วัน" delay={140}>
+          {o.upcoming.length === 0 ? (
+            <div className="hx-zero">
+              <span className="ic">{I.cal(24)}</span>
+              <p className="t">ไม่มีรอบใน 7 วันข้างหน้า</p>
+              <p>เปิดรอบใหม่เพื่อให้ผู้เข้าร่วมจองล่วงหน้าได้</p>
+              <Link href="/host/sessions" className="hx-btn" style={{ marginTop: 4 }}>
+                {I.plus()}จัดรอบกิจกรรม
               </Link>
-            ) : u.action === 'full' ? (
-              <span className="hd-btn">เต็มแล้ว</span>
-            ) : (
-              <button type="button" className="hd-btn" onClick={() => onTab('marketing')}>
-                {u.action === 'promote' ? 'โปรโมต' : 'แชร์ลิงก์'}
-              </button>
-            )}
-          </div>
-        ))}
-      </Panel>
-
-      <Panel title="ข้อสังเกตจากข้อมูลของคุณ" sub="สร้างจากกฎที่เขียนไว้ล่วงหน้า แสดงเมื่อข้อมูลถึงเกณฑ์เท่านั้น" className="a-ins">
-        {insights.length === 0 ? (
-          <p className="hd-few">ยังไม่มีข้อสังเกต — จะขึ้นเมื่อมีรอบและการจองมากพอ</p>
-        ) : (
-          insights.map((i) => (
-            <div key={i.id} className="hd-insight">
-              {i.text}
-              {basis === i.id && <div style={{ fontSize: 12, marginTop: 6, opacity: 0.85 }}>ข้อมูลที่ใช้: {i.basis}</div>}
-              <div className="acts">
-                <button type="button" onClick={() => setBasis(basis === i.id ? null : i.id)}>
-                  {basis === i.id ? 'ซ่อนข้อมูล' : 'ดูข้อมูลที่ใช้'}
-                </button>
-                <button type="button" onClick={() => hide(i.id)}>
-                  ไม่มีประโยชน์
-                </button>
-              </div>
             </div>
-          ))
-        )}
-      </Panel>
-    </div>
-  );
-}
+          ) : (
+            <div className="hx-up">
+              {o.upcoming.map((u) => (
+                <div key={u.id} className="hx-up-row">
+                  <div className="main">
+                    <div className="t">{u.title}</div>
+                    <div className="m">
+                      {thDay(u.date)} · {u.time} น. · {u.sold}/{u.cap} ที่
+                    </div>
+                    <span className="hx-track">
+                      <span style={{ width: `${Math.min(100, (u.sold / Math.max(1, u.cap)) * 100)}%` }} />
+                    </span>
+                  </div>
+                  {u.action === 'checkin' ? (
+                    <Link className="hx-btn ink" href={`/host/journeys/${u.id}`} style={{ height: 36 }}>
+                      เช็คชื่อ
+                    </Link>
+                  ) : u.action === 'full' ? (
+                    <span className="hx-btn white">เต็มแล้ว</span>
+                  ) : (
+                    <button type="button" className="hx-btn white" onClick={() => onTab('marketing')}>
+                      {u.action === 'promote' ? 'โปรโมต' : 'แชร์ลิงก์'}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
 
-/** The host's platform fee (GP): this month's rate per activity type, and how
- *  much more this month would bring next month's rate down (lib/gp). */
-function FeeCard({ fee }: { fee: Analytics['overview']['fee'] }) {
-  return (
-    <Panel
-      title="ค่าธรรมเนียม GP"
-      sub={fee.started ? 'ขั้นตามยอดขายเดือนก่อน แยกเดี่ยว / แบบรอบ · รวมค่าชำระเงินแล้ว' : `เริ่มคิด ${thDay(fee.startsOn, true)} — การจองที่ชำระก่อนหน้านั้นไม่มี GP`}
-      className="a-fee"
-    >
-      {fee.kinds.map((k) => (
-        <div key={k.kind} style={{ padding: '10px 0', borderTop: '1px solid rgba(13,30,29,.07)', fontSize: 13.5 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
-            <span style={{ fontWeight: 600 }}>{k.kind === 'single' ? 'กิจกรรมเดี่ยว' : 'กิจกรรมแบบรอบ'}</span>
-            <span className="hd-big" style={{ fontSize: 22 }}>{fee.started ? k.rate : k.nextMonthRate}%</span>
-          </div>
-          <div className="hd-few">
-            {fee.started ? `เดือนนี้ · เดือนหน้า ${k.nextMonthRate}%` : 'ม.ค. 70 ถ้ายอดเท่าเดือนนี้'} · ยอดเดือนนี้ {baht(k.salesThisMonth)}
-          </div>
-          <div className="hd-few">
-            {k.step
-              ? fee.started
-                ? `ขายอีก ${baht(k.step.need)} เดือนหน้าได้ ${k.step.rate}%`
-                : `ถ้ายอด ธ.ค. 69 ถึง ${baht(k.salesThisMonth + k.step.need)} ม.ค. 70 ได้ ${k.step.rate}%`
-              : 'ขั้นต่ำสุดแล้ว'}
-          </div>
-          {fee.started && k.why && <div className="hd-few">{k.why}</div>}
+        <Card title="ค่าธรรมเนียม GP" sub={o.fee.started ? 'ขั้นตามยอดขายเดือนก่อน แยกเดี่ยว / แบบรอบ' : 'เริ่มคิด 1 ม.ค. 70 — การจองที่ชำระก่อนหน้านั้นไม่มี GP'} delay={210}>
+          {o.fee.kinds.map((k) => {
+            const target = k.step ? k.salesThisMonth + k.step.need : null;
+            const rate = o.fee.started ? k.rate : k.nextMonthRate;
+            return (
+              <div key={k.kind} className="hx-gp">
+                <div className="hx-gp-top">
+                  <span>{k.kind === 'single' ? 'กิจกรรมเดี่ยว' : 'กิจกรรมแบบรอบ'}</span>
+                  <b>{rate}%</b>
+                </div>
+                <span className="hx-track gold">
+                  <span style={{ width: target ? `${Math.min(100, (k.salesThisMonth / target) * 100)}%` : '100%', animationDelay: '300ms' }} />
+                </span>
+                <div className="hx-gp-meta">
+                  <span>เดือนนี้ {baht(k.salesThisMonth)}</span>
+                  <span>{target ? `เป้า ${baht(target)}` : 'ขั้นต่ำสุดแล้ว'}</span>
+                </div>
+                <span className="hx-note">
+                  {k.step
+                    ? o.fee.started
+                      ? `ขายอีก ${baht(k.step.need)} → เดือนหน้าได้ ${k.step.rate}%`
+                      : `ถ้ายอด ธ.ค. 69 ถึง ${baht(target!)} → ม.ค. 70 ได้ ${k.step.rate}%`
+                    : o.fee.started
+                      ? `เดือนหน้า ${k.nextMonthRate}%`
+                      : 'ม.ค. 70 ถ้ายอดเท่าเดือนนี้'}
+                  {o.fee.started && k.why ? ` · ${k.why}` : ''}
+                </span>
+              </div>
+            );
+          })}
+          {o.fee.roundZeroUntil && <p className="hx-note">กิจกรรมแบบรอบ 0% ถึง {thDay(o.fee.roundZeroUntil, true)}</p>}
+          <p className="hx-note" style={{ fontSize: 12, paddingTop: 12, borderTop: '1px solid rgba(13,30,29,.06)' }}>
+            ส่วนของราคาต่อที่นั่งที่เกิน 3,000 บาท คิด 3% · กิจกรรมฟรี 0%
+          </p>
+        </Card>
+      </div>
+
+      <section className="hx-strip" style={{ animationDelay: '280ms' }}>
+        <span className="ic">{I.spark()}</span>
+        <div className="body">
+          <div className="t">ข้อสังเกตจากข้อมูลของคุณ</div>
+          {insights.length === 0 ? (
+            <div className="s">ยังไม่มีข้อสังเกต — จะขึ้นเมื่อมีรอบและการจองมากพอ</div>
+          ) : (
+            insights.map((i) => (
+              <div key={i.id} className="hx-insight">
+                {i.text}
+                {basis === i.id && <div className="basis">ข้อมูลที่ใช้: {i.basis}</div>}
+                <div className="acts">
+                  <button type="button" onClick={() => setBasis(basis === i.id ? null : i.id)}>
+                    {basis === i.id ? 'ซ่อนข้อมูล' : 'ดูข้อมูลที่ใช้'}
+                  </button>
+                  <button type="button" onClick={() => hide(i.id)}>
+                    ไม่มีประโยชน์
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
-      ))}
-      {fee.roundZeroUntil && <p className="hd-few" style={{ marginTop: 8 }}>กิจกรรมแบบรอบ 0% ถึง {thDay(fee.roundZeroUntil, true)}</p>}
-      <p className="hd-few" style={{ marginTop: 8 }}>ส่วนของราคาต่อที่นั่งที่เกิน 3,000 บาท คิด 3% · กิจกรรมฟรี 0%</p>
-    </Panel>
+      </section>
+    </div>
   );
 }

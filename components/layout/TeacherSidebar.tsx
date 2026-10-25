@@ -93,15 +93,18 @@ export function TeacherSidebar() {
   const [collapsed, toggleRail] = useRailCollapsed();
   // "จัดรอบกิจกรรม" is for the ผู้จัดรอบ role (session_host); admin sees it too.
   const [roles, setRoles] = useState<string[]>([]);
+  // First letter of the host's name, for the avatar in the phone top bar.
+  const [initial, setInitial] = useState('');
   useEffect(() => {
     fetch('/api/auth/me')
-      .then((r) => r.json() as Promise<{ user?: { role?: string; roles?: string[] } | null }>)
-      .then((d) => setRoles(d.user?.roles || (d.user?.role ? [d.user.role] : [])))
+      .then((r) => r.json() as Promise<{ user?: { role?: string; roles?: string[]; name?: string; nickname?: string } | null }>)
+      .then((d) => {
+        setRoles(d.user?.roles || (d.user?.role ? [d.user.role] : []));
+        setInitial(((d.user?.nickname || d.user?.name || '').trim()[0] || '').toUpperCase());
+      })
       .catch(() => {});
   }, []);
   const nav = NAV.filter((item) => item.href !== '/host/sessions' || hasAnyRole(roles, ['session_host']));
-  // The phone top bar names the section the page belongs to.
-  const here = NAV.find((item) => pathname.startsWith(item.href));
 
   useEffect(() => {
     if (!open) return;
@@ -116,13 +119,23 @@ export function TeacherSidebar() {
     <>
       {/* Phone top bar — the rail stays off-screen until the menu is opened. */}
       <header className="tdb-topbar">
+        <Link href="/host" className="tdb-topbar-brand">
+          <span className="tdb-brand-mark" aria-hidden>a</span>
+          <span className="tdb-topbar-name">
+            allsoullearn<b>.</b>
+          </span>
+          <span className="tdb-topbar-pill">HOST</span>
+        </Link>
+        {initial && (
+          <span className="tdb-topbar-av" aria-hidden>
+            {initial}
+          </span>
+        )}
         <button type="button" className="tdb-topbar-btn" onClick={() => setOpen(true)} aria-label="เปิดเมนูผู้จัด" aria-expanded={open}>
-          <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeWidth={1.8} d="M4 7h16M4 12h16M4 17h16" />
           </svg>
         </button>
-        <span className="tdb-topbar-title">{here?.label || 'Host'}</span>
-        <span className="tdb-brand-mark" aria-hidden>a</span>
       </header>
 
       {open && <div className="tdb-scrim" aria-hidden onClick={() => setOpen(false)} />}
