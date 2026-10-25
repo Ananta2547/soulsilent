@@ -10,8 +10,6 @@ import { computePayout } from '@/lib/workshop-utils';
  *   A group or whole-round booking's seat price is what was paid ÷ its seats.
  * - Round-based hosts: 0% for one month from their first round going on sale;
  *   hosts who already had rounds before 2570 get 0% for all of January 2570.
- * - Founding Host (a paid activity published by 31 Dec 2569 23:59): 1% below
- *   the table, not below 4%, for every booking paid in 2570.
  * - The rate follows the day the money was paid: anything paid before
  *   1 Jan 2570 is 0%, and December 2569's sales set January 2570's tier.
  * - GP is charged on what the host is paid for the seat: amount after the
@@ -21,7 +19,6 @@ import { computePayout } from '@/lib/workshop-utils';
 export const GP_START = '2027-01-01'; // 1 ม.ค. 2570, Thai time
 export const HIGH_PRICE_FROM = 3000;
 export const HIGH_PRICE_RATE = 3;
-export const FOUNDING_FLOOR = 4;
 /** [from sales (baht), rate %] — ascending. */
 export const TIERS: Record<'single' | 'round', [number, number][]> = {
   single: [
@@ -94,7 +91,7 @@ export function gpKindOf(w: Pick<GpWorkshop, 'master_kind' | 'payment_type'>): G
   return w.master_kind === 'round' ? 'round' : 'single';
 }
 
-type HostFacts = { founding: boolean; roundStart: number | null; roundZeroUntil: number };
+type HostFacts = { roundStart: number | null; roundZeroUntil: number };
 export type GpContext = {
   hosts: Map<string, HostFacts>;
   /** `${host}|${month}|${kind}` → frozen table rate + the sales it came from */
@@ -107,20 +104,16 @@ export type GpContext = {
 export async function loadGp(db: D1Database, hostIds: (string | null | undefined)[], now = Date.now()): Promise<GpContext> {
   const ctx: GpContext = { hosts: new Map(), months: new Map(), sales: new Map() };
   const ids = [...new Set(hostIds.filter((x): x is string => !!x))];
-  const cutoff = new Date(GP_START_MS).toISOString().replace('T', ' ').slice(0, 19); // UTC of 1 Jan 2570 00:00 Thai
   const curMonth = thaiMonth(now);
   for (const host of ids) {
     const [facts, sales, rows] = await Promise.all([
       db
         .prepare(
-          `SELECT
-             EXISTS (SELECT 1 FROM workshops w WHERE w.instructor_id = ?1 AND COALESCE(w.payment_type, 'paid') NOT IN ('free')
-                       AND COALESCE(w.price, 0) > 0 AND w.status != 'cancelled' AND w.created_at < ?2) AS founding,
-             (SELECT MIN(w.created_at) FROM workshops w JOIN workshop_masters m ON m.id = w.master_id
-               WHERE w.instructor_id = ?1 AND m.kind = 'round' AND w.status != 'cancelled') AS round_start`,
+          `SELECT MIN(w.created_at) AS round_start FROM workshops w JOIN workshop_masters m ON m.id = w.master_id
+            WHERE w.instructor_id = ? AND m.kind = 'round' AND w.status != 'cancelled'`,
         )
-        .bind(host, cutoff)
-        .first<{ founding: number; round_start: string | null }>(),
+        .bind(host)
+        .first<{ round_start: string | null }>(),
       db
         .prepare(
           `SELECT strftime('%Y-%m', datetime(b.paid_at, '+7 hours')) AS m,
@@ -147,7 +140,7 @@ export async function loadGp(db: D1Database, hostIds: (string | null | undefined
         zeroUntil = Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate(), d.getUTCHours(), d.getUTCMinutes()) - TH;
       }
     }
-    ctx.hosts.set(host, { founding: !!facts?.founding, roundStart, roundZeroUntil: zeroUntil });
+    ctx.hosts.set(host, { roundStart, roundZeroUntil: zeroUntil });
     for (const s of sales.results || []) ctx.sales.set(`${host}|${s.m}|${s.k}`, Number(s.s) || 0);
     for (const r of rows.results || []) ctx.months.set(`${host}|${r.month}|${r.kind}`, { rate: r.rate, prevSales: r.prev_sales });
 
@@ -170,12 +163,11 @@ export async function loadGp(db: D1Database, hostIds: (string | null | undefined
   return ctx;
 }
 
-/** Founding cut and round 0% month on top of a table rate, at time `at`. */
+/** The round 0% month (and GP's start date) on top of a table rate, at time `at`. */
 function adjust(ctx: GpContext, host: string, kind: GpKind, table: number, at: number): { rate: number; why: string | null } {
   if (at < GP_START_MS) return { rate: 0, why: 'ชำระก่อน 1 ม.ค. 2570' };
   const facts = ctx.hosts.get(host);
   if (kind === 'round' && facts && at < facts.roundZeroUntil) return { rate: 0, why: 'เดือนแรกของกิจกรรมแบบรอบ' };
-  if (facts?.founding && thaiMonth(at).startsWith('2027') && table > 0) return { rate: Math.max(FOUNDING_FLOOR, table - 1), why: 'Founding Host −1%' };
   return { rate: table, why: null };
 }
 
@@ -226,7 +218,6 @@ export function feeStatus(ctx: GpContext, host: string, now = Date.now()) {
   return {
     started: now >= GP_START_MS,
     startsOn: GP_START,
-    founding: !!facts?.founding,
     roundZeroUntil: facts?.roundZeroUntil && facts.roundZeroUntil > now ? new Date(facts.roundZeroUntil + TH).toISOString().slice(0, 10) : null,
     kinds: (['single', 'round'] as GpKind[]).map((kind) => {
       const salesNow = ctx.sales.get(`${host}|${ym}|${kind}`) || 0;

@@ -154,7 +154,6 @@ function FeeCard({ fee }: { fee: Analytics['overview']['fee'] }) {
       sub={fee.started ? 'ขั้นตามยอดขายเดือนก่อน แยกเดี่ยว / แบบรอบ · รวมค่าชำระเงินแล้ว' : `เริ่มคิด ${thDay(fee.startsOn, true)} — การจองที่ชำระก่อนหน้านั้นไม่มี GP`}
       className="a-fee"
     >
-      {fee.founding && <p className="hd-insight" style={{ margin: '0 0 10px' }}>Founding Host — อัตราต่ำกว่าตาราง 1% (ไม่ต่ำกว่า 4%) ตลอดปี 2570</p>}
       {fee.kinds.map((k) => (
         <div key={k.kind} style={{ padding: '10px 0', borderTop: '1px solid rgba(13,30,29,.07)', fontSize: 13.5 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>

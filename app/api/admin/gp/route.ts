@@ -16,7 +16,7 @@ const thaiStart = (ym: string) => Date.parse(`${ym}-01T00:00:00+07:00`);
 const sqlUtc = (ms: number) => new Date(ms).toISOString().replace('T', ' ').slice(0, 19);
 
 /** GET /api/admin/gp?month=YYYY-MM — every host's GP for one Thai month:
- *  last month's sales and the rate they set per type, the founding cut and
+ *  last month's sales and the rate they set per type, the
  *  round 0% period, this month's sales and the GP charged on them. */
 export async function GET(request: Request) {
   try {
@@ -72,7 +72,6 @@ export async function GET(request: Request) {
       };
       return {
         ...h,
-        founding: !!facts?.founding,
         roundZeroUntil: facts?.roundZeroUntil && facts.roundZeroUntil > start ? new Date(facts.roundZeroUntil + 7 * 3600000).toISOString().slice(0, 10) : null,
         single: kind('single'),
         round: kind('round'),

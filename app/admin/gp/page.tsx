@@ -10,7 +10,6 @@ type Row = {
   id: string;
   name: string;
   email: string;
-  founding: boolean;
   roundZeroUntil: string | null;
   single: Kind;
   round: Kind;
@@ -25,7 +24,7 @@ const thisMonth = () => new Date(Date.now() + 7 * 3600000).toISOString().slice(0
 
 /**
  * ค่าธรรมเนียม GP รายผู้จัด — per host for one month: last month's sales and
- * the tier they set (standalone / round-based), the Founding Host cut, the
+ * the tier they set (standalone / round-based), the
  * round 0% period, this month's sales and the GP charged on them (lib/gp).
  */
 export default function AdminGpPage() {
@@ -75,7 +74,7 @@ export default function AdminGpPage() {
             <b>แบบรอบ:</b> เดือนแรก 0% · {TIERS.round.map(([f, r]) => `${f ? `≥${f.toLocaleString()}` : '<15,000'} ${r}%`).join(' · ')}
           </span>
           <span>
-            ส่วนที่เกิน {HIGH_PRICE_FROM.toLocaleString()} บาท/ที่นั่ง {HIGH_PRICE_RATE}% · ฟรี 0% · Founding Host −1% (ไม่ต่ำกว่า 4%) ปี 2570
+            ส่วนที่เกิน {HIGH_PRICE_FROM.toLocaleString()} บาท/ที่นั่ง {HIGH_PRICE_RATE}% · ฟรี 0%
           </span>
         </div>
       </div>
@@ -136,7 +135,6 @@ export default function AdminGpPage() {
                           <div style={{ fontWeight: 600 }}>{r.name}</div>
                           <div className="adm-meta">{r.email}</div>
                           <span style={{ display: 'inline-flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
-                            {r.founding && <Badge tone="teal">Founding Host</Badge>}
                             {r.roundZeroUntil && <Badge tone="info">แบบรอบ 0% ถึง {r.roundZeroUntil}</Badge>}
                           </span>
                         </td>
