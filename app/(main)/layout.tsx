@@ -3,6 +3,7 @@ import { PageTransition } from '@/components/design/PageTransition';
 import { ScrollReveal } from '@/components/design/ScrollReveal';
 import { MarketingFooter } from '@/components/layout/MarketingFooter';
 import { InstallBanner } from '@/components/pwa/InstallBanner';
+import { Tracker } from '@/components/analytics/Tracker';
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -15,6 +16,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       {/* Global footer — shows on every page in the (main) shell. */}
       <MarketingFooter />
       <InstallBanner />
+      <Tracker />
     </>
   );
 }

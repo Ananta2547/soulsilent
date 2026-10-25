@@ -38,6 +38,7 @@ import { REFUND } from '@/lib/policy';
 import { learnServerClock } from '@/lib/server-clock';
 import { visibleAppStatus } from '@/lib/selection-status';
 import { GiftModal } from '@/components/workshops/GiftModal';
+import { readAttribution } from '@/lib/attribution';
 import { PosterZoom } from '@/components/workshops/PosterZoom';
 import { TransferLinkModal } from '@/components/workshops/TransferLinkModal';
 import { platformStyle, platformLabel } from '@/lib/online-platform';
@@ -251,7 +252,7 @@ function WorkshopDetailInner() {
       const res = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workshop_id: chosen.session.id, application, booking_kind: chosen.kind, tier_id: chosen.tier.id, group_size: chosen.seats, coupon_code: couponCode || undefined }),
+        body: JSON.stringify({ workshop_id: chosen.session.id, application, booking_kind: chosen.kind, tier_id: chosen.tier.id, group_size: chosen.seats, coupon_code: couponCode || undefined, attribution: readAttribution() }),
       });
       const data = (await res.json()) as BookingResult;
       if (!res.ok) {
@@ -271,7 +272,7 @@ function WorkshopDetailInner() {
       const res = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workshop_id: id, application, coupon_code: couponCode || undefined }),
+        body: JSON.stringify({ workshop_id: id, application, coupon_code: couponCode || undefined, attribution: readAttribution() }),
       });
       const data = (await res.json()) as BookingResult;
       if (!res.ok) {
@@ -318,7 +319,7 @@ function WorkshopDetailInner() {
       const res = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workshop_id: id, gift: recipient, coupon_code: couponCode || undefined }),
+        body: JSON.stringify({ workshop_id: id, gift: recipient, coupon_code: couponCode || undefined, attribution: readAttribution() }),
       });
       const data = (await res.json()) as { checkoutUrl?: string; claimUrl?: string; paid?: boolean; error?: string };
       if (!res.ok) {

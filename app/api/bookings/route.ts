@@ -10,6 +10,7 @@ import { expireStaleHolds, HOLD_MINUTES } from '@/lib/holds';
 import { claimUrl, newTransferToken, partyFromBooking } from '@/lib/transfers';
 import type { Workshop } from '@/lib/types';
 import { applyCode, type CouponColumns } from '@/lib/coupons';
+import { saveAttribution } from '@/lib/attribution';
 
 
 /** Whole years from a YYYY-MM-DD birthdate, or null. Mirrors the client. */
@@ -165,7 +166,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await requireAuth();
-    const { workshop_id, application, gift, booking_kind, tier_id, group_size, coupon_code } = (await request.json()) as {
+    const { workshop_id, application, gift, booking_kind, tier_id, group_size, coupon_code, attribution } = (await request.json()) as {
+      /** Where the visitor came from (lib/attribution) — stored for the Host Dashboard. */
+      attribution?: unknown;
       /** Coupon picked or typed at checkout (lib/coupons). Checked again here. */
       coupon_code?: string;
       workshop_id: string;
@@ -400,6 +403,7 @@ export async function POST(request: Request) {
         .bind(uuid(), bookingId, workshop_id, token, user.sub, from.name, from.phone, toName, toPhone)
         .run();
 
+      await saveAttribution(db, bookingId, attribution);
       const giftEnv = await getEnv();
       const giftSite = giftEnv.SITE_URL || 'http://localhost:3000';
       return NextResponse.json({
@@ -444,6 +448,7 @@ export async function POST(request: Request) {
         .prepare("UPDATE bookings SET application_json = COALESCE(?, application_json) WHERE id = ?")
         .bind(applicationJson, existing.id)
         .run();
+      await saveAttribution(db, existing.id, attribution);
       return NextResponse.json({ submitted: true, mode: 'selection', bookingId: existing.id });
     }
 
@@ -536,6 +541,7 @@ export async function POST(request: Request) {
         )
         .run();
     }
+    await saveAttribution(db, bookingId, attribution);
 
     // Selection apps + free direct bookings need no payment now.
     if (isSelection) {
