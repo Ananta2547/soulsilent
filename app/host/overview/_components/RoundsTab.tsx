@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { Analytics } from '@/lib/host-analytics';
-import { Card, DOW, Dropdown, Empty, HBars, Kpis, Stack100, baht, num } from './kit';
+import { Card, DOW, Dropdown, Empty, HBars, Kpis, Stack100, baht, num } from '@/components/dashboard/kit';
 
 type Act = Analytics['rounds']['activities'][number];
 const SORTS: [keyof Act, string][] = [

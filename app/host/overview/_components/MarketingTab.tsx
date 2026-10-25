@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import type { Analytics } from '@/lib/host-analytics';
 import { SOURCE_LABEL, type Source } from '@/lib/attribution';
-import { Card, Dropdown, Empty, HBars, I, PAL, Sheet, Stack100, baht, thDay } from './kit';
+import { Card, Dropdown, Empty, HBars, I, PAL, Sheet, Stack100, baht, thDay } from '@/components/dashboard/kit';
 
 type Link = Analytics['marketing']['links'][number];
 type Report = { id: string; period_from: string; period_to: string; activity_title: string | null; created_at: string; expires_at: string; live: number; revoked: number };

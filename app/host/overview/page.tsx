@@ -2,14 +2,14 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { Analytics } from '@/lib/host-analytics';
-import { Dropdown, I, thDay, useToast } from './_components/kit';
+import { Dropdown, I, thDay, useToast } from '@/components/dashboard/kit';
 import { OverviewTab } from './_components/OverviewTab';
 import { RoundsTab } from './_components/RoundsTab';
 import { PeopleTab } from './_components/PeopleTab';
 import { MoneyTab } from './_components/MoneyTab';
 import { FeedbackTab } from './_components/FeedbackTab';
 import { MarketingTab } from './_components/MarketingTab';
-import './dash.css';
+import '@/components/dashboard/dash.css';
 
 const TABS = [
   { key: 'overview', label: 'ภาพรวม' },

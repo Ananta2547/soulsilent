@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { Analytics } from '@/lib/host-analytics';
-import { Bars, Card, Dropdown, Empty, I, Rows, Seg, baht, downloadCsv, num, thDay, thMonth } from './kit';
+import { Bars, Card, Dropdown, Empty, I, Rows, Seg, baht, downloadCsv, num, thDay, thMonth } from '@/components/dashboard/kit';
 
 const DEDUCT = (t: string, v: number) => (t === 'percent' ? `${num(v)}%` : t === 'fixed' ? baht(v) : 'ไม่หัก');
 

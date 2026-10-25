@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { Analytics } from '@/lib/host-analytics';
-import { Bars, Card, I, Kpis, baht, deltaOf, num, thDay } from './kit';
+import { Bars, Card, I, Kpis, baht, deltaOf, num, thDay } from '@/components/dashboard/kit';
 
 const HIDDEN = 'hd_hidden_insights';
 

@@ -326,3 +326,21 @@
   .hx-funnel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hx-sheet { top: auto; right: 0; bottom: 0; left: 0; width: auto; max-width: none; max-height: 88vh; border-radius: 28px 28px 0 0; animation: hxSheetUp .35s cubic-bezier(.2,.7,.2,1) both; }
 }
+
+/* ---- Admin Insights: same pieces inside the admin shell (window scrolls,
+   main padding 40 / 24 / 16px, top bar 60px below 1024px) ---- */
+.hx.hx-admin .hx-tabs { top: 0; margin: 0 -40px; padding: 0 40px; }
+.hx-alerts { display: flex; flex-direction: column; gap: 8px; }
+.hx-alert { display: flex; align-items: center; gap: 10px; border-radius: 16px; padding: 12px 16px; font-size: 14px; font-weight: 500; text-decoration: none; color: inherit; }
+.hx-alert.bad { background: #fde4e1; color: #8a2216; }
+.hx-alert.warn { background: #fdf1d3; color: #6b4a00; }
+.hx-alert:hover { filter: brightness(.97); text-decoration: none; }
+.hx-alert span:last-child { margin-left: auto; opacity: .6; }
+.hx-pl { display: flex; flex-direction: column; }
+.hx-pl > div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(13,30,29,.06); font-size: 14px; }
+.hx-pl > div.sub { padding-left: 14px; color: var(--mu); font-size: 13.5px; }
+.hx-pl > div.total { border-bottom: 0; border-top: 2px solid var(--ink); font-weight: 700; font-size: 15px; }
+.hx-pl > div b { font-variant-numeric: tabular-nums; }
+.hx-pl .neg { color: #a3261a; }
+@media (max-width: 1023px) { .hx.hx-admin .hx-tabs { top: 60px; margin: 0 -24px; padding: 0 24px; } }
+@media (max-width: 759px) { .hx.hx-admin .hx-tabs { margin: 0 -16px; padding: 0 16px; } }

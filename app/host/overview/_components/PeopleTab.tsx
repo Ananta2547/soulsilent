@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { Analytics } from '@/lib/host-analytics';
-import { Bars, Card, Empty, FEW, HBars, Kpis, Rows, Seg, num, thDay, thMonth } from './kit';
+import { Bars, Card, Empty, FEW, HBars, Kpis, Rows, Seg, num, thDay, thMonth } from '@/components/dashboard/kit';
 
 type Win = 'd30' | 'd90' | 'd180' | 'all';
 const C = 2 * Math.PI * 50;

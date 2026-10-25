@@ -3,9 +3,9 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
-/* Shared pieces of the Host Dashboard v3 tabs (styles: ../dash.css, hx-*). */
+/* Shared pieces of the Host Dashboard v3 tabs (styles: ./dash.css, hx-*) — used by the Host Dashboard and Admin Insights. */
 
-export const baht = (n: number) => '฿' + Math.round(n).toLocaleString('th-TH');
+export const baht = (n: number) => (Math.round(n) < 0 ? '−฿' : '฿') + Math.abs(Math.round(n)).toLocaleString('th-TH');
 export const num = (n: number, d = 1) => n.toLocaleString('th-TH', { maximumFractionDigits: d });
 export const FEW = 'ข้อมูลยังน้อย';
 const MONTH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];

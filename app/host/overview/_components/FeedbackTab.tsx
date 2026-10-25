@@ -1,7 +1,7 @@
 'use client';
 
 import type { Analytics } from '@/lib/host-analytics';
-import { Card, Empty, FEW, HBars, num, stars, thDay } from './kit';
+import { Card, Empty, FEW, HBars, num, stars, thDay } from '@/components/dashboard/kit';
 
 /** After-activity surveys (AAR) and reviews. Seen only by you — never used to
  *  rank hosts. */
