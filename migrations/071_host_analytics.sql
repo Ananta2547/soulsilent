@@ -62,7 +62,9 @@ CREATE TABLE IF NOT EXISTS activity_impressions (
 CREATE TABLE IF NOT EXISTS host_links (
   id TEXT PRIMARY KEY,
   host_id TEXT NOT NULL,
-  workshop_id TEXT,
+  -- what the link opens: m:<master id> (activity page), w:<workshop id>
+  -- (one standalone activity), or NULL (the host's profile)
+  target TEXT,
   label TEXT,
   utm_source TEXT,
   utm_medium TEXT,

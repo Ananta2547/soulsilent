@@ -23,9 +23,18 @@ import { usePathname } from 'next/navigation';
  */
 type NavItem = { href: string; label: string; icon: React.ReactNode };
 
-// Workshops lead: they are what a teacher opens the dashboard to work on. The
-// money and the feedback are things they check *about* those workshops.
+// The dashboard leads: it answers what to do today, what money is coming and
+// whether things are growing (slide deck 10); the workshops follow.
 const NAV: NavItem[] = [
+  {
+    href: '/host/overview',
+    label: 'แดชบอร์ด',
+    icon: (
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 19V9m5 10V5m5 14v-7m5 7V8" />
+      </svg>
+    ),
+  },
   {
     href: '/host/journeys',
     label: 'กิจกรรมเดี่ยว',
@@ -47,15 +56,6 @@ const NAV: NavItem[] = [
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <rect x="3.5" y="5" width="17" height="15" rx="2" strokeWidth={1.5} />
         <path strokeLinecap="round" strokeWidth={1.5} d="M8 3v4M16 3v4M3.5 10h17M12 13v4M10 15h4" />
-      </svg>
-    ),
-  },
-  {
-    href: '/host/overview',
-    label: 'ภาพรวม / รายได้',
-    icon: (
-      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 19V9m5 10V5m5 14v-7m5 7V8" />
       </svg>
     ),
   },
