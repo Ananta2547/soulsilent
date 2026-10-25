@@ -105,32 +105,41 @@ export async function loadGp(db: D1Database, hostIds: (string | null | undefined
   const ctx: GpContext = { hosts: new Map(), months: new Map(), sales: new Map() };
   const ids = [...new Set(hostIds.filter((x): x is string => !!x))];
   const curMonth = thaiMonth(now);
+  if (!ids.length) return ctx;
+  // Three queries for all the hosts together (a page may load every host,
+  // and a Worker request has a cap on how many queries it may make).
+  const list = JSON.stringify(ids);
+  const IN = `(SELECT value FROM json_each(?1))`;
+  const [factRows, salesRows, monthRows] = await Promise.all([
+    db
+      .prepare(
+        `SELECT w.instructor_id AS host, MIN(w.created_at) AS round_start FROM workshops w JOIN workshop_masters m ON m.id = w.master_id
+          WHERE w.instructor_id IN ${IN} AND m.kind = 'round' AND w.status != 'cancelled' GROUP BY w.instructor_id`,
+      )
+      .bind(list)
+      .all<{ host: string; round_start: string | null }>(),
+    db
+      .prepare(
+        `SELECT w.instructor_id AS host, strftime('%Y-%m', datetime(b.paid_at, '+7 hours')) AS m,
+                CASE WHEN mm.kind = 'round' THEN 'round' ELSE 'single' END AS k,
+                SUM(b.amount + COALESCE(b.host_credit, 0)) AS s
+           FROM bookings b JOIN workshops w ON w.id = b.workshop_id LEFT JOIN workshop_masters mm ON mm.id = w.master_id
+          WHERE w.instructor_id IN ${IN} AND b.paid_at IS NOT NULL AND b.status != 'cancelled'
+            AND COALESCE(w.payment_type, 'paid') NOT IN ('free', 'deposit')
+          GROUP BY w.instructor_id, m, k`,
+      )
+      .bind(list)
+      .all<{ host: string; m: string; k: GpKind; s: number }>(),
+    db
+      .prepare(`SELECT host_id AS host, month, kind, prev_sales, rate FROM gp_months WHERE host_id IN ${IN}`)
+      .bind(list)
+      .all<{ host: string; month: string; kind: GpKind; prev_sales: number; rate: number }>(),
+  ]);
+  const inserts: D1PreparedStatement[] = [];
   for (const host of ids) {
-    const [facts, sales, rows] = await Promise.all([
-      db
-        .prepare(
-          `SELECT MIN(w.created_at) AS round_start FROM workshops w JOIN workshop_masters m ON m.id = w.master_id
-            WHERE w.instructor_id = ? AND m.kind = 'round' AND w.status != 'cancelled'`,
-        )
-        .bind(host)
-        .first<{ round_start: string | null }>(),
-      db
-        .prepare(
-          `SELECT strftime('%Y-%m', datetime(b.paid_at, '+7 hours')) AS m,
-                  CASE WHEN mm.kind = 'round' THEN 'round' ELSE 'single' END AS k,
-                  SUM(b.amount + COALESCE(b.host_credit, 0)) AS s
-             FROM bookings b JOIN workshops w ON w.id = b.workshop_id LEFT JOIN workshop_masters mm ON mm.id = w.master_id
-            WHERE w.instructor_id = ? AND b.paid_at IS NOT NULL AND b.status != 'cancelled'
-              AND COALESCE(w.payment_type, 'paid') NOT IN ('free', 'deposit')
-            GROUP BY m, k`,
-        )
-        .bind(host)
-        .all<{ m: string; k: GpKind; s: number }>(),
-      db
-        .prepare('SELECT month, kind, prev_sales, rate FROM gp_months WHERE host_id = ?')
-        .bind(host)
-        .all<{ month: string; kind: GpKind; prev_sales: number; rate: number }>(),
-    ]);
+    const facts = (factRows.results || []).find((f) => f.host === host);
+    const sales = { results: (salesRows.results || []).filter((s) => s.host === host) };
+    const rows = { results: (monthRows.results || []).filter((r) => r.host === host) };
     const roundStart = facts?.round_start ? utcMs(facts.round_start) : null;
     let zeroUntil = 0;
     if (roundStart) {
@@ -146,7 +155,6 @@ export async function loadGp(db: D1Database, hostIds: (string | null | undefined
 
     // Freeze every month from 2570 up to this one that has no row yet.
     if (now >= GP_START_MS) {
-      const inserts: D1PreparedStatement[] = [];
       for (let ym = thaiMonth(GP_START_MS); ym <= curMonth; ym = nextMonth(ym)) {
         for (const kind of ['single', 'round'] as GpKind[]) {
           const key = `${host}|${ym}|${kind}`;
@@ -157,9 +165,9 @@ export async function loadGp(db: D1Database, hostIds: (string | null | undefined
           inserts.push(db.prepare('INSERT OR IGNORE INTO gp_months (host_id, month, kind, prev_sales, rate) VALUES (?, ?, ?, ?, ?)').bind(host, ym, kind, prevSales, rate));
         }
       }
-      if (inserts.length) await db.batch(inserts);
     }
   }
+  if (inserts.length) await db.batch(inserts);
   return ctx;
 }
 

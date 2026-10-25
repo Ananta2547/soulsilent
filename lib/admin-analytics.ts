@@ -207,7 +207,11 @@ export type AdminAnalytics = ReturnType<typeof computeAdminAnalytics>;
 export function computeAdminAnalytics(d: AdminData, r: Range, now = Date.now()) {
   const wsById = new Map(d.ws.map((w) => [w.id, w]));
   const bkByWs = new Map<string, BK[]>();
-  for (const b of d.bk) bkByWs.set(b.workshop_id, [...(bkByWs.get(b.workshop_id) || []), b]);
+  for (const b of d.bk) {
+    const list = bkByWs.get(b.workshop_id);
+    if (list) list.push(b);
+    else bkByWs.set(b.workshop_id, [b]);
+  }
   const inWin = (ms: number) => ms >= r.fromMs && ms < r.toMs;
   const inPrev = (ms: number) => ms >= r.prevFromMs && ms < r.prevToMs;
   const soldIn = (w: WS) => Math.min(w.max_participants, (bkByWs.get(w.id) || []).filter(isLive).reduce((a, b) => a + seatsOf(b, w.max_participants), 0));
@@ -289,7 +293,9 @@ export function computeAdminAnalytics(d: AdminData, r: Range, now = Date.now()) 
     if (e.refund || e.b.parent_booking_id || !e.b.user_id) continue;
     const u = e.b.user_id;
     if (!firstBuy.has(u) || e.at < firstBuy.get(u)!) firstBuy.set(u, e.at);
-    buyTimes.set(u, [...(buyTimes.get(u) || []), e.at]);
+    const ts = buyTimes.get(u);
+    if (ts) ts.push(e.at);
+    else buyTimes.set(u, [e.at]);
   }
   buyTimes.forEach((v) => v.sort((a, b) => a - b));
   const buyersIn = (test: (ms: number) => boolean) => new Set(events.filter((e) => !e.refund && !e.b.parent_booking_id && e.b.user_id && test(e.at)).map((e) => e.b.user_id as string));
@@ -395,7 +401,11 @@ export function computeAdminAnalytics(d: AdminData, r: Range, now = Date.now()) 
   /* ---- hosts ---- */
   const hostIds = [...new Set(d.ws.map((w) => w.instructor_id).filter((x): x is string => !!x))];
   const respByWs = new Map<string, number[]>();
-  for (const x of d.responses) respByWs.set(x.workshop_id, [...(respByWs.get(x.workshop_id) || []), x.rating]);
+  for (const x of d.responses) {
+    const list = respByWs.get(x.workshop_id);
+    if (list) list.push(x.rating);
+    else respByWs.set(x.workshop_id, [x.rating]);
+  }
   const hosts = hostIds.map((id) => {
     const mine = d.ws.filter((w) => w.instructor_id === id);
     const ids = new Set(mine.map((w) => w.id));
