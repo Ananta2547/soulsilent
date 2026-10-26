@@ -4,24 +4,55 @@ import Link from 'next/link';
 import type { AdminAnalytics } from '@/lib/admin-analytics';
 import { Bars, Card, Empty, Kpis, Rows, baht, deltaOf, num, thDay } from '@/components/dashboard/kit';
 
+const URGENT_LABEL: Record<string, string> = {
+  refund_request: 'ผู้จองขอคืนเงิน รอดำเนินการ',
+  refund_round: 'ค้างคืนเงินจากรอบที่ยกเลิก',
+  payout: 'ค้างโอนให้ผู้จัดเกิน 7 วัน',
+  orphan: 'เงินเข้าผิดปกติ (ชำระซ้ำ / หลังยกเลิก)',
+  round_cancelled: 'รอบที่ยกเลิกแล้วยังคืนเงินไม่ครบ',
+  identity: 'ผู้ใช้แก้ชื่อ / วันเกิดเกิน 3 ครั้งใน 12 เดือน',
+  beam: 'ยังไม่ได้ตั้งอัตราค่าธรรมเนียม Beam — รายได้สุทธิยังไม่หักค่า Beam',
+};
+
 /** The front page: what needs doing, the platform's own money beside what it
  *  owes hosts, the headline figures, and who and what sells most. */
 export function OverviewTab({ a, periodLabel, onTab, onSettings }: { a: AdminAnalytics; periodLabel: string; onTab: (t: string) => void; onSettings: () => void }) {
   const o = a.overview;
   const c = o.cards;
   const netDelta = deltaOf(c.platformNet.cur, c.platformNet.prev, 'pct');
+  // Urgent alerts, one line per kind; the full list is on the alerts tab.
+  const byType = new Map<string, [string, number, string]>();
+  for (const x of a.alerts.open) {
+    if (x.tone !== 'bad' && x.type !== 'beam') continue;
+    const cur = byType.get(x.type);
+    byType.set(x.type, [x.type, (cur?.[1] || 0) + 1, x.tone]);
+  }
+  const urgent = [...byType.values()];
 
   return (
     <div className="hx-stack">
-      {o.alerts.length > 0 && (
+      {urgent.length > 0 && (
         <div className="hx-alerts" role="status">
-          {o.alerts.map((x) => (
-            <Link key={x.text} href={x.href} className={`hx-alert ${x.tone}`} onClick={x.href.includes('settings=1') ? (e) => (e.preventDefault(), onSettings()) : undefined}>
-              <span aria-hidden>{x.tone === 'bad' ? '⚠' : '•'}</span>
-              <span>{x.text}</span>
+          {urgent.map(([type, n, tone]) => (
+            <button
+              key={type}
+              type="button"
+              className={`hx-alert ${tone}`}
+              style={{ border: 0, width: '100%', textAlign: 'left', font: 'inherit', cursor: 'pointer' }}
+              onClick={() => (type === 'beam' ? onSettings() : onTab('alerts'))}
+            >
+              <span aria-hidden>{tone === 'bad' ? '⚠' : '•'}</span>
+              <span>
+                {URGENT_LABEL[type] || type} {type === 'beam' ? '' : `${n} รายการ`}
+              </span>
               <span aria-hidden>›</span>
-            </Link>
+            </button>
           ))}
+          {a.alerts.counts.total > urgent.reduce((s, [, n]) => s + n, 0) && (
+            <button type="button" className="hx-link-btn" onClick={() => onTab('alerts')}>
+              ดูแจ้งเตือนทั้งหมด {a.alerts.counts.total} รายการ ›
+            </button>
+          )}
         </div>
       )}
 

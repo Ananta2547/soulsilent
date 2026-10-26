@@ -9,10 +9,12 @@ import { HostsTab } from './_components/HostsTab';
 import { PeopleTab } from './_components/PeopleTab';
 import { ActivitiesTab } from './_components/ActivitiesTab';
 import { QualityTab } from './_components/QualityTab';
+import { AlertsTab } from './_components/AlertsTab';
 import '@/components/dashboard/dash.css';
 
 const TABS = [
   { key: 'overview', label: 'ภาพรวม' },
+  { key: 'alerts', label: 'แจ้งเตือน' },
   { key: 'money', label: 'การเงิน' },
   { key: 'hosts', label: 'ผู้จัด' },
   { key: 'people', label: 'ผู้เข้าร่วม' },
@@ -138,6 +140,7 @@ export default function AdminInsightsPage() {
           {TABS.map((t) => (
             <button key={t.key} type="button" className={`hx-tab${tab === t.key ? ' on' : ''}`} aria-current={tab === t.key ? 'page' : undefined} onClick={() => go(t.key)}>
               {t.label}
+              {t.key === 'alerts' && !!data?.alerts.counts.bad && <span className="n">{data.alerts.counts.bad}</span>}
             </button>
           ))}
         </nav>
@@ -161,6 +164,8 @@ export default function AdminInsightsPage() {
         </div>
       ) : tab === 'overview' ? (
         <OverviewTab a={data} periodLabel={periodLabel} onTab={go} onSettings={() => setSettingsOpen(true)} />
+      ) : tab === 'alerts' ? (
+        <AlertsTab a={data} onChanged={load} say={say} />
       ) : tab === 'money' ? (
         <MoneyTab a={data} say={say} />
       ) : tab === 'hosts' ? (

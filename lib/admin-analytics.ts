@@ -48,6 +48,7 @@ type WS = {
   payout_deduction_type: 'none' | 'fixed' | 'percent' | null;
   payout_deduction_value: number | null;
   payout_status: string | null;
+  updated_at: string | null;
 };
 type BK = {
   id: string;
@@ -73,20 +74,27 @@ type BK = {
   coupon_id: string | null;
   discount_amount: number | null;
   host_discount: number | null;
+  moved_from: string | null;
+  has_slip: number | null;
 };
 type TX = { id: string; doc_no: string; kind: string; status: string; gross: number; net: number; occurred_at: string; booking_id: string | null; workshop_id: string | null; category_id: string | null; payee_email: string | null; emailed_at: string | null };
 
 export type AdminData = {
   ws: WS[];
   bk: BK[];
-  users: { id: string; created_at: string; dob: string | null }[];
+  users: { id: string; created_at: string; dob: string | null; name?: string | null; email_verified?: number | null; account_status?: string | null }[];
+  /** Own name / date-of-birth changes in the last 12 months (migration 075). */
+  identity: { user_id: string; field: string; old_value: string | null; new_value: string | null; created_at: string }[];
+  /** Alerts admin marked as seen (migration 075). */
+  acks: { alert_key: string; by_name: string | null; note: string | null; acked_at: string }[];
+  orphanRows: { id: string; amount: number; reason: string; email: string | null; created_at: string }[];
   tx: TX[];
   categories: { id: string; name: string }[];
   coupons: { id: string; name: string }[];
   views: { day: string; n: number }[];
   impressions: { day: string; n: number }[];
-  responses: { workshop_id: string; rating: number; comment: string | null; created_at: string }[];
-  reviews: { workshop_id: string; rating: number; comment: string | null; created_at: string }[];
+  responses: { id?: string; workshop_id: string; rating: number; comment: string | null; created_at: string }[];
+  reviews: { id?: string; workshop_id: string; rating: number; comment: string | null; created_at: string }[];
   orphans: { n: number; amount: number };
   app: { day: string; metric: string; n: number }[];
   pushSubs: number;
@@ -98,33 +106,46 @@ const rows = <T>(db: D1Database, sql: string) => db.prepare(sql).all<T>().then((
 
 /** Everything Admin Insights needs, in one round of queries. */
 export async function loadAdminData(db: D1Database): Promise<AdminData> {
-  const [ws, bk, users, tx, categories, coupons, views, impressions, responses, reviews, orphans, app, push, settings] = await Promise.all([
+  // Tables from migration 075 may not exist yet on a database that has not run it.
+  const maybe = <T>(sql: string) => rows<T>(db, sql).catch(() => [] as T[]);
+  const [ws, bk, users, tx, categories, coupons, views, impressions, responses, reviews, orphans, app, push, settings, identity, acks, orphanRows] = await Promise.all([
     rows<WS>(
       db,
       `SELECT w.id, w.title, w.instructor_id, COALESCE(NULLIF(TRIM(u.nickname), ''), u.name) AS host_name, w.fee_mode, w.master_id, m.title AS master_title,
               m.kind AS master_kind, w.category, w.is_online, w.date, w.end_date, w.time_start, w.time_end, w.max_participants, w.status, w.price,
-              w.payment_type, w.created_at, w.payout_deduction_type, w.payout_deduction_value, w.payout_status
+              w.payment_type, w.created_at, w.payout_deduction_type, w.payout_deduction_value, w.payout_status, w.updated_at
          FROM workshops w LEFT JOIN workshop_masters m ON m.id = w.master_id LEFT JOIN users u ON u.id = w.instructor_id`,
     ),
     rows<BK>(
       db,
       `SELECT id, workshop_id, user_id, status, payment_status, amount, host_credit, group_size, booking_kind, parent_booking_id, attended,
               attendance_json, created_at, paid_at, cancel_reason, source, utm_campaign, app_status, beam_charge_id, beam_qr_charge_id,
-              coupon_id, discount_amount, host_discount
+              coupon_id, discount_amount, host_discount, moved_from,
+              CASE WHEN COALESCE(refund_slip_url, '') != '' THEN 1 ELSE 0 END AS has_slip
          FROM bookings`,
     ),
-    rows<AdminData['users'][number]>(db, `SELECT id, created_at, date_of_birth AS dob FROM users WHERE deleted_at IS NULL`),
+    rows<AdminData['users'][number]>(
+      db,
+      `SELECT id, created_at, date_of_birth AS dob, COALESCE(NULLIF(TRIM(nickname), ''), name) AS name, email_verified, account_status FROM users WHERE deleted_at IS NULL`,
+    ),
     rows<TX>(db, `SELECT id, doc_no, kind, status, gross, net, occurred_at, booking_id, workshop_id, category_id, payee_email, emailed_at FROM money_tx WHERE status = 'done'`),
     rows<{ id: string; name: string }>(db, `SELECT id, name FROM expense_categories`),
     rows<{ id: string; name: string }>(db, `SELECT id, name FROM coupons`),
     rows<{ day: string; n: number }>(db, `SELECT day, COUNT(*) AS n FROM activity_views GROUP BY day`),
     rows<{ day: string; n: number }>(db, `SELECT day, SUM(n) AS n FROM activity_impressions GROUP BY day`),
-    rows<AdminData['responses'][number]>(db, `SELECT workshop_id, rating, comment, created_at FROM survey_responses`),
-    rows<AdminData['reviews'][number]>(db, `SELECT workshop_id, rating, comment, created_at FROM reviews`),
+    rows<AdminData['responses'][number]>(db, `SELECT id, workshop_id, rating, comment, created_at FROM survey_responses`),
+    rows<AdminData['reviews'][number]>(db, `SELECT id, workshop_id, rating, comment, created_at FROM reviews`),
     db.prepare(`SELECT COUNT(*) AS n, COALESCE(SUM(amount), 0) AS amount FROM orphan_payments WHERE resolved = 0`).first<{ n: number; amount: number }>(),
     rows<{ day: string; metric: string; n: number }>(db, `SELECT day, metric, n FROM app_stats`),
     db.prepare(`SELECT COUNT(*) AS n FROM push_subscriptions`).first<{ n: number }>(),
     rows<{ key: string; value: string }>(db, `SELECT key, value FROM admin_settings WHERE key IN ('beam_fee_qr', 'beam_fee_card')`),
+    maybe<AdminData['identity'][number]>(
+      `SELECT user_id, field, old_value, new_value, created_at FROM identity_changes WHERE created_at >= datetime('now', '-365 days') ORDER BY created_at`,
+    ),
+    maybe<AdminData['acks'][number]>(
+      `SELECT a.alert_key, COALESCE(NULLIF(TRIM(u.nickname), ''), u.name) AS by_name, a.note, a.acked_at FROM admin_alert_acks a LEFT JOIN users u ON u.id = a.acked_by ORDER BY a.acked_at DESC`,
+    ),
+    rows<AdminData['orphanRows'][number]>(db, `SELECT id, amount, reason, email, created_at FROM orphan_payments WHERE resolved = 0 ORDER BY created_at DESC`),
   ]);
   const setting = (k: string) => {
     const v = settings.find((s) => s.key === k)?.value;
@@ -142,6 +163,9 @@ export async function loadAdminData(db: D1Database): Promise<AdminData> {
     responses,
     reviews,
     orphans: { n: orphans?.n || 0, amount: (orphans?.amount || 0) / 100 },
+    identity,
+    acks,
+    orphanRows,
     app,
     pushSubs: push?.n || 0,
     beam: { qr: setting('beam_fee_qr'), card: setting('beam_fee_card') },
@@ -330,9 +354,17 @@ export function computeAdminAnalytics(d: AdminData, r: Range, now = Date.now()) 
     return { label: a.label, n: xs.length, amount: sum(xs, (x) => x.net) };
   });
 
-  // Seats given back that have no refund recorded yet.
+  // Seats given back that still wait for their money — the same rule as the
+  // refund queue on /admin/payments (api/admin/refunds).
+  const isPendingRefund = (b: BK) =>
+    b.status === 'cancelled' &&
+    b.payment_status === 'paid' &&
+    (Number(b.amount) || 0) > 0 &&
+    (b.cancel_reason === 'workshop_changed' || b.cancel_reason === 'refund_requested') &&
+    !b.has_slip &&
+    !refundAt.has(b.id);
   const pendingRefunds = d.bk
-    .filter((b) => b.status === 'cancelled' && wasCollected(b) && (Number(b.amount) || 0) > 0 && b.payment_status !== 'refunded' && !refundAt.has(b.id))
+    .filter(isPendingRefund)
     .map((b) => ({ id: b.id, title: wsById.get(b.workshop_id)?.title || '—', amount: Number(b.amount) || 0, since: thaiDay(utcMs(b.paid_at)) }));
 
   // Beam payments the ledger has no row for, and payout vouchers not emailed.
@@ -559,19 +591,14 @@ export function computeAdminAnalytics(d: AdminData, r: Range, now = Date.now()) 
     return { day, install: at('install'), open: at('open') };
   });
 
-  /* ---- alerts for the front page ---- */
-  const alerts: { text: string; href: string; tone: 'bad' | 'warn' }[] = [];
-  const overdue = owed.filter((o) => o.days > 7);
-  if (overdue.length) alerts.push({ tone: 'bad', text: `ค้างโอนให้ผู้จัดเกิน 7 วัน ${overdue.length} รอบ รวม ฿${Math.round(sum(overdue, (o) => o.net)).toLocaleString('th-TH')}`, href: '/admin/ledger' });
-  if (pendingRefunds.length) alerts.push({ tone: 'bad', text: `การจองที่ยกเลิกแล้วแต่ยังไม่บันทึกการคืนเงิน ${pendingRefunds.length} รายการ`, href: '/admin/ledger' });
-  if (d.orphans.n) alerts.push({ tone: 'warn', text: `เงินเข้าที่ยังไม่ได้ตรวจ ${d.orphans.n} รายการ`, href: '/admin/payments' });
-  if (ledgerGaps) alerts.push({ tone: 'warn', text: `การชำระผ่าน Beam ที่ยังไม่มีในบัญชีการเงิน ${ledgerGaps} รายการ`, href: '/admin/ledger' });
-  if (d.beam.qr == null || d.beam.card == null) alerts.push({ tone: 'warn', text: 'ยังไม่ได้ตั้งอัตราค่าธรรมเนียม Beam — รายได้สุทธิยังไม่หักค่า Beam', href: '/admin/insights?tab=money&settings=1' });
+  /* ---- alerts: things a person should look at now (not tied to the window) ---- */
+  const alerts = computeAlerts({ d, now, wsById, bkByWs, refundAt, ledgerPaid, owed, isPendingRefund, hosts, soldIn });
 
   const owedTotal = sum(owed, (o) => o.net);
   return {
     range: { from: r.from, to: r.to, days: r.days },
     beam: d.beam,
+    alerts,
     overview: {
       cards: {
         sales: { cur: cur.sales, prev: prev.sales },
@@ -585,7 +612,6 @@ export function computeAdminAnalytics(d: AdminData, r: Range, now = Date.now()) 
       },
       cur,
       weekly,
-      alerts,
       owedTotal,
       topHosts: hostsSorted.filter((h) => h.sales > 0).slice(0, 5).map((h) => ({ id: h.id, name: h.name, sales: h.sales, platformNet: h.platformNet })),
       topActivities: activities.slice(0, 5),
@@ -664,5 +690,262 @@ export function computeAdminAnalytics(d: AdminData, r: Range, now = Date.now()) 
         appDaily,
       },
     },
+  };
+}
+
+/* ---------------- alerts ---------------- */
+
+export type AlertGroup = 'money' | 'rounds' | 'users' | 'quality';
+export type AlertTone = 'bad' | 'warn' | 'info';
+/** One thing to look at. `key` names the alert and the state it is in, so an
+ *  acknowledged alert comes back when that state moves on. */
+export type AdminAlert = { key: string; type: string; group: AlertGroup; tone: AlertTone; title: string; detail: string; href: string; day: string | null };
+
+/** Changes to own name / date of birth in 12 months that raise an alert. */
+export const IDENTITY_CHANGE_LIMIT = 3;
+const TONE_ORDER: Record<AlertTone, number> = { bad: 0, warn: 1, info: 2 };
+const ORPHAN_REASON: Record<string, string> = { duplicate: 'ชำระซ้ำ', late_cancelled: 'ชำระหลังยกเลิก', unknown: 'ไม่พบการจองที่ตรงกัน' };
+
+function computeAlerts(x: {
+  d: AdminData;
+  now: number;
+  wsById: Map<string, WS>;
+  bkByWs: Map<string, BK[]>;
+  refundAt: Map<string, number>;
+  ledgerPaid: Set<string>;
+  owed: { id: string; title: string; host: string; hostId: string | null; date: string; net: number; days: number }[];
+  isPendingRefund: (b: BK) => boolean;
+  hosts: { id: string; name: string; atRisk: boolean; lastRound: string | null }[];
+  soldIn: (w: WS) => number;
+}) {
+  const { d, now, wsById, bkByWs, refundAt, ledgerPaid, owed, isPendingRefund, hosts, soldIn } = x;
+  const items: AdminAlert[] = [];
+  const add = (a: AdminAlert) => items.push(a);
+  const userName = new Map(d.users.map((u) => [u.id, u.name || '—']));
+  const nameOf = (id: string | null) => (id ? userName.get(id) || '—' : '—');
+  const baht = (n: number) => '฿' + Math.round(n).toLocaleString('th-TH');
+  const daysSince = (ms: number) => Math.max(0, Math.floor((now - ms) / DAY));
+  const when = (w: WS) => `${Number(w.date.slice(8, 10))}/${Number(w.date.slice(5, 7))} ${w.time_start || ''}`.trim();
+
+  /* money */
+  for (const b of d.bk) {
+    if (!isPendingRefund(b)) continue;
+    const w = wsById.get(b.workshop_id);
+    const days = daysSince(utcMs(b.paid_at));
+    add({
+      key: `refund:${b.id}`,
+      type: b.cancel_reason === 'refund_requested' ? 'refund_request' : 'refund_round',
+      group: 'money',
+      tone: 'bad',
+      title: `${b.cancel_reason === 'refund_requested' ? 'ขอคืนเงิน' : 'คืนเงินจากรอบที่ยกเลิก'} · ${w?.title || '—'}`,
+      detail: `${nameOf(b.user_id)} · ${baht(Number(b.amount) || 0)} · ชำระเมื่อ ${days} วันก่อน`,
+      href: '/admin/payments',
+      day: thaiDay(utcMs(b.paid_at)),
+    });
+  }
+  for (const o of owed) {
+    if (o.days <= 7) continue;
+    add({ key: `payout:${o.id}`, type: 'payout', group: 'money', tone: 'bad', title: `ค้างโอนผู้จัด · ${o.title}`, detail: `${o.host} · ${baht(o.net)} · จบมา ${o.days} วัน`, href: '/admin/ledger', day: o.date });
+  }
+  for (const r of d.orphanRows) {
+    add({
+      key: `orphan:${r.id}`,
+      type: 'orphan',
+      group: 'money',
+      tone: 'bad',
+      title: `เงินเข้าผิดปกติ · ${ORPHAN_REASON[r.reason] || r.reason}`,
+      detail: `${baht((Number(r.amount) || 0) / 100)}${r.email ? ` · ${r.email}` : ''}`,
+      href: '/admin/payments',
+      day: thaiDay(utcMs(r.created_at)),
+    });
+  }
+  for (const t of d.tx) {
+    if ((t.kind !== 'host_payout' && t.kind !== 'refund') || !t.payee_email || t.emailed_at) continue;
+    add({
+      key: `voucher:${t.id}`,
+      type: 'voucher',
+      group: 'money',
+      tone: 'warn',
+      title: `ใบสำคัญจ่ายยังไม่ได้ส่งอีเมล · ${t.doc_no}`,
+      detail: `${t.kind === 'refund' ? 'คืนเงินผู้จอง' : 'โอนผู้จัด'} · ${baht(t.net)} · ${t.payee_email}`,
+      href: '/admin/ledger',
+      day: t.occurred_at.slice(0, 10),
+    });
+  }
+  // One alert for all of them: the fix ("ดึงรายการเก่า" on the ledger) covers every one at once.
+  const gaps = d.bk.filter((b) => (b.beam_charge_id || b.beam_qr_charge_id) && wasCollected(b) && Number(b.amount) > 0 && !ledgerPaid.has(b.id));
+  if (gaps.length) {
+    add({
+      key: `ledger:${gaps.length}`,
+      type: 'ledger',
+      group: 'money',
+      tone: 'warn',
+      title: `ชำระผ่าน Beam แต่ยังไม่มีในบัญชีการเงิน ${gaps.length} รายการ`,
+      detail: `รวม ${baht(gaps.reduce((s, b) => s + (Number(b.amount) || 0), 0))} · กด "ดึงรายการเก่า" ที่หน้าบัญชีการเงิน`,
+      href: '/admin/ledger',
+      day: null,
+    });
+  }
+  if (d.beam.qr == null || d.beam.card == null) {
+    add({ key: 'beam-unset', type: 'beam', group: 'money', tone: 'warn', title: 'ยังไม่ได้ตั้งอัตราค่าธรรมเนียม Beam', detail: 'รายได้สุทธิและกำไรยังไม่หักค่า Beam', href: '/admin/insights?tab=money&settings=1', day: null });
+  }
+
+  /* rounds */
+  for (const w of d.ws) {
+    const list = bkByWs.get(w.id) || [];
+    const start = wsStart(w);
+    const end = wsEnd(w);
+    if (w.status === 'cancelled') {
+      const had = list.filter((b) => wasCollected(b) && !b.parent_booking_id);
+      const moved = d.bk.filter((b) => b.moved_from === w.id).length;
+      if (!had.length && !moved) continue;
+      const pending = had.filter(isPendingRefund).length;
+      const refunded = had.filter((b) => (Number(b.amount) || 0) > 0 && (b.payment_status === 'refunded' || refundAt.has(b.id) || b.has_slip)).length;
+      const cancelledAt = utcMs(w.updated_at);
+      if (!pending && cancelledAt < now - 14 * DAY) continue;
+      add({
+        key: `cancelled:${w.id}:${pending ? 'open' : 'done'}`,
+        type: 'round_cancelled',
+        group: 'rounds',
+        tone: pending ? 'bad' : 'info',
+        title: `รอบถูกยกเลิก · ${w.title} (${when(w)})`,
+        detail: `${w.host_name || '—'} · มีผู้จอง ${had.length + moved} คน · ย้ายรอบ ${moved} · คืนเงินแล้ว ${refunded}${pending ? ` · ค้างคืน ${pending}` : ''}`,
+        href: pending ? '/admin/payments' : '/admin/workshops',
+        day: w.updated_at ? thaiDay(cancelledAt) : w.date,
+      });
+      continue;
+    }
+    const live = list.filter((b) => isLive(b) && !b.parent_booking_id);
+    if (end < now - 2 * 3600000 && end > now - 14 * DAY && live.length && !list.some(checkedIn)) {
+      add({ key: `nocheckin:${w.id}`, type: 'no_checkin', group: 'rounds', tone: 'warn', title: `จบแล้วแต่ยังไม่เช็คชื่อ · ${w.title} (${when(w)})`, detail: `${w.host_name || '—'} · ${live.length} การจอง`, href: '/admin/workshops', day: w.date });
+    }
+    if (start <= now) continue;
+    const sold = soldIn(w);
+    const cap = w.max_participants || 0;
+    const waiting = list.filter((b) => b.app_status === 'waitlisted' && b.status !== 'cancelled').length;
+    if (start < now + 3 * DAY && cap > 0 && sold / cap < 0.5) {
+      add({ key: `lowfill:${w.id}`, type: 'low_fill', group: 'rounds', tone: 'info', title: `ใกล้ถึงแต่ยังว่างเกินครึ่ง · ${w.title} (${when(w)})`, detail: `${w.host_name || '—'} · ขาย ${sold}/${cap} ที่`, href: '/admin/workshops', day: w.date });
+    }
+    if (waiting && sold < cap) {
+      add({ key: `waitfree:${w.id}`, type: 'wait_free', group: 'rounds', tone: 'warn', title: `มีที่ว่างแต่ยังมีคนรอสำรอง · ${w.title} (${when(w)})`, detail: `${w.host_name || '—'} · ว่าง ${cap - sold} ที่ · รอสำรอง ${waiting} คน`, href: '/admin/workshops', day: w.date });
+    } else if (waiting >= 3 && sold >= cap) {
+      add({ key: `waitfull:${w.id}`, type: 'wait_full', group: 'rounds', tone: 'info', title: `เต็มแล้ว คนรอสำรองเยอะ — น่าเปิดรอบเพิ่ม · ${w.title}`, detail: `${w.host_name || '—'} · รอสำรอง ${waiting} คน`, href: '/admin/workshops', day: w.date });
+    }
+  }
+
+  /* users */
+  const changes = new Map<string, AdminData['identity']>();
+  for (const c of d.identity) {
+    const l = changes.get(c.user_id);
+    if (l) l.push(c);
+    else changes.set(c.user_id, [c]);
+  }
+  for (const [uid, list] of changes) {
+    if (list.length <= IDENTITY_CHANGE_LIMIT) continue;
+    const names = list.filter((c) => c.field === 'name').length;
+    const dobs = list.length - names;
+    const last = list[list.length - 1];
+    add({
+      key: `identity:${uid}:${list.length}`,
+      type: 'identity',
+      group: 'users',
+      tone: 'bad',
+      title: `แก้ชื่อ / วันเกิด ${list.length} ครั้งใน 12 เดือน · ${nameOf(uid)}`,
+      detail: `ชื่อ ${names} ครั้ง · วันเกิด ${dobs} ครั้ง · ล่าสุด ${last.field === 'name' ? 'ชื่อ' : 'วันเกิด'}: ${last.old_value || '—'} → ${last.new_value || '—'}`,
+      href: '/admin/users',
+      day: thaiDay(utcMs(last.created_at)),
+    });
+  }
+  const paidUsers = new Set(d.bk.filter((b) => wasCollected(b) && Number(b.amount) > 0 && b.user_id).map((b) => b.user_id as string));
+  for (const u of d.users) {
+    if (u.account_status === 'pending_deletion') {
+      add({ key: `deletion:${u.id}`, type: 'deletion', group: 'users', tone: 'info', title: `ขอลบบัญชี · ${u.name || '—'}`, detail: 'ลบถาวรเมื่อครบ 30 วันหลังขอ', href: '/admin/users', day: null });
+    }
+  }
+  const unverified = d.users.filter((u) => paidUsers.has(u.id) && u.email_verified === 0);
+  if (unverified.length) {
+    const names = unverified.slice(0, 5).map((u) => u.name || '—');
+    add({
+      key: `unverified:${unverified.length}`,
+      type: 'unverified',
+      group: 'users',
+      tone: 'warn',
+      title: `ชำระเงินแล้วแต่ยังไม่ยืนยันอีเมล ${unverified.length} คน`,
+      detail: `${names.join(', ')}${unverified.length > names.length ? ` และอีก ${unverified.length - names.length} คน` : ''} · อีเมลแจ้งเรื่องการจองอาจไปไม่ถึง`,
+      href: '/admin/users',
+      day: null,
+    });
+  }
+
+  /* quality */
+  const recent = (s: string) => utcMs(s) >= now - 30 * DAY;
+  for (const [src, list] of [['survey', d.responses], ['review', d.reviews]] as const) {
+    for (const r of list) {
+      if (r.rating > 2 || !recent(r.created_at)) continue;
+      const w = wsById.get(r.workshop_id);
+      const text = (r.comment || '').trim();
+      add({
+        key: `lowrate:${src}:${r.id || `${r.workshop_id}:${r.created_at}`}`,
+        type: 'low_rating',
+        group: 'quality',
+        tone: 'warn',
+        title: `${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)} ${src === 'review' ? 'รีวิว' : 'แบบสอบถาม'} · ${w?.title || '—'}`,
+        detail: `${w?.host_name || '—'}${text ? ` · “${text.length > 90 ? text.slice(0, 90) + '…' : text}”` : ''}`,
+        href: src === 'review' ? '/admin/reviews' : '/admin/workshops',
+        day: thaiDay(utcMs(r.created_at)),
+      });
+    }
+  }
+  const cancelsBy = new Map<string, number>();
+  for (const w of d.ws) {
+    if (w.status !== 'cancelled' || !w.instructor_id || utcMs(w.updated_at) < now - 90 * DAY) continue;
+    if (!(bkByWs.get(w.id) || []).some(wasCollected) && !d.bk.some((b) => b.moved_from === w.id)) continue;
+    cancelsBy.set(w.instructor_id, (cancelsBy.get(w.instructor_id) || 0) + 1);
+  }
+  for (const [host, n] of cancelsBy) {
+    if (n < 2) continue;
+    add({ key: `hostcancel:${host}:${n}`, type: 'host_cancels', group: 'quality', tone: 'warn', title: `ผู้จัดยกเลิกรอบที่มีคนจองบ่อย · ${nameOf(host)}`, detail: `${n} รอบใน 90 วัน`, href: '/admin/insights?tab=hosts', day: null });
+  }
+  for (const h of hosts) {
+    if (!h.atRisk) continue;
+    add({ key: `atrisk:${h.id}`, type: 'host_at_risk', group: 'quality', tone: 'info', title: `ผู้จัดเสี่ยงหาย · ${h.name}`, detail: `เคยขายได้ ไม่มีรอบใหม่ จัดล่าสุด ${h.lastRound || '—'}`, href: '/admin/insights?tab=hosts', day: h.lastRound });
+  }
+  // Applications waiting 3+ days for the host to choose, one alert per round.
+  const waitingApps = new Map<string, number[]>();
+  for (const b of d.bk) {
+    if (b.app_status !== 'applied' || b.status === 'cancelled' || b.parent_booking_id) continue;
+    const w = wsById.get(b.workshop_id);
+    if (!w || w.status === 'cancelled' || wsStart(w) <= now) continue;
+    const days = daysSince(utcMs(b.created_at));
+    if (days < 3) continue;
+    const l = waitingApps.get(w.id);
+    if (l) l.push(days);
+    else waitingApps.set(w.id, [days]);
+  }
+  for (const [wid, days] of waitingApps) {
+    const w = wsById.get(wid)!;
+    add({
+      key: `app:${wid}:${days.length}`,
+      type: 'app_pending',
+      group: 'quality',
+      tone: 'warn',
+      title: `ใบสมัครรอคัดเลือก ${days.length} คน · ${w.title} (${when(w)})`,
+      detail: `ผู้จัด ${w.host_name || '—'} · รอนานสุด ${Math.max(...days)} วัน`,
+      href: '/admin/workshops',
+      day: w.date,
+    });
+  }
+
+  items.sort((a, b) => TONE_ORDER[a.tone] - TONE_ORDER[b.tone] || (b.day || '').localeCompare(a.day || ''));
+  const ackBy = new Map(d.acks.map((a) => [a.alert_key, a]));
+  const open = items.filter((a) => !ackBy.has(a.key));
+  const acked = items
+    .filter((a) => ackBy.has(a.key))
+    .map((a) => ({ ...a, ack: ackBy.get(a.key)! }))
+    .sort((a, b) => b.ack.acked_at.localeCompare(a.ack.acked_at));
+  return {
+    open,
+    acked,
+    counts: { bad: open.filter((a) => a.tone === 'bad').length, warn: open.filter((a) => a.tone === 'warn').length, info: open.filter((a) => a.tone === 'info').length, total: open.length },
   };
 }

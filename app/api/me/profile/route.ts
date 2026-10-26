@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 import { getCurrentUser, createToken, setAuthCookie } from '@/lib/auth';
 import type { ImageMeta, User } from '@/lib/types';
+import { logIdentityChanges } from '@/lib/identity-log';
 
 const isStr = (v: unknown): v is string => typeof v === 'string';
 
@@ -48,6 +49,7 @@ export async function PUT(request: Request) {
   const bio = isStr(body.bio) && body.bio.trim() !== '' ? body.bio.trim() : null;
 
   const db = await getDB();
+  const before = await db.prepare('SELECT name, date_of_birth FROM users WHERE id = ?').bind(payload.sub).first<{ name: string | null; date_of_birth: string | null }>();
   await db
     .prepare(
       `UPDATE users SET
@@ -74,6 +76,7 @@ export async function PUT(request: Request) {
       payload.sub,
     )
     .run();
+  if (before) await logIdentityChanges(db, payload.sub, 'profile', { name: before.name, dob: before.date_of_birth }, { name, dob });
 
   const user = await db
     .prepare(

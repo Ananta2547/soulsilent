@@ -184,12 +184,18 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const open = openOn === pathname;
   /** Unresolved money that needs a human (a badge on ตรวจเงินเข้า). */
   const [pending, setPending] = useState(0);
+  /** Urgent open alerts on Admin Insights (a badge on ข้อมูลเชิงลึก). */
+  const [urgent, setUrgent] = useState(0);
   const current = activeKey(pathname);
 
   useEffect(() => {
     fetch('/api/admin/orphan-payments')
       .then((r) => (r.ok ? (r.json() as Promise<{ unresolved?: number }>) : null))
       .then((d) => setPending(d?.unresolved || 0))
+      .catch(() => {});
+    fetch('/api/admin/alerts')
+      .then((r) => (r.ok ? (r.json() as Promise<{ bad?: number }>) : null))
+      .then((d) => setUrgent(d?.bad || 0))
       .catch(() => {});
   }, []);
 
@@ -226,7 +232,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               {label && <div className="adm-nav-label">{label}</div>}
               {keys.map((k) => {
                 const item: Item = I[k];
-                const badge = k === 'payments' ? pending : 0;
+                const badge = k === 'payments' ? pending : k === 'insights' ? urgent : 0;
                 return (
                   <Link
                     key={k}

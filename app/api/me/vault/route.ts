@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { hasIdentity, identityChanged, identityLockedUntil } from '@/lib/identity-lock';
+import { logIdentityChanges, vaultIdentity } from '@/lib/identity-log';
 
 /** GET /api/me/vault — the signed-in user's autofill vault (identity/health/emergency). */
 export async function GET() {
@@ -75,6 +76,7 @@ export async function PUT(request: Request) {
     } else {
       await db.prepare('UPDATE users SET vault_json = ? WHERE id = ?').bind(json, user.sub).run();
     }
+    if (touchesIdentity) await logIdentityChanges(db, user.sub, 'vault', vaultIdentity(prev), vaultIdentity(next));
     const after = await db
       .prepare('SELECT identity_locked_at FROM users WHERE id = ?')
       .bind(user.sub)
