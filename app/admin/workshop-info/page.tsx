@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Workshop } from '@/lib/types';
 import { parseTiers, tierDesc } from '@/lib/pricing';
+import { workshopPhase } from '@/lib/workshop-utils';
 
 type WorkshopRow = Workshop & { booking_count?: number };
 import Link from 'next/link';
@@ -35,14 +36,33 @@ export default function WorkshopInfoAdminPage() {
   const roundMasters = masters.filter((m) => m.kind !== 'single');
   const singleMasters = masters.filter((m) => m.kind === 'single');
 
+  // Each activity sits in one box by its rounds: one today, one still ahead,
+  // all over or cancelled, or none opened yet.
+  const phaseOf = (m: WorkshopMaster) => {
+    const ps = roundsOf(m.id).map((w) => workshopPhase(w));
+    return !ps.length ? 'none' : ps.includes('today') ? 'today' : ps.includes('upcoming') ? 'upcoming' : 'past';
+  };
+  const nextRound = (m: WorkshopMaster) => roundsOf(m.id).find((w) => workshopPhase(w) !== 'past');
+  const lastRound = (m: WorkshopMaster) => roundsOf(m.id).at(-1);
+  const at = (w?: WorkshopRow) => (w ? `${w.date}T${w.time_start || ''}` : '');
+  const inBox = (p: string) => shownMasters.filter((m) => phaseOf(m) === p);
+  const boxes = [
+    { key: 'today', title: 'มีรอบวันนี้', list: inBox('today').sort((a, b) => at(nextRound(a)).localeCompare(at(nextRound(b)))) },
+    { key: 'upcoming', title: 'เปิดและกำลังจะถึง', list: inBox('upcoming').sort((a, b) => at(nextRound(a)).localeCompare(at(nextRound(b)))) },
+    { key: 'none', title: 'ยังไม่มีรอบ', list: inBox('none').sort((a, b) => a.title.localeCompare(b.title, 'th')) },
+    { key: 'past', title: 'จบแล้ว / ยกเลิก', list: inBox('past').sort((a, b) => at(lastRound(b)).localeCompare(at(lastRound(a)))) },
+  ].filter((b) => b.list.length > 0);
+
   const load = useCallback(async () => {
     setLoadError(false);
     try {
-      fetch('/api/workshops?counts=1')
+      // Rounds decide which box an activity sits in, so wait for them too.
+      const rounds = fetch('/api/workshops?counts=1')
         .then((r) => (r.ok ? (r.json() as Promise<{ workshops: WorkshopRow[] }>) : { workshops: [] }))
         .then((d) => setWorkshops(d.workshops || []))
         .catch(() => {});
       const res = await fetch('/api/workshop-masters');
+      await rounds;
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as { masters: WorkshopMaster[] };
       setMasters(data.masters || []);
@@ -130,79 +150,88 @@ export default function WorkshopInfoAdminPage() {
           </button>
         </div>
       ) : (
-        // Cards are poster-wide: as many A3 portraits fit the row as can.
-        <div className="adm-posters">
-          {shownMasters.map((m) => {
-            const rounds = roundsOf(m.id);
-            const open = openMaster === m.id;
-            return (
-              <article key={m.id} className="adm-card adm-poster">
-                {m.cover_image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={m.cover_image_url} alt={m.title} className="adm-poster-img" />
-                ) : (
-                  <div className="adm-poster-img is-empty">poster · a3</div>
-                )}
-                <div className="adm-poster-body">
-                  <h3>{m.title}</h3>
-                  {m.organizer_name && <p className="adm-meta">โดย {m.organizer_name}</p>}
-                  {m.kind !== 'single' && (
-                    <p className="adm-meta">
-                      ราคา/คน {m.price_group != null ? `฿${m.price_group.toLocaleString()}` : '—'}
-                      {parseTiers(m.price_tiers_json).map((t) => ` · ${t.label} ฿${t.price.toLocaleString()} (${tierDesc(t)})`).join('')}
-                    </p>
-                  )}
-                  {/* Rounds the teacher has opened under this master. */}
-                  <button type="button" onClick={() => setOpenMaster((o) => (o === m.id ? null : m.id))} className="adm-poster-toggle" aria-expanded={open}>
-                    {open ? '▾' : '▸'} {m.kind === 'single' ? 'กิจกรรม' : 'รอบ'} · {rounds.length}
-                  </button>
-                  {open && (
-                    <div className="adm-rounds">
-                      {rounds.length === 0 && (
-                        <div className="adm-round adm-meta">
-                          {m.kind === 'single' ? (
-                            <span>
-                              ยังไม่มีกิจกรรม — สร้างที่ <Link href="/admin/workshops">กิจกรรม (รอบ)</Link> แล้วผูกกับข้อมูลนี้
-                            </span>
-                          ) : (
-                            'ยังไม่มีรอบ — ผู้จัดเปิดได้ที่ Host Dashboard → จัดรอบกิจกรรม'
+        <>
+          {boxes.map((box) => (
+            <section key={box.key}>
+              <h2 className="adm-h2" style={{ margin: '0 0 12px' }}>
+                {box.title} <span className="adm-meta">· {box.list.length}</span>
+              </h2>
+              {/* Cards are poster-wide: as many A3 portraits fit the row as can. */}
+              <div className="adm-posters">
+                {box.list.map((m) => {
+                const rounds = roundsOf(m.id);
+                const open = openMaster === m.id;
+                return (
+                  <article key={m.id} className="adm-card adm-poster">
+                    {m.cover_image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={m.cover_image_url} alt={m.title} className="adm-poster-img" />
+                    ) : (
+                      <div className="adm-poster-img is-empty">poster · a3</div>
+                    )}
+                    <div className="adm-poster-body">
+                      <h3>{m.title}</h3>
+                      {m.organizer_name && <p className="adm-meta">โดย {m.organizer_name}</p>}
+                      {m.kind !== 'single' && (
+                        <p className="adm-meta">
+                          ราคา/คน {m.price_group != null ? `฿${m.price_group.toLocaleString()}` : '—'}
+                          {parseTiers(m.price_tiers_json).map((t) => ` · ${t.label} ฿${t.price.toLocaleString()} (${tierDesc(t)})`).join('')}
+                        </p>
+                      )}
+                      {/* Rounds the teacher has opened under this master. */}
+                      <button type="button" onClick={() => setOpenMaster((o) => (o === m.id ? null : m.id))} className="adm-poster-toggle" aria-expanded={open}>
+                        {open ? '▾' : '▸'} {m.kind === 'single' ? 'กิจกรรม' : 'รอบ'} · {rounds.length}
+                      </button>
+                      {open && (
+                        <div className="adm-rounds">
+                          {rounds.length === 0 && (
+                            <div className="adm-round adm-meta">
+                              {m.kind === 'single' ? (
+                                <span>
+                                  ยังไม่มีกิจกรรม — สร้างที่ <Link href="/admin/workshops">กิจกรรม (รอบ)</Link> แล้วผูกกับข้อมูลนี้
+                                </span>
+                              ) : (
+                                'ยังไม่มีรอบ — ผู้จัดเปิดได้ที่ Host Dashboard → จัดรอบกิจกรรม'
+                              )}
+                            </div>
                           )}
+                          {rounds.map((w) => (
+                            <Link key={w.id} href={`/admin/workshops/${w.id}/applicants`} className="adm-round">
+                              <span style={{ flex: 1, minWidth: 0 }}>
+                                <b>{new Date(w.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</b>
+                                <br />
+                                <span className="adm-meta">
+                                  {w.time_start}–{w.time_end}
+                                  {w.location ? ` · ${w.location}` : ''}
+                                  {w.status !== 'active' ? ` · ${w.status}` : ''}
+                                </span>
+                              </span>
+                              <span className="adm-mono" style={{ fontSize: 12 }}>
+                                {w.booking_count ?? 0}/{w.max_participants}
+                              </span>
+                            </Link>
+                          ))}
                         </div>
                       )}
-                      {rounds.map((w) => (
-                        <Link key={w.id} href={`/admin/workshops/${w.id}/applicants`} className="adm-round">
-                          <span style={{ flex: 1, minWidth: 0 }}>
-                            <b>{new Date(w.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</b>
-                            <br />
-                            <span className="adm-meta">
-                              {w.time_start}–{w.time_end}
-                              {w.location ? ` · ${w.location}` : ''}
-                              {w.status !== 'active' ? ` · ${w.status}` : ''}
-                            </span>
-                          </span>
-                          <span className="adm-mono" style={{ fontSize: 12 }}>
-                            {w.booking_count ?? 0}/{w.max_participants}
-                          </span>
-                        </Link>
-                      ))}
+                      <div className="adm-mcard-acts" style={{ marginTop: 'auto', paddingTop: 10 }}>
+                        <button type="button" className="adm-btn sm" onClick={() => setModal({ mode: 'edit', master: m })}>
+                          แก้ไข
+                        </button>
+                        <RowMenu
+                          items={[
+                            { label: 'ดูหน้าจริง ↗', onClick: () => window.open(`/journey-info/${m.id}`, '_blank', 'noopener') },
+                            { label: busyId === m.id ? 'กำลังลบ…' : 'ลบ', danger: true, disabled: busyId === m.id, onClick: () => remove(m) },
+                          ]}
+                        />
+                      </div>
                     </div>
-                  )}
-                  <div className="adm-mcard-acts" style={{ marginTop: 'auto', paddingTop: 10 }}>
-                    <button type="button" className="adm-btn sm" onClick={() => setModal({ mode: 'edit', master: m })}>
-                      แก้ไข
-                    </button>
-                    <RowMenu
-                      items={[
-                        { label: 'ดูหน้าจริง ↗', onClick: () => window.open(`/journey-info/${m.id}`, '_blank', 'noopener') },
-                        { label: busyId === m.id ? 'กำลังลบ…' : 'ลบ', danger: true, disabled: busyId === m.id, onClick: () => remove(m) },
-                      ]}
-                    />
-                  </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
+                  </article>
+                );
+                })}
+              </div>
+            </section>
+          ))}
+        </>
       )}
 
       <AdminFormModal

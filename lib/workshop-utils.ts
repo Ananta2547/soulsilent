@@ -147,6 +147,17 @@ export function isWorkshopOngoing(w: TimeShape, now: Date = serverNow()): boolea
   return t >= getWorkshopStart(w).getTime() && t <= getWorkshopEndPrecise(w).getTime();
 }
 
+export type WorkshopPhase = 'today' | 'upcoming' | 'past';
+
+/** Which admin list a workshop belongs in: 'past' once it is cancelled,
+ *  completed or over; 'today' when one of its days is today (Thai date);
+ *  otherwise 'upcoming'. */
+export function workshopPhase(w: DateShape & { status?: string | null }, now: Date = serverNow()): WorkshopPhase {
+  if (w.status === 'cancelled' || w.status === 'completed' || hasWorkshopEnded(w, now)) return 'past';
+  const today = new Date(now.getTime() + 7 * 3600000).toISOString().slice(0, 10);
+  return getWorkshopDays(w).includes(today) ? 'today' : 'upcoming';
+}
+
 /** Net organizer payout = gross minus a fixed amount or a percentage. */
 export function computePayout(
   gross: number,

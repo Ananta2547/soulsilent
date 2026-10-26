@@ -5,7 +5,7 @@ import { PageLoader } from '@/components/design/PageLoader';
 import { useEffect, useState } from 'react';
 import type { DayTime, Location, Workshop, ApplicationQuestion } from '@/lib/types';
 import { parseImageMeta } from '@/lib/image-meta';
-import { parseSchedule, parseInstructorIds, parseDashboardAccess, getWorkshopStatusBadge, hasWorkshopEnded } from '@/lib/workshop-utils';
+import { parseSchedule, parseInstructorIds, parseDashboardAccess, getWorkshopStatusBadge, hasWorkshopEnded, workshopPhase } from '@/lib/workshop-utils';
 import { AdminFormModal } from '@/components/admin/AdminFormModal';
 import {
   WorkshopForm,
@@ -33,6 +33,8 @@ function safeParseArray<T>(json: string | null | undefined, fallback: T[]): T[] 
   }
 }
 
+const PAST_STEP = 20;
+
 export default function AdminWorkshopsPage() {
   const [workshops, setWorkshops] = useState<Workshop[]>([]);
   // One-day workshops vs rounds opened under a round master.
@@ -45,6 +47,8 @@ export default function AdminWorkshopsPage() {
   const [formDirty, setFormDirty] = useState(false);
   const [pendingClose, setPendingClose] = useState(false);
   const [query, setQuery] = useState('');
+  // The "past" box grows by PAST_STEP rows at a time — it only gets longer.
+  const [pastShown, setPastShown] = useState(PAST_STEP);
 
   async function fetchAll() {
     setLoadError(false);
@@ -281,29 +285,29 @@ export default function AdminWorkshopsPage() {
     return { where, when, st: statusOf(ws), menu, star, edit, progress };
   };
 
-  return (
+  // Three boxes: today, open and coming (soonest first), over or cancelled (latest first).
+  const startKey = (w: Workshop) => `${w.date}T${w.time_start || ''}`;
+  const byPhase = (p: string) => shownWorkshops.filter((w) => workshopPhase(w) === p);
+  const sections = [
+    { key: 'today', title: 'วันนี้', sub: 'เริ่มหรือกำลังจัดวันนี้', empty: 'ไม่มีกิจกรรมวันนี้', list: byPhase('today').sort((a, b) => startKey(a).localeCompare(startKey(b))) },
+    { key: 'upcoming', title: 'เปิดและกำลังจะถึง', sub: 'เรียงจากใกล้ที่สุด', empty: 'ไม่มีกิจกรรมที่กำลังจะถึง', list: byPhase('upcoming').sort((a, b) => startKey(a).localeCompare(startKey(b))) },
+    { key: 'past', title: 'จบแล้ว / ยกเลิก', sub: 'เรียงจากล่าสุด', empty: 'ยังไม่มีกิจกรรมที่จบแล้ว', list: byPhase('past').sort((a, b) => startKey(b).localeCompare(startKey(a))) },
+  ];
+
+  const listView = (list: Workshop[]) => (
     <>
-      <AdminHead
-        eyebrow="admin · workshops"
-        title="กิจกรรม (รอบ)"
-        sub={`ทั้งหมด ${workshops.length} รายการ · ติดดาวเพื่อแสดงในการ์ดหน้าแรก`}
-        actions={
-          <button type="button" onClick={() => setModal({ mode: 'create' })} className="adm-btn teal">
-            + เพิ่มกิจกรรม
-          </button>
-        }
-      />
-
-      <div className="adm-toolbar">
-        <AdminSearch value={query} onChange={setQuery} placeholder="ค้นหาชื่อกิจกรรมหรือสถานที่" />
-        <AdminChips value={kindFilter} onChange={setKindFilter} items={KIND_TABS} />
-      </div>
-
-      <div className="adm-card">
-        {shownWorkshops.length > 0 && (
-          <>
             <div className="adm-table-wrap has-cards">
-              <table className="adm-table">
+              <table className="adm-table" style={{ tableLayout: 'fixed' }}>
+                {/* Same widths in every box so the columns line up down the page. */}
+                <colgroup>
+                  <col style={{ width: '26%' }} />
+                  <col style={{ width: '22%' }} />
+                  <col style={{ width: '9%' }} />
+                  <col style={{ width: '11%' }} />
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '6%' }} />
+                  <col style={{ width: '12%' }} />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>กิจกรรม</th>
@@ -316,7 +320,7 @@ export default function AdminWorkshopsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {shownWorkshops.map((ws) => {
+                  {list.map((ws) => {
                     const r = rowOf(ws);
                     return (
                       <tr key={ws.id}>
@@ -350,7 +354,7 @@ export default function AdminWorkshopsPage() {
               </table>
             </div>
             <div className="adm-mcards">
-              {shownWorkshops.map((ws) => {
+              {list.map((ws) => {
                 const r = rowOf(ws);
                 return (
                   <div key={ws.id} className="adm-mcard">
@@ -375,8 +379,51 @@ export default function AdminWorkshopsPage() {
                 );
               })}
             </div>
-          </>
-        )}
+    </>
+  );
+
+  return (
+    <>
+      <AdminHead
+        eyebrow="admin · workshops"
+        title="กิจกรรม (รอบ)"
+        sub={`ทั้งหมด ${workshops.length} รายการ · ติดดาวเพื่อแสดงในการ์ดหน้าแรก`}
+        actions={
+          <button type="button" onClick={() => setModal({ mode: 'create' })} className="adm-btn teal">
+            + เพิ่มกิจกรรม
+          </button>
+        }
+      />
+
+      <div className="adm-toolbar">
+        <AdminSearch value={query} onChange={setQuery} placeholder="ค้นหาชื่อกิจกรรมหรือสถานที่" />
+        <AdminChips value={kindFilter} onChange={setKindFilter} items={KIND_TABS} />
+      </div>
+
+      {shownWorkshops.length > 0 &&
+        sections.map((sec) => {
+          const rows = sec.key === 'past' ? sec.list.slice(0, pastShown) : sec.list;
+          return (
+            <section key={sec.key} className="adm-card">
+              <div className="adm-card-head">
+                <h2 className="adm-h2">
+                  {sec.title} <span className="adm-meta">· {sec.list.length}</span>
+                </h2>
+                <span className="adm-meta">{sec.sub}</span>
+              </div>
+              {sec.list.length === 0 ? <div className="adm-empty">{sec.empty}</div> : listView(rows)}
+              {sec.list.length > rows.length && (
+                <div style={{ padding: '4px 20px 20px', textAlign: 'center' }}>
+                  <button type="button" className="adm-btn sm white" onClick={() => setPastShown((n) => n + PAST_STEP)}>
+                    แสดงเพิ่ม (อีก {sec.list.length - rows.length} รายการ)
+                  </button>
+                </div>
+              )}
+            </section>
+          );
+        })}
+
+      <div className="adm-card" hidden={shownWorkshops.length > 0}>
         {workshops.length > 0 && shownWorkshops.length === 0 && (
           <div className="adm-empty">
             <p style={{ margin: '0 0 12px' }}>ไม่พบรายการที่ตรงกับเงื่อนไข</p>
