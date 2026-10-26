@@ -14,7 +14,7 @@ export async function GET() {
   const me = await getCurrentUserWithRoles();
   if (!me) return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 });
   const db = await getDB();
-  return NextResponse.json({ off: await mutedKinds(db, me.sub), host: hasAnyRole(me.roles, ['teacher', 'session_host']) });
+  return NextResponse.json({ off: await mutedKinds(db, me.sub), host: hasAnyRole(me.roles, ['teacher', 'session_host']), admin: me.role === 'admin' });
 }
 
 export async function PUT(req: Request) {

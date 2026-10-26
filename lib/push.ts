@@ -25,7 +25,7 @@ type Env = { VAPID_PUBLIC_KEY?: string; VAPID_PRIVATE_KEY?: string; SITE_URL?: s
  * 'change' — a round moved or was cancelled — is not among them: it is always
  * sent, so nobody turns up on the wrong day.
  */
-export const PUSH_KINDS = ['booking', 'reminder', 'host'] as const;
+export const PUSH_KINDS = ['booking', 'reminder', 'host', 'admin'] as const;
 export type PushKind = (typeof PUSH_KINDS)[number] | 'change' | 'test';
 
 /** The kinds this member switched off. Empty when none (or before 066). */

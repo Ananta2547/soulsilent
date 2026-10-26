@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDB, getEnv } from '@/lib/db';
 import { claimOnce, sendPushToUser, subscribedUsers, vapidKeys, type PushKind } from '@/lib/push';
 import { seatsHeldSubquery } from '@/lib/seats';
+import { pushAdminAlerts } from '@/lib/admin-alert-push';
 import { parseDashboardAccess, parseInstructorIds } from '@/lib/workshop-utils';
 
 /**
@@ -382,6 +383,12 @@ export async function GET(request: Request) {
       if (!/no such table/i.test(msg)) throw error;
     }
 
+    // New urgent Admin Insights alerts to admins, every 15 minutes (lib/admin-alert-push).
+    const admin = await pushAdminAlerts(db, env).catch((e) => {
+      console.error('Admin alerts push error:', e);
+      return 0;
+    });
+
     // Housekeeping, 03:00–03:09 Thai time: forget sent-markers older than 60
     // days and schedules of rounds long over. Every notice above only looks at
     // bookings from the last hour or rounds from yesterday on, so an old key
@@ -400,7 +407,7 @@ export async function GET(request: Request) {
         .catch(() => null);
     }
 
-    return NextResponse.json({ ok: true, ...counts, pruned });
+    return NextResponse.json({ ok: true, ...counts, admin, pruned });
   } catch (error) {
     // Before migration 064 the subscription table does not exist: nothing to do.
     const msg = error instanceof Error ? error.message : String(error);

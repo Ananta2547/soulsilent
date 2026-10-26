@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import type { AdminAlert, AdminAnalytics, AlertGroup, AlertTone } from '@/lib/admin-analytics';
 import { Card, Empty, Seg, thDay } from '@/components/dashboard/kit';
+import { PushToggle } from '@/components/pwa/PushToggle';
 
 const GROUPS: [AlertGroup, string, string][] = [
   ['money', 'เงินและบัญชี', 'คืนเงิน · ค้างโอน · เงินเข้าผิดปกติ · บัญชีไม่ครบ'],
@@ -89,6 +90,10 @@ export function AlertsTab({ a, onChanged, say }: { a: AdminAnalytics; onChanged:
           </Card>
         );
       })}
+
+      <Card title="แจ้งเตือนเรื่องด่วนผ่านแอป" sub="เรื่องด่วนใหม่จะเด้งบนเครื่องที่เปิดไว้ (ตรวจทุก 15 นาที รวมเป็นข้อความเดียว) · ปิดได้ที่สวิตช์ “แจ้งเตือนผู้ดูแล”" delay={280}>
+        <PushToggle />
+      </Card>
 
       <Card
         title={`รับทราบแล้ว · ${al.acked.length}`}

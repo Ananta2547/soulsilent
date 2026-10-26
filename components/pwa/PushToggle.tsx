@@ -131,7 +131,7 @@ export function PushToggle({ variant = 'full' }: { variant?: 'full' | 'nudge' })
   );
 }
 
-type Kind = 'booking' | 'reminder' | 'host';
+type Kind = 'booking' | 'reminder' | 'host' | 'admin';
 
 /** Which kinds of notification to get, for every device of this member.
  *  Moves and cancellations are listed but locked on. */
@@ -139,17 +139,19 @@ function PushPrefs() {
   const { lang } = useLang();
   const [off, setOff] = useState<Kind[] | null>(null);
   const [host, setHost] = useState(false);
+  const [admin, setAdmin] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
 
   useEffect(() => {
     let alive = true;
     fetch('/api/push/prefs')
-      .then((r) => (r.ok ? (r.json() as Promise<{ off: Kind[]; host: boolean }>) : null))
+      .then((r) => (r.ok ? (r.json() as Promise<{ off: Kind[]; host: boolean; admin?: boolean }>) : null))
       .then((d) => {
         if (!alive || !d) return;
         setOff(d.off);
         setHost(d.host);
+        setAdmin(!!d.admin);
       })
       .catch(() => {});
     return () => {
@@ -202,6 +204,15 @@ function PushPrefs() {
             k: 'host' as const,
             title: tr(lang, 'มีคนจองรอบของคุณ', 'Someone booked your round'),
             sub: tr(lang, 'สำหรับผู้จัด ทุกครั้งที่มีการจองใหม่', 'For hosts, on every new booking'),
+          },
+        ]
+      : []),
+    ...(admin
+      ? [
+          {
+            k: 'admin' as const,
+            title: tr(lang, 'แจ้งเตือนผู้ดูแล (เรื่องด่วน)', 'Admin alerts (urgent)'),
+            sub: tr(lang, 'เรื่องด่วนใหม่จากหน้าข้อมูลเชิงลึก เช่น คืนเงิน ค้างโอน รอบยกเลิก', 'New urgent items from Admin Insights'),
           },
         ]
       : []),
