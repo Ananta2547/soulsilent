@@ -12,10 +12,11 @@ import {
   AccountPanel,
   IdentityPanel,
   AutofillPanel,
+  NotificationsPanel,
   type MeData,
 } from '@/components/me/settings/panels';
 
-type TabKey = 'edit' | 'account' | 'identity' | 'autofill';
+type TabKey = 'edit' | 'account' | 'identity' | 'autofill' | 'notify';
 
 const SECTIONS: { key: TabKey; th: string; en: string; icon: React.ReactNode }[] = [
   {
@@ -59,6 +60,17 @@ const SECTIONS: { key: TabKey; th: string; en: string; icon: React.ReactNode }[]
       <svg width="17" height="17" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <rect x="3" y="5" width="18" height="14" rx="2" strokeWidth={1.7} />
         <path strokeLinecap="round" strokeWidth={1.7} d="M7 10h6M7 14h10" />
+      </svg>
+    ),
+  },
+  {
+    key: 'notify',
+    th: 'การแจ้งเตือน',
+    en: 'Notifications',
+    icon: (
+      <svg width="17" height="17" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M6 16V11a6 6 0 1112 0v5l1.5 2h-15z" />
+        <path strokeLinecap="round" strokeWidth={1.7} d="M10 20.5a2 2 0 004 0" />
       </svg>
     ),
   },
@@ -129,6 +141,14 @@ function SettingsHub() {
     router.replace(`/me/settings?tab=${k}`, { scroll: false });
   }
 
+  // On a phone the section rail scrolls sideways; bring the open one into view
+  // (a link to ?tab=notify would otherwise land on a tab that is off-screen).
+  useEffect(() => {
+    const el = document.querySelector<HTMLElement>('.set-navitem[aria-current="true"]');
+    const rail = el?.parentElement;
+    if (el && rail && rail.scrollWidth > rail.clientWidth) rail.scrollTo({ left: el.offsetLeft - (rail.clientWidth - el.offsetWidth) / 2, behavior: 'smooth' });
+  }, [tab]);
+
   const meta = SECTIONS.find((s) => s.key === tab)!;
 
   return (
@@ -177,6 +197,7 @@ function SettingsHub() {
               {tab === 'account' && <AccountPanel me={me} onSaved={notify} onDirtyChange={onDirtyChange} />}
               {tab === 'identity' && <IdentityPanel me={me} onSaved={notify} />}
               {tab === 'autofill' && <AutofillPanel me={me} onSaved={notify} onDirtyChange={onDirtyChange} />}
+              {tab === 'notify' && <NotificationsPanel />}
             </>
           )}
         </div>

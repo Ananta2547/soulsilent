@@ -15,7 +15,9 @@ import { disablePush, enablePush, pushState, type PushState } from './push';
 
 const NUDGE_KEY = 'asl-push-nudge-closed';
 
-export function PushToggle({ variant = 'full' }: { variant?: 'full' | 'nudge' }) {
+/** `prefs={false}`: leave the kind switches out — for a page that shows them
+ *  itself regardless of this device (Settings → การแจ้งเตือน). */
+export function PushToggle({ variant = 'full', prefs = true }: { variant?: 'full' | 'nudge'; prefs?: boolean }) {
   const { lang } = useLang();
   const [state, setState] = useState<PushState | 'loading'>('loading');
   const [busy, setBusy] = useState(false);
@@ -121,7 +123,7 @@ export function PushToggle({ variant = 'full' }: { variant?: 'full' | 'nudge' })
           {busy ? tr(lang, 'กำลังเปิด…', 'Turning on…') : tr(lang, 'เปิดการแจ้งเตือน', 'Turn on notifications')}
         </button>
       )}
-      {state === 'on' && <PushPrefs />}
+      {state === 'on' && prefs && <PushPrefs />}
       {state === 'on' && (
         <button type="button" className="pwa-ghost" disabled={busy} onClick={turnOff}>
           {tr(lang, 'ปิดการแจ้งเตือนบนเครื่องนี้', 'Turn off on this device')}
@@ -135,7 +137,7 @@ type Kind = 'booking' | 'reminder' | 'host' | 'admin';
 
 /** Which kinds of notification to get, for every device of this member.
  *  Moves and cancellations are listed but locked on. */
-function PushPrefs() {
+export function PushPrefs() {
   const { lang } = useLang();
   const [off, setOff] = useState<Kind[] | null>(null);
   const [host, setHost] = useState(false);

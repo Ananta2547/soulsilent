@@ -10,6 +10,7 @@ import { ImageUploader } from '@/components/admin/image/ImageUploader';
 import { ASPECTS } from '@/lib/image-aspects';
 import { parseImageMeta } from '@/lib/image-meta';
 import type { ImageMeta } from '@/lib/types';
+import { PushPrefs, PushToggle } from '@/components/pwa/PushToggle';
 
 export interface MeData {
   id: string;
@@ -582,6 +583,30 @@ export function AccountPanel({
  *   (1) Identity — first/last name + nickname   (2) Health & dietary — medical.
  * All read from the autofill vault (localStorage). Incomplete → the status and
  * each unfinished step link to the Autofill form so the user can complete it. */
+/** Every notification switch in one place: this device on or off (the same
+ *  control as /app), and which kinds to get. The kinds are saved for the
+ *  member, not the device, so they show even where this device cannot take
+ *  notifications. Hosts and admins also see their own kinds. */
+export function NotificationsPanel() {
+  const { lang } = useLang();
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <SectionCard
+        title={tr(lang, 'เครื่องนี้', 'This device')}
+        desc={tr(lang, 'เปิดหรือปิดการแจ้งเตือนบนอุปกรณ์ที่ใช้อยู่ตอนนี้', 'Turn notifications on or off for the device you are using')}
+      >
+        <PushToggle prefs={false} />
+      </SectionCard>
+      <SectionCard
+        title={tr(lang, 'ประเภทที่ได้รับ', 'What you get')}
+        desc={tr(lang, 'ตั้งครั้งเดียว ใช้กับทุกเครื่องที่คุณเปิดการแจ้งเตือนไว้', 'Set once — applies to every device you turned notifications on')}
+      >
+        <PushPrefs />
+      </SectionCard>
+    </div>
+  );
+}
+
 export function IdentityPanel({ me, onSaved }: { me?: MeData; onSaved?: (m: string) => void }) {
   const { lang } = useLang();
   const router = useRouter();
