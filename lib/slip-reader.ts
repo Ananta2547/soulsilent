@@ -114,15 +114,15 @@ export async function readSlipWithGemini(image: { bytes: ArrayBuffer; mime: stri
   return askGemini(btoa(bin), image.mime, key, model, true);
 }
 
-async function askGemini(b64: string, mime: string, key: string, model: string, retry: boolean): Promise<SlipFields> {
+async function askGemini(b64: string, mime: string, key: string, model: string, retry: boolean, think = true): Promise<SlipFields> {
   const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
     body: JSON.stringify({
       contents: [{ role: 'user', parts: [{ inline_data: { mime_type: mime, data: b64 } }, { text: PROMPT }] }],
-      generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: SCHEMA },
+      generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: SCHEMA, ...(think ? { thinkingConfig: { thinkingLevel: 'low' } } : {}) },
     }),
-    signal: AbortSignal.timeout(30000),
+    signal: AbortSignal.timeout(60000),
   });
   if (!r.ok) {
     const detail = await r.text().catch(() => '');
@@ -132,6 +132,7 @@ async function askGemini(b64: string, mime: string, key: string, model: string, 
     } catch {}
     console.error('[slip-reader] Gemini', model, r.status, detail.slice(0, 500));
     const next = r.status === 404 && retry ? /use (?:models\/)?([\w.-]+)/i.exec(reason)?.[1]?.replace(/\.$/, '') : null;
+    if (r.status === 400 && think && /thinking/i.test(reason)) return askGemini(b64, mime, key, model, retry, false);
     if (next && next !== model) return askGemini(b64, mime, key, next, false);
     if (r.status === 429) throw new Error('Gemini ใช้เกินโควต้า — รอสักครู่แล้วลองใหม่');
     if (/location is not supported/i.test(reason)) throw new Error('Gemini ไม่ให้บริการจากตำแหน่งเซิร์ฟเวอร์นี้');

@@ -32,6 +32,7 @@ export async function POST(request: Request) {
     const msg = (error as Error).message;
     if (msg === 'Unauthorized' || msg === 'Forbidden') return NextResponse.json({ error: msg }, { status: 403 });
     console.error('[ledger] read-slip', error);
+    if ((error as Error).name === 'TimeoutError') return NextResponse.json({ error: 'Gemini ตอบช้าเกินไป — ลองแนบใหม่อีกครั้ง' }, { status: 504 });
     return NextResponse.json({ error: msg || 'อ่านสลิปไม่สำเร็จ' }, { status: 502 });
   }
 }
