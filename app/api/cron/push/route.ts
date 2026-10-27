@@ -3,6 +3,7 @@ import { getDB, getEnv } from '@/lib/db';
 import { claimOnce, sendPushToUser, subscribedUsers, vapidKeys, type PushKind } from '@/lib/push';
 import { seatsHeldSubquery } from '@/lib/seats';
 import { pushAdminAlerts } from '@/lib/admin-alert-push';
+import { pushEvents } from '@/lib/push-events';
 import { parseDashboardAccess, parseInstructorIds } from '@/lib/workshop-utils';
 
 /**
@@ -383,6 +384,13 @@ export async function GET(request: Request) {
       if (!/no such table/i.test(msg)) throw error;
     }
 
+    // Refunds asked for, applications, low ratings, selection results, claimed
+    // gifts and surveys opening (lib/push-events).
+    const events = await pushEvents(db, send).catch((e) => {
+      console.error('Push events error:', e);
+      return {};
+    });
+
     // New urgent Admin Insights alerts to admins, every 15 minutes (lib/admin-alert-push).
     const admin = await pushAdminAlerts(db, env).catch((e) => {
       console.error('Admin alerts push error:', e);
@@ -407,7 +415,7 @@ export async function GET(request: Request) {
         .catch(() => null);
     }
 
-    return NextResponse.json({ ok: true, ...counts, admin, pruned });
+    return NextResponse.json({ ok: true, ...counts, events, admin, pruned });
   } catch (error) {
     // Before migration 064 the subscription table does not exist: nothing to do.
     const msg = error instanceof Error ? error.message : String(error);

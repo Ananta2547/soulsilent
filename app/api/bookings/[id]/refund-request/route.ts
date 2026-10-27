@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getDB } from '@/lib/db';
+import { getDB, getEnv } from '@/lib/db';
+import { notifyHostsRefundRequest } from '@/lib/push-events';
 import { requireAuth } from '@/lib/auth';
 import { getWorkshopStart } from '@/lib/workshop-utils';
 import type { Workshop } from '@/lib/types';
@@ -33,6 +34,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       )
       .bind(id, id)
       .run();
+    await notifyHostsRefundRequest(db, await getEnv(), id);
     return NextResponse.json({ ok: true });
   } catch (error) {
     if ((error as Error).message === 'Unauthorized') return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 });

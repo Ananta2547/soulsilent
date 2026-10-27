@@ -198,14 +198,14 @@ export function PushPrefs() {
     {
       k: 'booking',
       title: tr(lang, 'การจองของฉัน', 'My bookings'),
-      sub: tr(lang, 'จองสำเร็จ และเพื่อนรับคำเชิญเข้ากลุ่ม', 'Booking confirmed, a friend joined your group'),
+      sub: tr(lang, 'จองสำเร็จ ผลคัดเลือก ได้รับสิทธิ์/ของขวัญ เพื่อนเข้ากลุ่ม และแบบสอบถามหลังกิจกรรม', 'Booking confirmed, selection results, seats received, friends joining, surveys'),
     },
     ...(host
       ? [
           {
             k: 'host' as const,
-            title: tr(lang, 'มีคนจองรอบของคุณ', 'Someone booked your round'),
-            sub: tr(lang, 'สำหรับผู้จัด ทุกครั้งที่มีการจองใหม่', 'For hosts, on every new booking'),
+            title: tr(lang, 'สำหรับผู้จัด', 'For hosts'),
+            sub: tr(lang, 'มีคนจอง ขอคืนเงิน ใบสมัครใหม่ และรีวิว/แบบสอบถามคะแนนต่ำ', 'New bookings, refund requests, applications, low ratings'),
           },
         ]
       : []),
