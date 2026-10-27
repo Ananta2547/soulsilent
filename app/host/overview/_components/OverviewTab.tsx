@@ -174,7 +174,7 @@ export function OverviewTab({ a, periodLabel, onTab }: { a: Analytics; periodLab
           )}
         </Card>
 
-        <Card title="ค่าธรรมเนียม GP" sub={o.fee.started ? 'ขั้นตามยอดขายเดือนก่อน แยกเดี่ยว / แบบรอบ' : 'เริ่มคิด 1 ม.ค. 70 — การจองที่ชำระก่อนหน้านั้นไม่มี GP'} delay={210}>
+        <Card title="ค่าธรรมเนียม GP" sub={o.fee.started ? 'ขั้นตามยอดขายเดือนก่อน แยกเดี่ยว / แบบรอบ' : 'เริ่มคิด 1 ม.ค. 70 — กิจกรรมที่จัดก่อนหน้านั้นไม่มี GP'} delay={210}>
           {o.fee.kinds.map((k) => {
             const target = k.step ? k.salesThisMonth + k.step.need : null;
             const rate = o.fee.started ? k.rate : k.nextMonthRate;

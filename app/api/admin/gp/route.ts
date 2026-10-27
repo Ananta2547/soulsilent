@@ -43,7 +43,7 @@ export async function GET(request: Request) {
           .prepare(
             `SELECT b.id, b.amount, b.host_credit, b.paid_at, b.status, b.payment_status, b.group_size, b.booking_kind, b.parent_booking_id,
                     w.id AS w_id, w.instructor_id, m.kind AS master_kind, w.payment_type, w.max_participants, w.fee_mode,
-                    w.payout_deduction_type, w.payout_deduction_value
+                    w.payout_deduction_type, w.payout_deduction_value, w.date
                FROM bookings b JOIN workshops w ON w.id = b.workshop_id LEFT JOIN workshop_masters m ON m.id = w.master_id
               WHERE b.paid_at >= ? AND b.paid_at < ? AND b.status != 'cancelled'`,
           )

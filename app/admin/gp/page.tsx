@@ -96,7 +96,7 @@ export default function AdminGpPage() {
         <>
           {!data.started && (
             <div className="adm-notice" style={{ marginBottom: 12 }}>
-              เดือนนี้อยู่ก่อน 1 ม.ค. 2570 — การจองที่ชำระในเดือนนี้ไม่มี GP (ยอดขายธันวาคม 2569 ใช้คิดขั้นของมกราคม 2570)
+              เดือนนี้อยู่ก่อน 1 ม.ค. 2570 — กิจกรรมที่จัดก่อน 1 ม.ค. 2570 ไม่มี GP ส่วนกิจกรรมที่จัดตั้งแต่ 1 ม.ค. 2570 คิดตามอัตรามกราคม 2570 (ยอดขายธันวาคม 2569 ใช้คิดขั้นของมกราคม 2570)
             </div>
           )}
           <div className="adm-card" style={{ padding: '14px 18px', marginBottom: 12, display: 'flex', gap: 28, flexWrap: 'wrap' }}>

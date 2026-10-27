@@ -10,8 +10,10 @@ import { computePayout } from '@/lib/workshop-utils';
  *   A group or whole-round booking's seat price is what was paid ÷ its seats.
  * - Round-based hosts: 0% for one month from their first round going on sale;
  *   hosts who already had rounds before 2570 get 0% for all of January 2570.
- * - The rate follows the day the money was paid: anything paid before
- *   1 Jan 2570 is 0%, and December 2569's sales set January 2570's tier.
+ * - A workshop held before 1 Jan 2570 carries 0% however it was paid. One held
+ *   from then on takes the rate of the month the money was paid, counting
+ *   money paid before 2570 as paid in January 2570 (December 2569's sales set
+ *   January 2570's tier).
  * - GP is charged on what the host is paid for the seat: amount after the
  *   host's own discount, plus what ASL covers for a comp or ASL coupon.
  * Admin can switch a round to a manual deduction instead (fee_mode 'manual'). */
@@ -72,6 +74,8 @@ export type GpWorkshop = {
   fee_mode: string | null;
   payout_deduction_type: 'none' | 'fixed' | 'percent' | null;
   payout_deduction_value: number | null;
+  /** First day (YYYY-MM-DD): a workshop held before GP_START is 0%. */
+  date: string;
 };
 export type GpBooking = {
   id: string;
@@ -173,7 +177,7 @@ export async function loadGp(db: D1Database, hostIds: (string | null | undefined
 
 /** The round 0% month (and GP's start date) on top of a table rate, at time `at`. */
 function adjust(ctx: GpContext, host: string, kind: GpKind, table: number, at: number): { rate: number; why: string | null } {
-  if (at < GP_START_MS) return { rate: 0, why: 'ชำระก่อน 1 ม.ค. 2570' };
+  if (at < GP_START_MS) return { rate: 0, why: 'ก่อน 1 ม.ค. 2570' };
   const facts = ctx.hosts.get(host);
   if (kind === 'round' && facts && at < facts.roundZeroUntil) return { rate: 0, why: 'เดือนแรกของกิจกรรมแบบรอบ' };
   return { rate: table, why: null };
@@ -191,7 +195,8 @@ export function gpOfBooking(ctx: GpContext, w: GpWorkshop, b: GpBooking): { rate
   const gross = (Number(b.amount) || 0) + (Number(b.host_credit) || 0);
   const kind = gpKindOf(w);
   if (!b.paid_at || kind === 'free' || gross <= 0 || !w.instructor_id) return { rate: 0, gp: 0, gross };
-  const { rate } = rateFor(ctx, w.instructor_id, kind, utcMs(b.paid_at));
+  if (wallMs(w.date) < GP_START_MS) return { rate: 0, gp: 0, gross };
+  const { rate } = rateFor(ctx, w.instructor_id, kind, Math.max(utcMs(b.paid_at), GP_START_MS));
   if (rate <= 0) return { rate: 0, gp: 0, gross };
   const seats = Math.max(1, b.parent_booking_id ? 1 : b.booking_kind === 'private' ? w.max_participants || 1 : b.group_size || 1);
   const perSeat = gross / seats;
@@ -249,7 +254,7 @@ export async function roundFeesById(db: D1Database, workshopId: string) {
   const w = await db
     .prepare(
       `SELECT w.id, w.instructor_id, m.kind AS master_kind, w.payment_type, w.max_participants, w.fee_mode,
-              w.payout_deduction_type, w.payout_deduction_value
+              w.payout_deduction_type, w.payout_deduction_value, w.date
          FROM workshops w LEFT JOIN workshop_masters m ON m.id = w.master_id WHERE w.id = ?`,
     )
     .bind(workshopId)
