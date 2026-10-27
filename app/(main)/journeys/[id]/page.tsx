@@ -34,7 +34,7 @@ import {
   canAccessTeacherDashboard,
 } from '@/lib/workshop-utils';
 import { hasAnyRole } from '@/lib/roles';
-import { REFUND } from '@/lib/policy';
+import { HOLD_MINUTES } from '@/lib/policy';
 import { learnServerClock } from '@/lib/server-clock';
 import { visibleAppStatus } from '@/lib/selection-status';
 import { GiftModal } from '@/components/workshops/GiftModal';
@@ -284,6 +284,19 @@ function WorkshopDetailInner() {
     } catch {
       setBooking(false);
       return { error: tr(lang, 'เกิดข้อผิดพลาด', 'Something went wrong') };
+    }
+  }
+
+  // Closing the booking popup — also its "booked" / "application sent" result,
+  // which can be dismissed by tapping outside it. A paid booking leaves the
+  // page for checkout instead, so whatever is still open here is done: free
+  // the button and reload, so it reads "booked" rather than "processing".
+  function closeBooking() {
+    setBookingOpen(false);
+    setChosen(null);
+    if (booking) {
+      setBooking(false);
+      load();
     }
   }
 
@@ -973,8 +986,33 @@ function WorkshopDetailInner() {
                 </Reveal>
               )}
 
+              {/* Online: no venue to find — say where the room link comes from. */}
+              {!!workshop.is_online && (
+                <Reveal>
+                  <span className="eyebrow">
+                    <T th="สถานที่ · ออนไลน์" en="location + online" />
+                  </span>
+                  <h2 className="display-th" style={{ fontSize: 'clamp(28px, 3.5vw, 40px)', margin: '14px 0 20px' }}>
+                    <T th="เจอกันออนไลน์" en="We meet online" />
+                  </h2>
+                  <div className="card card-static" style={{ background: 'var(--cream)', boxShadow: 'none', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <span className="mono" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '.12em', textTransform: 'uppercase' }}>
+                      {tr(lang, 'แพลตฟอร์ม', 'Platform')}
+                    </span>
+                    <span style={{ fontSize: 18, fontWeight: 600 }}>{platformLabel(workshop.online_platform, workshop.online_platform_other)}</span>
+                    <p style={{ margin: 0, fontSize: 14.5, color: 'var(--muted)', lineHeight: 1.65 }}>
+                      {tr(
+                        lang,
+                        'ไม่ต้องเดินทาง — เข้าร่วมจากที่ไหนก็ได้ ลิงก์เข้าห้องจะแสดงในหน้านี้และในหน้า “การจองของฉัน” หลังจองสำเร็จ และส่งไปทางอีเมลด้วย',
+                        'No travel needed — join from anywhere. The room link appears here and in “My bookings” once you have booked, and is emailed to you too.',
+                      )}
+                    </p>
+                  </div>
+                </Reveal>
+              )}
+
               {/* How to find us — map + address */}
-              {locationLabel && (
+              {locationLabel && !workshop.is_online && (
                 <Reveal>
                   <span className="eyebrow">
                     <T th="สถานที่ · แผนที่" en="location + map" />
@@ -1126,7 +1164,7 @@ function WorkshopDetailInner() {
 
       {bookingOpen && (
         <BookingModal
-          onClose={() => setBookingOpen(false)}
+          onClose={closeBooking}
           workshop={workshop}
           submitting={booking}
           onSubmit={(application, couponCode) => handleBooking(application, couponCode)}
@@ -1147,7 +1185,7 @@ function WorkshopDetailInner() {
       )}
       {chosen && (
         <BookingModal
-          onClose={() => setChosen(null)}
+          onClose={closeBooking}
           workshop={chosen.session}
           submitting={booking}
           onSubmit={submitChosen}
@@ -1680,14 +1718,16 @@ function BookingCardContent({
           color: 'var(--muted)',
         }}
       >
-        {[
-          tr(lang, 'จองที่นั่งทันที · ชำระเงินภายใน 10 นาที', 'Seat held instantly · pay within 10 minutes'),
-          tr(
-            lang,
-            `ยกเลิกก่อน ${REFUND.fullDays} วัน รับเงินคืน · ไปไม่ได้โอนสิทธิ์ได้`,
-            `Cancel ${REFUND.fullDays} days ahead for a refund · or transfer your seat`,
-          ),
-        ].map((line) => (
+        {(isFree
+          ? [
+              tr(lang, 'กดจองแล้วได้ที่นั่งทันที', 'Your seat is confirmed as soon as you book'),
+              tr(lang, 'ไปไม่ได้ โอนสิทธิ์ให้คนอื่นได้', "Can't make it? Transfer your seat"),
+            ]
+          : [
+              tr(lang, `จองที่นั่งทันที · ชำระเงินภายใน ${HOLD_MINUTES} นาที`, `Seat held instantly · pay within ${HOLD_MINUTES} minutes`),
+              tr(lang, 'ยกเลิกเองไม่คืนเงิน · ไปไม่ได้โอนสิทธิ์ได้', 'No refund if you cancel · transfer your seat instead'),
+            ]
+        ).map((line) => (
           <li key={line} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ color: 'var(--teal)', fontWeight: 700, flexShrink: 0 }}>✓</span>
             {line}

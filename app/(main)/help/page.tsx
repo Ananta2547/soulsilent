@@ -43,8 +43,8 @@ const HELP_FAQ: { cat: L; items: { q: L; a: L }[] }[] = [
       {
         q: { th: 'ยกเลิกแล้วได้เงินคืนไหม?', en: 'Can I get a refund if I cancel?' },
         a: {
-          th: `ยกเลิกก่อนวันกิจกรรม ${REFUND.fullDays} วันขึ้นไปได้เงินคืนเต็มจำนวน (หักค่าธรรมเนียมการชำระเงิน) ${REFUND.partialDays}–${REFUND.fullDays - 1} วันได้คืน ${REFUND.partialPercent}% และถ้าผู้จัดยกเลิกกิจกรรม คุณได้เงินคืนเต็มจำนวน ดูรายละเอียดที่หน้าข้อกำหนดการใช้งาน หัวข้อการยกเลิกและการคืนเงิน`,
-          en: `Cancel ${REFUND.fullDays}+ days before for a full refund (less the payment fee), ${REFUND.partialDays}–${REFUND.fullDays - 1} days before for ${REFUND.partialPercent}%. If the host cancels, you get everything back. See “Cancellation and refunds” in our terms.`,
+          th: `ไม่ได้ — เมื่อชำระแล้ว การยกเลิกเองไม่ได้รับเงินคืน แต่ถ้าไปไม่ได้ คุณโอนที่นั่งให้คนอื่นได้ฟรีจากหน้า “การจองของฉัน” ก่อนกิจกรรมเริ่ม ถ้าผู้จัดยกเลิกหรือย้ายรอบ คุณได้เงินคืนเต็มจำนวน (โอนคืนภายใน ${REFUND.payoutDays} วันทำการ) ดูรายละเอียดที่หน้าข้อกำหนดการใช้งาน หัวข้อการยกเลิกและการคืนเงิน`,
+          en: `No — once paid, cancelling yourself is not refunded. If you can't go, transfer your seat to someone else for free from “My bookings” before the activity starts. If the host cancels or moves your round, you get a full refund (within ${REFUND.payoutDays} business days). See “Cancellation and refunds” in our terms.`,
         },
       },
       {
