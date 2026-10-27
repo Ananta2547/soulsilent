@@ -10,7 +10,10 @@ import Link from 'next/link';
 import { AdminFormModal } from '@/components/admin/AdminFormModal';
 import { adminConfirm, adminToast, AdminHead, AdminChips, RowMenu } from '@/components/admin/AdminShell';
 import { MasterForm } from './_components/MasterForm';
-import type { WorkshopMaster } from '@/lib/types';
+import type { MasterStatus, WorkshopMaster } from '@/lib/types';
+import { STATUS_LABEL } from '@/lib/round-rules';
+
+const STATUS_TONE: Record<MasterStatus, string> = { open: 'ok', paused: 'warn', draft: 'mute', archived: 'mute' };
 
 // 'single' opens the standalone-workshop form — the same one the workshop
 // list uses — so a one-off workshop can be made from here as well.
@@ -171,6 +174,11 @@ export default function WorkshopInfoAdminPage() {
                     )}
                     <div className="adm-poster-body">
                       <h3>{m.title}</h3>
+                      {m.kind !== 'single' && (
+                        <span className={`adm-badge ${STATUS_TONE[m.activity_status || 'open']}`} style={{ alignSelf: 'flex-start' }}>
+                          {STATUS_LABEL[m.activity_status || 'open']}
+                        </span>
+                      )}
                       {m.organizer_name && <p className="adm-meta">โดย {m.organizer_name}</p>}
                       {m.kind !== 'single' && (
                         <p className="adm-meta">

@@ -80,6 +80,8 @@ export interface ScheduleDay {
 }
 
 /** Overview/master record — activity info shared across its sessions (rounds). */
+export type MasterStatus = 'open' | 'paused' | 'draft' | 'archived';
+
 export interface WorkshopMaster {
   id: string;
   title: string;
@@ -112,6 +114,14 @@ export interface WorkshopMaster {
    *  PDPA photo/video consent switch; copied into each round (migration 069). */
   application_form?: string | null;
   require_consent?: number | null;
+  /** Round activity settings (migration 077) — see lib/round-rules.ts. */
+  activity_status?: MasterStatus;
+  age_min?: number | null;
+  age_max?: number | null;
+  close_days_before?: number | null;
+  close_time?: string | null;
+  /** JSON { title, intro, questions } — the AAR every round uses. */
+  survey_json?: string | null;
   created_at: string;
   updated_at: string;
   /** Joined (not a column): the organizer teacher's display name. */

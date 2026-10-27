@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { v4 as uuid } from 'uuid';
 import { getDB } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
+import { cleanAges, cleanCloseRule, statusOf } from '@/lib/round-rules';
 import type { ImageMeta, WorkshopMaster } from '@/lib/types';
 import { normalizeTiers, seatPrice } from '@/lib/pricing';
 
@@ -39,6 +40,11 @@ type Body = {
   location_ids?: string[];
   price_group_booking?: number | null;
   price_tiers?: unknown;
+  activity_status?: unknown;
+  age_min?: unknown;
+  age_max?: unknown;
+  close_days_before?: unknown;
+  close_time?: unknown;
 };
 const locIds = (v: unknown): string => JSON.stringify(Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x) : []);
 const kindOf = (v: unknown): 'round' | 'single' => (v === 'single' ? 'single' : 'round');
@@ -59,13 +65,17 @@ export async function POST(request: Request) {
     // tiers) still takes the price it was sent.
     const tiers = normalizeTiers(body.price_tiers);
     const priceGroup = tiers.length ? seatPrice(tiers) : money(body.price_group);
+    const ages = cleanAges(body.age_min, body.age_max);
+    if ('error' in ages) return NextResponse.json({ error: ages.error }, { status: 400 });
+    const rule = cleanCloseRule(body.close_days_before, body.close_time);
+    if ('error' in rule) return NextResponse.json({ error: rule.error }, { status: 400 });
     await db
       .prepare(
         `INSERT INTO workshop_masters
           (id, title, description, organizer, cover_image_url, cover_image_meta, target_json, takeaways_json,
            price_group, price_private, default_max_participants, kind, location_ids_json,
-           price_group_booking, price_tiers_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           price_group_booking, price_tiers_json, activity_status, age_min, age_max, close_days_before, close_time)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         id,
@@ -82,7 +92,12 @@ export async function POST(request: Request) {
         kindOf(body.kind),
         locIds(body.location_ids),
         money(body.price_group_booking),
-        JSON.stringify(tiers)
+        JSON.stringify(tiers),
+        statusOf(body.activity_status),
+        ages.min,
+        ages.max,
+        rule.days,
+        rule.time
       )
       .run();
     return NextResponse.json({ id }, { status: 201 });

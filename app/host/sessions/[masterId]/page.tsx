@@ -21,6 +21,8 @@ import { DOW_TH, IcoPin, SeatBar, TH_MONTHS, TdbCalendar, addDays, baht, dateOf,
 import { ONLINE_PLATFORMS, ONLINE_VENUE, isMeetingUrl, platformLabel, venueRules } from '@/lib/online-platform';
 import { CancelRoundModal } from './_components/CancelRoundModal';
 import { ApplicationModal } from './_components/ApplicationModal';
+import { CloseRuleModal } from './_components/CloseRuleModal';
+import { MASTER_STATUSES, STATUS_LABEL, canOpenRounds } from '@/lib/round-rules';
 
 type Round = {
   id: string;
@@ -100,6 +102,7 @@ export default function TeacherMasterSessionsPage() {
   const [cancelFor, setCancelFor] = useState<Round | null>(null);
   // The activity's application form + PDPA (ApplicationModal).
   const [appOpen, setAppOpen] = useState(false);
+  const [closeOpen, setCloseOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   const load = () =>
@@ -190,6 +193,10 @@ export default function TeacherMasterSessionsPage() {
 
   function openAdd(onDate?: string) {
     if (!master) return;
+    if (!canOpenRounds(master.activity_status)) {
+      setToast(`กิจกรรมนี้${STATUS_LABEL[master.activity_status || 'open']}อยู่ — เปิดรอบใหม่ไม่ได้`);
+      return;
+    }
     setEditing(null);
     setRepeat('once');
     setDates(onDate ? [onDate] : []);
@@ -467,11 +474,33 @@ export default function TeacherMasterSessionsPage() {
               {appCount} ข้อ{master.require_consent ? ' · PDPA' : ''}
             </small>
           </button>
-          <button type="button" className="btn btn-teal" onClick={() => openAdd()}>
+          {/* When booking closes before each round (migration 077). */}
+          <button type="button" className="btn btn-paper tdb-app-btn" onClick={() => setCloseOpen(true)}>
+            ปิดรับจอง
+            <small>{master.close_days_before == null ? 'จนรอบเริ่ม' : `${master.close_days_before === 0 ? 'วันกิจกรรม' : `${master.close_days_before} วันก่อน`} · ${master.close_time || '23:59'}`}</small>
+          </button>
+          {/* One AAR survey for every round, and every answer and review. */}
+          <Link href={`/host/sessions/${master.id}/aar`} className="btn btn-paper tdb-app-btn">
+            AAR / รีวิว
+            <small>{master.survey_json ? 'ใช้ทุกรอบ' : 'ยังไม่ได้ตั้ง'}</small>
+          </Link>
+          <button
+            type="button"
+            className="btn btn-teal"
+            onClick={() => openAdd()}
+            disabled={!canOpenRounds(master.activity_status)}
+            style={{ opacity: canOpenRounds(master.activity_status) ? 1 : 0.5 }}
+          >
             <span style={{ fontSize: 18, lineHeight: 1 }}>+</span> เพิ่มรอบ
           </button>
         </div>
       </div>
+
+      {master.activity_status && master.activity_status !== 'open' && (
+        <div className="tdb-note-warn" style={{ marginBottom: 18 }}>
+          กิจกรรมนี้ <b>{STATUS_LABEL[master.activity_status]}</b> — {MASTER_STATUSES.find((s) => s.key === master.activity_status)?.hint} · เปลี่ยนสถานะได้ที่ Admin
+        </div>
+      )}
 
       <div className="tdb-stats">
         <div>
@@ -580,6 +609,10 @@ export default function TeacherMasterSessionsPage() {
                 <div className="tdb-round-actions">
                   <Link href={`/host/sessions/round/${r.id}`} className="btn btn-teal btn-sm">
                     เช็คชื่อ →
+                  </Link>
+                  {/* This round's QR and answers. */}
+                  <Link href={`/host/sessions/round/${r.id}?tab=aar`} className="tdb-soft-btn" style={{ padding: '9px 16px', fontSize: 13 }}>
+                    AAR / รีวิว
                   </Link>
                   <button type="button" className="tdb-soft-btn" style={{ padding: '9px 16px', fontSize: 13 }} onClick={() => startEdit(r)}>
                     แก้ไข
@@ -955,6 +988,19 @@ export default function TeacherMasterSessionsPage() {
         </div>
       )}
 
+
+      {closeOpen && (
+        <CloseRuleModal
+          master={master}
+          nextRound={upcoming[0] || null}
+          onClose={() => setCloseOpen(false)}
+          onSaved={async (msg) => {
+            setCloseOpen(false);
+            setToast(msg);
+            await load();
+          }}
+        />
+      )}
 
       {appOpen && (
         <ApplicationModal

@@ -172,11 +172,15 @@ export async function pushEvents(db: D1Database, send: Send): Promise<Record<str
     }
   }
 
-  // The after-activity survey just opened: to everyone checked in who has not answered.
+  // The after-activity survey just opened — or the round it was ready for
+  // just ended (an activity's AAR is set up before its rounds happen): to
+  // everyone checked in who has not answered.
   const invites = await all<{ survey_id: string; wid: string; title: string; user_id: string }>(
     `SELECT s.id AS survey_id, w.id AS wid, w.title, b.user_id
        FROM surveys s JOIN workshops w ON w.id = s.workshop_id JOIN bookings b ON b.workshop_id = w.id
-      WHERE s.is_open = 1 AND datetime(s.created_at) >= datetime('now', '-60 minutes') AND b.user_id IS NOT NULL
+      WHERE s.is_open = 1 AND b.user_id IS NOT NULL
+        AND (datetime(s.created_at) >= datetime('now', '-60 minutes')
+          OR datetime(COALESCE(NULLIF(w.end_date, ''), w.date) || ' ' || COALESCE(NULLIF(w.time_end, ''), '23:59'), '-7 hours') BETWEEN datetime('now', '-60 minutes') AND datetime('now'))
         AND (b.attended = 1 OR instr(COALESCE(b.attendance_json, ''), ':1') > 0)
         AND NOT EXISTS (SELECT 1 FROM survey_responses r WHERE r.survey_id = s.id AND r.user_id = b.user_id)
       LIMIT 500`,

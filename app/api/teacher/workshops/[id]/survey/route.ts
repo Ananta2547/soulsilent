@@ -6,6 +6,7 @@ import { hasAnyRole } from '@/lib/roles';
 import { canAccessTeacherDashboard } from '@/lib/workshop-utils';
 import { parseAnswers, sanitizeQuestions, surveyFromRow, type SurveyResponse } from '@/lib/survey';
 import type { Workshop } from '@/lib/types';
+import { ensureRoundSurvey } from '@/lib/round-rules';
 
 type SurveyRow = Parameters<typeof surveyFromRow>[0];
 
@@ -37,6 +38,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if ('error' in ctx) return ctx.error;
   const { db, workshop } = ctx;
 
+  // A round of an activity with its own AAR (migration 077) gets that survey.
+  if (workshop.master_id) {
+    const m = await db.prepare('SELECT survey_json, organizer FROM workshop_masters WHERE id = ?').bind(workshop.master_id).first<{ survey_json: string | null; organizer: string | null }>();
+    if (m?.survey_json) await ensureRoundSurvey(db, id, m.survey_json, m.organizer);
+  }
   const row = await db.prepare('SELECT * FROM surveys WHERE workshop_id = ?').bind(id).first<SurveyRow>();
   let template = null;
   if (!row && workshop.master_id) {

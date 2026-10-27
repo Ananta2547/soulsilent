@@ -10,6 +10,7 @@ import {
 } from '@/lib/home-data';
 import type { Article, ArticleCategory, Workshop } from '@/lib/types';
 import { publicWorkshop } from '@/lib/workshop-public';
+import { visibleMasterSql } from '@/lib/round-rules';
 
 /** A review as the home page shows it: no emails, author and journey joined. */
 export type PublicReview = {
@@ -38,8 +39,8 @@ export type HomeBundle = {
 export async function loadHomeBundle(): Promise<HomeBundle> {
   const db = await getDB();
   const [active, featured, articles, categories, reviews, stats] = await db.batch([
-    db.prepare(workshopListSql(['status = ?'])).bind('active'),
-    db.prepare(workshopListSql(["status IN ('active', 'closed')", 'featured = 1'])),
+    db.prepare(workshopListSql(['status = ?', visibleMasterSql('m')])).bind('active'),
+    db.prepare(workshopListSql(["status IN ('active', 'closed')", 'featured = 1', visibleMasterSql('m')])),
     db.prepare(PUBLISHED_ARTICLES_SQL),
     db.prepare(ARTICLE_CATEGORIES_SQL),
     db.prepare(reviewListSql({ limit: 10, featured: true })),

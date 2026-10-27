@@ -7,6 +7,7 @@ import { ImageUploader } from '@/components/admin/image/ImageUploader';
 import { ASPECTS } from '@/lib/image-aspects';
 import { AdminSheet, adminAlert } from '@/components/admin/AdminShell';
 import { parseSlipQr, type SlipFields } from '@/lib/slip-reader';
+import { HostPayoutInfoCard } from './HostPayoutInfoCard';
 
 export type TransferKind = 'refund' | 'host_payout' | 'host_return' | 'income' | 'expense';
 
@@ -115,6 +116,7 @@ export function RecordTransferSheet({
 
   const beamRow = !!edit && (edit.ref_source === 'beam' || edit.method === 'beam');
   const incoming = INCOMING.includes(kind);
+  const payoutHost = preset.host_id || edit?.host_id || null;
 
   useEffect(() => {
     if (kind !== 'expense' || cats.length) return;
@@ -243,6 +245,25 @@ export function RecordTransferSheet({
               <option value="host_payout">จ่ายรายได้ผู้จัด</option>
             </select>
           </div>
+        )}
+
+        {kind === 'host_payout' && payoutHost && (
+          <HostPayoutInfoCard
+            hostId={payoutHost}
+            onLoad={(i) => {
+              // Fill only what admin has not typed; the account is kept as 4 digits on save.
+              if (edit) return;
+              const fill = (k: string, v: string | null, set: (fn: (cur: string) => string) => void) => v && !touched.current.has(k) && set((cur) => cur || v);
+              fill('payee', i.account_name, setPayee);
+              if (i.account_no) {
+                fill('bank', i.bank, setBank);
+                fill('account', i.account_no, setAccount);
+              } else if (i.promptpay) {
+                fill('account', i.promptpay, setAccount);
+                if (!touched.current.has('method')) setMethod('promptpay');
+              }
+            }}
+          />
         )}
 
         {!beamRow && (

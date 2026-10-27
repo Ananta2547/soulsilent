@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 import { getCurrentUserWithRoles } from '@/lib/auth';
 import { hasAnyRole } from '@/lib/roles';
+import { syncRounds } from '@/lib/round-rules';
 import { ONLINE_VENUE, isMeetingUrl, normalizeOnlineFields, venueRules } from '@/lib/online-platform';
 
 const TIME_RE = /^\d{2}:\d{2}$/;
@@ -120,6 +121,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (seats != null) { sets.push('max_participants = ?'); vals.push(seats); }
   vals.push(id);
   await db.prepare(`UPDATE workshops SET ${sets.join(', ')} WHERE id = ?`).bind(...vals).run();
+  // A new day moves the booking close with it.
+  if (date !== w.date) await syncRounds(db, w.master_id as string);
   const round = await db.prepare('SELECT * FROM workshops WHERE id = ?').bind(id).first();
   return NextResponse.json({ round });
 }

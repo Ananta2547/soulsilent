@@ -6,6 +6,7 @@ import { getCurrentUserWithRoles } from '@/lib/auth';
 import { hasAnyRole } from '@/lib/roles';
 import type { Workshop, WorkshopMaster } from '@/lib/types';
 import { bookableTiers, cardPrice } from '@/lib/pricing';
+import { canOpenRounds, ensureRoundSurvey, roundCloseAt, STATUS_LABEL } from '@/lib/round-rules';
 import { ONLINE_VENUE, isMeetingUrl, normalizeOnlineFields, venueRules } from '@/lib/online-platform';
 
 /* The teacher's session manager. A master is the activity the admin wrote up
@@ -194,6 +195,9 @@ export async function POST(request: Request) {
   if (!u.roles.includes('admin') && master.organizer !== u.sub) {
     return NextResponse.json({ error: 'คุณไม่ได้เป็นผู้จัดของกิจกรรมนี้' }, { status: 403 });
   }
+  if (!canOpenRounds(master.activity_status)) {
+    return NextResponse.json({ error: `กิจกรรมนี้${STATUS_LABEL[master.activity_status || 'open']}อยู่ — เปิดรอบใหม่ไม่ได้` }, { status: 400 });
+  }
   // Any price will do — a round-only master carries the round price on
   // its cards and sells through its tiers.
   if (cardPrice(bookableTiers(master)) == null) {
@@ -252,6 +256,7 @@ export async function POST(request: Request) {
     const id = uuid();
     ids.push(id);
     await insertRound(db, id, master, venue, date, slot, seats, u.sub);
+    await ensureRoundSurvey(db, id, master.survey_json, master.organizer);
   }
 
   const first = await db.prepare('SELECT * FROM workshops WHERE id = ?').bind(ids[0]).first<Workshop>();
@@ -284,9 +289,9 @@ async function insertRound(
         max_participants, price, image_url, image_meta, status,
         admission_type, payment_type, deposit_amount, require_consent, master_id,
         day_times_json, is_online, online_platform, online_platform_other, online_url,
-        dashboard_access_json, created_by, application_form
+        dashboard_access_json, created_by, application_form, min_age, max_age, close_at
        ) VALUES (?, ?, ?, ?, ?, 'one_day', ?, '[]', ?, ?, ?, ?, '[]', ?, ?, '[]', ?, ?, ?, ?, ?, 'active',
-                 'direct', 'paid', 0, ?, ?, '[]', ?, ?, ?, ?, '[]', ?, ?)`
+                 'direct', 'paid', 0, ?, ?, '[]', ?, ?, ?, ?, '[]', ?, ?, ?, ?, ?)`
     )
     .bind(
       id,
@@ -316,7 +321,11 @@ async function insertRound(
       online?.platform_other ?? null,
       online?.url ?? null,
       createdBy,
-      master.application_form || '[]'
+      master.application_form || '[]',
+      // Age limit and booking close of the activity (migration 077).
+      master.age_min ?? null,
+      master.age_max ?? null,
+      roundCloseAt(date, master)
     )
     .run();
 }

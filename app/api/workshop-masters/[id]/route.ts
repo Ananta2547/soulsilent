@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { seatsHeldSubquery } from '@/lib/seats';
 import { getDB } from '@/lib/db';
-import { requireAdmin } from '@/lib/auth';
+import { getCurrentUserWithRoles, requireAdmin } from '@/lib/auth';
+import { cleanAges, cleanCloseRule, isHiddenStatus, statusOf, syncRounds } from '@/lib/round-rules';
 import { expireStaleHolds } from '@/lib/holds';
 import type { ImageMeta, WorkshopMaster } from '@/lib/types';
 import { cardPrice, normalizeTiers, seatPrice } from '@/lib/pricing';
@@ -21,7 +22,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const db = await getDB();
     await expireStaleHolds(db);
 
-    const master = await db
+    let master = await db
       .prepare(
         `SELECT m.*, u.name AS organizer_name,
                 -- the public page links the organizer only while they hold the host role
@@ -31,6 +32,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       )
       .bind(id)
       .first<WorkshopMaster>();
+    // A draft or archived activity is off the public site: only admin and
+    // its own host still open it.
+    if (master && isHiddenStatus(master.activity_status)) {
+      const u = await getCurrentUserWithRoles();
+      if (!u || (!u.roles.includes('admin') && u.sub !== master.organizer)) master = null;
+    }
     if (!master) {
       return NextResponse.json({ error: 'ไม่พบข้อมูลกิจกรรม' }, { status: 404 });
     }
@@ -68,6 +75,11 @@ type Body = {
   location_ids?: string[];
   price_group_booking?: number | null;
   price_tiers?: unknown;
+  activity_status?: unknown;
+  age_min?: unknown;
+  age_max?: unknown;
+  close_days_before?: unknown;
+  close_time?: unknown;
 };
 const locIds = (v: unknown): string => JSON.stringify(Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x) : []);
 const kindOf = (v: unknown): 'round' | 'single' => (v === 'single' ? 'single' : 'round');
@@ -89,6 +101,19 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     // tiers) still takes the price it was sent.
     const tiers = normalizeTiers(body.price_tiers);
     const priceGroup = tiers.length ? seatPrice(tiers) : money(body.price_group);
+    // Status, age limit and booking close (migration 077) — only when sent,
+    // so an older caller does not clear them.
+    const settings = 'activity_status' in body;
+    const ages = cleanAges(body.age_min, body.age_max);
+    if ('error' in ages) return NextResponse.json({ error: ages.error }, { status: 400 });
+    const rule = cleanCloseRule(body.close_days_before, body.close_time);
+    if ('error' in rule) return NextResponse.json({ error: rule.error }, { status: 400 });
+    if (settings) {
+      await db
+        .prepare('UPDATE workshop_masters SET activity_status = ?, age_min = ?, age_max = ?, close_days_before = ?, close_time = ? WHERE id = ?')
+        .bind(statusOf(body.activity_status), ages.min, ages.max, rule.days, rule.time, id)
+        .run();
+    }
     await db
       .prepare(
         `UPDATE workshop_masters SET
@@ -142,6 +167,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           id
         )
         .run();
+      if (settings) await syncRounds(db, id);
     }
     return NextResponse.json({ success: true });
   } catch (error) {

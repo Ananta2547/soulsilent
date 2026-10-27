@@ -213,6 +213,8 @@ export function PayoutManager({
           preset={{
             kind: 'host_payout',
             workshop_id: workshop.id,
+            // Shows the host's payout account in the form (migration 077).
+            host_id: workshop.instructor_id || undefined,
             gross: Math.max(0, Math.round((net - transferred) * 100) / 100) || undefined,
             payee_name: host?.name,
             payee_email: host?.email,

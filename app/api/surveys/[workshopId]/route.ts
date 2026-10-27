@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid';
 import { getDB } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { surveyFromRow, validateAnswers } from '@/lib/survey';
+import { ensureRoundSurvey } from '@/lib/round-rules';
 
 type SurveyRow = Parameters<typeof surveyFromRow>[0];
 type WorkshopRow = { id: string; title: string; date: string; time_start: string; time_end: string; image_url: string | null };
@@ -20,6 +21,16 @@ async function attendedBooking(db: Awaited<ReturnType<typeof getDB>>, workshopId
     .first<{ id: string }>();
 }
 
+/** A round of an activity with its own AAR (migration 077) answers that
+ *  survey even before its host opened the round's AAR tab. */
+async function roundSurvey(db: Awaited<ReturnType<typeof getDB>>, workshopId: string) {
+  const m = await db
+    .prepare('SELECT m.survey_json, m.organizer FROM workshops w JOIN workshop_masters m ON m.id = w.master_id WHERE w.id = ?')
+    .bind(workshopId)
+    .first<{ survey_json: string | null; organizer: string | null }>();
+  if (m?.survey_json) await ensureRoundSurvey(db, workshopId, m.survey_json, m.organizer);
+}
+
 /**
  * GET /api/surveys/[workshopId] — what the QR code opens. Always says which
  * workshop it is and where the visitor stands (signed in? checked in?
@@ -28,6 +39,7 @@ async function attendedBooking(db: Awaited<ReturnType<typeof getDB>>, workshopId
 export async function GET(_req: Request, { params }: { params: Promise<{ workshopId: string }> }) {
   const { workshopId } = await params;
   const db = await getDB();
+  await roundSurvey(db, workshopId);
   const [workshop, row] = await Promise.all([
     db.prepare('SELECT id, title, date, time_start, time_end, image_url FROM workshops WHERE id = ?').bind(workshopId).first<WorkshopRow>(),
     db.prepare('SELECT * FROM surveys WHERE workshop_id = ?').bind(workshopId).first<SurveyRow>(),

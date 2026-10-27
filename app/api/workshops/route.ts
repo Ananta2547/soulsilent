@@ -7,6 +7,7 @@ import { normalizeInstructorIds } from '@/lib/workshop-utils';
 import { normalizeOnlineFields } from '@/lib/online-platform';
 import type { Workshop } from '@/lib/types';
 import { workshopListSql } from '@/lib/home-data';
+import { visibleMasterSql } from '@/lib/round-rules';
 
 export async function GET(request: Request) {
   try {
@@ -34,6 +35,8 @@ export async function GET(request: Request) {
     const params: string[] = [];
     if (!isAdmin) {
       where.push(`status IN (${PUBLIC_STATUSES.map((s) => `'${s}'`).join(', ')})`);
+      // A draft or archived round activity hides its rounds too.
+      where.push(visibleMasterSql('m'));
     }
 
     // Public pages show open + closed workshops, never drafts.

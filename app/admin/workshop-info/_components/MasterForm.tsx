@@ -13,6 +13,8 @@ import { UnsavedDialog } from '@/components/admin/UnsavedDialog';
 import { ONLINE_VENUE, venueRules } from '@/lib/online-platform';
 import { ApplicationEditor } from '@/components/workshops/ApplicationEditor';
 import type { ApplicationQuestion } from '@/lib/types';
+import { MASTER_STATUSES, closeRuleText } from '@/lib/round-rules';
+import type { MasterStatus } from '@/lib/types';
 
 const toQuestions = (json: string | null | undefined): ApplicationQuestion[] => {
   try {
@@ -148,6 +150,12 @@ export function MasterForm({
   // Round activities: the application form + PDPA switch (migration 069).
   const [questions, setQuestions] = useState<ApplicationQuestion[]>(() => toQuestions(initial?.application_form));
   const [consent, setConsent] = useState(!!initial?.require_consent);
+  // Status, age limit and booking close (migration 077).
+  const [status, setStatus] = useState<MasterStatus>(initial?.activity_status || 'open');
+  const [ageMin, setAgeMin] = useState(initial?.age_min != null ? String(initial.age_min) : '');
+  const [ageMax, setAgeMax] = useState(initial?.age_max != null ? String(initial.age_max) : '');
+  const [closeDays, setCloseDays] = useState(initial?.close_days_before != null ? String(initial.close_days_before) : '');
+  const [closeTime, setCloseTime] = useState(initial?.close_time || '23:59');
 
   // Unsaved-changes tracking: snapshot the loaded baseline once, then compare
   // the live fields against it so the modal can warn before discarding edits.
@@ -168,11 +176,16 @@ export function MasterForm({
         locationIds: toArr(initial?.location_ids_json),
         questions: toQuestions(initial?.application_form),
         consent: !!initial?.require_consent,
+        status: initial?.activity_status || 'open',
+        ageMin: initial?.age_min != null ? String(initial.age_min) : '',
+        ageMax: initial?.age_max != null ? String(initial.age_max) : '',
+        closeDays: initial?.close_days_before != null ? String(initial.close_days_before) : '',
+        closeTime: initial?.close_time || '23:59',
       }),
     [initial],
   );
   const dirty =
-    JSON.stringify({ title, organizer, description, coverUrl, coverMeta, target, takeaways, priceGroup, priceGroupBooking, tiers, defaultSeats, locationIds, questions, consent }) !== baseline;
+    JSON.stringify({ title, organizer, description, coverUrl, coverMeta, target, takeaways, priceGroup, priceGroupBooking, tiers, defaultSeats, locationIds, questions, consent, status, ageMin, ageMax, closeDays, closeTime }) !== baseline;
   useEffect(() => {
     onDirtyChange?.(dirty);
   }, [dirty, onDirtyChange]);
@@ -216,6 +229,9 @@ export function MasterForm({
           default_max_participants: Number(defaultSeats) || 20,
           kind: initial?.kind || kind,
           location_ids: locationIds,
+          ...((initial?.kind || kind) === 'round'
+            ? { activity_status: status, age_min: ageMin.trim(), age_max: ageMax.trim(), close_days_before: closeDays.trim(), close_time: closeTime }
+            : {}),
         }),
       });
       const data = (await res.json()) as { error?: string; id?: string };
@@ -470,6 +486,46 @@ export function MasterForm({
             ผู้จัดแก้ได้เองในหน้าจัดรอบ · บันทึกแล้วใช้กับทุกรอบที่ยังไม่เริ่ม และรอบที่เปิดใหม่
           </p>
           <ApplicationEditor questions={questions} onQuestions={setQuestions} consent={consent} onConsent={setConsent} disabled={saving} />
+        </SheetSection>
+      )}
+
+      {isRound && (
+        <SheetSection n={6} title="สถานะ · อายุ · ปิดรับจอง">
+          <div className="adm-field">
+            <label>สถานะกิจกรรม</label>
+            <AdmSelect value={status} onChange={(e) => setStatus(e.target.value as MasterStatus)} aria-label="สถานะกิจกรรม">
+              {MASTER_STATUSES.map((s) => (
+                <option key={s.key} value={s.key}>
+                  {s.label}
+                </option>
+              ))}
+            </AdmSelect>
+            <p className="adm-hint">{MASTER_STATUSES.find((s) => s.key === status)?.hint}</p>
+          </div>
+          <div className="adm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}>
+            <div className="adm-field">
+              <label htmlFor="mf-age-min">อายุต่ำสุด (ปี)</label>
+              <input id="mf-age-min" type="number" min={0} max={120} step="1" value={ageMin} onChange={(e) => setAgeMin(e.target.value)} placeholder="ไม่จำกัด" />
+            </div>
+            <div className="adm-field">
+              <label htmlFor="mf-age-max">อายุสูงสุด (ปี)</label>
+              <input id="mf-age-max" type="number" min={0} max={120} step="1" value={ageMax} onChange={(e) => setAgeMax(e.target.value)} placeholder="ไม่จำกัด" />
+            </div>
+          </div>
+          <p className="adm-hint" style={{ marginTop: -6 }}>
+            นับจากวันเกิดของผู้จองในวันกิจกรรม · ใช้กับทุกรอบที่ยังไม่ถึง รวมคนรับสิทธิ์และเพื่อนในกลุ่ม
+          </p>
+          <div className="adm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}>
+            <div className="adm-field">
+              <label htmlFor="mf-close-days">ปิดรับจองก่อนวันกิจกรรม (วัน)</label>
+              <input id="mf-close-days" type="number" min={0} max={365} step="1" value={closeDays} onChange={(e) => setCloseDays(e.target.value)} placeholder="ไม่ปิดก่อน" />
+            </div>
+            <div className="adm-field">
+              <label htmlFor="mf-close-time">เวลาปิดรับ</label>
+              <input id="mf-close-time" type="time" value={closeTime} onChange={(e) => setCloseTime(e.target.value)} disabled={closeDays.trim() === ''} />
+            </div>
+          </div>
+          <p className="adm-hint" style={{ marginTop: -6 }}>{closeRuleText(closeDays, closeTime)} · ผู้จัดแก้เองได้ในหน้าจัดรอบ</p>
         </SheetSection>
       )}
 

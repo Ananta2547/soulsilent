@@ -872,7 +872,7 @@ function WorkshopDetailInner() {
                     className="display-th"
                     style={{ fontSize: 'clamp(28px, 3.5vw, 40px)', margin: '14px 0 24px' }}
                   >
-                    <T th="คนที่จะอยู่กับคุณทั้งวัน" en="Who'll be with you all day" />
+                    <T th="ร่วมเดินทางไปกับ" en="On this journey with" />
                   </h2>
                   <div className="ws-fac-list">
                   {instructors.map((ins) => (
@@ -907,7 +907,16 @@ function WorkshopDetailInner() {
                             ? tr(lang, 'ผู้ก่อตั้ง & LEAD FACILITATOR', 'founder & lead facilitator')
                             : tr(lang, 'ผู้ดูแลกิจกรรม', 'host')}
                       </div>
-                      <h3 className="display-th">{ins.name}</h3>
+                      <h3 className="display-th">
+                        {/* A host has a public page of their own (/hosts/[id]). */}
+                        {ins.role === 'teacher' ? (
+                          <Link href={`/hosts/${ins.id}`} style={{ color: 'inherit', textDecoration: 'none' }}>
+                            {ins.name}
+                          </Link>
+                        ) : (
+                          ins.name
+                        )}
+                      </h3>
                       <p
                         className="ws-fac-bio"
                         style={{
@@ -922,6 +931,15 @@ function WorkshopDetailInner() {
                           en="Designs and hosts this journey — creating space for unhurried learning"
                         />
                       </p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 20px' }}>
+                      {ins.role === 'teacher' && (
+                        <Link
+                          href={`/hosts/${ins.id}`}
+                          style={{ color: 'var(--teal)', fontWeight: 600, fontSize: 14, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                        >
+                          <T th="ดูหน้าผู้จัด" en="See the host's page" /> <span className="mono">→</span>
+                        </Link>
+                      )}
                       {ins.portfolio_id && (
                         <Link
                           href={`/p/${ins.portfolio_id}`}
@@ -942,6 +960,7 @@ function WorkshopDetailInner() {
                           <span className="mono">→</span>
                         </Link>
                       )}
+                      </div>
                     </div>
                   </div>
                   ))}
