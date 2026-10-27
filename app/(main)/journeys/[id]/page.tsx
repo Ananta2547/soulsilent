@@ -1011,7 +1011,7 @@ function WorkshopDetailInner() {
                       {tr(lang, 'แพลตฟอร์ม', 'Platform')}
                     </span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 18, fontWeight: 600 }}>
-                      <PlatformMark platform={platformStyle(workshop.online_platform).value} size={28} />
+                      <PlatformMark platform={platformStyle(workshop.online_platform).value} size={44} />
                       {platformLabel(workshop.online_platform, workshop.online_platform_other)}
                     </span>
                     <p style={{ margin: 0, fontSize: 14.5, color: 'var(--muted)', lineHeight: 1.65 }}>
@@ -1561,6 +1561,12 @@ function BookingCardContent({
             timeEnd={workshop.time_end}
             endDate={lastDay}
           />
+          {/* The room link first — it is what a booked member came for. */}
+          {!!workshop.is_online && workshop.online_url && (
+            <div style={{ marginTop: 10 }}>
+              <JoinOnlineButton workshop={workshop} lang={lang} />
+            </div>
+          )}
           {/* While the event is ongoing, booked users can view their application
               and edit only the PDPA consent. */}
           {ongoing && booked && (
@@ -1715,7 +1721,7 @@ function BookingCardContent({
       {/* Join link — online workshops only, and only once the seat is secured.
           The API withholds `online_url` from everyone else, so its presence is
           already the permission check; `booked` just avoids a flash. */}
-      {!!workshop.is_online && booked && workshop.online_url && (
+      {!!workshop.is_online && booked && !isPaid && workshop.online_url && (
         <JoinOnlineButton workshop={workshop} lang={lang} />
       )}
 
@@ -2188,25 +2194,28 @@ function JoinOnlineButton({ workshop, lang }: { workshop: Workshop; lang: 'th' |
         border: style.border ? `1px solid ${style.border}` : '1px solid transparent',
       }}
     >
-      <PlatformMark platform={style.value} />
-      {tr(lang, `เข้าร่วมทาง ${name}`, `Join on ${name}`)}
+      {style.wordmark ? (
+        // The brand's own wordmark stands in for its name ("เข้าร่วมทาง zoom").
+        <>
+          {tr(lang, 'เข้าร่วมทาง', 'Join on')}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={style.wordmark} alt={name} height={18} style={{ height: 18, width: 'auto', display: 'block' }} />
+        </>
+      ) : (
+        <>
+          <PlatformMark platform={style.value} />
+          {tr(lang, `เข้าร่วมทาง ${name}`, `Join on ${name}`)}
+        </>
+      )}
     </a>
   );
 }
 
 /** The platform's own logo (public/brand, same origin so the CSP allows
- *  it) on a white chip, so it reads on the brand-coloured button too.
- *  'other' has no brand mark and renders nothing. */
-function PlatformMark({ platform, size = 22 }: { platform: string; size?: number }) {
+ *  it), as is. 'other' has no brand mark and renders nothing. */
+function PlatformMark({ platform, size = 24 }: { platform: string; size?: number }) {
   const logo = platformStyle(platform).logo;
   if (!logo) return null;
-  return (
-    <span
-      aria-hidden="true"
-      style={{ width: size + 8, height: size + 8, borderRadius: 9, background: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={logo} alt="" width={size} height={size} style={{ width: size, height: size, objectFit: 'contain' }} />
-    </span>
-  );
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={logo} alt="" aria-hidden="true" width={size} height={size} style={{ width: size, height: size, objectFit: 'contain', flexShrink: 0 }} />;
 }

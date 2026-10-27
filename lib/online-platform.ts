@@ -16,6 +16,8 @@ export interface PlatformStyle {
   border?: string;
   /** The brand's own logo, served from /public/brand. */
   logo?: string;
+  /** A white wordmark that replaces the name on the join button. */
+  wordmark?: string;
   /** The "เจอกันออนไลน์" box: a light wash of the brand colour, and the
    *  brand colour itself for its label and edge. */
   tint: string;
@@ -23,7 +25,7 @@ export interface PlatformStyle {
 }
 
 export const ONLINE_PLATFORMS: PlatformStyle[] = [
-  { value: 'zoom', label: 'Zoom', bg: '#0B5CFF', fg: '#ffffff', logo: '/brand/zoom.svg', tint: '#EDF3FF', accent: '#0B5CFF' },
+  { value: 'zoom', label: 'Zoom', bg: '#0B5CFF', fg: '#ffffff', logo: '/brand/zoom.svg', wordmark: '/brand/zoom-wordmark.svg', tint: '#EDF3FF', accent: '#0B5CFF' },
   { value: 'meet', label: 'Google Meet', bg: '#ffffff', fg: '#1f7a45', border: '#dadce0', logo: '/brand/google-meet.svg', tint: '#EAF6EE', accent: '#00832D' },
   { value: 'teams', label: 'Microsoft Teams', bg: '#5059C9', fg: '#ffffff', logo: '/brand/microsoft-teams.svg', tint: '#EFEEFD', accent: '#5B5FC7' },
   // No brand mark — the button falls back to the site's own colour and shows
