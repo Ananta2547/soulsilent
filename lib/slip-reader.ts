@@ -103,23 +103,40 @@ const SCHEMA = {
   },
 };
 
-/** Ask Gemini to read the slip picture. Throws with a message admin can act on. */
-export async function readSlipWithGemini(image: { bytes: ArrayBuffer; mime: string }, key: string, model = 'gemini-2.5-flash'): Promise<SlipFields> {
+/** Ask Gemini to read the slip picture. Throws with a message admin can act on.
+ *  The default is Google's rolling "latest Flash" alias so a retired model
+ *  never breaks the form; when a pinned model is retired anyway (404 naming
+ *  its replacement), the replacement is tried once. */
+export async function readSlipWithGemini(image: { bytes: ArrayBuffer; mime: string }, key: string, model = 'gemini-flash-latest'): Promise<SlipFields> {
   let bin = '';
   const u8 = new Uint8Array(image.bytes);
   for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode(...u8.subarray(i, i + 0x8000));
+  return askGemini(btoa(bin), image.mime, key, model, true);
+}
+
+async function askGemini(b64: string, mime: string, key: string, model: string, retry: boolean): Promise<SlipFields> {
   const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
     body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ inline_data: { mime_type: image.mime, data: btoa(bin) } }, { text: PROMPT }] }],
+      contents: [{ role: 'user', parts: [{ inline_data: { mime_type: mime, data: b64 } }, { text: PROMPT }] }],
       generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: SCHEMA },
     }),
     signal: AbortSignal.timeout(30000),
   });
   if (!r.ok) {
     const detail = await r.text().catch(() => '');
-    throw new Error(r.status === 400 || r.status === 403 ? `Gemini ปฏิเสธคำขอ (${r.status}) — ตรวจ GEMINI_API_KEY` : `Gemini ตอบกลับผิดพลาด (${r.status}) ${detail.slice(0, 120)}`);
+    let reason = '';
+    try {
+      reason = (JSON.parse(detail) as { error?: { message?: string } }).error?.message || '';
+    } catch {}
+    console.error('[slip-reader] Gemini', model, r.status, detail.slice(0, 500));
+    const next = r.status === 404 && retry ? /use (?:models\/)?([\w.-]+)/i.exec(reason)?.[1]?.replace(/\.$/, '') : null;
+    if (next && next !== model) return askGemini(b64, mime, key, next, false);
+    if (r.status === 429) throw new Error('Gemini ใช้เกินโควต้า — รอสักครู่แล้วลองใหม่');
+    if (/location is not supported/i.test(reason)) throw new Error('Gemini ไม่ให้บริการจากตำแหน่งเซิร์ฟเวอร์นี้');
+    if (/api key/i.test(reason)) throw new Error('GEMINI_API_KEY ไม่ถูกต้อง');
+    throw new Error(`Gemini ตอบกลับผิดพลาด (${r.status}) ${reason.slice(0, 120)}`.trim());
   }
   const data = (await r.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
   const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';

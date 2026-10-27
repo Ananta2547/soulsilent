@@ -161,7 +161,7 @@ export function RecordTransferSheet({
     put('bank', incoming ? f?.from_bank || qr?.bank : f?.to_bank, setBank, bank);
     if (!incoming) put('account', f?.to_account?.replace(/[^0-9xX]/g, ''), setAccount, account);
     put('description', f?.memo, setDescription, description);
-    if (filled.length) setReading({ state: 'done', msg: `กรอกจากสลิปแล้ว ${filled.length} ช่อง${'error' in ai ? ' (อ่านได้แค่ QR)' : ''} — ตรวจให้ถูกก่อนบันทึก` });
+    if (filled.length) setReading({ state: 'done', msg: `กรอกจากสลิปแล้ว ${filled.length} ช่อง${'error' in ai ? ` (อ่านได้แค่ QR · ${ai.error})` : ''} — ตรวจให้ถูกก่อนบันทึก` });
     else setReading({ state: 'error', msg: ('error' in ai && ai.error) || 'ไม่พบข้อมูลที่อ่านได้บนสลิป — กรอกเอง' });
   }
 
