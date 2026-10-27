@@ -83,21 +83,26 @@ export function Countdown({ date, timeStart, timeEnd, endDate }: Props) {
 
   if (now >= start.getTime() && now < end.getTime()) {
     return (
+      // Same dark card as the countdown before it, so the box does not
+      // change colour the moment the activity starts.
       <div
         style={{
           textAlign: 'center',
-          padding: '14px 20px',
-          background: 'var(--accent)',
-          color: 'var(--ink)',
-          borderRadius: 14,
-          fontWeight: 700,
-          fontSize: 14,
+          padding: '18px 16px',
+          background: 'var(--ink)',
+          color: '#fff',
+          borderRadius: 16,
         }}
       >
-        <div style={{ fontFamily: 'JetBrains Mono, IBM Plex Sans Thai', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', opacity: 0.7, marginBottom: 4 }}>
+        <div
+          className="mono"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 10.5, color: 'var(--accent)', letterSpacing: '.16em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 8 }}
+        >
+          <span className="cd-live-dot" aria-hidden="true" />
           {tr(lang, 'กำลังเริ่มแล้ว', 'In progress')}
         </div>
-        {tr(lang, 'กิจกรรมกำลังจัดอยู่ตอนนี้', 'The event is happening now')}
+        <div style={{ fontFamily: "'Mitr', sans-serif", fontWeight: 500, fontSize: 17 }}>{tr(lang, 'กิจกรรมกำลังจัดอยู่ตอนนี้', 'The event is happening now')}</div>
+        <style>{`.cd-live-dot{width:8px;height:8px;border-radius:99px;background:var(--accent);animation:cdLive 1.6s ease-out infinite}@keyframes cdLive{0%{box-shadow:0 0 0 0 rgba(245,194,67,.55)}100%{box-shadow:0 0 0 10px rgba(245,194,67,0)}}@media (prefers-reduced-motion: reduce){.cd-live-dot{animation:none}}`}</style>
       </div>
     );
   }

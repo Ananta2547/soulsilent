@@ -14,15 +14,21 @@ export interface PlatformStyle {
   fg: string;
   /** Border only matters for the light Google Meet button. */
   border?: string;
+  /** The brand's own logo, served from /public/brand. */
+  logo?: string;
+  /** The "เจอกันออนไลน์" box: a light wash of the brand colour, and the
+   *  brand colour itself for its label and edge. */
+  tint: string;
+  accent: string;
 }
 
 export const ONLINE_PLATFORMS: PlatformStyle[] = [
-  { value: 'zoom', label: 'Zoom', bg: '#0B5CFF', fg: '#ffffff' },
-  { value: 'meet', label: 'Google Meet', bg: '#ffffff', fg: '#1f7a45', border: '#dadce0' },
-  { value: 'teams', label: 'Microsoft Teams', bg: '#5059C9', fg: '#ffffff' },
+  { value: 'zoom', label: 'Zoom', bg: '#0B5CFF', fg: '#ffffff', logo: '/brand/zoom.svg', tint: '#EDF3FF', accent: '#0B5CFF' },
+  { value: 'meet', label: 'Google Meet', bg: '#ffffff', fg: '#1f7a45', border: '#dadce0', logo: '/brand/google-meet.svg', tint: '#EAF6EE', accent: '#00832D' },
+  { value: 'teams', label: 'Microsoft Teams', bg: '#5059C9', fg: '#ffffff', logo: '/brand/microsoft-teams.svg', tint: '#EFEEFD', accent: '#5B5FC7' },
   // No brand mark — the button falls back to the site's own colour and shows
   // whatever name the admin typed.
-  { value: 'other', label: 'อื่นๆ', bg: 'var(--teal)', fg: '#ffffff' },
+  { value: 'other', label: 'อื่นๆ', bg: 'var(--teal)', fg: '#ffffff', tint: 'var(--cream)', accent: 'var(--teal-deep)' },
 ];
 
 /** Normalise the online fields coming from the admin form before storing.

@@ -995,11 +995,25 @@ function WorkshopDetailInner() {
                   <h2 className="display-th" style={{ fontSize: 'clamp(28px, 3.5vw, 40px)', margin: '14px 0 20px' }}>
                     <T th="เจอกันออนไลน์" en="We meet online" />
                   </h2>
-                  <div className="card card-static" style={{ background: 'var(--cream)', boxShadow: 'none', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <span className="mono" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '.12em', textTransform: 'uppercase' }}>
+                  <div
+                    className="card card-static"
+                    style={{
+                      background: platformStyle(workshop.online_platform).tint,
+                      border: `1px solid color-mix(in srgb, ${platformStyle(workshop.online_platform).accent} 22%, transparent)`,
+                      boxShadow: 'none',
+                      padding: '24px 28px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 10,
+                    }}
+                  >
+                    <span className="mono" style={{ fontSize: 11, color: platformStyle(workshop.online_platform).accent, letterSpacing: '.12em', textTransform: 'uppercase' }}>
                       {tr(lang, 'แพลตฟอร์ม', 'Platform')}
                     </span>
-                    <span style={{ fontSize: 18, fontWeight: 600 }}>{platformLabel(workshop.online_platform, workshop.online_platform_other)}</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 18, fontWeight: 600 }}>
+                      <PlatformMark platform={platformStyle(workshop.online_platform).value} size={28} />
+                      {platformLabel(workshop.online_platform, workshop.online_platform_other)}
+                    </span>
                     <p style={{ margin: 0, fontSize: 14.5, color: 'var(--muted)', lineHeight: 1.65 }}>
                       {tr(
                         lang,
@@ -2180,37 +2194,19 @@ function JoinOnlineButton({ workshop, lang }: { workshop: Workshop; lang: 'th' |
   );
 }
 
-/** Simple brand-suggestive marks. Drawn inline because the page's CSP blocks
- *  remote images, and 'other' deliberately renders nothing. */
-function PlatformMark({ platform }: { platform: string }) {
-  if (platform === 'zoom') {
-    return (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <rect x="2" y="6" width="13" height="12" rx="3" fill="currentColor" />
-        <path d="M16 11l5-3.2v8.4L16 13v-2z" fill="currentColor" />
-      </svg>
-    );
-  }
-  if (platform === 'meet') {
-    return (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <rect x="2" y="6" width="12" height="12" rx="2.5" fill="#1f7a45" />
-        <path d="M15 11l6-3.6v9.2L15 13v-2z" fill="#fbbc04" />
-        <path d="M15 11l6-3.6V11h-6z" fill="#ea4335" />
-      </svg>
-    );
-  }
-  if (platform === 'teams') {
-    return (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <rect x="3" y="5" width="12" height="14" rx="2.5" fill="currentColor" />
-        <text x="9" y="15.5" textAnchor="middle" fontSize="9" fontWeight="700" fill="#5059C9">
-          T
-        </text>
-        <circle cx="18.5" cy="8" r="2.6" fill="currentColor" opacity=".85" />
-        <path d="M16 12h5v4.2a2.6 2.6 0 01-5 0V12z" fill="currentColor" opacity=".85" />
-      </svg>
-    );
-  }
-  return null;
+/** The platform's own logo (public/brand, same origin so the CSP allows
+ *  it) on a white chip, so it reads on the brand-coloured button too.
+ *  'other' has no brand mark and renders nothing. */
+function PlatformMark({ platform, size = 22 }: { platform: string; size?: number }) {
+  const logo = platformStyle(platform).logo;
+  if (!logo) return null;
+  return (
+    <span
+      aria-hidden="true"
+      style={{ width: size + 8, height: size + 8, borderRadius: 9, background: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={logo} alt="" width={size} height={size} style={{ width: size, height: size, objectFit: 'contain' }} />
+    </span>
+  );
 }
