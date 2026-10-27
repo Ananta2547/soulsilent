@@ -115,15 +115,18 @@ export async function readSlipWithGemini(image: { bytes: ArrayBuffer; mime: stri
 }
 
 async function askGemini(b64: string, mime: string, key: string, model: string, retry: boolean, think = true): Promise<SlipFields> {
+  const t0 = Date.now();
+  console.log('[slip-reader] ask', model, 'image KB', Math.round((b64.length * 3) / 4 / 1024));
   const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
     body: JSON.stringify({
       contents: [{ role: 'user', parts: [{ inline_data: { mime_type: mime, data: b64 } }, { text: PROMPT }] }],
-      generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: SCHEMA, ...(think ? { thinkingConfig: { thinkingLevel: 'low' } } : {}) },
+      generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: SCHEMA, ...(think ? { thinkingConfig: { thinkingLevel: 'minimal' } } : {}) },
     }),
     signal: AbortSignal.timeout(60000),
   });
+  console.log('[slip-reader] reply', model, r.status, Date.now() - t0, 'ms');
   if (!r.ok) {
     const detail = await r.text().catch(() => '');
     let reason = '';
