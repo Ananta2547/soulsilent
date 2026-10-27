@@ -102,6 +102,8 @@ export type AdminData = {
   pushSubs: number;
   beam: { qr: number | null; card: number | null };
   gp: GpContext;
+  /** Round activities (kind 'round') and their status (migration 077). */
+  masters: { id: string; title: string; host_name: string | null; status: string }[];
 };
 
 const rows = <T>(db: D1Database, sql: string) => db.prepare(sql).all<T>().then((r) => r.results || []);
@@ -151,6 +153,18 @@ export async function loadAdminData(db: D1Database): Promise<AdminData> {
     ),
     rows<AdminData['orphanRows'][number]>(db, `SELECT id, amount, reason, email, created_at FROM orphan_payments WHERE resolved = 0 ORDER BY created_at DESC`),
   ]);
+  // activity_status arrives with migration 077; before it every activity is open.
+  const masters = await rows<AdminData['masters'][number]>(
+    db,
+    `SELECT m.id, m.title, COALESCE(NULLIF(TRIM(u.nickname), ''), u.name) AS host_name, m.activity_status AS status
+       FROM workshop_masters m LEFT JOIN users u ON u.id = m.organizer WHERE m.kind = 'round'`,
+  ).catch(() =>
+    rows<AdminData['masters'][number]>(
+      db,
+      `SELECT m.id, m.title, COALESCE(NULLIF(TRIM(u.nickname), ''), u.name) AS host_name, 'open' AS status
+         FROM workshop_masters m LEFT JOIN users u ON u.id = m.organizer WHERE m.kind = 'round'`,
+    ),
+  );
   const setting = (k: string) => {
     const v = settings.find((s) => s.key === k)?.value;
     return v != null && v !== '' && Number.isFinite(Number(v)) ? Number(v) : null;
@@ -174,6 +188,7 @@ export async function loadAdminData(db: D1Database): Promise<AdminData> {
     pushSubs: push?.n || 0,
     beam: { qr: setting('beam_fee_qr'), card: setting('beam_fee_card') },
     gp: await loadGp(db, ws.map((w) => w.instructor_id)),
+    masters,
   };
 }
 
@@ -823,6 +838,8 @@ export type AdminAlert = { key: string; type: string; group: AlertGroup; tone: A
 
 /** Changes to own name / date of birth in 12 months that raise an alert. */
 export const IDENTITY_CHANGE_LIMIT = 3;
+/** A round activity should have at least this many rounds a month. */
+export const MIN_ROUNDS_PER_MONTH = 3;
 const TONE_ORDER: Record<AlertTone, number> = { bad: 0, warn: 1, info: 2 };
 const ORPHAN_REASON: Record<string, string> = { duplicate: 'ชำระซ้ำ', late_cancelled: 'ชำระหลังยกเลิก', unknown: 'ไม่พบการจองที่ตรงกัน' };
 
@@ -963,6 +980,30 @@ function computeAlerts(x: {
       add({ key: `waitfree:${w.id}`, type: 'wait_free', group: 'rounds', tone: 'warn', title: `มีที่ว่างแต่ยังมีคนรอสำรอง · ${w.title} (${when(w)})`, detail: `${w.host_name || '—'} · ว่าง ${cap - sold} ที่ · รอสำรอง ${waiting} คน`, href: '/admin/workshops', day: w.date });
     } else if (waiting >= 3 && sold >= cap) {
       add({ key: `waitfull:${w.id}`, type: 'wait_full', group: 'rounds', tone: 'info', title: `เต็มแล้ว คนรอสำรองเยอะ — น่าเปิดรอบเพิ่ม · ${w.title}`, detail: `${w.host_name || '—'} · รอสำรอง ${waiting} คน`, href: '/admin/workshops', day: w.date });
+    }
+  }
+
+  // A round activity with fewer than MIN_ROUNDS_PER_MONTH rounds this month
+  // or next — only while it is open (paused / draft / archived are on purpose).
+  const thisMonth = thaiDay(now).slice(0, 7);
+  const [y, m] = thisMonth.split('-').map(Number);
+  const nextMonth = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
+  const monthName = (ym: string) => new Date(`${ym}-01T00:00:00Z`).toLocaleDateString('th-TH', { month: 'long', timeZone: 'UTC' });
+  for (const am of d.masters || []) {
+    if (am.status !== 'open' || isTestRound({ title: am.title, master_title: null, location: null, location_name: null })) continue;
+    for (const ym of [thisMonth, nextMonth]) {
+      const n = d.ws.filter((w) => w.master_id === am.id && w.status !== 'cancelled' && w.date.startsWith(ym)).length;
+      if (n >= MIN_ROUNDS_PER_MONTH) continue;
+      add({
+        key: `fewrounds:${am.id}:${ym}:${n}`,
+        type: 'few_rounds',
+        group: 'rounds',
+        tone: n === 0 ? 'warn' : 'info',
+        title: `รอบน้อยกว่า ${MIN_ROUNDS_PER_MONTH} รอบ${ym === thisMonth ? 'เดือนนี้' : 'เดือนหน้า'} · ${am.title}`,
+        detail: `${am.host_name || '—'} · ${monthName(ym)} มี ${n} รอบ`,
+        href: '/admin/workshop-info',
+        day: `${ym}-01`,
+      });
     }
   }
 
