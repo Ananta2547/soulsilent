@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { AdminAnalytics } from '@/lib/admin-analytics';
 import { Card, Dropdown, Empty, HBars, I, Kpis, Rows, baht, downloadCsv, num, thDay } from '@/components/dashboard/kit';
+import { RecordTransferSheet } from '@/components/admin/ledger/RecordTransferSheet';
 
 type Host = AdminAnalytics['hosts']['rows'][number];
 const SORTS: [keyof Host, string][] = [
@@ -16,8 +17,10 @@ const SORTS: [keyof Host, string][] = [
 
 /** Every host side by side: who sells, who is owed, who is drifting away,
  *  and how the GP tiers are spread. */
-export function HostsTab({ a, say }: { a: AdminAnalytics; say: (m: string) => void }) {
+export function HostsTab({ a, say, onChanged }: { a: AdminAnalytics; say: (m: string) => void; onChanged: () => void }) {
   const h = a.hosts;
+  // A host paying back what was overpaid, recorded in the money ledger.
+  const [returning, setReturning] = useState<{ id: string; name: string; amount: number } | null>(null);
   const [sort, setSort] = useState<keyof Host>('sales');
   const [open, setOpen] = useState(false);
   const rows = [...h.rows].sort((x, y) =>
@@ -102,6 +105,63 @@ export function HostsTab({ a, say }: { a: AdminAnalytics; say: (m: string) => vo
           </div>
         )}
       </Card>
+
+      <div className="hx-g g11">
+        <Card title="ยอดคงเหลือผู้จัด" sub="รายได้ของรอบที่จัดเสร็จ − ที่โอนไปแล้ว + ที่ผู้จัดคืนมา · บวก = เราค้างจ่าย · ลบ = ผู้จัดต้องคืนเรา" delay={40}>
+          {h.balances.length === 0 ? (
+            <Empty>ไม่มียอดค้างระหว่างกัน</Empty>
+          ) : (
+            <div className="hx-rows">
+              {h.balances.map((b) => (
+                <div key={b.id} className="hx-row" style={{ flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+                    <div className="main">{b.name}</div>
+                    <div className="sub">
+                      รายได้ {baht(b.earned)} · โอนแล้ว {baht(b.paid)}
+                      {b.returned ? ` · คืนมา ${baht(b.returned)}` : ''}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <b style={{ color: b.balance < 0 ? '#a3261a' : undefined }}>{b.balance < 0 ? `ผู้จัดต้องคืน ${baht(-b.balance)}` : `ค้างจ่าย ${baht(b.balance)}`}</b>
+                    {b.balance < 0 && (
+                      <button type="button" className="hx-btn white" onClick={() => setReturning({ id: b.id, name: b.name, amount: -b.balance })}>
+                        บันทึกผู้จัดคืนเงิน
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+        <Card title="ยอดเปลี่ยนหลังโอน" sub="รอบที่โอนให้ผู้จัดไปแล้ว แต่ยอดตอนนี้ไม่ตรงกับที่โอน (มีคืนเงิน / จองเพิ่มหลังโอน)" delay={80}>
+          {h.drift.length === 0 ? (
+            <Empty>ทุกรอบที่โอนแล้วยอดตรงกัน</Empty>
+          ) : (
+            <Rows
+              rows={h.drift.map((x) => ({
+                key: x.id,
+                main: x.title,
+                sub: `${x.host} · ${x.doc} โอน ${thDay(x.paidAt, true)} ${baht(x.paid)} · ตอนนี้ ${baht(x.now)}`,
+                amt: <span style={{ color: x.diff > 0 ? '#a3261a' : undefined }}>{x.diff > 0 ? `ต้องคืน ${baht(x.diff)}` : `ต้องโอนเพิ่ม ${baht(-x.diff)}`}</span>,
+              }))}
+            />
+          )}
+        </Card>
+      </div>
+
+      {returning && (
+        <RecordTransferSheet
+          lockKind
+          preset={{ kind: 'host_return', host_id: returning.id, gross: returning.amount, payee_name: returning.name, description: `ผู้จัดคืนเงินส่วนที่โอนเกิน · ${returning.name}` }}
+          onClose={() => setReturning(null)}
+          onSaved={(tx) => {
+            setReturning(null);
+            say(`บันทึก ${tx.doc_no} แล้ว`);
+            onChanged();
+          }}
+        />
+      )}
 
       <div className="hx-g g11">
         <Card title="ผู้จัดที่เสี่ยงหาย" sub="เคยขายได้ ไม่มีรอบใหม่ และไม่ได้จัดมาเกิน 60 วัน — ลองติดต่อ" delay={70}>

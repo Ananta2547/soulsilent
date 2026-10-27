@@ -49,6 +49,8 @@ type WS = {
   payout_deduction_value: number | null;
   payout_status: string | null;
   updated_at: string | null;
+  location: string | null;
+  location_name: string | null;
 };
 type BK = {
   id: string;
@@ -77,7 +79,7 @@ type BK = {
   moved_from: string | null;
   has_slip: number | null;
 };
-type TX = { id: string; doc_no: string; kind: string; status: string; gross: number; net: number; occurred_at: string; booking_id: string | null; workshop_id: string | null; category_id: string | null; payee_email: string | null; emailed_at: string | null };
+type TX = { id: string; doc_no: string; kind: string; status: string; gross: number; withholding: number; net: number; occurred_at: string; booking_id: string | null; workshop_id: string | null; host_id: string | null; category_id: string | null; payee_email: string | null; emailed_at: string | null };
 
 export type AdminData = {
   ws: WS[];
@@ -113,8 +115,10 @@ export async function loadAdminData(db: D1Database): Promise<AdminData> {
       db,
       `SELECT w.id, w.title, w.instructor_id, COALESCE(NULLIF(TRIM(u.nickname), ''), u.name) AS host_name, w.fee_mode, w.master_id, m.title AS master_title,
               m.kind AS master_kind, w.category, w.is_online, w.date, w.end_date, w.time_start, w.time_end, w.max_participants, w.status, w.price,
-              w.payment_type, w.created_at, w.payout_deduction_type, w.payout_deduction_value, w.payout_status, w.updated_at
-         FROM workshops w LEFT JOIN workshop_masters m ON m.id = w.master_id LEFT JOIN users u ON u.id = w.instructor_id`,
+              w.payment_type, w.created_at, w.payout_deduction_type, w.payout_deduction_value, w.payout_status, w.updated_at,
+              w.location, l.name AS location_name
+         FROM workshops w LEFT JOIN workshop_masters m ON m.id = w.master_id LEFT JOIN users u ON u.id = w.instructor_id
+         LEFT JOIN locations l ON l.id = w.location_id`,
     ),
     rows<BK>(
       db,
@@ -128,7 +132,7 @@ export async function loadAdminData(db: D1Database): Promise<AdminData> {
       db,
       `SELECT id, created_at, date_of_birth AS dob, COALESCE(NULLIF(TRIM(nickname), ''), name) AS name, email_verified, account_status FROM users WHERE deleted_at IS NULL`,
     ),
-    rows<TX>(db, `SELECT id, doc_no, kind, status, gross, net, occurred_at, booking_id, workshop_id, category_id, payee_email, emailed_at FROM money_tx WHERE status = 'done'`),
+    rows<TX>(db, `SELECT id, doc_no, kind, status, gross, withholding, net, occurred_at, booking_id, workshop_id, host_id, category_id, payee_email, emailed_at FROM money_tx WHERE status = 'done'`),
     rows<{ id: string; name: string }>(db, `SELECT id, name FROM expense_categories`),
     rows<{ id: string; name: string }>(db, `SELECT id, name FROM coupons`),
     rows<{ day: string; n: number }>(db, `SELECT day, COUNT(*) AS n FROM activity_views GROUP BY day`),
@@ -224,11 +228,26 @@ const PRICE_BANDS: [string, number][] = [
   ['3,000 ขึ้นไป', Infinity],
 ];
 
+/** A round made to try the site out: ทดสอบ or the word "test" in its title,
+ *  its activity's title or its venue. */
+const TEST_RE = /ทดสอบ|\btest\b/i;
+export const isTestRound = (w: Pick<WS, 'title' | 'master_title' | 'location' | 'location_name'>) =>
+  TEST_RE.test([w.title, w.master_title, w.location, w.location_name].filter(Boolean).join(' '));
+
 /* ---------------- the computation ---------------- */
 
 export type AdminAnalytics = ReturnType<typeof computeAdminAnalytics>;
 
-export function computeAdminAnalytics(d: AdminData, r: Range, now = Date.now()) {
+export function computeAdminAnalytics(full: AdminData, r: Range, now = Date.now(), opts: { includeTests?: boolean } = {}) {
+  // Test rounds (ทดสอบ / test in the round, its activity or its venue) and
+  // everything hanging off them are left out unless asked for. The ledger's
+  // cash stays whole: a test payment still moved real money.
+  const testRounds = full.ws.filter(isTestRound);
+  const testIds = new Set(testRounds.map((w) => w.id));
+  const keep = (wid: string) => opts.includeTests || !testIds.has(wid);
+  const d: AdminData = opts.includeTests
+    ? full
+    : { ...full, ws: full.ws.filter((w) => keep(w.id)), bk: full.bk.filter((b) => keep(b.workshop_id)), responses: full.responses.filter((x) => keep(x.workshop_id)), reviews: full.reviews.filter((x) => keep(x.workshop_id)) };
   const wsById = new Map(d.ws.map((w) => [w.id, w]));
   const bkByWs = new Map<string, BK[]>();
   for (const b of d.bk) {
@@ -371,6 +390,61 @@ export function computeAdminAnalytics(d: AdminData, r: Range, now = Date.now()) 
   const ledgerGaps = d.bk.filter((b) => viaBeam(b) && wasCollected(b) && (Number(b.amount) || 0) > 0 && !ledgerPaid.has(b.id)).length;
   const unsentVouchers = d.tx.filter((t) => t.kind === 'host_payout' && t.payee_email && !t.emailed_at).length;
 
+  /* ---- host ledger: what each host has earned, been paid and paid back ---- */
+  // A payout records what the round was worth then; a refund afterwards
+  // lowers the round without telling anyone. Comparing the two finds it.
+  const payoutsByWs = new Map<string, { gross: number; doc: string; at: string }>();
+  for (const t of d.tx) {
+    if (t.kind !== 'host_payout' || !t.workshop_id || !wsById.has(t.workshop_id)) continue;
+    const p = payoutsByWs.get(t.workshop_id);
+    payoutsByWs.set(t.workshop_id, { gross: (p?.gross || 0) + t.gross, doc: t.doc_no, at: t.occurred_at });
+  }
+  const drift = [...payoutsByWs.entries()]
+    .map(([wid, p]) => {
+      const w = wsById.get(wid)!;
+      const nowNet = w.status === 'cancelled' ? 0 : roundNet(w);
+      return { id: wid, title: w.title, date: w.date, host: w.host_name || '—', hostId: w.instructor_id, paid: round2(p.gross), now: round2(nowNet), diff: round2(p.gross - nowNet), doc: p.doc, paidAt: p.at.slice(0, 10) };
+    })
+    .filter((x) => Math.abs(x.diff) >= 1)
+    .sort((a, b) => b.diff - a.diff);
+  const returnedBy = new Map<string, number>();
+  for (const t of full.tx) if (t.kind === 'host_return' && t.host_id) returnedBy.set(t.host_id, (returnedBy.get(t.host_id) || 0) + t.gross);
+  const hostBook = new Map<string, { earned: number; paid: number }>();
+  for (const w of d.ws) {
+    if (!w.instructor_id) continue;
+    const p = payoutsByWs.get(w.id);
+    const ended = wsEnd(w) < now;
+    // Rounds marked paid before the ledger existed carry no amount: count them as settled.
+    if (!p && (w.status === 'cancelled' || !ended || w.payout_status === 'paid')) continue;
+    const e = hostBook.get(w.instructor_id) || { earned: 0, paid: 0 };
+    e.earned += w.status === 'cancelled' ? 0 : roundNet(w);
+    e.paid += p?.gross || 0;
+    hostBook.set(w.instructor_id, e);
+  }
+  for (const id of returnedBy.keys()) if (!hostBook.has(id)) hostBook.set(id, { earned: 0, paid: 0 });
+  const hostName = new Map(d.ws.filter((w) => w.instructor_id).map((w) => [w.instructor_id as string, w.host_name || '—']));
+  const hostBalances = [...hostBook.entries()]
+    .map(([id, e]) => {
+      const returned = returnedBy.get(id) || 0;
+      // + we still owe the host · − the host owes us
+      return { id, name: hostName.get(id) || '—', earned: round2(e.earned), paid: round2(e.paid), returned: round2(returned), balance: round2(e.earned - e.paid + returned) };
+    })
+    .filter((h) => Math.abs(h.balance) >= 1 || h.paid > 0)
+    .sort((a, b) => a.balance - b.balance);
+
+  /* ---- money held for others, as of now ---- */
+  const prepaid = sum(
+    d.bk.filter((b) => isLive(b) && !b.parent_booking_id && (() => {
+      const w = wsById.get(b.workshop_id);
+      return !!w && w.status !== 'cancelled' && wsEnd(w) >= now;
+    })()),
+    (b) => Number(b.amount) || 0,
+  );
+  const hostPayable = sum(hostBalances.filter((h) => h.balance > 0), (h) => h.balance);
+  const hostReceivable = sum(hostBalances.filter((h) => h.balance < 0), (h) => -h.balance);
+  const whtHeld = sum(full.tx.filter((t) => t.kind === 'host_payout'), (t) => Number(t.withholding) || 0);
+  const refundsOwed = sum(pendingRefunds, (x) => x.amount);
+
   /* ---- time series ---- */
   const weekStart = (ms: number) => wallToMs(thaiDay(ms)) - thaiDow(ms) * DAY;
   const thisWeek = weekStart(now);
@@ -397,9 +471,41 @@ export function computeAdminAnalytics(d: AdminData, r: Range, now = Date.now()) 
   /* ---- money tab ---- */
   const ledgerFlows = (test: (ms: number) => boolean) => {
     const by = (k: string) => sum(d.tx.filter((t) => t.kind === k && test(ledgerMs(t.occurred_at))), (t) => t.net);
-    return { in: by('booking_payment'), refund: by('refund'), payout: by('host_payout'), expense: by('expense'), payroll: by('payroll') };
+    return { in: by('booking_payment'), hostReturn: by('host_return'), refund: by('refund'), payout: by('host_payout'), expense: by('expense'), payroll: by('payroll') };
   };
   const all = ledgerFlows(() => true);
+  const cashBalance = round2(all.in + all.hostReturn - all.refund - all.payout - all.expense - all.payroll);
+  const heldTotal = round2(prepaid + hostPayable + refundsOwed + whtHeld);
+
+  // Bookings made in the window that ended up cancelled, by what became of the money.
+  const wasRefunded = (b: BK) =>
+    b.payment_status === 'refunded' || refundAt.has(b.id) || !!b.has_slip || b.cancel_reason === 'refunded' || b.cancel_reason === 'late_refunded';
+  const cancelledIn = d.bk.filter((b) => b.status === 'cancelled' && !b.parent_booking_id && inWin(utcMs(b.created_at)));
+  const cancelGroup = (label: string, xs: BK[]) => ({ label, n: xs.length, amount: sum(xs, (b) => Number(b.amount) || 0) });
+  const cancels = [
+    cancelGroup('คืนเงินแล้ว', cancelledIn.filter((b) => wasCollected(b) && Number(b.amount) > 0 && wasRefunded(b))),
+    cancelGroup('ยังไม่คืน (ต้องคืน)', cancelledIn.filter(isPendingRefund)),
+    cancelGroup('ยกเลิกก่อนจ่าย (ไม่มีเงินเข้า)', cancelledIn.filter((b) => !b.paid_at)),
+  ];
+
+  // Withholding tax on host payouts, by the month it was withheld. Zero until
+  // the business registers and starts withholding (the payout form has the field).
+  const whtMonthly = monthsBack.map((ym) => ({
+    month: ym,
+    amount: sum(full.tx.filter((t) => t.kind === 'host_payout' && t.occurred_at.slice(0, 7) === ym), (t) => Number(t.withholding) || 0),
+  }));
+
+  // Accrual basis: a seat's money counts in the month its round ended, and a
+  // seat given back never counts. Cash basis (above) counts the day it was paid.
+  const accrualEvents: Ev[] = events.filter((e) => !e.refund && isLive(e.b) && e.w.status !== 'cancelled' && wsEnd(e.w) < now).map((e) => ({ ...e, at: wsEnd(e.w) }));
+  const accrualCur = money(inWin, accrualEvents);
+  const accrualMonthly = monthsBack.map((ym) => {
+    const [from, to] = monthRange(ym);
+    const t = (ms: number) => ms >= from && ms < to;
+    const m = money(t, accrualEvents);
+    const expenses = expensesIn(t);
+    return { month: ym, ...m, expenses, profit: round2(m.platformNet - expenses) };
+  });
   const expByCat = new Map<string, number>();
   for (const t of d.tx) {
     if ((t.kind !== 'expense' && t.kind !== 'payroll') || !inWin(ledgerMs(t.occurred_at))) continue;
@@ -592,11 +698,12 @@ export function computeAdminAnalytics(d: AdminData, r: Range, now = Date.now()) 
   });
 
   /* ---- alerts: things a person should look at now (not tied to the window) ---- */
-  const alerts = computeAlerts({ d, now, wsById, bkByWs, refundAt, ledgerPaid, owed, isPendingRefund, hosts, soldIn });
+  const alerts = computeAlerts({ d, now, wsById, bkByWs, refundAt, ledgerPaid, owed, isPendingRefund, hosts, soldIn, drift });
 
   const owedTotal = sum(owed, (o) => o.net);
   return {
     range: { from: r.from, to: r.to, days: r.days },
+    tests: { included: !!opts.includeTests, rounds: testRounds.map((w) => ({ id: w.id, title: w.title, date: w.date, host: w.host_name || '—' })).sort((a, b) => b.date.localeCompare(a.date)) },
     beam: d.beam,
     alerts,
     overview: {
@@ -621,7 +728,7 @@ export function computeAdminAnalytics(d: AdminData, r: Range, now = Date.now()) 
       expenses: expCur,
       profit: round2(cur.platformNet - expCur),
       monthly,
-      ledger: { all: { ...all, balance: round2(all.in - all.refund - all.payout - all.expense - all.payroll) }, cur: ledgerFlows(inWin) },
+      ledger: { all: { ...all, balance: cashBalance }, cur: ledgerFlows(inWin) },
       payable: { owed: owedTotal, owedRounds: owed.slice(0, 40), notYet: sum(notYet, (x) => x.net), notYetRounds: notYet.length, aging },
       expByCat: [...expByCat.entries()].map(([label, value]) => ({ label, value: round2(value) })).sort((a, b) => b.value - a.value),
       methods,
@@ -629,6 +736,10 @@ export function computeAdminAnalytics(d: AdminData, r: Range, now = Date.now()) 
       vat: { last12: fee12, threshold: 1800000 },
       pendingRefunds: { n: pendingRefunds.length, amount: sum(pendingRefunds, (x) => x.amount), rows: pendingRefunds.slice(0, 20) },
       ledgerGaps,
+      accrual: { cur: accrualCur, profit: round2(accrualCur.platformNet - expCur), monthly: accrualMonthly },
+      held: { prepaid, hostPayable, refundsOwed, wht: whtHeld, total: heldTotal, cash: cashBalance, own: round2(cashBalance - heldTotal), hostReceivable },
+      cancels,
+      wht: { total: whtHeld, monthly: whtMonthly },
     },
     hosts: {
       total: hosts.length,
@@ -639,6 +750,8 @@ export function computeAdminAnalytics(d: AdminData, r: Range, now = Date.now()) 
       top3Share: pct(sum(hostsSorted.slice(0, 3), (h) => h.sales), cur.sales),
       rows: hostsSorted,
       tiers: { single: tierCount('single'), round: tierCount('round') },
+      balances: hostBalances,
+      drift,
     },
     people: {
       signups: signupsCur.length,
@@ -717,6 +830,7 @@ function computeAlerts(x: {
   isPendingRefund: (b: BK) => boolean;
   hosts: { id: string; name: string; atRisk: boolean; lastRound: string | null }[];
   soldIn: (w: WS) => number;
+  drift: { id: string; title: string; date: string; host: string; paid: number; now: number; diff: number; doc: string }[];
 }) {
   const { d, now, wsById, bkByWs, refundAt, ledgerPaid, owed, isPendingRefund, hosts, soldIn } = x;
   const items: AdminAlert[] = [];
@@ -746,6 +860,18 @@ function computeAlerts(x: {
   for (const o of owed) {
     if (o.days <= 7) continue;
     add({ key: `payout:${o.id}`, type: 'payout', group: 'money', tone: 'bad', title: `ค้างโอนผู้จัด · ${o.title}`, detail: `${o.host} · ${baht(o.net)} · จบมา ${o.days} วัน`, href: '/admin/ledger', day: o.date });
+  }
+  for (const g of x.drift) {
+    add({
+      key: `drift:${g.id}:${Math.round(g.diff)}`,
+      type: g.diff > 0 ? 'drift_over' : 'drift_under',
+      group: 'money',
+      tone: g.diff > 0 ? 'bad' : 'warn',
+      title: `${g.diff > 0 ? 'ยอดลดหลังโอนผู้จัด' : 'ยอดเพิ่มหลังโอนผู้จัด'} · ${g.title}`,
+      detail: `${g.host} · โอนไป ${baht(g.paid)} (${g.doc}) · ยอดตอนนี้ ${baht(g.now)} · ${g.diff > 0 ? 'ผู้จัดต้องคืน' : 'ต้องโอนเพิ่ม'} ${baht(Math.abs(g.diff))}`,
+      href: '/admin/insights?tab=hosts',
+      day: g.date,
+    });
   }
   for (const r of d.orphanRows) {
     add({

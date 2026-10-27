@@ -143,6 +143,7 @@ export function checkManual(body: Record<string, unknown>): { input: TxInput } |
   const payee = String(body.payee_name ?? '').trim();
   if (!payee) return { error: 'ใส่ชื่อผู้รับเงิน' };
   if (kind === 'expense' && !body.category_id) return { error: 'เลือกหมวดค่าใช้จ่าย' };
+  if (kind === 'host_return' && !body.host_id) return { error: 'ไม่พบผู้จัดที่คืนเงิน' };
   const s = (k: string) => (body[k] == null || body[k] === '' ? null : String(body[k]));
   return {
     input: {

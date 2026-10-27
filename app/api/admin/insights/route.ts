@@ -8,7 +8,8 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** GET /api/admin/insights?from=YYYY-MM-DD&to=YYYY-MM-DD — every figure of
  *  Admin Insights for one window (Thai dates, inclusive; default the last 30
- *  days), compared with the equally long window before it. */
+ *  days), compared with the equally long window before it. &tests=1 keeps
+ *  test rounds in the figures (left out by default). */
 export async function GET(request: Request) {
   try {
     await requireAdmin();
@@ -18,7 +19,7 @@ export async function GET(request: Request) {
     if (!DATE.test(from) || !DATE.test(to)) return NextResponse.json({ error: 'ช่วงวันที่ไม่ถูกต้อง' }, { status: 400 });
     if (from > to) [from, to] = [to, from];
     const db = await getDB();
-    return NextResponse.json(computeAdminAnalytics(await loadAdminData(db), makeRange(from, to)));
+    return NextResponse.json(computeAdminAnalytics(await loadAdminData(db), makeRange(from, to), Date.now(), { includeTests: sp.get('tests') === '1' }));
   } catch (error) {
     const msg = (error as Error).message;
     if (msg === 'Unauthorized' || msg === 'Forbidden') return NextResponse.json({ error: msg }, { status: 403 });

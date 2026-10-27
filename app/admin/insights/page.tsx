@@ -48,6 +48,8 @@ export default function AdminInsightsPage() {
   const [error, setError] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Test rounds (ทดสอบ / test in the name or venue) stay out of the figures unless asked for.
+  const [withTests, setWithTests] = useState(false);
   const [toast, say] = useToast();
 
   // ?tab= and ?settings=1 deep links (alerts link here). Read after mount.
@@ -65,7 +67,7 @@ export default function AdminInsightsPage() {
   const periodLabel = range.key === 'custom' ? `${thDay(custom.from)} – ${thDay(custom.to, true)}` : range.label;
 
   const load = useCallback(() => {
-    fetch(`/api/admin/insights?${new URLSearchParams({ from, to })}`)
+    fetch(`/api/admin/insights?${new URLSearchParams({ from, to, ...(withTests ? { tests: '1' } : {}) })}`)
       .then((r) => {
         if (!r.ok) throw new Error(String(r.status));
         return r.json() as Promise<AdminAnalytics>;
@@ -75,7 +77,7 @@ export default function AdminInsightsPage() {
         setError(false);
       })
       .catch(() => setError(true));
-  }, [from, to]);
+  }, [from, to, withTests]);
   useEffect(() => {
     load();
   }, [load]);
@@ -132,6 +134,10 @@ export default function AdminInsightsPage() {
           <button type="button" className="hx-btn white" onClick={() => setSettingsOpen(true)}>
             ตั้งค่า Beam
           </button>
+          <label className="hx-note" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', whiteSpace: 'nowrap' }} title="รอบที่ชื่อ ชื่อกิจกรรม หรือสถานที่มีคำว่า ทดสอบ / test">
+            <input type="checkbox" checked={withTests} onChange={(e) => setWithTests(e.target.checked)} />
+            รวมรายการทดสอบ{data ? ` (${data.tests.rounds.length} รอบ)` : ''}
+          </label>
         </div>
       </div>
 
@@ -169,7 +175,7 @@ export default function AdminInsightsPage() {
       ) : tab === 'money' ? (
         <MoneyTab a={data} say={say} />
       ) : tab === 'hosts' ? (
-        <HostsTab a={data} say={say} />
+        <HostsTab a={data} say={say} onChanged={load} />
       ) : tab === 'people' ? (
         <PeopleTab a={data} />
       ) : tab === 'activities' ? (

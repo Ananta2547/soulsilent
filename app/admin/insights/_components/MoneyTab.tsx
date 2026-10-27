@@ -9,16 +9,21 @@ import { Bars, Card, Dropdown, Empty, HBars, I, Rows, Seg, baht, downloadCsv, nu
  *  hosts and for how long, expenses, payment methods and coupons. */
 export function MoneyTab({ a, say }: { a: AdminAnalytics; say: (m: string) => void }) {
   const m = a.money;
-  const c = m.cur;
+  // Cash basis counts money the day it was paid; accrual counts a seat in the
+  // month its round ended (and never a seat given back).
+  const [basis, setBasis] = useState<'cash' | 'accrual'>('cash');
+  const c = basis === 'cash' ? m.cur : m.accrual.cur;
+  const profit = basis === 'cash' ? m.profit : m.accrual.profit;
+  const monthly = basis === 'cash' ? m.monthly : m.accrual.monthly;
   const [view, setView] = useState<'chart' | 'table'>('chart');
   const [exportOpen, setExportOpen] = useState(false);
   const beamSet = a.beam.qr != null && a.beam.card != null;
   const csv = (k: string) => {
     if (k === 'pl')
       downloadCsv(
-        `งบกำไรขาดทุนรายเดือน-${a.range.to}.csv`,
+        `งบกำไรขาดทุนรายเดือน-${basis === 'cash' ? 'เกณฑ์เงินสด' : 'เกณฑ์คงค้าง'}-${a.range.to}.csv`,
         ['เดือน', 'ยอดขาย (GMV)', 'ส่วนของผู้จัด', 'ค่าธรรมเนียม', 'ค่า Beam (ประมาณ)', 'ASL ออกให้', 'รายได้สุทธิแพลตฟอร์ม', 'รายจ่ายธุรกิจ', 'กำไร/ขาดทุน', 'คืนเงิน', 'การจอง'],
-        m.monthly.map((x) => [x.month, x.sales, x.hostShare, x.fee, x.beam, x.subsidy, x.platformNet, x.expenses, x.profit, x.refunds, x.bookings]),
+        monthly.map((x) => [x.month, x.sales, x.hostShare, x.fee, x.beam, x.subsidy, x.platformNet, x.expenses, x.profit, x.refunds, x.bookings]),
       );
     else
       downloadCsv(
@@ -43,7 +48,20 @@ export function MoneyTab({ a, say }: { a: AdminAnalytics; say: (m: string) => vo
   return (
     <div className="hx-stack">
       <div className="hx-g g75">
-        <Card title="งบกำไรขาดทุน" sub={`${thDay(a.range.from, true)} – ${thDay(a.range.to, true)} · ตามวันที่ชำระ / วันที่จ่ายจริง`}>
+        <Card
+          title="งบกำไรขาดทุน"
+          sub={`${thDay(a.range.from, true)} – ${thDay(a.range.to, true)} · ${basis === 'cash' ? 'เกณฑ์เงินสด: นับวันที่ชำระ / วันที่จ่ายจริง' : 'เกณฑ์คงค้าง: นับเมื่อรอบจัดเสร็จ ที่นั่งที่ยกเลิกไม่นับ'}`}
+          right={
+            <Seg<'cash' | 'accrual'>
+              options={[
+                ['cash', 'ตามวันชำระ'],
+                ['accrual', 'ตามวันจัดเสร็จ'],
+              ]}
+              value={basis}
+              onChange={setBasis}
+            />
+          }
+        >
           <div className="hx-pl">
             {line('ยอดขาย (GMV)', c.sales)}
             {line('ส่วนของผู้จัด', c.hostShare, 'sub', '− ')}
@@ -52,10 +70,11 @@ export function MoneyTab({ a, say }: { a: AdminAnalytics; say: (m: string) => vo
             {line('ASL ออกให้ (คูปอง / บัตรเชิญ)', c.subsidy, 'sub', '− ')}
             {line('รายได้สุทธิแพลตฟอร์ม', c.platformNet)}
             {line('รายจ่ายธุรกิจ + เงินเดือน', m.expenses, 'sub', '− ')}
-            {line('กำไร / ขาดทุน', m.profit, 'total')}
+            {line('กำไร / ขาดทุน', profit, 'total')}
           </div>
           <p className="hx-note">
-            Take rate {c.takeRate == null ? '—' : `${num(c.takeRate)}%`} · คืนเงินในช่วงนี้ {baht(c.refunds)} (หักออกจากยอดขายแล้ว) · เงินที่ผู้จองจ่ายจริง {baht(c.cash)}
+            Take rate {c.takeRate == null ? '—' : `${num(c.takeRate)}%`}
+            {basis === 'cash' ? ` · คืนเงินในช่วงนี้ ${baht(c.refunds)} (หักออกจากยอดขายแล้ว) · เงินที่ผู้จองจ่ายจริง ${baht(c.cash)}` : ` · ${c.seats} ที่นั่งในรอบที่จัดเสร็จในช่วงนี้`}
           </p>
         </Card>
         <Card title="เงินตามบัญชีการเงิน" sub="จากรายการใน ledger (ไม่รวมค่า Beam ที่หักก่อนเงินเข้าบัญชี)" delay={70}>
@@ -95,7 +114,7 @@ export function MoneyTab({ a, say }: { a: AdminAnalytics; say: (m: string) => vo
 
       <Card
         title="รายเดือน 12 เดือน"
-        sub="ยอดขายแยกส่วนของผู้จัด / ค่าธรรมเนียม · ตารางมีกำไรขาดทุนทุกเดือน"
+        sub={`ยอดขายแยกส่วนของผู้จัด / ค่าธรรมเนียม · ตารางมีกำไรขาดทุนทุกเดือน · ${basis === 'cash' ? 'ตามวันชำระ' : 'ตามวันจัดเสร็จ'}`}
         className={`raised${exportOpen ? ' menu-open' : ''}`}
         delay={140}
         right={
@@ -122,17 +141,17 @@ export function MoneyTab({ a, say }: { a: AdminAnalytics; say: (m: string) => vo
       >
         {view === 'chart' ? (
           <Bars
-            labels={m.monthly.map((x) => thMonth(x.month))}
+            labels={monthly.map((x) => thMonth(x.month))}
             series={[
-              { name: 'ส่วนของผู้จัด', color: '#a5d9d1', values: m.monthly.map((x) => x.hostShare) },
-              { name: 'ค่าธรรมเนียม ASL', color: '#0d8a7e', values: m.monthly.map((x) => x.fee) },
+              { name: 'ส่วนของผู้จัด', color: '#a5d9d1', values: monthly.map((x) => x.hostShare) },
+              { name: 'ค่าธรรมเนียม ASL', color: '#0d8a7e', values: monthly.map((x) => x.fee) },
             ]}
             fmt={baht}
             every={1}
           />
         ) : (
           <Rows
-            rows={[...m.monthly].reverse().map((x) => ({
+            rows={[...monthly].reverse().map((x) => ({
               key: x.month,
               main: thMonth(x.month),
               sub: `ขาย ${baht(x.sales)} · ค่าธรรมเนียม ${baht(x.fee)} · Beam ${baht(x.beam)} · ASL ออก ${baht(x.subsidy)} · รายจ่าย ${baht(x.expenses)}`,
@@ -181,10 +200,40 @@ export function MoneyTab({ a, say }: { a: AdminAnalytics; say: (m: string) => vo
         </Card>
       </div>
 
+      <div className="hx-g g75">
+        <Card title="เงินที่ถือแทนผู้อื่น ณ วันนี้" sub="เงินในบัญชีที่ยังไม่ใช่ของ ASL — ไม่ขึ้นกับช่วงเวลาที่เลือก" delay={460}>
+          <div className="hx-pl">
+            {line('รายได้รับล่วงหน้า (ผู้จองจ่ายแล้ว รอบยังไม่จัด)', m.held.prepaid, 'sub')}
+            {line('ค้างจ่ายผู้จัด', m.held.hostPayable, 'sub')}
+            {line('รอคืนเงินลูกค้า', m.held.refundsOwed, 'sub')}
+            {line('ภาษีหัก ณ ที่จ่ายรอนำส่ง', m.held.wht, 'sub')}
+            {line('รวมเงินที่ถือแทนผู้อื่น', m.held.total)}
+            {line('เงินในบัญชีตามบัญชีการเงิน', m.held.cash, 'sub')}
+            {line('เงินของ ASL จริง', m.held.own, 'total')}
+          </div>
+          <p className="hx-note">
+            {m.held.own < 0 ? 'ติดลบ = เงินในบัญชีน้อยกว่าเงินที่ต้องจ่ายคืนผู้อื่น (หรือบัญชีการเงินยังบันทึกไม่ครบ) · ' : ''}
+            {m.held.hostReceivable > 0 ? `ผู้จัดต้องคืนเรา ${baht(m.held.hostReceivable)} (ยังไม่นับรวม) · ` : ''}
+            เงินในบัญชีคิดจากรายการที่บันทึกใน ledger ไม่หักค่า Beam
+          </p>
+        </Card>
+        <Card title="การจองที่ยกเลิก" sub="จองในช่วงนี้แล้วยกเลิก · แยกตามเงินที่เกิดขึ้น" delay={500}>
+          <Rows rows={m.cancels.map((x) => ({ key: x.label, main: x.label, sub: `${x.n} รายการ`, amt: baht(x.amount) }))} />
+        </Card>
+      </div>
+
       <div className="hx-g auto240">
         <Card title="ยกเลิกแล้วแต่ยังไม่คืนเงิน" sub="การจองที่ยกเลิก ยังไม่มีรายการคืนเงินในบัญชี" delay={490}>
           <div className="hx-big">{baht(m.pendingRefunds.amount)}</div>
           {m.pendingRefunds.rows.length > 0 && <Rows rows={m.pendingRefunds.rows.slice(0, 6).map((x) => ({ key: x.id, main: x.title, sub: `ชำระ ${thDay(x.since, true)}`, amt: baht(x.amount) }))} />}
+        </Card>
+        <Card title="ภาษีหัก ณ ที่จ่าย" sub="ที่หักจากการโอนรายได้ผู้จัด (ภ.ง.ด.3)" delay={530}>
+          <div className="hx-big">{baht(m.wht.total)}</div>
+          {m.wht.monthly.some((x) => x.amount > 0) ? (
+            <Rows rows={m.wht.monthly.filter((x) => x.amount > 0).map((x) => ({ key: x.month, main: thMonth(x.month), amt: baht(x.amount) }))} />
+          ) : (
+            <p className="hx-note">ยังไม่ได้หัก — ยังไม่จดทะเบียน · เมื่อเริ่มหัก ใส่ยอดในช่อง &quot;หัก ณ ที่จ่าย&quot; ตอนบันทึกการโอนผู้จัด แล้วสรุปรายเดือนจะขึ้นที่นี่</p>
+          )}
         </Card>
         <Card title="ตรวจบัญชี" sub="การชำระผ่าน Beam ที่ยังไม่มีรายการรับเงินใน ledger" delay={560}>
           <div className="hx-big">{num(m.ledgerGaps, 0)} รายการ</div>

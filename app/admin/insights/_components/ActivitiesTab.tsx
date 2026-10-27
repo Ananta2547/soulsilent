@@ -7,6 +7,7 @@ import { Card, DOW, Empty, HBars, Kpis, PAL, Rows, Stack100, baht, deltaOf, num 
  *  bookings end, and when people pay. */
 export function ActivitiesTab({ a }: { a: AdminAnalytics }) {
   const x = a.activities;
+  const x2 = a.tests.rounds;
   const heatMax = Math.max(1, ...x.heat.flat());
   const stack = (rows: { label: string; value: number }[]) => rows.map((r, i) => ({ label: r.label, value: r.value, color: PAL[i % PAL.length] }));
 
@@ -80,6 +81,14 @@ export function ActivitiesTab({ a }: { a: AdminAnalytics }) {
             ])}
           </div>
         </div>
+      </Card>
+
+      <Card
+        title={`รายการทดสอบ · ${x2.length}`}
+        sub={a.tests.included ? 'กำลังรวมอยู่ในตัวเลข (ติ๊ก "รวมรายการทดสอบ" ด้านบน)' : 'ไม่นับในตัวเลขทุกหน้า — ตรวจจากคำว่า ทดสอบ / test ในชื่อรอบ ชื่อกิจกรรม หรือสถานที่'}
+        delay={420}
+      >
+        {x2.length === 0 ? <Empty>ไม่พบรายการทดสอบ</Empty> : <Rows rows={x2.slice(0, 30).map((t) => ({ key: t.id, main: t.title, sub: `${t.host} · ${t.date}` }))} />}
       </Card>
     </div>
   );

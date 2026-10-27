@@ -6,7 +6,7 @@ import { ImageUploader } from '@/components/admin/image/ImageUploader';
 import { ASPECTS } from '@/lib/image-aspects';
 import { AdminSheet, adminAlert } from '@/components/admin/AdminShell';
 
-export type TransferKind = 'refund' | 'host_payout' | 'expense';
+export type TransferKind = 'refund' | 'host_payout' | 'host_return' | 'expense';
 
 /** What the opener already knows; the admin fills in the rest. */
 export type TransferPreset = {
@@ -25,6 +25,7 @@ export type SavedTx = { id: string; doc_no: string; net: number; voucher_token: 
 const KIND_TITLE: Record<TransferKind, string> = {
   refund: 'บันทึกการโอนคืนเงิน',
   host_payout: 'บันทึกการโอนรายได้ผู้จัด',
+  host_return: 'บันทึกผู้จัดคืนเงิน',
   expense: 'บันทึกค่าใช้จ่าย',
 };
 
@@ -177,10 +178,12 @@ export function RecordTransferSheet({
             <label>ยอดรวม (บาท)</label>
             <input type="number" inputMode="decimal" min="0" step="0.01" value={gross} onChange={(e) => setGross(e.target.value)} />
           </div>
-          <div className="adm-field">
-            <label>หัก ณ ที่จ่าย (บาท)</label>
-            <input type="number" inputMode="decimal" min="0" step="0.01" value={withholding} placeholder="0" onChange={(e) => setWithholding(e.target.value)} />
-          </div>
+          {kind !== 'host_return' && (
+            <div className="adm-field">
+              <label>หัก ณ ที่จ่าย (บาท)</label>
+              <input type="number" inputMode="decimal" min="0" step="0.01" value={withholding} placeholder="0" onChange={(e) => setWithholding(e.target.value)} />
+            </div>
+          )}
         </div>
         <p className="adm-hint" style={{ marginTop: -6 }}>
           โอนจริง (สุทธิ) <b>฿{Math.max(0, g - w).toLocaleString('th-TH', { maximumFractionDigits: 2 })}</b>
@@ -222,8 +225,8 @@ export function RecordTransferSheet({
         )}
 
         <div className="adm-field">
-          <label>ผู้รับเงิน</label>
-          <input value={payee} onChange={(e) => setPayee(e.target.value)} placeholder="ชื่อบัญชีปลายทาง / ร้านค้า" />
+          <label>{kind === 'host_return' ? 'ผู้โอนคืน (ผู้จัด)' : 'ผู้รับเงิน'}</label>
+          <input value={payee} onChange={(e) => setPayee(e.target.value)} placeholder={kind === 'host_return' ? 'ชื่อบัญชีที่โอนมา' : 'ชื่อบัญชีปลายทาง / ร้านค้า'} />
         </div>
         <div className="ldg-row">
           <div className="adm-field">
