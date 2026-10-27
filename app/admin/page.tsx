@@ -123,7 +123,7 @@ export default function AdminDashboard() {
   const todayKey = dayKey(today);
   const newToday = allBookings.filter((b) => dayKey(toDate(b.created_at)) === todayKey).length;
   const attention = [
-    { n: orphans, label: 'เงินเข้าที่ต้องตรวจ', href: '/admin/payments', bg: '#fde4e1', color: '#a3261a' },
+    { n: orphans, label: 'เงินเข้าที่ต้องตรวจ', href: '/admin/ledger', bg: '#fde4e1', color: '#a3261a' },
     { n: pendingPay, label: 'การจองที่รอชำระเงิน', href: '/admin/workshops', bg: '#fdf1d3', color: '#7a5200' },
     { n: stats?.pendingDeletion || 0, label: 'บัญชีที่ขอลบ (ภายใน 30 วัน)', href: '/admin/users', bg: '#eceeed', color: '#4c5755' },
   ].filter((a) => a.n > 0);

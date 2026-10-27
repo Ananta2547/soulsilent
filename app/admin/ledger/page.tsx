@@ -4,13 +4,35 @@ import { useCallback, useEffect, useState } from 'react';
 import { PageLoader } from '@/components/design/PageLoader';
 import { AdminHead, AdminChips, AdminSearch, AdminSheet, Badge, RowMenu, adminAlert, adminConfirm, adminToast } from '@/components/admin/AdminShell';
 import { RecordTransferSheet } from '@/components/admin/ledger/RecordTransferSheet';
+import { PendingMoney } from '@/components/admin/ledger/PendingMoney';
 import { KIND_LABEL, METHOD_LABEL, type MoneyTx, type TxKind, type TxMethod } from '@/lib/ledger-shared';
 
 type Row = MoneyTx & { category_name: string | null; workshop_title: string | null; workshop_date: string | null };
 type Totals = { in: number; out: number; withholding: number; count: number };
 type Cat = { id: string; name: string; sort: number; active: number };
+type Edit = { id: string; edited_at: string; note: string | null; editor: string | null; before: Record<string, unknown>; after: Record<string, unknown> };
 
-type Filter = 'all' | 'in' | 'refund' | 'host_payout' | 'expense' | 'void';
+/** Thai names of the fields an edit can change, for the history list. */
+const FIELD_LABEL: Record<string, string> = {
+  gross: 'ยอดรวม',
+  withholding: 'หัก ณ ที่จ่าย',
+  net: 'สุทธิ',
+  method: 'ช่องทาง',
+  ref_id: 'เลขอ้างอิง',
+  ref_source: 'ที่มาเลขอ้างอิง',
+  no_ref_reason: 'เหตุผลไม่มีเลขอ้างอิง',
+  occurred_at: 'วันเวลา',
+  payee_name: 'ชื่อ',
+  payee_bank: 'ธนาคาร',
+  payee_account: 'เลขบัญชี',
+  payee_email: 'อีเมล',
+  category_id: 'หมวด',
+  description: 'รายละเอียด',
+  slip_url: 'สลิป',
+  slip_meta: 'การครอบสลิป',
+};
+
+type Filter = 'all' | 'in' | 'income' | 'refund' | 'host_payout' | 'expense' | 'void';
 
 const baht = (n: number) => '฿' + n.toLocaleString('th-TH', { maximumFractionDigits: 2 });
 const when = (s: string) => s.replace('T', ' ');
@@ -42,7 +64,9 @@ export default function AdminLedgerPage() {
   const [q, setQ] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState<'expense' | 'income' | null>(null);
+  const [editing, setEditing] = useState<Row | null>(null);
+  const [history, setHistory] = useState<Edit[] | null>(null);
   const [open, setOpen] = useState<Row | null>(null);
   const [voiding, setVoiding] = useState<Row | null>(null);
   const [voidReason, setVoidReason] = useState('');
@@ -70,6 +94,19 @@ export default function AdminLedgerPage() {
     const t = setTimeout(load, 250);
     return () => clearTimeout(t);
   }, [load]);
+
+  useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    fetch('/api/admin/ledger/' + open.id)
+      .then(async (r) => ((await r.json()) as { edits?: Edit[] }).edits || [])
+      .then((e) => alive && setHistory(e))
+      .catch(() => alive && setHistory([]));
+    return () => {
+      alive = false;
+      setHistory(null);
+    };
+  }, [open]);
 
   async function importLegacy() {
     if (!(await adminConfirm({ title: 'ดึงรายการเก่าเข้าบัญชี?', msg: 'เงินเข้าจาก Beam ที่ยังไม่อยู่ในบัญชี + สลิปคืนเงินและสลิปจ่ายผู้จัดเดิม จะถูกบันทึกเป็น "รายการเก่า" — กดซ้ำได้ ไม่บันทึกซ้ำ', ok: 'ดึงข้อมูล' }))) return;
@@ -109,6 +146,7 @@ export default function AdminLedgerPage() {
 
   const menu = (t: Row) => [
     { label: 'ดูรายละเอียด', onClick: () => setOpen(t) },
+    { label: t.ref_source === 'beam' ? 'แก้ไขรายละเอียด' : 'แก้ไข', disabled: t.status === 'void', onClick: () => setEditing(t) },
     { label: t.direction === 'out' ? 'เปิดใบสำคัญจ่าย' : 'เปิดใบสำคัญรับ', href: `/voucher/${t.voucher_token}` },
     ...(t.direction === 'out' && t.payee_email && t.status === 'done' ? [{ label: 'ส่งอีเมลใบสำคัญจ่ายอีกครั้ง', onClick: () => resend(t) }] : []),
     { label: 'ยกเลิกรายการ', danger: true, disabled: t.status === 'void' || t.ref_source === 'beam', onClick: () => setVoiding(t) },
@@ -157,12 +195,17 @@ export default function AdminLedgerPage() {
             <button type="button" className="adm-btn" onClick={importLegacy}>
               ดึงรายการเก่า
             </button>
-            <button type="button" className="adm-btn teal" onClick={() => setAdding(true)}>
+            <button type="button" className="adm-btn" onClick={() => setAdding('income')}>
+              + รายรับ
+            </button>
+            <button type="button" className="adm-btn teal" onClick={() => setAdding('expense')}>
               + บันทึกรายการ
             </button>
           </>
         }
       />
+
+      <PendingMoney onRecorded={load} />
 
       {totals && (
         <div className="ldg-sums">
@@ -195,6 +238,7 @@ export default function AdminLedgerPage() {
           items={[
             { key: 'all', label: 'ทั้งหมด' },
             { key: 'in', label: 'เงินเข้า' },
+            { key: 'income', label: 'รายรับอื่น' },
             { key: 'refund', label: 'คืนเงิน' },
             { key: 'host_payout', label: 'จ่ายผู้จัด' },
             { key: 'expense', label: 'ค่าใช้จ่าย' },
@@ -281,11 +325,25 @@ export default function AdminLedgerPage() {
 
       {adding && (
         <RecordTransferSheet
-          preset={{ kind: 'expense' }}
-          onClose={() => setAdding(false)}
+          preset={{ kind: adding }}
+          onClose={() => setAdding(null)}
           onSaved={(tx, emailed) => {
-            setAdding(false);
+            setAdding(null);
             adminToast(`บันทึก ${tx.doc_no} แล้ว${emailed ? ' · ส่งอีเมลแล้ว' : ''}`);
+            load();
+          }}
+        />
+      )}
+
+      {editing && (
+        <RecordTransferSheet
+          edit={editing}
+          preset={{}}
+          onClose={() => setEditing(null)}
+          onSaved={(tx, emailed) => {
+            setEditing(null);
+            setOpen(null);
+            adminToast('แก้ไข ' + tx.doc_no + ' แล้ว' + (emailed ? ' · ส่งอีเมลแล้ว' : ''));
             load();
           }}
         />
@@ -304,6 +362,11 @@ export default function AdminLedgerPage() {
               {open.status === 'done' && open.ref_source !== 'beam' && (
                 <button type="button" className="adm-btn" style={{ marginRight: 'auto', color: '#a3261a' }} onClick={() => setVoiding(open)}>
                   ยกเลิกรายการ
+                </button>
+              )}
+              {open.status === 'done' && (
+                <button type="button" className="adm-btn" onClick={() => (setEditing(open), setOpen(null))}>
+                  แก้ไข
                 </button>
               )}
               <a className="adm-btn teal" href={`/voucher/${open.voucher_token}`} target="_blank" rel="noopener noreferrer">
@@ -381,6 +444,28 @@ export default function AdminLedgerPage() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={open.slip_url} alt="สลิป" />
             </a>
+          )}
+          {history && history.length > 0 && (
+            <div style={{ marginTop: 18 }}>
+              <div className="adm-label" style={{ marginBottom: 8 }}>
+                ประวัติการแก้ไข
+              </div>
+              {history.map((h) => (
+                <div key={h.id} className="adm-notice" style={{ marginBottom: 8 }}>
+                  <div style={{ fontWeight: 600 }}>
+                    {h.edited_at} · {h.editor || '—'}
+                    {h.note ? ' · ' + h.note : ''}
+                  </div>
+                  {Object.keys(h.after)
+                    .filter((k) => k !== 'slip_meta' && k !== 'ref_source')
+                    .map((k) => (
+                      <div key={k} className="adm-meta">
+                        {FIELD_LABEL[k] || k}: {String(h.before[k] ?? '—')} → {String(h.after[k] ?? '—')}
+                      </div>
+                    ))}
+                </div>
+              ))}
+            </div>
           )}
         </AdminSheet>
       )}

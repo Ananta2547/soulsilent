@@ -27,8 +27,6 @@ const I = {
   coupons: { href: '/admin/coupons', label: 'คูปอง', d: 'M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z' },
   gp: { href: '/admin/gp', label: 'ค่าธรรมเนียม GP', d: 'M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z' },
   ledger: { href: '/admin/ledger', label: 'บัญชีการเงิน', d: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
-  payments: { href: '/admin/payments', label: 'ตรวจเงินเข้า', d: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' },
-  export: { href: '/admin/finance-export', label: 'ทดสอบ Export API', d: 'M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0 0l-4-4m4 4l4-4' },
 } satisfies Record<string, Item>;
 
 type Key = keyof typeof I;
@@ -38,7 +36,7 @@ const GROUPS: [string, Key[]][] = [
   ['กิจกรรม', ['workshops', 'info', 'locations']],
   ['เนื้อหา', ['articles', 'reviews']],
   ['ผู้ใช้ & การจอง', ['users', 'groups', 'transfers']],
-  ['การเงิน', ['revenue', 'ledger', 'gp', 'payments', 'coupons', 'export']],
+  ['การเงิน', ['revenue', 'ledger', 'gp', 'coupons']],
 ];
 
 const TABS: Key[] = ['overview', 'workshops', 'users', 'revenue'];
@@ -182,7 +180,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   /** The drawer, and the path it was opened on — moving to another page closes it. */
   const [openOn, setOpenOn] = useState<string | null>(null);
   const open = openOn === pathname;
-  /** Unresolved money that needs a human (a badge on ตรวจเงินเข้า). */
+  /** Unresolved money that needs a human (a badge on บัญชีการเงิน). */
   const [pending, setPending] = useState(0);
   /** Urgent open alerts on Admin Insights (a badge on ข้อมูลเชิงลึก). */
   const [urgent, setUrgent] = useState(0);
@@ -232,7 +230,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               {label && <div className="adm-nav-label">{label}</div>}
               {keys.map((k) => {
                 const item: Item = I[k];
-                const badge = k === 'payments' ? pending : k === 'insights' ? urgent : 0;
+                const badge = k === 'ledger' ? pending : k === 'insights' ? urgent : 0;
                 return (
                   <Link
                     key={k}

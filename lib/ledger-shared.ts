@@ -2,7 +2,7 @@
  * without pulling in the server side (lib/ledger.ts re-exports them). */
 
 export type Direction = 'in' | 'out';
-export type TxKind = 'booking_payment' | 'refund' | 'host_payout' | 'host_return' | 'expense' | 'payroll';
+export type TxKind = 'booking_payment' | 'refund' | 'host_payout' | 'host_return' | 'income' | 'expense' | 'payroll';
 export type TxMethod = 'beam' | 'bank_transfer' | 'promptpay' | 'cash' | 'bank_api' | 'other';
 export type RefSource = 'beam' | 'bank_slip' | 'bank_api' | 'manual' | 'legacy';
 
@@ -47,6 +47,7 @@ export const KIND_LABEL: Record<TxKind, string> = {
   refund: 'คืนเงินผู้จอง',
   host_payout: 'จ่ายรายได้ผู้จัด',
   host_return: 'ผู้จัดคืนเงิน',
+  income: 'รายรับอื่น',
   expense: 'ค่าใช้จ่ายธุรกิจ',
   payroll: 'เงินเดือน',
 };
@@ -56,6 +57,8 @@ export const DIRECTION_OF: Record<TxKind, Direction> = {
   host_payout: 'out',
   // A host paying back what was overpaid (a refund after their payout).
   host_return: 'in',
+  // Money in that is not a booking: a sponsor, a grant, interest, a sale.
+  income: 'in',
   expense: 'out',
   payroll: 'out',
 };
@@ -70,4 +73,4 @@ export const METHOD_LABEL: Record<TxMethod, string> = {
 /** Methods whose transfer always leaves a reference to record. */
 export const NEEDS_REF: TxMethod[] = ['bank_transfer', 'promptpay', 'bank_api', 'beam'];
 /** Kinds admin enters by hand (Beam rows are written by the system). */
-export const MANUAL_KINDS: TxKind[] = ['refund', 'host_payout', 'host_return', 'expense'];
+export const MANUAL_KINDS: TxKind[] = ['refund', 'host_payout', 'host_return', 'income', 'expense'];

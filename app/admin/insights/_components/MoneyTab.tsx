@@ -22,8 +22,8 @@ export function MoneyTab({ a, say }: { a: AdminAnalytics; say: (m: string) => vo
     if (k === 'pl')
       downloadCsv(
         `งบกำไรขาดทุนรายเดือน-${basis === 'cash' ? 'เกณฑ์เงินสด' : 'เกณฑ์คงค้าง'}-${a.range.to}.csv`,
-        ['เดือน', 'ยอดขาย (GMV)', 'ส่วนของผู้จัด', 'ค่าธรรมเนียม', 'ค่า Beam (ประมาณ)', 'ASL ออกให้', 'รายได้สุทธิแพลตฟอร์ม', 'รายจ่ายธุรกิจ', 'กำไร/ขาดทุน', 'คืนเงิน', 'การจอง'],
-        monthly.map((x) => [x.month, x.sales, x.hostShare, x.fee, x.beam, x.subsidy, x.platformNet, x.expenses, x.profit, x.refunds, x.bookings]),
+        ['เดือน', 'ยอดขาย (GMV)', 'ส่วนของผู้จัด', 'ค่าธรรมเนียม', 'ค่า Beam (ประมาณ)', 'ASL ออกให้', 'รายได้สุทธิแพลตฟอร์ม', 'รายรับอื่น', 'รายจ่ายธุรกิจ', 'กำไร/ขาดทุน', 'คืนเงิน', 'การจอง'],
+        monthly.map((x) => [x.month, x.sales, x.hostShare, x.fee, x.beam, x.subsidy, x.platformNet, x.otherIncome, x.expenses, x.profit, x.refunds, x.bookings]),
       );
     else
       downloadCsv(
@@ -69,6 +69,7 @@ export function MoneyTab({ a, say }: { a: AdminAnalytics; say: (m: string) => vo
             {line(`ค่า Beam${beamSet ? ' (ประมาณ)' : ' — ยังไม่ได้ตั้งอัตรา'}`, c.beam, 'sub', '− ')}
             {line('ASL ออกให้ (คูปอง / บัตรเชิญ)', c.subsidy, 'sub', '− ')}
             {line('รายได้สุทธิแพลตฟอร์ม', c.platformNet)}
+            {line('รายรับอื่น (สปอนเซอร์ ทุน ฯลฯ)', m.otherIncome, 'sub', '+ ')}
             {line('รายจ่ายธุรกิจ + เงินเดือน', m.expenses, 'sub', '− ')}
             {line('กำไร / ขาดทุน', profit, 'total')}
           </div>
@@ -88,6 +89,10 @@ export function MoneyTab({ a, say }: { a: AdminAnalytics; say: (m: string) => vo
             <div>
               <span>รับชำระ (ช่วงนี้)</span>
               <b>{baht(m.ledger.cur.in)}</b>
+            </div>
+            <div className="sub">
+              <span>รายรับอื่น + ผู้จัดคืนเงิน</span>
+              <b>+ {baht(m.ledger.cur.income + m.ledger.cur.hostReturn)}</b>
             </div>
             <div className="sub">
               <span>คืนเงินผู้จอง</span>

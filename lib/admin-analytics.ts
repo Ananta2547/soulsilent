@@ -326,8 +326,12 @@ export function computeAdminAnalytics(full: AdminData, r: Range, now = Date.now(
 
   const cur = money(inWin);
   const prev = money(inPrev);
+  // Money in that is not a booking (sponsors, grants, interest) from the ledger.
+  const incomeIn = (test: (ms: number) => boolean) => sum(d.tx.filter((t) => t.kind === 'income' && test(ledgerMs(t.occurred_at))), (t) => t.gross);
   const expCur = expensesIn(inWin);
   const expPrev = expensesIn(inPrev);
+  const incCur = incomeIn(inWin);
+  const incPrev = incomeIn(inPrev);
 
   /* ---- people basics ---- */
   const firstBuy = new Map<string, number>();
@@ -374,7 +378,7 @@ export function computeAdminAnalytics(full: AdminData, r: Range, now = Date.now(
   });
 
   // Seats given back that still wait for their money — the same rule as the
-  // refund queue on /admin/payments (api/admin/refunds).
+  // refund queue on /admin/ledger (api/admin/refunds).
   const isPendingRefund = (b: BK) =>
     b.status === 'cancelled' &&
     b.payment_status === 'paid' &&
@@ -465,16 +469,17 @@ export function computeAdminAnalytics(full: AdminData, r: Range, now = Date.now(
     const t = (ms: number) => ms >= from && ms < to;
     const m = money(t);
     const expenses = expensesIn(t);
-    return { month: ym, ...m, expenses, profit: round2(m.platformNet - expenses), signups: signupsIn(t).length, firstBuyers: firstIn(t) };
+    const otherIncome = incomeIn(t);
+    return { month: ym, ...m, otherIncome, expenses, profit: round2(m.platformNet + otherIncome - expenses), signups: signupsIn(t).length, firstBuyers: firstIn(t) };
   });
 
   /* ---- money tab ---- */
   const ledgerFlows = (test: (ms: number) => boolean) => {
     const by = (k: string) => sum(d.tx.filter((t) => t.kind === k && test(ledgerMs(t.occurred_at))), (t) => t.net);
-    return { in: by('booking_payment'), hostReturn: by('host_return'), refund: by('refund'), payout: by('host_payout'), expense: by('expense'), payroll: by('payroll') };
+    return { in: by('booking_payment'), hostReturn: by('host_return'), income: by('income'), refund: by('refund'), payout: by('host_payout'), expense: by('expense'), payroll: by('payroll') };
   };
   const all = ledgerFlows(() => true);
-  const cashBalance = round2(all.in + all.hostReturn - all.refund - all.payout - all.expense - all.payroll);
+  const cashBalance = round2(all.in + all.hostReturn + all.income - all.refund - all.payout - all.expense - all.payroll);
   const heldTotal = round2(prepaid + hostPayable + refundsOwed + whtHeld);
 
   // Bookings made in the window that ended up cancelled, by what became of the money.
@@ -504,7 +509,8 @@ export function computeAdminAnalytics(full: AdminData, r: Range, now = Date.now(
     const t = (ms: number) => ms >= from && ms < to;
     const m = money(t, accrualEvents);
     const expenses = expensesIn(t);
-    return { month: ym, ...m, expenses, profit: round2(m.platformNet - expenses) };
+    const otherIncome = incomeIn(t);
+    return { month: ym, ...m, otherIncome, expenses, profit: round2(m.platformNet + otherIncome - expenses) };
   });
   const expByCat = new Map<string, number>();
   for (const t of d.tx) {
@@ -715,7 +721,7 @@ export function computeAdminAnalytics(full: AdminData, r: Range, now = Date.now(
         bookings: { cur: cur.bookings, prev: prev.bookings },
         buyers: { cur: buyersCur.size, prev: buyersPrev.size },
         signups: { cur: signupsCur.length, prev: signupsIn(inPrev).length },
-        profit: { cur: round2(cur.platformNet - expCur), prev: round2(prev.platformNet - expPrev) },
+        profit: { cur: round2(cur.platformNet + incCur - expCur), prev: round2(prev.platformNet + incPrev - expPrev) },
       },
       cur,
       weekly,
@@ -726,7 +732,8 @@ export function computeAdminAnalytics(full: AdminData, r: Range, now = Date.now(
     money: {
       cur,
       expenses: expCur,
-      profit: round2(cur.platformNet - expCur),
+      otherIncome: incCur,
+      profit: round2(cur.platformNet + incCur - expCur),
       monthly,
       ledger: { all: { ...all, balance: cashBalance }, cur: ledgerFlows(inWin) },
       payable: { owed: owedTotal, owedRounds: owed.slice(0, 40), notYet: sum(notYet, (x) => x.net), notYetRounds: notYet.length, aging },
@@ -736,7 +743,7 @@ export function computeAdminAnalytics(full: AdminData, r: Range, now = Date.now(
       vat: { last12: fee12, threshold: 1800000 },
       pendingRefunds: { n: pendingRefunds.length, amount: sum(pendingRefunds, (x) => x.amount), rows: pendingRefunds.slice(0, 20) },
       ledgerGaps,
-      accrual: { cur: accrualCur, profit: round2(accrualCur.platformNet - expCur), monthly: accrualMonthly },
+      accrual: { cur: accrualCur, profit: round2(accrualCur.platformNet + incCur - expCur), monthly: accrualMonthly },
       held: { prepaid, hostPayable, refundsOwed, wht: whtHeld, total: heldTotal, cash: cashBalance, own: round2(cashBalance - heldTotal), hostReceivable },
       cancels,
       wht: { total: whtHeld, monthly: whtMonthly },
@@ -853,7 +860,7 @@ function computeAlerts(x: {
       tone: 'bad',
       title: `${b.cancel_reason === 'refund_requested' ? 'ขอคืนเงิน' : 'คืนเงินจากรอบที่ยกเลิก'} · ${w?.title || '—'}`,
       detail: `${nameOf(b.user_id)} · ${baht(Number(b.amount) || 0)} · ชำระเมื่อ ${days} วันก่อน`,
-      href: '/admin/payments',
+      href: '/admin/ledger',
       day: thaiDay(utcMs(b.paid_at)),
     });
   }
@@ -881,7 +888,7 @@ function computeAlerts(x: {
       tone: 'bad',
       title: `เงินเข้าผิดปกติ · ${ORPHAN_REASON[r.reason] || r.reason}`,
       detail: `${baht((Number(r.amount) || 0) / 100)}${r.email ? ` · ${r.email}` : ''}`,
-      href: '/admin/payments',
+      href: '/admin/ledger',
       day: thaiDay(utcMs(r.created_at)),
     });
   }
@@ -936,7 +943,7 @@ function computeAlerts(x: {
         tone: pending ? 'bad' : 'info',
         title: `รอบถูกยกเลิก · ${w.title} (${when(w)})`,
         detail: `${w.host_name || '—'} · มีผู้จอง ${had.length + moved} คน · ย้ายรอบ ${moved} · คืนเงินแล้ว ${refunded}${pending ? ` · ค้างคืน ${pending}` : ''}`,
-        href: pending ? '/admin/payments' : '/admin/workshops',
+        href: pending ? '/admin/ledger' : '/admin/workshops',
         day: w.updated_at ? thaiDay(cancelledAt) : w.date,
       });
       continue;

@@ -78,7 +78,7 @@ export function QualityTab({ a }: { a: AdminAnalytics }) {
           <div className="hx-big">{num(s.orphans.n, 0)} รายการ</div>
           <p className="hx-note">
             รวม {baht(s.orphans.amount)} ·{' '}
-            <Link href="/admin/payments" style={{ color: 'var(--teal)' }}>
+            <Link href="/admin/ledger" style={{ color: 'var(--teal)' }}>
               ไปตรวจ ›
             </Link>
           </p>
