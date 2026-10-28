@@ -27,6 +27,7 @@ const I = {
   coupons: { href: '/admin/coupons', label: 'คูปอง', d: 'M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z' },
   gp: { href: '/admin/gp', label: 'ค่าธรรมเนียม GP', d: 'M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z' },
   ledger: { href: '/admin/ledger', label: 'บัญชีการเงิน', d: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
+  hosts: { href: '/admin/hosts', label: 'บัญชีผู้จัด', d: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z' },
 } satisfies Record<string, Item>;
 
 type Key = keyof typeof I;
@@ -36,7 +37,7 @@ const GROUPS: [string, Key[]][] = [
   ['กิจกรรม', ['workshops', 'info', 'locations']],
   ['เนื้อหา', ['articles', 'reviews']],
   ['ผู้ใช้ & การจอง', ['users', 'groups', 'transfers']],
-  ['การเงิน', ['revenue', 'ledger', 'gp', 'coupons']],
+  ['การเงิน', ['revenue', 'ledger', 'hosts', 'gp', 'coupons']],
 ];
 
 const TABS: Key[] = ['overview', 'workshops', 'users', 'revenue'];

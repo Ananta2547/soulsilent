@@ -14,7 +14,7 @@ import {
 } from './_components/WorkshopForm';
 import { ApplicationFormBuilder } from './_components/ApplicationFormBuilder';
 import { PayoutManager } from './_components/PayoutManager';
-import { adminAlert, adminConfirm, adminToast, AdminHead, AdminSearch, AdminChips, Badge, RowMenu, type MenuItem, type Tone } from '@/components/admin/AdminShell';
+import { adminAlert, adminConfirm, adminToast, AdminHead, AdminSearch, AdminChips, AdminSheet, Badge, RowMenu, type MenuItem, type Tone } from '@/components/admin/AdminShell';
 
 type ModalState =
   | { mode: 'create' }
@@ -43,6 +43,8 @@ export default function AdminWorkshopsPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [modal, setModal] = useState<ModalState>(null);
+  // The Google Drive photo link of one activity (one-day or a round).
+  const [photosFor, setPhotosFor] = useState<Workshop | null>(null);
   const [loadingEdit, setLoadingEdit] = useState<string | null>(null);
   const [formDirty, setFormDirty] = useState(false);
   const [pendingClose, setPendingClose] = useState(false);
@@ -253,6 +255,7 @@ export default function AdminWorkshopsPage() {
           setModal({ mode: 'application', id: ws.id, title: ws.title, questions: safeParseArray<ApplicationQuestion>(ws.application_form, []) }),
       },
       { label: 'เงินโอน (Payout)', onClick: () => setModal({ mode: 'payout', id: ws.id, title: ws.title, workshop: ws }) },
+      { label: ws.photos_drive_url ? 'ลิงก์รูปภาพกิจกรรม ✓' : 'ลิงก์รูปภาพกิจกรรม', onClick: () => setPhotosFor(ws) },
       { label: 'ลบกิจกรรม', danger: true, onClick: () => handleDelete(ws.id) },
     ];
     const star = (
@@ -498,6 +501,70 @@ export default function AdminWorkshopsPage() {
           />
         ) : null}
       </AdminFormModal>
+
+      {photosFor && (
+        <PhotosSheet
+          workshop={photosFor}
+          onClose={() => setPhotosFor(null)}
+          onSaved={() => {
+            setPhotosFor(null);
+            adminToast('บันทึกลิงก์รูปภาพแล้ว');
+            fetchAll();
+          }}
+        />
+      )}
     </>
+  );
+}
+
+/** Admin sets (or clears) where an activity's photos are kept. The host's
+ *  roster and the participant's journey show the link once it is set. */
+function PhotosSheet({ workshop, onClose, onSaved }: { workshop: Workshop; onClose: () => void; onSaved: () => void }) {
+  const [url, setUrl] = useState(workshop.photos_drive_url || '');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  async function save() {
+    setSaving(true);
+    setErr(null);
+    try {
+      const r = await fetch(`/api/admin/workshops/${workshop.id}/photos`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+      const d = (await r.json()) as { error?: string };
+      if (!r.ok) throw new Error(d.error || 'บันทึกไม่สำเร็จ');
+      onSaved();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+  return (
+    <AdminSheet
+      open
+      onClose={onClose}
+      eyebrow="รูปภาพกิจกรรม"
+      title={workshop.title}
+      sub={`${workshop.date} · ${workshop.time_start}–${workshop.time_end}`}
+      width={520}
+      footer={
+        <>
+          <button type="button" className="adm-btn" onClick={onClose}>
+            ยกเลิก
+          </button>
+          <button type="button" className="adm-btn teal" disabled={saving} onClick={save}>
+            {saving ? 'กำลังบันทึก…' : 'บันทึก'}
+          </button>
+        </>
+      }
+    >
+      {err && <div className="adm-notice is-bad">{err}</div>}
+      {!workshop.require_consent && (
+        <div className="adm-notice is-warn">กิจกรรมนี้ไม่ได้ขอความยินยอมถ่ายภาพ (PDPA) — ใส่ลิงก์รูปไม่ได้จนกว่าจะเปิด PDPA</div>
+      )}
+      <div className="adm-field">
+        <label htmlFor="ws-photos">Link Google Drive (รูปกิจกรรม)</label>
+        <input id="ws-photos" type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://drive.google.com/..." />
+        <p className="adm-hint">ผู้จัดเห็นปุ่ม “ดูรูปภาพกิจกรรม” ในหน้าเช็คชื่อ · ผู้เข้าร่วมที่ถูกเช็คชื่อแล้วเห็นใน My Journey · เว้นว่าง = ไม่มีการเก็บภาพ</p>
+      </div>
+    </AdminSheet>
   );
 }

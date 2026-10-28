@@ -473,7 +473,8 @@ export default function TeacherCheckinPage() {
         </div>
       </div>
 
-      <div className="tdb-seg pillcount full" role="tablist" style={{ marginBottom: 22 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 22 }}>
+      <div className="tdb-seg pillcount full" role="tablist" style={{ marginBottom: 0 }}>
         {(
           [
             ['roster', 'เช็คชื่อ', `${sum.in + sum.out}/${total}`, ''],
@@ -486,6 +487,29 @@ export default function TeacherCheckinPage() {
             {n && <span className="n">{n}</span>}
           </button>
         ))}
+      </div>
+        {/* The activity's photos — admin sets the Google Drive link; none = nothing kept. */}
+        {w.photos_drive_url ? (
+          <a href={w.photos_drive_url} target="_blank" rel="noopener noreferrer" className="btn btn-paper" style={{ padding: '11px 20px', fontSize: 14, gap: 8 }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="5" width="18" height="14" rx="2.5" />
+              <circle cx="9" cy="10" r="1.6" />
+              <path d="M21 16l-5-5-8 8" />
+            </svg>
+            ดูรูปภาพกิจกรรม <span className="mono">↗</span>
+          </a>
+        ) : (
+          <span
+            className="btn"
+            style={{ padding: '11px 20px', fontSize: 13.5, gap: 8, background: 'transparent', boxShadow: 'inset 0 0 0 1.5px var(--cream-deep)', color: 'var(--muted)', cursor: 'not-allowed', fontWeight: 500 }}
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="5" width="18" height="14" rx="2.5" />
+              <path d="M4 4l16 16" />
+            </svg>
+            ไม่มีการเก็บภาพในกิจกรรมนี้
+          </span>
+        )}
       </div>
 
       {/* ================= ROSTER ================= */}

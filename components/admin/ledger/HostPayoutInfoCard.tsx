@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { HostPayoutInfo } from '@/app/api/admin/hosts/[id]/payout-info/route';
+import type { HostPayoutInfo } from '@/lib/host-payout';
 
 type Draft = { bank: string; account_no: string; account_name: string; promptpay: string; note: string };
 const EMPTY: Draft = { bank: '', account_no: '', account_name: '', promptpay: '', note: '' };
@@ -46,7 +46,7 @@ export function HostPayoutInfoCard({ hostId, onLoad }: { hostId: string; onLoad:
     setSaving(true);
     setErr('');
     try {
-      const r = await fetch(`/api/admin/hosts/${hostId}/payout-info`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(draft) });
+      const r = await fetch(`/api/admin/hosts/${hostId}/payout-info`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...(info || {}), ...draft }) }); // keeps the contact fields this card does not show
       const d = (await r.json()) as { info?: HostPayoutInfo | null; error?: string };
       if (!r.ok) throw new Error(d.error || 'บันทึกไม่สำเร็จ');
       setInfo(d.info ?? null);

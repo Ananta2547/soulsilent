@@ -195,9 +195,15 @@ export default function AdminUsersPage() {
     ) : (
       <Badge tone="ok">ปกติ</Badge>
     );
+    // A host's payout account and contacts live on บัญชีผู้จัด.
+    const hostLink: MenuItem[] =
+      hasRole(user, 'teacher') || hasRole(user, 'session_host')
+        ? [{ label: 'บัญชีผู้จัด (โอนเงิน & ติดต่อ)', onClick: () => window.location.assign(`/admin/hosts?q=${encodeURIComponent(user.email)}`) }]
+        : [];
     const menu: MenuItem[] = owner
-      ? []
+      ? hostLink
       : [
+          ...hostLink,
           status === 'active'
             ? { label: 'ระงับบัญชี', danger: true, onClick: () => setStatus(user.id, 'suspended'), disabled: busyId === user.id }
             : status === 'suspended'
