@@ -995,7 +995,11 @@ function WorkshopDetailInner() {
                   <h2 className="display-th" style={{ fontSize: 'clamp(28px, 3.5vw, 40px)', margin: '14px 0 20px' }}>
                     <T th="เจอกันออนไลน์" en="We meet online" />
                   </h2>
-                  <OnlineMeet workshop={workshop} lang={lang} />
+                  <OnlineMeet
+                    workshop={workshop}
+                    lang={lang}
+                    booked={!!userBooking && userBooking.status !== 'cancelled' && (userBooking.payment_status === 'paid' || userBooking.status === 'confirmed')}
+                  />
                 </Reveal>
               )}
 
@@ -2198,13 +2202,14 @@ const WAVE_A = 'M2 20 Q 50 4, 100 20 T 200 20 T 300 20 T 398 20';
 const WAVE_B = 'M2 34 Q 50 18, 100 34 T 200 34 T 300 34 T 398 34';
 
 /** "เจอกันออนไลน์" (design: Journey Detail). The platform, whether the room
- *  link is ready (the API only sends online_url to a member with a seat), the
- *  three steps from booking to meeting, and what to have ready. */
-function OnlineMeet({ workshop, lang }: { workshop: Workshop; lang: 'th' | 'en' }) {
+ *  link is ready, the three steps from booking to meeting, and what to have
+ *  ready. The link is the viewer's only once they hold a seat — an admin is
+ *  sent online_url too, so its presence alone is not enough. */
+function OnlineMeet({ workshop, lang, booked }: { workshop: Workshop; lang: 'th' | 'en'; booked: boolean }) {
   const style = platformStyle(workshop.online_platform);
   const name = platformLabel(workshop.online_platform, workshop.online_platform_other);
   const [copied, setCopied] = useState(false);
-  const ready = !!workshop.online_url;
+  const ready = booked && !!workshop.online_url;
   const steps: [string, string][] = [
     [tr(lang, 'จองที่นั่ง', 'Book a seat'), tr(lang, 'ได้ที่นั่งในชื่อของคุณทันที', 'The seat is yours right away')],
     [tr(lang, 'รับลิงก์เข้าห้อง', 'Get the room link'), tr(lang, 'แสดงในหน้านี้ · “การจองของฉัน” · และอีเมล', 'Here · in “My bookings” · and by email')],
