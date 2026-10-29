@@ -76,6 +76,7 @@ export async function linePush(env: LineEnv, to: string, payload: PushPayload): 
       body: JSON.stringify({ to, messages: [flexOf(payload, env.SITE_URL || 'https://allsoullearn.com')] }),
     });
     if (!r.ok) console.warn('[line] push rejected', r.status, (await r.text().catch(() => '')).slice(0, 200));
+    else console.log('[line] push ok', payload.title);
     return r.ok;
   } catch (e) {
     console.warn('[line] push failed', e);

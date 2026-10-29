@@ -158,6 +158,13 @@ export async function claimOnce(db: D1Database, key: string): Promise<boolean> {
   }
 }
 
+/** Undo claimOnce when nothing was delivered, so a later run retries. */
+export async function releaseClaim(db: D1Database, key: string): Promise<void> {
+  try {
+    await db.prepare('DELETE FROM push_sent WHERE key = ?').bind(key).run();
+  } catch {}
+}
+
 /** SQL: members a notification can reach — an app device, or linked LINE. */
 export const REACHABLE_USERS_SQL = `SELECT user_id FROM push_subscriptions UNION ${LINE_REACHABLE_SQL}`;
 

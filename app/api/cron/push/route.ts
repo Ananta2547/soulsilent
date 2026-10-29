@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDB, getEnv } from '@/lib/db';
-import { claimOnce, REACHABLE_USERS_SQL, sendPushToUser, subscribedUsers, vapidKeys, type PushKind } from '@/lib/push';
+import { claimOnce, REACHABLE_USERS_SQL, releaseClaim, sendPushToUser, subscribedUsers, vapidKeys, type PushKind } from '@/lib/push';
 import { seatsHeldSubquery } from '@/lib/seats';
 import { pushAdminAlerts } from '@/lib/admin-alert-push';
 import { pushEvents } from '@/lib/push-events';
@@ -131,7 +131,11 @@ export async function GET(request: Request) {
     urgency: 'normal' | 'high' = 'normal',
   ) => {
     if (!(await claimOnce(db, key))) return false;
-    return (await sendPushToUser(db, env, userId, payload, { urgency, topic: key.split(':')[0], kind })) > 0;
+    const ok = (await sendPushToUser(db, env, userId, payload, { urgency, topic: key.split(':')[0], kind })) > 0;
+    // Nothing delivered (LINE or every device refused): give the key back so
+    // the next run tries again while the notice is still in its window.
+    if (!ok) await releaseClaim(db, key);
+    return ok;
   };
 
   try {
