@@ -615,7 +615,9 @@ export function BookingModal({
           </>
         )}
 
-        {step === 1 && !incomplete && hasStep2 && (
+        {/* Online or onsite, one step or two: the same boxes — the pick, name
+            & age, contact. Health & food only where people travel to a venue. */}
+        {step === 1 && !incomplete && (
           <>
             <div style={{ background: 'var(--teal-50)', borderRadius: 22, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -634,32 +636,19 @@ export function BookingModal({
               <Eyebrow style={{ marginBottom: 10 }}>{tr(lang, 'ช่องทางติดต่อ', 'Contact')}</Eyebrow>
               <KV rows={[[tr(lang, 'โทร', 'Phone'), phone], [tr(lang, 'อีเมล', 'Email'), profile?.email || ''], ['Line · Facebook', socials]]} />
             </Card>
-            <Card>
-              <Eyebrow style={{ marginBottom: 10 }}>{tr(lang, 'สุขภาพ & อาหาร', 'Health & food')}</Eyebrow>
-              <KV
-                rows={[
-                  [tr(lang, 'เงื่อนไขสุขภาพ / แพ้', 'Medical / allergies'), vault.medical || ''],
-                  [tr(lang, 'ข้อจำกัดอาหาร', 'Food restrictions'), vault.dietary || ''],
-                ]}
-                tail={[tr(lang, 'ผู้ติดต่อฉุกเฉิน', 'Emergency contact'), tr(lang, 'เก็บเป็นความลับ ใช้เฉพาะกรณีฉุกเฉินในวันงาน', 'Kept private; used only in an emergency on the day.')]}
-              />
-            </Card>
+            {!isOnline && (
+              <Card>
+                <Eyebrow style={{ marginBottom: 10 }}>{tr(lang, 'สุขภาพ & อาหาร', 'Health & food')}</Eyebrow>
+                <KV
+                  rows={[
+                    [tr(lang, 'เงื่อนไขสุขภาพ / แพ้', 'Medical / allergies'), vault.medical || ''],
+                    [tr(lang, 'ข้อจำกัดอาหาร', 'Food restrictions'), vault.dietary || ''],
+                  ]}
+                  tail={[tr(lang, 'ผู้ติดต่อฉุกเฉิน', 'Emergency contact'), tr(lang, 'เก็บเป็นความลับ ใช้เฉพาะกรณีฉุกเฉินในวันงาน', 'Kept private; used only in an emergency on the day.')]}
+                />
+              </Card>
+            )}
           </>
-        )}
-
-        {step === 1 && !incomplete && !hasStep2 && (
-          <Card>
-            <Eyebrow style={{ marginBottom: 10 }}>{tr(lang, 'ผู้สมัคร', 'Applicant')}</Eyebrow>
-            <KV
-              rows={[
-                [tr(lang, 'ชื่อ-นามสกุล', 'Full name'), `${nameLine}${vault.nickname ? ` (${vault.nickname})` : ''}`],
-                [tr(lang, 'อายุ · เพศ', 'Age · gender'), ageGender],
-                [tr(lang, 'อีเมล · Line', 'Email · Line'), [profile?.email, vault.lineId].filter(Boolean).join(' · ')],
-                [tr(lang, 'โทร', 'Phone'), phone],
-              ]}
-            />
-            <div style={{ marginTop: 12 }}>{editLink}</div>
-          </Card>
         )}
 
         {step === 2 && (
