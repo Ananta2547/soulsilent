@@ -7,7 +7,7 @@ import { useParams } from 'next/navigation';
 import { useLang, T, tr } from '@/lib/i18n';
 import { Reveal } from '@/components/design/Reveal';
 import { Btn } from '@/components/design/RippleButton';
-import { getEffectivePrice, safeParseArray } from '@/lib/workshop-utils';
+import { getEffectivePrice, getWorkshopStatusBadge, safeParseArray } from '@/lib/workshop-utils';
 import type { WorkshopMaster, Workshop } from '@/lib/types';
 import { Icon } from '@/components/design/Icon';
 import { useLoadingTracker } from '@/components/design/DataLoading';
@@ -31,7 +31,8 @@ export default function WorkshopInfoPage() {
         .then((d) => {
           if (d) {
             setMaster(d.master);
-            setSessions(d.sessions || []);
+            // Only rounds still taking bookings (not started, not past close).
+            setSessions((d.sessions || []).filter((s) => getWorkshopStatusBadge(s).open));
           }
         })
         .catch(() => {})

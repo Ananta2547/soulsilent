@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLang, tr } from '@/lib/i18n';
 import { MonthPicker } from '@/components/calendar/MonthPicker';
 import { fmtDate } from '@/lib/datetime';
+import { getWorkshopStatusBadge } from '@/lib/workshop-utils';
 import type { Workshop, WorkshopMaster } from '@/lib/types';
 import { bookableTiers, isGroupTier, tierDesc, tierSeats, tierTotal, type PriceTier } from '@/lib/pricing';
 
@@ -36,7 +37,9 @@ export function SessionPickerModal({
 }) {
   const { lang } = useLang();
 
-  const open = useMemo(() => sessions.filter((s) => s.status === 'active'), [sessions]);
+  // Only rounds still taking bookings: not started, not past their close time
+  // (the same check the booking API makes, on the server's clock).
+  const open = useMemo(() => sessions.filter((s) => getWorkshopStatusBadge(s).open), [sessions]);
   const days = useMemo(() => new Set(open.map((s) => s.date)), [open]);
   const marks = useMemo(() => {
     const m: Record<string, number> = {};
