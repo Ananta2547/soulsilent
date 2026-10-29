@@ -1092,6 +1092,11 @@ function WorkshopDetailInner() {
                   onViewApplication={() => setConsentOpen(true)}
                   manageHref={manageHref}
                   lang={lang}
+                  otherRoundsOpen={
+                    !!master &&
+                    master.kind !== 'single' &&
+                    siblings.some((s) => s.id !== workshop.id && getWorkshopStatusBadge(s).open && s.private_taken === 0 && s.booked < s.max_participants)
+                  }
                 />
               </div>
             </div>
@@ -1281,6 +1286,7 @@ function BookingCardContent({
   onViewApplication,
   manageHref,
   lang,
+  otherRoundsOpen = false,
 }: {
   workshop: Workshop;
   spotsLeft: number;
@@ -1303,6 +1309,9 @@ function BookingCardContent({
   /** Set when the viewer teaches this workshop: its Teacher Dashboard page. */
   manageHref?: string | null;
   lang: 'th' | 'en';
+  /** A round activity with another round still taking bookings: the button
+   *  opens the round picker even when this round has closed, filled or ended. */
+  otherRoundsOpen?: boolean;
 }) {
   const eff = getEffectivePrice(workshop);
   // Show "Free" when the payment model is free OR the effective price is ฿0.
@@ -1310,15 +1319,19 @@ function BookingCardContent({
   const isSelection = workshop.admission_type === 'selection';
   const paymentType = workshop.payment_type || 'paid';
   // Organizer/admin cancelled the whole event → no booking, show the reason.
-  const cancelled = workshop.status === 'cancelled';
+  // A round activity whose other rounds still take bookings: someone without a
+  // seat here can pick another round, so this round being cancelled, closed,
+  // full or over does not lock the button (the picker shows only open rounds).
+  const pickAnother = otherRoundsOpen && (!userBooking || userBooking.status === 'cancelled');
+  const cancelled = workshop.status === 'cancelled' && !pickAnother;
   // Event finished → block any new booking.
-  const ended = hasWorkshopEnded(workshop);
+  const ended = hasWorkshopEnded(workshop) && !pickAnother;
   // First day already under way → registration closes (matches the "ปิดรับ"
   // badge in listings). Multi-day events must not accept joiners mid-run.
   const started = hasWorkshopStarted(workshop);
   // Registration is open — same rule as the cards and the booking API: not
   // started, not past the admin's close_at, not past a selection's announce.
-  const regOpen = getWorkshopStatusBadge(workshop).open;
+  const regOpen = getWorkshopStatusBadge(workshop).open || pickAnother;
   // Currently taking place (start → last day's end) — multi-day aware.
   const ongoing = isWorkshopOngoing(workshop);
   const wsDays = getWorkshopDays(workshop);
@@ -1328,7 +1341,7 @@ function BookingCardContent({
   const isRejected = isSelection && visStatus === 'rejected';
   // Selection accepts applications beyond capacity (waitlist), so the "sold
   // out" gate only applies to direct booking.
-  const soldOut = !isSelection && spotsLeft <= 0;
+  const soldOut = !isSelection && spotsLeft <= 0 && !pickAnother;
   // A live selection application this user already submitted (track, don't re-apply).
   const hasApplied =
     isSelection &&

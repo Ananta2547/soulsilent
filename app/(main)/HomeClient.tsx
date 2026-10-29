@@ -6,7 +6,7 @@ import type { Workshop, Article, ArticleCategory } from '@/lib/types';
 import { useLang } from '@/lib/i18n';
 import { Icon } from '@/components/design/Icon';
 import { useLoadingTracker } from '@/components/design/DataLoading';
-import { getEffectivePrice, hasWorkshopEnded, getWorkshopCardStatus, isNewWorkshop, isWorkshopFull, compareWorkshopsForListing } from '@/lib/workshop-utils';
+import { getEffectivePrice, hasWorkshopEnded, getWorkshopCardStatus, isNewWorkshop, isWorkshopFull, compareWorkshopsForListing, getWorkshopStatusBadge } from '@/lib/workshop-utils';
 import { learnServerClock, learnServerTime } from '@/lib/server-clock';
 import type { HomeBundle, PublicReview } from '@/lib/home-bundle';
 import { categoryLabel, formatArticleDate } from '@/lib/article-utils';
@@ -536,6 +536,8 @@ function RoundsSection({ workshops }: { workshops: Workshop[] }) {
       if (g) {
         g.count += 1;
         g.days.add(w.date);
+        // The card leads with a round still taking bookings, not one past its close.
+        if (!getWorkshopStatusBadge(g.first).open && getWorkshopStatusBadge(w).open) g.first = w;
       } else byMaster.set(w.master_id as string, { first: w, count: 1, days: new Set([w.date]) });
     });
     return [...byMaster.values()].slice(0, 8);
