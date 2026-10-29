@@ -2979,6 +2979,24 @@ body {
   gap: 16px;
 }
 
+/* "เจอกันออนไลน์" on the journey page (design: Journey Detail) */
+.ws-online-step {
+  position: relative; display: flex; flex-direction: column; gap: 6px; padding: 16px 16px 18px;
+  background: var(--paper); border-radius: 18px;
+  transition: transform .35s cubic-bezier(.2,.7,.2,1), box-shadow .35s cubic-bezier(.2,.7,.2,1);
+}
+.ws-online-step:hover { transform: translateY(-4px); box-shadow: 0 16px 40px -16px rgba(13,30,29,.18); }
+.ws-online-copy {
+  border: 0; cursor: pointer; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600; font-family: inherit;
+  background: var(--teal); color: #fff; transition: transform .2s cubic-bezier(.2,.7,.2,1), background .2s ease;
+}
+.ws-online-copy:hover { transform: translateY(-2px); background: var(--teal-deep); }
+.ws-online-copy:active { transform: scale(.96); }
+@media (prefers-reduced-motion: reduce) {
+  .ws-online-step, .ws-online-copy { transition: none; }
+  .ws-online-step:hover, .ws-online-copy:hover { transform: none; }
+}
+
 .ws-fac-card {
   display: flex;
   gap: 24px;

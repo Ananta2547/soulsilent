@@ -25,7 +25,7 @@ export interface PlatformStyle {
 }
 
 export const ONLINE_PLATFORMS: PlatformStyle[] = [
-  { value: 'zoom', label: 'Zoom', bg: '#0B5CFF', fg: '#ffffff', logo: '/brand/zoom.svg', wordmark: '/brand/zoom-wordmark.svg', tint: '#EDF3FF', accent: '#0B5CFF' },
+  { value: 'zoom', label: 'Zoom', bg: 'linear-gradient(120deg, #0845bf 0%, #0b5cff 70%)', fg: '#ffffff', logo: '/brand/zoom.svg', wordmark: '/brand/zoom-wordmark.svg', tint: '#EDF3FF', accent: '#0B5CFF' },
   { value: 'meet', label: 'Google Meet', bg: '#ffffff', fg: '#1f7a45', border: '#dadce0', logo: '/brand/google-meet.svg', tint: '#EAF6EE', accent: '#00832D' },
   { value: 'teams', label: 'Microsoft Teams', bg: '#5059C9', fg: '#ffffff', logo: '/brand/microsoft-teams.svg', tint: '#EFEEFD', accent: '#5B5FC7' },
   // No brand mark — the button falls back to the site's own colour and shows

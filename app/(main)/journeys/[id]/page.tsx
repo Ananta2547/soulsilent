@@ -995,33 +995,7 @@ function WorkshopDetailInner() {
                   <h2 className="display-th" style={{ fontSize: 'clamp(28px, 3.5vw, 40px)', margin: '14px 0 20px' }}>
                     <T th="เจอกันออนไลน์" en="We meet online" />
                   </h2>
-                  <div
-                    className="card card-static"
-                    style={{
-                      background: platformStyle(workshop.online_platform).tint,
-                      border: `1px solid color-mix(in srgb, ${platformStyle(workshop.online_platform).accent} 22%, transparent)`,
-                      boxShadow: 'none',
-                      padding: '24px 28px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 10,
-                    }}
-                  >
-                    <span className="mono" style={{ fontSize: 11, color: platformStyle(workshop.online_platform).accent, letterSpacing: '.12em', textTransform: 'uppercase' }}>
-                      {tr(lang, 'แพลตฟอร์ม', 'Platform')}
-                    </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 18, fontWeight: 600 }}>
-                      <PlatformMark platform={platformStyle(workshop.online_platform).value} size={44} />
-                      {platformLabel(workshop.online_platform, workshop.online_platform_other)}
-                    </span>
-                    <p style={{ margin: 0, fontSize: 14.5, color: 'var(--muted)', lineHeight: 1.65 }}>
-                      {tr(
-                        lang,
-                        'ไม่ต้องเดินทาง — เข้าร่วมจากที่ไหนก็ได้ ลิงก์เข้าห้องจะแสดงในหน้านี้และในหน้า “การจองของฉัน” หลังจองสำเร็จ และส่งไปทางอีเมลด้วย',
-                        'No travel needed — join from anywhere. The room link appears here and in “My bookings” once you have booked, and is emailed to you too.',
-                      )}
-                    </p>
-                  </div>
+                  <OnlineMeet workshop={workshop} lang={lang} />
                 </Reveal>
               )}
 
@@ -1486,8 +1460,8 @@ function BookingCardContent({
             announceAt={workshop.announce_at}
             heading={
               hasApplied
-                ? tr(lang, 'คุณสมัครแล้ว — รอประกาศผลวันที่', "You've applied — results on")
-                : tr(lang, 'ประกาศผลคัดเลือก', 'Results announcement')
+                ? tr(lang, '✓ สมัครแล้ว · รอประกาศผล', '✓ Applied · awaiting results')
+                : tr(lang, 'ประกาศผลคัดเลือก · นับถอยหลัง', 'Results · counting down')
             }
           />
         </div>
@@ -1500,32 +1474,29 @@ function BookingCardContent({
           {tr(lang, 'จัดการ Dashboard', 'Manage in Dashboard')} <span className="mono">→</span>
         </Link>
       ) : cancelled ? (
-        <div
-          style={{ width: '100%', textAlign: 'center', fontSize: 14.5, fontWeight: 600, color: '#b3261e', background: '#fdeceb', border: '1px solid #f3c9c5', borderRadius: 14, padding: '15px 18px', lineHeight: 1.6 }}
-        >
-          {tr(lang, 'กิจกรรมมีการเปลี่ยนแปลงกำหนดการ', 'This event has been changed / cancelled')}
+        <div style={{ background: 'var(--ink)', color: '#fff', borderRadius: 18, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span className="mono" style={{ fontSize: 10.5, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Icon name="reminder" size={15} /> {tr(lang, 'แจ้งจากผู้จัด', 'From the host')}
+          </span>
+          <span style={{ fontFamily: 'var(--font-display-th)', fontWeight: 500, fontSize: 18, lineHeight: 1.35 }}>
+            {tr(lang, 'กิจกรรมมีการเปลี่ยนแปลงกำหนดการ', 'This event has been changed')}
+          </span>
+          <span style={{ fontSize: 13, color: 'rgba(255,255,255,.7)', lineHeight: 1.6 }}>{tr(lang, 'เราจะแจ้งรายละเอียดรอบใหม่ทางอีเมล', "We'll email you the new details")}</span>
         </div>
       ) : ended ? (
         userCompleted ? (
           userReview ? (
             // A review is one-time and immutable — show it read-only, no edit.
-            <div
-              style={{
-                background: 'var(--cream)',
-                borderRadius: 16,
-                padding: '16px 18px',
-                border: '1px solid var(--cream-deep)',
-              }}
-            >
+            <div style={{ background: 'var(--cream)', borderRadius: 18, padding: '18px 20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
-                <span className="mono" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '.1em', textTransform: 'uppercase' }}>
-                  {tr(lang, 'รีวิวของคุณ', 'Your review')}
+                <span className="mono" style={{ fontSize: 10.5, color: 'var(--teal-deep)', letterSpacing: '.16em', textTransform: 'uppercase' }}>
+                  ✓ {tr(lang, 'รีวิวของคุณ', 'Your review')}
                 </span>
                 <Stars value={userReview.rating} size={14} />
               </div>
               {userReview.comment && (
-                <p style={{ fontSize: 13.5, color: 'var(--ink)', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>
-                  {userReview.comment}
+                <p style={{ fontFamily: 'var(--font-display-th)', fontWeight: 500, fontSize: 17, color: 'var(--ink)', lineHeight: 1.45, margin: '4px 0 0', whiteSpace: 'pre-wrap' }}>
+                  “{userReview.comment}”
                 </p>
               )}
             </div>
@@ -2184,14 +2155,16 @@ function JoinOnlineButton({ workshop, lang }: { workshop: Workshop; lang: 'th' |
         justifyContent: 'center',
         gap: 10,
         width: '100%',
-        padding: '14px 22px',
+        minHeight: 50,
+        padding: '12px 22px',
         borderRadius: 999,
         fontSize: 15,
         fontWeight: 700,
         textDecoration: 'none',
         background: style.bg,
         color: style.fg,
-        border: style.border ? `1px solid ${style.border}` : '1px solid transparent',
+        boxShadow: `inset 0 0 0 1px ${style.border || 'transparent'}`,
+        boxSizing: 'border-box',
       }}
     >
       {style.wordmark ? (
@@ -2199,11 +2172,11 @@ function JoinOnlineButton({ workshop, lang }: { workshop: Workshop; lang: 'th' |
         <>
           {tr(lang, 'เข้าร่วมทาง', 'Join on')}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={style.wordmark} alt={name} height={18} style={{ height: 18, width: 'auto', display: 'block' }} />
+          <img src={style.wordmark} alt={name} height={17} style={{ height: 17, width: 'auto', display: 'block', marginTop: 1 }} />
         </>
       ) : (
         <>
-          <PlatformMark platform={style.value} />
+          <PlatformMark platform={style.value} size={26} />
           {tr(lang, `เข้าร่วมทาง ${name}`, `Join on ${name}`)}
         </>
       )}
@@ -2218,4 +2191,106 @@ function PlatformMark({ platform, size = 24 }: { platform: string; size?: number
   if (!logo) return null;
   // eslint-disable-next-line @next/next/no-img-element
   return <img src={logo} alt="" aria-hidden="true" width={size} height={size} style={{ width: size, height: size, objectFit: 'contain', flexShrink: 0 }} />;
+}
+
+const SPARKLE = 'M20 4 L22 18 L36 20 L22 22 L20 36 L18 22 L4 20 L18 18 Z';
+const WAVE_A = 'M2 20 Q 50 4, 100 20 T 200 20 T 300 20 T 398 20';
+const WAVE_B = 'M2 34 Q 50 18, 100 34 T 200 34 T 300 34 T 398 34';
+
+/** "เจอกันออนไลน์" (design: Journey Detail). The platform, whether the room
+ *  link is ready (the API only sends online_url to a member with a seat), the
+ *  three steps from booking to meeting, and what to have ready. */
+function OnlineMeet({ workshop, lang }: { workshop: Workshop; lang: 'th' | 'en' }) {
+  const style = platformStyle(workshop.online_platform);
+  const name = platformLabel(workshop.online_platform, workshop.online_platform_other);
+  const [copied, setCopied] = useState(false);
+  const ready = !!workshop.online_url;
+  const steps: [string, string][] = [
+    [tr(lang, 'จองที่นั่ง', 'Book a seat'), tr(lang, 'ได้ที่นั่งในชื่อของคุณทันที', 'The seat is yours right away')],
+    [tr(lang, 'รับลิงก์เข้าห้อง', 'Get the room link'), tr(lang, 'แสดงในหน้านี้ · “การจองของฉัน” · และอีเมล', 'Here · in “My bookings” · and by email')],
+    [tr(lang, 'เจอกันออนไลน์', 'Meet online'), tr(lang, 'เข้าร่วมจากที่ไหนก็ได้ ตามเวลานัด', 'Join from anywhere at the set time')],
+  ];
+  const prep = [tr(lang, 'อินเทอร์เน็ตที่เสถียร', 'A steady connection'), tr(lang, 'หูฟัง · ไมค์', 'Headphones · mic'), tr(lang, 'มุมเงียบ ๆ ของคุณ', 'A quiet corner')];
+  return (
+    <div style={{ position: 'relative', overflow: 'hidden', background: 'var(--cream)', borderRadius: 22, padding: '26px 26px 24px', display: 'flex', flexDirection: 'column', gap: 22 }}>
+      <svg viewBox="0 0 40 40" aria-hidden="true" style={{ position: 'absolute', top: 18, right: 22, width: 26, height: 26, pointerEvents: 'none' }}>
+        <path d={SPARKLE} fill="var(--accent)" />
+      </svg>
+      <svg viewBox="0 0 400 60" preserveAspectRatio="none" aria-hidden="true" style={{ position: 'absolute', right: -20, bottom: -14, width: 260, height: 44, pointerEvents: 'none', opacity: 0.7 }}>
+        <path d={WAVE_A} fill="none" stroke="var(--teal-200)" strokeWidth="2.5" strokeLinecap="round" />
+        <path d={WAVE_B} fill="none" stroke="var(--teal-200)" strokeWidth="2.5" strokeLinecap="round" />
+      </svg>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', paddingRight: 36 }}>
+        {style.logo ? (
+          <PlatformMark platform={style.value} size={52} />
+        ) : (
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="3" y="5" width="18" height="12" rx="2.5" />
+            <path d="M8 21h8M12 17v4" />
+          </svg>
+        )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+          <span className="mono" style={{ fontSize: 10.5, color: 'var(--teal-deep)', letterSpacing: '.16em', textTransform: 'uppercase' }}>
+            {tr(lang, 'แพลตฟอร์ม', 'Platform')}
+          </span>
+          <span style={{ fontFamily: 'var(--font-display-th)', fontWeight: 500, fontSize: 26, lineHeight: 1.1, color: 'var(--ink)' }}>{name}</span>
+        </div>
+        <span style={{ fontFamily: 'var(--font-hand)', fontWeight: 700, fontSize: 22, color: 'var(--teal)', transform: 'rotate(-4deg)', marginLeft: 4 }}>
+          {tr(lang, 'ไม่ต้องเดินทาง ✺', 'No travel ✺')}
+        </span>
+      </div>
+
+      {ready ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', background: 'var(--paper)', color: 'var(--ink)', borderRadius: 999, padding: '8px 8px 8px 18px' }}>
+          <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 99, background: 'var(--teal)', boxShadow: '0 0 0 4px var(--teal-50)', flexShrink: 0 }} />
+          <span style={{ fontSize: 13.5, fontWeight: 600, flex: 1, minWidth: 160 }}>{tr(lang, 'ลิงก์เข้าห้องของคุณพร้อมแล้ว', 'Your room link is ready')}</span>
+          <button
+            type="button"
+            className="ws-online-copy"
+            onClick={() =>
+              navigator.clipboard?.writeText(workshop.online_url || '').then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1800);
+              })
+            }
+          >
+            {copied ? tr(lang, '✓ คัดลอกแล้ว', '✓ Copied') : tr(lang, 'คัดลอกลิงก์', 'Copy link')}
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', background: 'var(--paper)', borderRadius: 999, padding: '10px 18px', fontSize: 13.5, color: 'var(--ink)' }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="4.5" y="10.5" width="15" height="10" rx="2.5" />
+            <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
+          </svg>
+          <span style={{ fontWeight: 600 }}>{tr(lang, 'ลิงก์เข้าห้องจะปลดล็อกหลังจองสำเร็จ', 'The room link unlocks once you have booked')}</span>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10 }}>
+        {steps.map(([title, sub], i) => (
+          <div key={title} className="ws-online-step">
+            <span className="mono" style={{ fontSize: 10.5, letterSpacing: '.16em', color: 'var(--teal)', fontWeight: 600 }}>
+              0{i + 1} —
+            </span>
+            <span style={{ fontFamily: 'var(--font-display-th)', fontWeight: 500, fontSize: 16, lineHeight: 1.3, color: 'var(--ink)' }}>{title}</span>
+            <span style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.55 }}>{sub}</span>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <span className="mono" style={{ fontSize: 10.5, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)', alignSelf: 'center', marginRight: 4 }}>
+          {tr(lang, 'เตรียมตัว', 'Have ready')}
+        </span>
+        {prep.map((p) => (
+          <span key={p} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--paper)', borderRadius: 999, padding: '6px 12px', fontSize: 12.5, color: 'var(--ink)' }}>
+            <span style={{ color: 'var(--teal)' }}>✓</span>
+            {p}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
 }

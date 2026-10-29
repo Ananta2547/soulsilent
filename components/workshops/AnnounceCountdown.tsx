@@ -5,7 +5,6 @@
  * Once the time passes it prompts the user to refresh for their result. */
 import { useEffect, useState } from 'react';
 import { useLang, tr } from '@/lib/i18n';
-import { Icon } from '@/components/design/Icon';
 import { fmtDateTime } from '@/lib/datetime';
 
 function parts(diffMs: number) {
@@ -42,32 +41,23 @@ export function AnnounceCountdown({
   const passed = diff <= 0;
   const { days, hours, mins, secs } = parts(diff);
 
+  // Same dark card as the event countdown (design: Journey Detail).
   return (
-    <div
-      style={{
-        background: 'var(--cream)',
-        border: '1px solid var(--cream-deep)',
-        borderRadius: 14,
-        padding: '12px 16px',
-        ...style,
-      }}
-    >
-      <div className="mono" style={{ fontSize: 10.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--teal-deep)', marginBottom: 4 }}>
-        <Icon name="date" size={16} /> {heading ?? tr(lang, 'ประกาศผลคัดเลือก', 'Results announcement')}
+    <div style={{ background: 'var(--ink)', color: '#fff', padding: '18px 16px', borderRadius: 16, ...style }}>
+      <div className="mono" style={{ fontSize: 10.5, color: 'var(--accent)', letterSpacing: '.16em', textTransform: 'uppercase', textAlign: 'center', fontWeight: 600 }}>
+        {heading ?? tr(lang, 'ประกาศผลคัดเลือก · นับถอยหลัง', 'Results · counting down')}
       </div>
-      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>
-        {fmtDateTime(announceAt, lang, 'long')}
-      </div>
+      <div style={{ fontSize: 13.5, color: 'rgba(255,255,255,.75)', textAlign: 'center', margin: '4px 0 12px' }}>{fmtDateTime(announceAt, lang, 'long')}</div>
       {passed ? (
-        <div style={{ fontSize: 12.5, color: 'var(--teal-deep)', marginTop: 6, fontWeight: 600 }}>
+        <div style={{ fontSize: 13, color: 'var(--accent)', textAlign: 'center', fontWeight: 600 }}>
           {tr(lang, 'ถึงเวลาประกาศผลแล้ว — รีเฟรชหน้าเพื่อดูผล', 'Announcement time reached — refresh to see your result')}
         </div>
       ) : (
-        <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-          <Unit n={days} label={tr(lang, 'วัน', 'd')} />
-          <Unit n={hours} label={tr(lang, 'ชม.', 'h')} />
-          <Unit n={mins} label={tr(lang, 'นาที', 'm')} />
-          <Unit n={secs} label={tr(lang, 'วิ', 's')} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, textAlign: 'center' }}>
+          <Unit n={days} label={tr(lang, 'วัน', 'days')} />
+          <Unit n={hours} label={tr(lang, 'ชม.', 'hrs')} />
+          <Unit n={mins} label={tr(lang, 'นาที', 'min')} />
+          <Unit n={secs} label={tr(lang, 'วิ', 'sec')} />
         </div>
       )}
     </div>
@@ -76,9 +66,11 @@ export function AnnounceCountdown({
 
 function Unit({ n, label }: { n: number; label: string }) {
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 3, background: 'var(--paper)', borderRadius: 9, padding: '4px 9px' }}>
-      <span style={{ fontFamily: 'Archivo Black, Mitr, sans-serif', fontSize: 16, color: 'var(--teal)', lineHeight: 1 }}>{n}</span>
-      <span style={{ fontSize: 11, color: 'var(--muted)' }}>{label}</span>
-    </span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ fontFamily: 'Archivo Black, Mitr, sans-serif', fontSize: 'clamp(20px, 3.4vw, 30px)', lineHeight: 1, letterSpacing: '-.02em', color: '#fff' }}>{String(n).padStart(2, '0')}</div>
+      <div className="mono" style={{ fontSize: 9.5, color: '#9ab1ae', letterSpacing: '.12em', textTransform: 'uppercase' }}>
+        {label}
+      </div>
+    </div>
   );
 }
