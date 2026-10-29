@@ -8,6 +8,7 @@
  * booking or a page.
  */
 import { sendWebPush, type VapidKeys } from '@/lib/webpush';
+import { LINE_REACHABLE_SQL, lineIdOf, linePush, lineMessagingReady, type LineEnv } from '@/lib/line';
 
 export type PushPayload = {
   title: string;
@@ -18,7 +19,7 @@ export type PushPayload = {
   tag?: string;
 };
 
-type Env = { VAPID_PUBLIC_KEY?: string; VAPID_PRIVATE_KEY?: string; SITE_URL?: string };
+type Env = { VAPID_PUBLIC_KEY?: string; VAPID_PRIVATE_KEY?: string; SITE_URL?: string } & LineEnv;
 
 /**
  * Kinds of notification a member can switch off (push_prefs, migration 066).
@@ -99,6 +100,9 @@ export async function removeSubscription(db: D1Database, endpoint: string): Prom
  * Send to every device of one member. Returns how many devices accepted it.
  * Dead subscriptions (404/410) are deleted on the way. With `kind`, nothing
  * is sent when the member switched that kind off.
+ *
+ * A member who linked LINE (migration 079) gets it on LINE instead of the
+ * app — the user chose one channel, not both.
  */
 export async function sendPushToUser(
   db: D1Database,
@@ -107,9 +111,13 @@ export async function sendPushToUser(
   payload: PushPayload,
   opts: { ttl?: number; urgency?: 'low' | 'normal' | 'high'; topic?: string; kind?: PushKind } = {},
 ): Promise<number> {
+  if (opts.kind && (await mutedKinds(db, userId)).includes(opts.kind)) return 0;
+  if (lineMessagingReady(env)) {
+    const lineId = await lineIdOf(db, userId);
+    if (lineId) return (await linePush(env, lineId, payload)) ? 1 : 0;
+  }
   const keys = vapidKeys(env);
   if (!keys) return 0;
-  if (opts.kind && (await mutedKinds(db, userId)).includes(opts.kind)) return 0;
   let subs: { endpoint: string; p256dh: string; auth: string }[] = [];
   try {
     subs =
@@ -150,16 +158,26 @@ export async function claimOnce(db: D1Database, key: string): Promise<boolean> {
   }
 }
 
-/** Members (of the given ids) who have at least one device subscribed. */
+/** SQL: members a notification can reach — an app device, or linked LINE. */
+export const REACHABLE_USERS_SQL = `SELECT user_id FROM push_subscriptions UNION ${LINE_REACHABLE_SQL}`;
+
+/** Members (of the given ids) a notification can reach: at least one device
+ *  subscribed, or LINE linked and not blocked. */
 export async function subscribedUsers(db: D1Database, userIds: string[]): Promise<Set<string>> {
   const ids = [...new Set(userIds.filter(Boolean))];
   if (!ids.length) return new Set();
+  const marks = ids.map(() => '?').join(',');
   try {
     const rows = await db
-      .prepare(`SELECT DISTINCT user_id FROM push_subscriptions WHERE user_id IN (${ids.map(() => '?').join(',')})`)
+      .prepare(`SELECT DISTINCT user_id FROM push_subscriptions WHERE user_id IN (${marks})`)
       .bind(...ids)
       .all<{ user_id: string }>();
-    return new Set((rows.results || []).map((r) => r.user_id));
+    const out = new Set((rows.results || []).map((r) => r.user_id));
+    try {
+      const line = await db.prepare(`${LINE_REACHABLE_SQL} AND id IN (${marks})`).bind(...ids).all<{ id: string }>();
+      for (const r of line.results || []) out.add(r.id);
+    } catch {} // before migration 079
+    return out;
   } catch {
     return new Set();
   }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDB, getEnv } from '@/lib/db';
-import { claimOnce, sendPushToUser, subscribedUsers, vapidKeys, type PushKind } from '@/lib/push';
+import { claimOnce, REACHABLE_USERS_SQL, sendPushToUser, subscribedUsers, vapidKeys, type PushKind } from '@/lib/push';
 import { seatsHeldSubquery } from '@/lib/seats';
 import { pushAdminAlerts } from '@/lib/admin-alert-push';
 import { pushEvents } from '@/lib/push-events';
@@ -53,7 +53,8 @@ const SELECT = `SELECT b.id, b.user_id, w.title, w.date, w.time_start, l.name AS
                   FROM bookings b
                   JOIN workshops w ON w.id = b.workshop_id
                   LEFT JOIN locations l ON l.id = w.location_id`;
-const HAS_DEVICE = `b.user_id IN (SELECT user_id FROM push_subscriptions)`;
+// An app device, or LINE linked (migration 079).
+const HAS_DEVICE = `b.user_id IN (${REACHABLE_USERS_SQL})`;
 
 /** What members rely on to turn up: compared run to run to spot a move. */
 type Snapshot = {
@@ -227,7 +228,7 @@ export async function GET(request: Request) {
            LEFT JOIN users u ON u.id = m.user_id
           WHERE m.parent_booking_id IS NOT NULL AND m.user_id IS NOT NULL AND m.status != 'cancelled'
             AND datetime(m.created_at) >= datetime('now', '-60 minutes')
-            AND p.user_id IN (SELECT user_id FROM push_subscriptions)
+            AND p.user_id IN (${REACHABLE_USERS_SQL})
           LIMIT 100`,
       )
       .all<{ id: string; user_id: string; title: string; friend: string | null }>();

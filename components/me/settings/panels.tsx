@@ -11,6 +11,7 @@ import { ASPECTS } from '@/lib/image-aspects';
 import { parseImageMeta } from '@/lib/image-meta';
 import type { ImageMeta } from '@/lib/types';
 import { PushPrefs, PushToggle } from '@/components/pwa/PushToggle';
+import { LineConnect } from '@/components/pwa/LineConnect';
 
 export interface MeData {
   id: string;
@@ -591,6 +592,12 @@ export function NotificationsPanel() {
   const { lang } = useLang();
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <SectionCard
+        title="LINE"
+        desc={tr(lang, 'เชื่อมแล้ว การแจ้งเตือนทั้งหมดส่งทาง LINE แทนแอป', 'Once linked, every notification goes to LINE instead of the app')}
+      >
+        <LineConnect />
+      </SectionCard>
       <SectionCard
         title={tr(lang, 'เครื่องนี้', 'This device')}
         desc={tr(lang, 'เปิดหรือปิดการแจ้งเตือนบนอุปกรณ์ที่ใช้อยู่ตอนนี้', 'Turn notifications on or off for the device you are using')}
