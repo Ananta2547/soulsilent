@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { Workshop } from '@/lib/types';
-import { getWorkshopTags, getEffectivePrice, getWorkshopCardStatus, isNewWorkshop, compareWorkshopsForListing, hasWorkshopEnded } from '@/lib/workshop-utils';
+import { getWorkshopTags, getEffectivePrice, getWorkshopCardStatus, isNewWorkshop, compareWorkshopsForListing, hasWorkshopEnded, getWorkshopStatusBadge } from '@/lib/workshop-utils';
 import { learnServerClock } from '@/lib/server-clock';
 import { Icon } from '@/components/design/Icon';
 import { useLoadingTracker } from '@/components/design/DataLoading';
@@ -178,12 +178,16 @@ function WorkshopsListingInner() {
   const collapsed = useMemo(() => {
     const seen = new Set<string>();
     const nearest = new Map<string, string>();
-    [...workshops]
+    // The nearest round still taking bookings; failing that, the nearest not
+    // yet over — so one round past its booking close does not close the card.
+    const upcoming = [...workshops]
       .filter((w) => w.master_kind === 'round' && w.master_id && !hasWorkshopEnded(w))
-      .sort((a, b) => (a.date + a.time_start).localeCompare(b.date + b.time_start))
-      .forEach((w) => {
+      .sort((a, b) => (a.date + a.time_start).localeCompare(b.date + b.time_start));
+    for (const pass of [(w: Workshop) => getWorkshopStatusBadge(w).open, () => true]) {
+      upcoming.filter(pass).forEach((w) => {
         if (!nearest.has(w.master_id as string)) nearest.set(w.master_id as string, w.id);
       });
+    }
     return filtered.filter((w) => {
       if (w.master_kind !== 'round' || !w.master_id) return true;
       if (seen.has(w.master_id)) return false;
