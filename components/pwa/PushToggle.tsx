@@ -214,7 +214,7 @@ export function PushPrefs() {
           {
             k: 'admin' as const,
             title: tr(lang, 'แจ้งเตือนผู้ดูแล (เรื่องด่วน)', 'Admin alerts (urgent)'),
-            sub: tr(lang, 'เรื่องด่วนใหม่จากหน้าข้อมูลเชิงลึก เช่น คืนเงิน ค้างโอน รอบยกเลิก', 'New urgent items from Admin Insights'),
+            sub: tr(lang, 'รอบที่มีคนจองถูกยกเลิกหรือเลื่อน และเรื่องด่วนจากหน้าข้อมูลเชิงลึก เช่น คืนเงิน ค้างโอน', 'Booked rounds cancelled or moved, and urgent items from Admin Insights'),
           },
         ]
       : []),
