@@ -122,7 +122,7 @@ export async function GET(request: Request) {
   if (!vapidKeys(env)) return NextResponse.json({ ok: true, skipped: 'push not configured' });
 
   const db = await getDB();
-  const counts = { booked: 0, remind1d: 0, remind2h: 0, joined: 0, host: 0, changed: 0, cancelled: 0 };
+  const counts = { booked: 0, remind1d: 0, remind2h: 0, joined: 0, host: 0, changed: 0, cancelled: 0, admin: 0 };
   const send = async (
     key: string,
     userId: string,
@@ -136,6 +136,19 @@ export async function GET(request: Request) {
     // the next run tries again while the notice is still in its window.
     if (!ok) await releaseClaim(db, key);
     return ok;
+  };
+
+  // Every admin who can be reached (app or LINE), looked up once per run.
+  let adminIds: string[] | null = null;
+  const tellAdmins = async (key: string, payload: Parameters<typeof sendPushToUser>[3]) => {
+    if (!adminIds) {
+      const all = (await db.prepare("SELECT id FROM users WHERE role = 'admin' AND deleted_at IS NULL").all<{ id: string }>()).results || [];
+      const reach = await subscribedUsers(db, all.map((a) => a.id));
+      adminIds = all.map((a) => a.id).filter((id) => reach.has(id));
+    }
+    for (const id of adminIds) {
+      if (await send(`${key}:${id}`, id, payload, 'admin', 'high')) counts.admin++;
+    }
   };
 
   try {
@@ -355,6 +368,23 @@ export async function GET(request: Request) {
             );
             if (ok) counts.cancelled++;
           }
+          // Admins hear of every cancelled round that had bookings (moved seats count).
+          const had = await db
+            .prepare(
+              `SELECT COUNT(*) AS n FROM bookings b
+                WHERE b.parent_booking_id IS NULL AND b.payment_status IN ('paid', 'refunded')
+                  AND ((b.workshop_id = ? AND b.cancel_reason = 'workshop_changed') OR b.moved_from = ?)`,
+            )
+            .bind(r.id, r.id)
+            .first<{ n: number }>();
+          if (had?.n) {
+            await tellAdmins(`adm-cancelled:${r.id}`, {
+              title: `รอบถูกยกเลิก: ${r.title}`,
+              body: `รอบ ${thDate(before.date)}${before.time_start ? ` ${before.time_start} น.` : ''} · มีผู้จอง ${had.n} คน — ตรวจการคืนเงิน/ย้ายรอบ`,
+              url: '/admin/insights?tab=alerts',
+              tag: `adm-round-${r.id}`,
+            });
+          }
         } else if (before && now.status !== 'cancelled') {
           const what = describeChange(before, now);
           if (what) {
@@ -372,6 +402,19 @@ export async function GET(request: Request) {
                 'high',
               );
               if (ok) counts.changed++;
+            }
+            // Admins too, when the round has bookings.
+            const live = await db
+              .prepare("SELECT COUNT(*) AS n FROM bookings WHERE workshop_id = ? AND status = 'confirmed' AND parent_booking_id IS NULL")
+              .bind(r.id)
+              .first<{ n: number }>();
+            if (live?.n) {
+              await tellAdmins(`adm-changed:${r.id}:${version}`, {
+                title: `รอบถูกเลื่อน/เปลี่ยน: ${r.title}`,
+                body: `${what} · มีผู้จอง ${live.n} คน`,
+                url: '/admin/workshops',
+                tag: `adm-round-${r.id}`,
+              });
             }
           }
         }
