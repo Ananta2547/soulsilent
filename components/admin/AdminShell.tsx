@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { AlertFocus } from '@/components/admin/AlertFocus';
 
 /**
  * The admin console frame ("Admin Dashboard v3"): an ink sidebar grouped by
@@ -271,7 +272,13 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           <span className="adm-top-tag">ADMIN</span>
         </div>
 
-        <main className="adm-main">{children}</main>
+        <main className="adm-main">
+          {/* Banner + highlight for rows an alert sent us to (?focus=). */}
+          <Suspense fallback={null}>
+            <AlertFocus />
+          </Suspense>
+          {children}
+        </main>
 
         <nav className="adm-tabbar" aria-label="ทางลัด">
           {TABS.map((k) => (

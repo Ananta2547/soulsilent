@@ -187,12 +187,12 @@ export function Stack100({ items, noneText }: { items: { label: string; value: n
   );
 }
 
-export type Row = { main: ReactNode; sub?: ReactNode; amt?: ReactNode; mono?: boolean; faded?: boolean; key?: string };
+export type Row = { main: ReactNode; sub?: ReactNode; amt?: ReactNode; mono?: boolean; faded?: boolean; key?: string; /** data-focus tokens (AlertFocus) */ focus?: string };
 export function Rows({ rows }: { rows: Row[] }) {
   return (
     <div className="hx-rows">
       {rows.map((x, i) => (
-        <div key={x.key || i} className="hx-row" style={x.faded ? { opacity: 0.5 } : undefined}>
+        <div key={x.key || i} className="hx-row" data-focus={x.focus} style={x.faded ? { opacity: 0.5 } : undefined}>
           <div className="main">
             <div>{x.main}</div>
             {x.sub && <div className={`sub${x.mono ? ' mono' : ''}`}>{x.sub}</div>}

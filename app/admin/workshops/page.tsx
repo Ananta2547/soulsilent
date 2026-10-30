@@ -14,6 +14,7 @@ import {
 } from './_components/WorkshopForm';
 import { ApplicationFormBuilder } from './_components/ApplicationFormBuilder';
 import { PayoutManager } from './_components/PayoutManager';
+import { useFocusTokens } from '@/components/admin/AlertFocus';
 import { adminAlert, adminConfirm, adminToast, AdminHead, AdminSearch, AdminChips, AdminSheet, Badge, RowMenu, type MenuItem, type Tone } from '@/components/admin/AdminShell';
 
 type ModalState =
@@ -51,6 +52,8 @@ export default function AdminWorkshopsPage() {
   const [query, setQuery] = useState('');
   // The "past" box grows by PAST_STEP rows at a time — it only gets longer.
   const [pastShown, setPastShown] = useState(PAST_STEP);
+  // Rows an alert sent us to (?focus=ws:<id>) — shown even past the paging.
+  const focusTokens = useFocusTokens();
 
   async function fetchAll() {
     setLoadError(false);
@@ -326,7 +329,7 @@ export default function AdminWorkshopsPage() {
                   {list.map((ws) => {
                     const r = rowOf(ws);
                     return (
-                      <tr key={ws.id}>
+                      <tr key={ws.id} data-focus={`ws:${ws.id}`}>
                         <td>
                           <div className="adm-cell-title">
                             <div style={{ minWidth: 0 }}>
@@ -360,7 +363,7 @@ export default function AdminWorkshopsPage() {
               {list.map((ws) => {
                 const r = rowOf(ws);
                 return (
-                  <div key={ws.id} className="adm-mcard">
+                  <div key={ws.id} className="adm-mcard" data-focus={`ws:${ws.id}`}>
                     <div className="adm-mcard-top">
                       <div>
                         <div className="adm-mcard-title">{ws.title}</div>
@@ -405,7 +408,8 @@ export default function AdminWorkshopsPage() {
 
       {shownWorkshops.length > 0 &&
         sections.map((sec) => {
-          const rows = sec.key === 'past' ? sec.list.slice(0, pastShown) : sec.list;
+          const lastFocus = sec.list.reduce((n, w, i) => (focusTokens.includes(`ws:${w.id}`) ? i + 1 : n), 0);
+          const rows = sec.key === 'past' ? sec.list.slice(0, Math.max(pastShown, lastFocus)) : sec.list;
           return (
             <section key={sec.key} className="adm-card">
               <div className="adm-card-head">

@@ -163,7 +163,7 @@ export default function AdminReviewsPage() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {shown.map((r) => (
-            <article key={r.id} className="adm-card adm-review">
+            <article key={r.id} className="adm-card adm-review" data-focus={`review:${r.id}`}>
               <div className="adm-review-top">
                 <div style={{ flex: '1 1 220px', minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: 15 }}>{r.user_name || '—'}</div>

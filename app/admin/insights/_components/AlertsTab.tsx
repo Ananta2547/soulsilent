@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { AdminAlert, AdminAnalytics, AlertGroup, AlertTone } from '@/lib/admin-analytics';
 import { Card, Empty, Seg, thDay } from '@/components/dashboard/kit';
 import { LineNudge } from '@/components/pwa/NotifyPrefs';
+import { FOCUS_KEY, type FocusNote } from '@/components/admin/AlertFocus';
 
 const GROUPS: [AlertGroup, string, string][] = [
   ['money', 'เงินและบัญชี', 'คืนเงิน · ค้างโอน · เงินเข้าผิดปกติ · บัญชีไม่ครบ'],
@@ -14,6 +15,20 @@ const GROUPS: [AlertGroup, string, string][] = [
 ];
 const TONE_LABEL: Record<AlertTone, string> = { bad: 'ด่วน', warn: 'ควรดู', info: 'ข้อมูล' };
 type Filter = 'all' | AlertTone;
+
+/** The alert's page, with ?focus= so the row it is about gets highlighted. */
+function hrefOf(x: AdminAlert) {
+  if (!x.focus) return x.href;
+  return `${x.href}${x.href.includes('?') ? '&' : '?'}focus=${encodeURIComponent(x.focus)}`;
+}
+/** Hand the alert's words to the banner on the next page (AlertFocus). */
+function remember(x: AdminAlert) {
+  if (!x.focus) return;
+  const note: FocusNote = { focus: x.focus, title: x.title, detail: x.detail, todo: x.todo };
+  try {
+    sessionStorage.setItem(FOCUS_KEY, JSON.stringify(note));
+  } catch {}
+}
 
 /** Every open alert, by group, each with where to deal with it and a
  *  "รับทราบ" that hides it for every admin until its state moves on. */
@@ -76,7 +91,7 @@ export function AlertsTab({ a, onChanged, say }: { a: AdminAnalytics; onChanged:
                       </div>
                     </div>
                     <div className="acts">
-                      <Link href={x.href} className="hx-btn white">
+                      <Link href={hrefOf(x)} onClick={() => remember(x)} className="hx-btn white">
                         ไปจัดการ ›
                       </Link>
                       <button type="button" className="hx-btn" disabled={busy === x.key} onClick={() => ack(x)}>

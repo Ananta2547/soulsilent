@@ -192,7 +192,7 @@ export default function AdminLedgerPage() {
             <button type="button" className="adm-btn" onClick={() => setCatsOpen(true)}>
               หมวดค่าใช้จ่าย
             </button>
-            <button type="button" className="adm-btn" onClick={importLegacy}>
+            <button type="button" className="adm-btn" onClick={importLegacy} data-focus="ledger-import">
               ดึงรายการเก่า
             </button>
             <button type="button" className="adm-btn" onClick={() => setAdding('income')}>
@@ -279,7 +279,7 @@ export default function AdminLedgerPage() {
               </thead>
               <tbody>
                 {rows.map((t) => (
-                  <tr key={t.id} style={{ opacity: t.status === 'void' ? 0.55 : 1 }}>
+                  <tr key={t.id} data-focus={`tx:${t.id}`} style={{ opacity: t.status === 'void' ? 0.55 : 1 }}>
                     <td>
                       <button type="button" className="adm-link-title ldg-doc" onClick={() => setOpen(t)}>
                         {t.doc_no}
@@ -302,7 +302,7 @@ export default function AdminLedgerPage() {
           </div>
           <div className="adm-mcards">
             {rows.map((t) => (
-              <div key={t.id} className="adm-mcard" style={{ opacity: t.status === 'void' ? 0.55 : 1 }}>
+              <div key={t.id} className="adm-mcard" data-focus={`tx:${t.id}`} style={{ opacity: t.status === 'void' ? 0.55 : 1 }}>
                 <div className="adm-mcard-top">
                   <div onClick={() => setOpen(t)} style={{ cursor: 'pointer', minWidth: 0 }}>
                     <div className="adm-mcard-title">

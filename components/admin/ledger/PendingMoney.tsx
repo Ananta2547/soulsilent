@@ -98,7 +98,7 @@ export function PendingMoney({ onRecorded }: { onRecorded: () => void }) {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {refunds.map((r) => (
-              <article key={r.id} className="adm-card adm-orphan">
+              <article key={r.id} className="adm-card adm-orphan" data-focus={`refund:${r.id}`}>
                 <div style={{ flex: '1 1 140px', minWidth: 0 }}>
                   <div className="adm-orphan-amount">฿{r.amount.toLocaleString()}</div>
                   <div className="adm-meta" style={{ fontSize: 12, marginTop: 4 }}>
@@ -157,7 +157,7 @@ export function PendingMoney({ onRecorded }: { onRecorded: () => void }) {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {orphans.map((o) => (
-                <article key={o.id} className="adm-card adm-orphan" style={{ opacity: o.resolved ? 0.55 : 1 }}>
+                <article key={o.id} className="adm-card adm-orphan" data-focus={`orphan:${o.id}`} style={{ opacity: o.resolved ? 0.55 : 1 }}>
                   <div style={{ flex: '1 1 200px', minWidth: 0 }}>
                     <div className="adm-orphan-amount">
                       {(o.amount / 100).toLocaleString('th-TH', { minimumFractionDigits: 2 })} {o.currency.toUpperCase()}

@@ -165,7 +165,7 @@ export default function WorkshopInfoAdminPage() {
                 const rounds = roundsOf(m.id);
                 const open = openMaster === m.id;
                 return (
-                  <article key={m.id} className="adm-card adm-poster">
+                  <article key={m.id} className="adm-card adm-poster" data-focus={`master:${m.id}`}>
                     {m.cover_image_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={m.cover_image_url} alt={m.title} className="adm-poster-img" />

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import type { AdminAnalytics } from '@/lib/admin-analytics';
 import { Dropdown, I, Sheet, thDay, useToast } from '@/components/dashboard/kit';
 import { OverviewTab } from './_components/OverviewTab';
@@ -52,14 +53,16 @@ export default function AdminInsightsPage() {
   const [withTests, setWithTests] = useState(false);
   const [toast, say] = useToast();
 
-  // ?tab= and ?settings=1 deep links (alerts link here). Read after mount.
+  // ?tab= and ?settings=1 deep links (alerts link here, also from this same
+  // page, so follow the URL rather than reading it once).
+  const sp = useSearchParams();
+  const urlTab = sp.get('tab');
+  const urlSettings = sp.get('settings') === '1';
   useEffect(() => {
-    const sp = new URLSearchParams(window.location.search);
-    const t = sp.get('tab');
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (t && TABS.some((x) => x.key === t)) setTab(t as Tab);
-    if (sp.get('settings') === '1') setSettingsOpen(true);
-  }, []);
+    if (urlTab && TABS.some((x) => x.key === urlTab)) setTab(urlTab as Tab);
+    if (urlSettings) setSettingsOpen(true);
+  }, [urlTab, urlSettings]);
 
   const range = RANGES.find((r) => r.key === rangeKey)!;
   const from = range.key === 'custom' ? custom.from : thaiToday(range.days - 1);

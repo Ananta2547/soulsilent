@@ -844,7 +844,21 @@ export type AlertGroup = 'money' | 'rounds' | 'users' | 'quality';
 export type AlertTone = 'bad' | 'warn' | 'info';
 /** One thing to look at. `key` names the alert and the state it is in, so an
  *  acknowledged alert comes back when that state moves on. */
-export type AdminAlert = { key: string; type: string; group: AlertGroup; tone: AlertTone; title: string; detail: string; href: string; day: string | null };
+export type AdminAlert = {
+  key: string;
+  type: string;
+  group: AlertGroup;
+  tone: AlertTone;
+  title: string;
+  detail: string;
+  href: string;
+  day: string | null;
+  /** Rows to highlight on the href page — comma-separated `data-focus` tokens
+   *  (components/admin/AlertFocus). */
+  focus?: string;
+  /** What to do once there, shown in the banner on that page. */
+  todo?: string;
+};
 
 /** Changes to own name / date of birth in 12 months that raise an alert. */
 export const IDENTITY_CHANGE_LIMIT = 3;
@@ -888,12 +902,14 @@ function computeAlerts(x: {
       title: `${b.cancel_reason === 'refund_requested' ? 'ขอคืนเงิน' : 'คืนเงินจากรอบที่ยกเลิก'} · ${w?.title || '—'}`,
       detail: `${nameOf(b.user_id)} · ${baht(Number(b.amount) || 0)} · ชำระเมื่อ ${days} วันก่อน`,
       href: '/admin/ledger',
+      focus: `refund:${b.id}`,
+      todo: 'โอนคืนตามยอดที่จ่าย แล้วกด “บันทึกการโอนคืน” ในกล่องที่ไฮไลต์',
       day: thaiDay(utcMs(b.paid_at)),
     });
   }
   for (const o of owed) {
     if (o.days <= 7) continue;
-    add({ key: `payout:${o.id}`, type: 'payout', group: 'money', tone: 'bad', title: `ค้างโอนผู้จัด · ${o.title}`, detail: `${o.host} · ${baht(o.net)} · จบมา ${o.days} วัน`, href: '/admin/ledger', day: o.date });
+    add({ key: `payout:${o.id}`, type: 'payout', group: 'money', tone: 'bad', title: `ค้างโอนผู้จัด · ${o.title}`, detail: `${o.host} · ${baht(o.net)} · จบมา ${o.days} วัน`, href: '/admin/workshops', focus: `ws:${o.id}`, todo: 'ที่แถวที่ไฮไลต์ กดเมนู ⋯ → “เงินโอน (Payout)” แล้วบันทึกการโอนให้ผู้จัด', day: o.date });
   }
   for (const g of x.drift) {
     add({
@@ -904,6 +920,8 @@ function computeAlerts(x: {
       title: `${g.diff > 0 ? 'ยอดลดหลังโอนผู้จัด' : 'ยอดเพิ่มหลังโอนผู้จัด'} · ${g.title}`,
       detail: `${g.host} · โอนไป ${baht(g.paid)} (${g.doc}) · ยอดตอนนี้ ${baht(g.now)} · ${g.diff > 0 ? 'ผู้จัดต้องคืน' : 'ต้องโอนเพิ่ม'} ${baht(Math.abs(g.diff))}`,
       href: '/admin/insights?tab=hosts',
+      focus: `drift:${g.id}`,
+      todo: g.diff > 0 ? 'ติดต่อผู้จัดให้คืนส่วนเกิน แล้วกด “บันทึกผู้จัดคืนเงิน” ในกล่องยอดคงเหลือผู้จัด' : 'โอนส่วนที่ขาดให้ผู้จัด แล้วบันทึกที่เมนู “เงินโอน (Payout)” ของรอบนั้น',
       day: g.date,
     });
   }
@@ -916,6 +934,8 @@ function computeAlerts(x: {
       title: `เงินเข้าผิดปกติ · ${ORPHAN_REASON[r.reason] || r.reason}`,
       detail: `${baht((Number(r.amount) || 0) / 100)}${r.email ? ` · ${r.email}` : ''}`,
       href: '/admin/ledger',
+      focus: `orphan:${r.id}`,
+      todo: 'คืนเงินที่ Beam Dashboard แล้วกด “จัดการแล้ว” ในกล่องที่ไฮไลต์',
       day: thaiDay(utcMs(r.created_at)),
     });
   }
@@ -929,6 +949,8 @@ function computeAlerts(x: {
       title: `ใบสำคัญจ่ายยังไม่ได้ส่งอีเมล · ${t.doc_no}`,
       detail: `${t.kind === 'refund' ? 'คืนเงินผู้จอง' : 'โอนผู้จัด'} · ${baht(t.net)} · ${t.payee_email}`,
       href: '/admin/ledger',
+      focus: `tx:${t.id}`,
+      todo: 'กดแถวที่ไฮไลต์เพื่อเปิดรายการ แล้วส่งอีเมลใบสำคัญจ่าย',
       day: t.occurred_at.slice(0, 10),
     });
   }
@@ -943,11 +965,13 @@ function computeAlerts(x: {
       title: `ชำระผ่าน Beam แต่ยังไม่มีในบัญชีการเงิน ${gaps.length} รายการ`,
       detail: `รวม ${baht(gaps.reduce((s, b) => s + (Number(b.amount) || 0), 0))} · กด "ดึงรายการเก่า" ที่หน้าบัญชีการเงิน`,
       href: '/admin/ledger',
+      focus: 'ledger-import',
+      todo: 'กดปุ่ม “ดึงรายการเก่า” ที่ไฮไลต์ — กดซ้ำได้ ไม่บันทึกซ้ำ',
       day: null,
     });
   }
   if (d.beam.qr == null || d.beam.card == null) {
-    add({ key: 'beam-unset', type: 'beam', group: 'money', tone: 'warn', title: 'ยังไม่ได้ตั้งอัตราค่าธรรมเนียม Beam', detail: 'รายได้สุทธิและกำไรยังไม่หักค่า Beam', href: '/admin/insights?tab=money&settings=1', day: null });
+    add({ key: 'beam-unset', type: 'beam', group: 'money', tone: 'warn', title: 'ยังไม่ได้ตั้งอัตราค่าธรรมเนียม Beam', detail: 'รายได้สุทธิและกำไรยังไม่หักค่า Beam', href: '/admin/insights?tab=money&settings=1', todo: 'ใส่อัตราค่าธรรมเนียม QR และบัตรตามสัญญา Beam แล้วกดบันทึก', day: null });
   }
 
   /* rounds */
@@ -971,25 +995,27 @@ function computeAlerts(x: {
         title: `รอบถูกยกเลิก · ${w.title} (${when(w)})`,
         detail: `${w.host_name || '—'} · มีผู้จอง ${had.length + moved} คน · ย้ายรอบ ${moved} · คืนเงินแล้ว ${refunded}${pending ? ` · ค้างคืน ${pending}` : ''}`,
         href: pending ? '/admin/ledger' : '/admin/workshops',
+        focus: pending ? had.filter(isPendingRefund).map((b) => `refund:${b.id}`).join(',') : `ws:${w.id}`,
+        todo: pending ? 'โอนคืนผู้จองของรอบนี้ทีละคน แล้วกด “บันทึกการโอนคืน” ในกล่องที่ไฮไลต์' : 'คืนเงินครบแล้ว — ตรวจดูรอบที่ไฮไลต์ แล้วกด “รับทราบ” ที่หน้าแจ้งเตือน',
         day: w.updated_at ? thaiDay(cancelledAt) : w.date,
       });
       continue;
     }
     const live = list.filter((b) => isLive(b) && !b.parent_booking_id);
     if (end < now - 2 * 3600000 && end > now - 14 * DAY && live.length && !list.some(checkedIn)) {
-      add({ key: `nocheckin:${w.id}`, type: 'no_checkin', group: 'rounds', tone: 'warn', title: `จบแล้วแต่ยังไม่เช็คชื่อ · ${w.title} (${when(w)})`, detail: `${w.host_name || '—'} · ${live.length} การจอง`, href: '/admin/workshops', day: w.date });
+      add({ key: `nocheckin:${w.id}`, type: 'no_checkin', group: 'rounds', tone: 'warn', title: `จบแล้วแต่ยังไม่เช็คชื่อ · ${w.title} (${when(w)})`, detail: `${w.host_name || '—'} · ${live.length} การจอง`, href: '/admin/workshops', focus: `ws:${w.id}`, todo: 'ที่แถวที่ไฮไลต์ กดเมนู ⋯ → “เช็คชื่อ” หรือแจ้งผู้จัดให้เช็คชื่อ', day: w.date });
     }
     if (start <= now) continue;
     const sold = soldIn(w);
     const cap = w.max_participants || 0;
     const waiting = list.filter((b) => b.app_status === 'waitlisted' && b.status !== 'cancelled').length;
     if (start < now + 3 * DAY && cap > 0 && sold / cap < 0.5) {
-      add({ key: `lowfill:${w.id}`, type: 'low_fill', group: 'rounds', tone: 'info', title: `ใกล้ถึงแต่ยังว่างเกินครึ่ง · ${w.title} (${when(w)})`, detail: `${w.host_name || '—'} · ขาย ${sold}/${cap} ที่`, href: '/admin/workshops', day: w.date });
+      add({ key: `lowfill:${w.id}`, type: 'low_fill', group: 'rounds', tone: 'info', title: `ใกล้ถึงแต่ยังว่างเกินครึ่ง · ${w.title} (${when(w)})`, detail: `${w.host_name || '—'} · ขาย ${sold}/${cap} ที่`, href: '/admin/workshops', focus: `ws:${w.id}`, todo: 'ช่วยโปรโมตรอบที่ไฮไลต์ หรือคุยกับผู้จัดเรื่องเลื่อน/รวมรอบ', day: w.date });
     }
     if (waiting && sold < cap) {
-      add({ key: `waitfree:${w.id}`, type: 'wait_free', group: 'rounds', tone: 'warn', title: `มีที่ว่างแต่ยังมีคนรอสำรอง · ${w.title} (${when(w)})`, detail: `${w.host_name || '—'} · ว่าง ${cap - sold} ที่ · รอสำรอง ${waiting} คน`, href: '/admin/workshops', day: w.date });
+      add({ key: `waitfree:${w.id}`, type: 'wait_free', group: 'rounds', tone: 'warn', title: `มีที่ว่างแต่ยังมีคนรอสำรอง · ${w.title} (${when(w)})`, detail: `${w.host_name || '—'} · ว่าง ${cap - sold} ที่ · รอสำรอง ${waiting} คน`, href: '/admin/workshops', focus: `ws:${w.id}`, todo: 'ที่แถวที่ไฮไลต์ กดเมนู ⋯ → “ผู้สมัคร” แล้วเลื่อนคนรอสำรองขึ้นมา', day: w.date });
     } else if (waiting >= 3 && sold >= cap) {
-      add({ key: `waitfull:${w.id}`, type: 'wait_full', group: 'rounds', tone: 'info', title: `เต็มแล้ว คนรอสำรองเยอะ — น่าเปิดรอบเพิ่ม · ${w.title}`, detail: `${w.host_name || '—'} · รอสำรอง ${waiting} คน`, href: '/admin/workshops', day: w.date });
+      add({ key: `waitfull:${w.id}`, type: 'wait_full', group: 'rounds', tone: 'info', title: `เต็มแล้ว คนรอสำรองเยอะ — น่าเปิดรอบเพิ่ม · ${w.title}`, detail: `${w.host_name || '—'} · รอสำรอง ${waiting} คน`, href: '/admin/workshops', focus: `ws:${w.id}`, todo: 'คุยกับผู้จัดเรื่องเปิดรอบเพิ่มของกิจกรรมที่ไฮไลต์', day: w.date });
     }
   }
 
@@ -1012,6 +1038,8 @@ function computeAlerts(x: {
         title: `รอบน้อยกว่า ${MIN_ROUNDS_PER_MONTH} รอบ${ym === thisMonth ? 'เดือนนี้' : 'เดือนหน้า'} · ${am.title}`,
         detail: `${am.host_name || '—'} · ${monthName(ym)} มี ${n} รอบ`,
         href: '/admin/workshop-info',
+        focus: `master:${am.id}`,
+        todo: 'กิจกรรมที่ไฮไลต์มีรอบน้อย — คุยกับผู้จัดเรื่องเปิดรอบเพิ่ม หรือเปลี่ยนสถานะเป็นพักไว้',
         day: `${ym}-01`,
       });
     }
@@ -1037,13 +1065,15 @@ function computeAlerts(x: {
       title: `แก้ชื่อ / วันเกิด ${list.length} ครั้งใน 12 เดือน · ${nameOf(uid)}`,
       detail: `ชื่อ ${names} ครั้ง · วันเกิด ${dobs} ครั้ง · ล่าสุด ${last.field === 'name' ? 'ชื่อ' : 'วันเกิด'}: ${last.old_value || '—'} → ${last.new_value || '—'}`,
       href: '/admin/users',
+      focus: `user:${uid}`,
+      todo: 'ตรวจบัญชีที่ไฮไลต์ — ถ้าผิดปกติ ระงับบัญชีได้จากแถวนั้น',
       day: thaiDay(utcMs(last.created_at)),
     });
   }
   const paidUsers = new Set(d.bk.filter((b) => wasCollected(b) && Number(b.amount) > 0 && b.user_id).map((b) => b.user_id as string));
   for (const u of d.users) {
     if (u.account_status === 'pending_deletion') {
-      add({ key: `deletion:${u.id}`, type: 'deletion', group: 'users', tone: 'info', title: `ขอลบบัญชี · ${u.name || '—'}`, detail: 'ลบถาวรเมื่อครบ 30 วันหลังขอ', href: '/admin/users', day: null });
+      add({ key: `deletion:${u.id}`, type: 'deletion', group: 'users', tone: 'info', title: `ขอลบบัญชี · ${u.name || '—'}`, detail: 'ลบถาวรเมื่อครบ 30 วันหลังขอ', href: '/admin/users', focus: `user:${u.id}`, todo: 'ระบบลบเองเมื่อครบ 30 วัน — ตรวจว่าบัญชีที่ไฮไลต์ไม่มีการจองค้าง', day: null });
     }
   }
   const unverified = d.users.filter((u) => paidUsers.has(u.id) && u.email_verified === 0);
@@ -1057,6 +1087,8 @@ function computeAlerts(x: {
       title: `ชำระเงินแล้วแต่ยังไม่ยืนยันอีเมล ${unverified.length} คน`,
       detail: `${names.join(', ')}${unverified.length > names.length ? ` และอีก ${unverified.length - names.length} คน` : ''} · อีเมลแจ้งเรื่องการจองอาจไปไม่ถึง`,
       href: '/admin/users',
+      focus: unverified.slice(0, 40).map((u) => `user:${u.id}`).join(','),
+      todo: 'ติดต่อคนที่ไฮไลต์ให้ยืนยันอีเมล',
       day: null,
     });
   }
@@ -1076,6 +1108,8 @@ function computeAlerts(x: {
         title: `${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)} ${src === 'review' ? 'รีวิว' : 'แบบสอบถาม'} · ${w?.title || '—'}`,
         detail: `${w?.host_name || '—'}${text ? ` · “${text.length > 90 ? text.slice(0, 90) + '…' : text}”` : ''}`,
         href: src === 'review' ? '/admin/reviews' : '/admin/workshops',
+        focus: src === 'review' ? `review:${r.id}` : `ws:${r.workshop_id}`,
+        todo: src === 'review' ? 'อ่านรีวิวที่ไฮไลต์ แล้วคุยกับผู้จัด' : 'ดูแบบสอบถามของรอบที่ไฮไลต์ แล้วคุยกับผู้จัด',
         day: thaiDay(utcMs(r.created_at)),
       });
     }
@@ -1088,11 +1122,11 @@ function computeAlerts(x: {
   }
   for (const [host, n] of cancelsBy) {
     if (n < 2) continue;
-    add({ key: `hostcancel:${host}:${n}`, type: 'host_cancels', group: 'quality', tone: 'warn', title: `ผู้จัดยกเลิกรอบที่มีคนจองบ่อย · ${nameOf(host)}`, detail: `${n} รอบใน 90 วัน`, href: '/admin/insights?tab=hosts', day: null });
+    add({ key: `hostcancel:${host}:${n}`, type: 'host_cancels', group: 'quality', tone: 'warn', title: `ผู้จัดยกเลิกรอบที่มีคนจองบ่อย · ${nameOf(host)}`, detail: `${n} รอบใน 90 วัน`, href: '/admin/insights?tab=hosts', focus: `host:${host}`, todo: 'คุยกับผู้จัดที่ไฮไลต์เรื่องการยกเลิกรอบที่มีคนจอง', day: null });
   }
   for (const h of hosts) {
     if (!h.atRisk) continue;
-    add({ key: `atrisk:${h.id}`, type: 'host_at_risk', group: 'quality', tone: 'info', title: `ผู้จัดเสี่ยงหาย · ${h.name}`, detail: `เคยขายได้ ไม่มีรอบใหม่ จัดล่าสุด ${h.lastRound || '—'}`, href: '/admin/insights?tab=hosts', day: h.lastRound });
+    add({ key: `atrisk:${h.id}`, type: 'host_at_risk', group: 'quality', tone: 'info', title: `ผู้จัดเสี่ยงหาย · ${h.name}`, detail: `เคยขายได้ ไม่มีรอบใหม่ จัดล่าสุด ${h.lastRound || '—'}`, href: '/admin/insights?tab=hosts', focus: `host:${h.id}`, todo: 'ลองติดต่อผู้จัดที่ไฮไลต์ ชวนเปิดรอบใหม่', day: h.lastRound });
   }
   // Applications waiting 3+ days for the host to choose, one alert per round.
   const waitingApps = new Map<string, number[]>();
@@ -1116,6 +1150,8 @@ function computeAlerts(x: {
       title: `ใบสมัครรอคัดเลือก ${days.length} คน · ${w.title} (${when(w)})`,
       detail: `ผู้จัด ${w.host_name || '—'} · รอนานสุด ${Math.max(...days)} วัน`,
       href: '/admin/workshops',
+      focus: `ws:${wid}`,
+      todo: 'ที่แถวที่ไฮไลต์ กดเมนู ⋯ → “ผู้สมัคร (คัดเลือก)” หรือเตือนผู้จัดให้คัดเลือก',
       day: w.date,
     });
   }

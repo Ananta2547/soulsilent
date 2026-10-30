@@ -302,7 +302,7 @@ export default function AdminUsersPage() {
                   {found.map((user) => {
                     const r = rowOf(user);
                     return (
-                      <tr key={user.id}>
+                      <tr key={user.id} data-focus={`user:${user.id}`}>
                         <td>
                           <div className="adm-cell-title">
                             <span className="adm-avatar">{(r.display || '?').charAt(0).toUpperCase()}</span>
@@ -339,7 +339,7 @@ export default function AdminUsersPage() {
               {found.map((user) => {
                 const r = rowOf(user);
                 return (
-                  <div key={user.id} className="adm-mcard">
+                  <div key={user.id} className="adm-mcard" data-focus={`user:${user.id}`}>
                     <div className="adm-mcard-top">
                       <span className="adm-avatar" style={{ width: 40, height: 40, fontSize: 14 }}>
                         {(r.display || '?').charAt(0).toUpperCase()}

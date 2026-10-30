@@ -75,7 +75,7 @@ export function HostsTab({ a, say, onChanged }: { a: AdminAnalytics; say: (m: st
         ) : (
           <div className="hx-acts">
             {rows.map((x) => (
-              <div key={x.id} className="hx-act">
+              <div key={x.id} className="hx-act" data-focus={`host:${x.id}`}>
                 <div style={{ minWidth: 0 }}>
                   <div className="t">
                     {x.name}
@@ -141,6 +141,7 @@ export function HostsTab({ a, say, onChanged }: { a: AdminAnalytics; say: (m: st
             <Rows
               rows={h.drift.map((x) => ({
                 key: x.id,
+                focus: `drift:${x.id}`,
                 main: x.title,
                 sub: `${x.host} · ${x.doc} โอน ${thDay(x.paidAt, true)} ${baht(x.paid)} · ตอนนี้ ${baht(x.now)}`,
                 amt: <span style={{ color: x.diff > 0 ? '#a3261a' : undefined }}>{x.diff > 0 ? `ต้องคืน ${baht(x.diff)}` : `ต้องโอนเพิ่ม ${baht(-x.diff)}`}</span>,
@@ -168,7 +169,7 @@ export function HostsTab({ a, say, onChanged }: { a: AdminAnalytics; say: (m: st
           {h.atRisk.length === 0 ? (
             <Empty>ไม่มี</Empty>
           ) : (
-            <Rows rows={h.atRisk.map((x) => ({ key: x.id, main: x.name, sub: `จัดล่าสุด ${x.lastRound ? thDay(x.lastRound, true) : '—'}`, amt: x.owed > 0 ? `ค้างจ่าย ${baht(x.owed)}` : '' }))} />
+            <Rows rows={h.atRisk.map((x) => ({ key: x.id, focus: `host:${x.id}`, main: x.name, sub: `จัดล่าสุด ${x.lastRound ? thDay(x.lastRound, true) : '—'}`, amt: x.owed > 0 ? `ค้างจ่าย ${baht(x.owed)}` : '' }))} />
           )}
         </Card>
         <Card title="ขั้น GP ของผู้จัดที่เคลื่อนไหว" sub="อัตราเดือนนี้ · จำนวนผู้จัดในแต่ละขั้น" delay={140}>
