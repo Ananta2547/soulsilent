@@ -328,7 +328,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
                   { k: 'รอบใหม่', v: `${when} ${d.time} น.` },
                 ],
                 cta: { label: 'ยืนยันรอบใหม่', url: '/me/bookings' },
-                cta2: { label: 'ไม่สะดวก ขอคืนเงิน', url: '/me/bookings' },
               },
             },
           );

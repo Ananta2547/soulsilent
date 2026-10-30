@@ -24,7 +24,7 @@ export const LINE_SAMPLES: { name: string; card: Card }[] = [
     card: {
       topic: 'change', title: `ย้ายรอบ: ${J}`, sub: 'ผู้จัดย้ายที่นั่งของคุณไปรอบใหม่',
       rows: [{ k: 'รอบเดิม', v: `${D} ${TM}`, color: '#9aaba8' }, { k: 'รอบใหม่', v: 'ส. 21 พ.ย. 10:00 น.' }],
-      cta: { label: 'ยืนยันรอบใหม่', url: '/me/bookings' }, cta2: { label: 'ไม่สะดวก ขอคืนเงิน', url: '/me/bookings' },
+      cta: { label: 'ยืนยันรอบใหม่', url: '/me/bookings' },
     },
   },
   { name: 'รอบถูกยกเลิก', card: { topic: 'cancel', title: `ยกเลิก: ${J}`, sub: 'ขออภัย รอบนี้ถูกยกเลิก การคืนเงินเป็นไปตามนโยบาย', rows: [{ k: 'รอบ', v: `${D} ${TM}`, color: '#a3261a' }], cta: { label: 'ดูการจองและการคืนเงิน', url: '/me/bookings', dark: true } } },
