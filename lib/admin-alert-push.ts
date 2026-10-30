@@ -6,7 +6,7 @@ type Env = Parameters<typeof sendPushToUser>[1];
 
 /** How often the cron looks for new urgent alerts. Working out every alert
  *  reads the whole platform, so not on every minute's run. */
-const EVERY_MS = 15 * 60 * 1000;
+const EVERY_MS = 3 * 60 * 1000;
 
 /**
  * Push new urgent ("ด่วน") Admin Insights alerts to every admin's devices.

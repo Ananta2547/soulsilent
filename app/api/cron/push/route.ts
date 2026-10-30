@@ -435,7 +435,7 @@ export async function GET(request: Request) {
       return {};
     });
 
-    // New urgent Admin Insights alerts to admins, every 15 minutes (lib/admin-alert-push).
+    // New urgent Admin Insights alerts to admins, every 3 minutes (lib/admin-alert-push).
     const admin = await pushAdminAlerts(db, env).catch((e) => {
       console.error('Admin alerts push error:', e);
       return 0;

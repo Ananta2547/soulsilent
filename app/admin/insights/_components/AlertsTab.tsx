@@ -91,7 +91,7 @@ export function AlertsTab({ a, onChanged, say }: { a: AdminAnalytics; onChanged:
         );
       })}
 
-      <Card title="แจ้งเตือนเรื่องด่วนทาง LINE" sub="เรื่องด่วนใหม่ส่งเข้า LINE ที่เชื่อมไว้ (ตรวจทุก 15 นาที รวมเป็นข้อความเดียว) · ปิดได้ที่สวิตช์ “แจ้งเตือนผู้ดูแล” ในหน้าตั้งค่า" delay={280}>
+      <Card title="แจ้งเตือนเรื่องด่วนทาง LINE" sub="เรื่องด่วนใหม่ส่งเข้า LINE ที่เชื่อมไว้ (ตรวจทุก 3 นาที รวมเป็นข้อความเดียว) · ปิดได้ที่สวิตช์ “แจ้งเตือนผู้ดูแล” ในหน้าตั้งค่า" delay={280}>
         <LineNudge dismissible={false} />
         <a href="/me/settings?tab=notify" style={{ fontSize: 14, fontWeight: 600, color: 'var(--teal-deep)' }}>ตั้งค่าการแจ้งเตือน →</a>
       </Card>

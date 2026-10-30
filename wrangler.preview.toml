@@ -12,7 +12,7 @@
 #   - name            : soulsilent-preview     (a different Worker entirely)
 #   - workers_dev     : true                   (preview URL instead of a domain)
 #   - no [[routes]]                            (never touches allsoullearn.com)
-#   - [triggers] every 5 min, CRON_JOBS="push" (app notifications only — never
+#   - [triggers] every 3 min, CRON_JOBS="push" (LINE notifications only — never
 #                                               expire-holds: it calls the LIVE
 #                                               Beam account to refund)
 #   - D1 / R2         : dedicated preview database + bucket
@@ -25,9 +25,9 @@ compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 # Serve on <name>.<account-subdomain>.workers.dev.
 workers_dev = true
 
-# App notifications only (CRON_JOBS = "push"); see the header.
+# LINE notifications only (CRON_JOBS = "push"); see the header.
 [triggers]
-crons = ["*/5 * * * *"]
+crons = ["*/3 * * * *"]
 
 [assets]
 directory = ".open-next/assets"
