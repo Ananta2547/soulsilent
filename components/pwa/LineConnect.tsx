@@ -2,8 +2,8 @@
 
 /**
  * Link this member's LINE account (migration 079). While linked and a friend
- * of the AllSoulLearn Official Account, every notification goes to LINE
- * instead of the app. Linking runs through LINE Login (/api/line/connect),
+ * of the AllSoulLearn Official Account, notifications reach them on LINE —
+ * the only channel since the installable app was retired. Linking runs through LINE Login (/api/line/connect),
  * which also asks to add the Official Account as a friend.
  */
 import { useEffect, useState } from 'react';
@@ -74,7 +74,7 @@ export function LineConnect() {
     try {
       await fetch('/api/line/link', { method: 'DELETE' });
       setS((x) => (x ? { ...x, linked: false, blocked: false, linkedAt: null } : x));
-      setNote({ text: tr(lang, 'ยกเลิกการเชื่อมแล้ว — การแจ้งเตือนกลับไปส่งในแอป', 'Unlinked — notifications go back to the app'), ok: true });
+      setNote({ text: tr(lang, 'ยกเลิกการเชื่อมแล้ว — จะไม่ได้รับการแจ้งเตือนจนกว่าจะเชื่อมใหม่', 'Unlinked — no notifications until you link again'), ok: true });
     } finally {
       setBusy(false);
     }
@@ -94,10 +94,10 @@ export function LineConnect() {
           <h2>{tr(lang, 'แจ้งเตือนทาง LINE', 'LINE notifications')}</h2>
           <p>
             {!s.linked
-              ? tr(lang, 'รับทุกการแจ้งเตือนเป็นแชทจาก AllSoulLearn ใน LINE แทนแจ้งเตือนในแอป — ไม่ต้องติดตั้งแอป', 'Get every notification as a chat from AllSoulLearn on LINE instead of the app — no app needed')
+              ? tr(lang, 'รับการแจ้งเตือนเป็นแชทจาก AllSoulLearn ใน LINE — ยืนยันการจอง เตือนก่อนวันกิจกรรม และแจ้งทันทีถ้ารอบเลื่อนหรือยกเลิก', 'Get notifications as a chat from AllSoulLearn on LINE — booking confirmations, reminders, and right away if your round moves or is cancelled')
               : s.blocked
-                ? tr(lang, 'เชื่อมแล้ว แต่ยังไม่ได้เพิ่มเพื่อน (หรือบล็อก) AllSoulLearn — ตอนนี้จึงยังส่งแจ้งเตือนในแอปแทน', 'Linked, but AllSoulLearn is not your friend (or is blocked) — notifications still go to the app')
-                : tr(lang, 'เชื่อมแล้ว — การแจ้งเตือนทั้งหมดส่งทาง LINE แทนแอป ประเภทที่ปิดไว้ด้านล่างจะไม่ส่งทั้งสองทาง', 'Linked — every notification goes to LINE instead of the app. Kinds you switch off below are off on both.')}
+                ? tr(lang, 'เชื่อมแล้ว แต่ยังไม่ได้เพิ่มเพื่อน (หรือบล็อก) AllSoulLearn — ตอนนี้จึงยังส่งแจ้งเตือนไม่ได้', 'Linked, but AllSoulLearn is not your friend (or is blocked) — notifications cannot reach you yet')
+                : tr(lang, 'เชื่อมแล้ว — การแจ้งเตือนส่งทาง LINE ยกเว้นประเภทที่ปิดไว้ด้านล่าง', 'Linked — notifications go to LINE, except the kinds you switch off below')}
           </p>
         </div>
       </div>

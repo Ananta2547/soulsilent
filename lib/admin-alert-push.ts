@@ -43,7 +43,7 @@ export async function pushAdminAlerts(db: D1Database, env: Env, now = Date.now()
           body: fresh.slice(0, 3).map((a) => `• ${a.title}`).join('\n') + (fresh.length > 3 ? `\nและอีก ${fresh.length - 3} เรื่อง` : ''),
         };
   for (const id of devices) {
-    await sendPushToUser(db, env, id, { ...payload, url: '/admin/insights?tab=alerts', tag: 'admin-alerts' }, { kind: 'admin', urgency: 'high', topic: 'admin-alerts' });
+    await sendPushToUser(db, env, id, { ...payload, url: '/admin/insights?tab=alerts', tag: 'admin-alerts' }, { kind: 'admin' });
   }
   return fresh.length;
 }

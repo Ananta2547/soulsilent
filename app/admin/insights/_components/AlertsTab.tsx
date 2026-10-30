@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import type { AdminAlert, AdminAnalytics, AlertGroup, AlertTone } from '@/lib/admin-analytics';
 import { Card, Empty, Seg, thDay } from '@/components/dashboard/kit';
-import { PushToggle } from '@/components/pwa/PushToggle';
+import { LineNudge } from '@/components/pwa/NotifyPrefs';
 
 const GROUPS: [AlertGroup, string, string][] = [
   ['money', 'เงินและบัญชี', 'คืนเงิน · ค้างโอน · เงินเข้าผิดปกติ · บัญชีไม่ครบ'],
@@ -91,8 +91,9 @@ export function AlertsTab({ a, onChanged, say }: { a: AdminAnalytics; onChanged:
         );
       })}
 
-      <Card title="แจ้งเตือนเรื่องด่วนผ่านแอป" sub="เรื่องด่วนใหม่จะเด้งบนเครื่องที่เปิดไว้ (ตรวจทุก 15 นาที รวมเป็นข้อความเดียว) · ปิดได้ที่สวิตช์ “แจ้งเตือนผู้ดูแล”" delay={280}>
-        <PushToggle />
+      <Card title="แจ้งเตือนเรื่องด่วนทาง LINE" sub="เรื่องด่วนใหม่ส่งเข้า LINE ที่เชื่อมไว้ (ตรวจทุก 15 นาที รวมเป็นข้อความเดียว) · ปิดได้ที่สวิตช์ “แจ้งเตือนผู้ดูแล” ในหน้าตั้งค่า" delay={280}>
+        <LineNudge dismissible={false} />
+        <a href="/me/settings?tab=notify" style={{ fontSize: 14, fontWeight: 600, color: 'var(--teal-deep)' }}>ตั้งค่าการแจ้งเตือน →</a>
       </Card>
 
       <Card

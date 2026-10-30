@@ -3,7 +3,6 @@ import './globals.css';
 import { LangProvider } from '@/lib/i18n';
 import { DataLoadingProvider, DataLoadingScreen } from '@/components/design/DataLoading';
 import { PwaRegister } from '@/components/pwa/PwaRegister';
-import { APPLE_SPLASH } from '@/components/pwa/splash';
 import { DEFAULT_OG_IMAGE, SITE_DESCRIPTION, SITE_NAME, SITE_ORIGIN } from '@/lib/seo';
 
 export const metadata: Metadata = {
@@ -21,16 +20,13 @@ export const metadata: Metadata = {
     images: [{ url: DEFAULT_OG_IMAGE, width: 512, height: 512, alt: 'AllSoulLearn' }],
   },
   twitter: { card: 'summary_large_image' },
-  // Installed on iPhone/iPad (Add to Home Screen): full screen, own icon/title.
-  appleWebApp: { capable: true, title: 'AllSoulLearn', statusBarStyle: 'default', startupImage: APPLE_SPLASH },
   icons: { apple: '/icons/apple-touch-icon.png' },
   formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {
   themeColor: '#0C8577',
-  // Lets the installed app draw under the notch/home bar; padding comes from
-  // env(safe-area-inset-*) where it matters.
+  // Draw under the notch/home bar; padding comes from env(safe-area-inset-*).
   viewportFit: 'cover',
 };
 

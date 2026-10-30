@@ -56,7 +56,7 @@ export async function notifyHostsRefundRequest(db: D1Database, env: Env, booking
         env,
         host,
         { title: 'มีคนขอคืนเงิน', body: `${first(r.member, 'ผู้เข้าร่วม')} ขอคืนเงินแทนการย้ายรอบ · ${r.title} ${thDate(r.date)}`, url: `/host/journeys/${r.wid}`, tag: `host-${r.wid}` },
-        { kind: 'host', topic: 'host-refund' },
+        { kind: 'host' },
       );
     }
   } catch (e) {

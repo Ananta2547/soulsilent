@@ -95,30 +95,30 @@ export function QualityTab({ a }: { a: AdminAnalytics }) {
             </div>
           </div>
         </Card>
-        <Card title="แอป (PWA)" sub="ในช่วงนี้" delay={420}>
+        <Card title="แจ้งเตือนทาง LINE" sub="ในช่วงนี้" delay={420}>
           <div className="hx-pl">
             <div>
-              <span>ติดตั้งใหม่</span>
-              <b>{num(s.installs, 0)}</b>
+              <span>เชื่อม LINE ใหม่</span>
+              <b>{num(s.lineNew, 0)}</b>
             </div>
             <div>
-              <span>เปิดแอป</span>
-              <b>{num(s.opens, 0)}</b>
+              <span>แจ้งเตือนที่ส่ง</span>
+              <b>{num(s.sent, 0)}</b>
             </div>
             <div>
-              <span>อุปกรณ์ที่รับแจ้งเตือน (ทั้งหมด)</span>
-              <b>{num(s.pushSubs, 0)}</b>
+              <span>สมาชิกที่เชื่อม LINE (ทั้งหมด)</span>
+              <b>{num(s.lineLinked, 0)}</b>
             </div>
           </div>
         </Card>
       </div>
 
-      <Card title="การใช้แอป 30 วันล่าสุด" sub="ติดตั้ง / เปิดแอปรายวัน" delay={490}>
+      <Card title="แจ้งเตือน 30 วันล่าสุด" sub="ส่งแจ้งเตือน / เชื่อม LINE รายวัน" delay={490}>
         <Bars
-          labels={s.appDaily.map((d) => thDay(d.day))}
+          labels={s.notifyDaily.map((d) => thDay(d.day))}
           series={[
-            { name: 'เปิดแอป', color: '#a5d9d1', values: s.appDaily.map((d) => d.open) },
-            { name: 'ติดตั้ง', color: '#0d8a7e', values: s.appDaily.map((d) => d.install) },
+            { name: 'ส่งแจ้งเตือน', color: '#a5d9d1', values: s.notifyDaily.map((d) => d.sent) },
+            { name: 'เชื่อม LINE', color: '#06C755', values: s.notifyDaily.map((d) => d.linked) },
           ]}
           every={5}
         />

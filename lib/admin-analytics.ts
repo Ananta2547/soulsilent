@@ -98,8 +98,10 @@ export type AdminData = {
   responses: { id?: string; workshop_id: string; rating: number; comment: string | null; created_at: string }[];
   reviews: { id?: string; workshop_id: string; rating: number; comment: string | null; created_at: string }[];
   orphans: { n: number; amount: number };
-  app: { day: string; metric: string; n: number }[];
-  pushSubs: number;
+  /** Per Thai day: 'linked' (LINE linked) and 'sent' (notifications). */
+  notify: { day: string; metric: string; n: number }[];
+  /** Members linked to LINE and not blocking the Official Account. */
+  lineLinked: number;
   beam: { qr: number | null; card: number | null };
   gp: GpContext;
   /** Round activities (kind 'round') and their status (migration 077). */
@@ -112,7 +114,7 @@ const rows = <T>(db: D1Database, sql: string) => db.prepare(sql).all<T>().then((
 export async function loadAdminData(db: D1Database): Promise<AdminData> {
   // Tables from migration 075 may not exist yet on a database that has not run it.
   const maybe = <T>(sql: string) => rows<T>(db, sql).catch(() => [] as T[]);
-  const [ws, bk, users, tx, categories, coupons, views, impressions, responses, reviews, orphans, app, push, settings, identity, acks, orphanRows] = await Promise.all([
+  const [ws, bk, users, tx, categories, coupons, views, impressions, responses, reviews, orphans, notify, lineLinked, settings, identity, acks, orphanRows] = await Promise.all([
     rows<WS>(
       db,
       `SELECT w.id, w.title, w.instructor_id, COALESCE(NULLIF(TRIM(u.nickname), ''), u.name) AS host_name, w.fee_mode, w.master_id, m.title AS master_title,
@@ -142,8 +144,16 @@ export async function loadAdminData(db: D1Database): Promise<AdminData> {
     rows<AdminData['responses'][number]>(db, `SELECT id, workshop_id, rating, comment, created_at FROM survey_responses`),
     rows<AdminData['reviews'][number]>(db, `SELECT id, workshop_id, rating, comment, created_at FROM reviews`),
     db.prepare(`SELECT COUNT(*) AS n, COALESCE(SUM(amount), 0) AS amount FROM orphan_payments WHERE resolved = 0`).first<{ n: number; amount: number }>(),
-    rows<{ day: string; metric: string; n: number }>(db, `SELECT day, metric, n FROM app_stats`),
-    db.prepare(`SELECT COUNT(*) AS n FROM push_subscriptions`).first<{ n: number }>(),
+    // LINE links (migration 079) and notifications sent, per Thai day.
+    maybe<{ day: string; metric: string; n: number }>(
+      `SELECT date(line_linked_at, '+7 hours') AS day, 'linked' AS metric, COUNT(*) AS n FROM users WHERE line_linked_at IS NOT NULL GROUP BY 1
+       UNION ALL
+       SELECT date(sent_at, '+7 hours') AS day, 'sent' AS metric, COUNT(*) AS n FROM push_sent WHERE sent_at >= datetime('now', '-400 days') GROUP BY 1`,
+    ),
+    db
+      .prepare(`SELECT COUNT(*) AS n FROM users WHERE line_user_id IS NOT NULL AND COALESCE(line_blocked, 0) = 0`)
+      .first<{ n: number }>()
+      .catch(() => null),
     rows<{ key: string; value: string }>(db, `SELECT key, value FROM admin_settings WHERE key IN ('beam_fee_qr', 'beam_fee_card')`),
     maybe<AdminData['identity'][number]>(
       `SELECT user_id, field, old_value, new_value, created_at FROM identity_changes WHERE created_at >= datetime('now', '-365 days') ORDER BY created_at`,
@@ -184,8 +194,8 @@ export async function loadAdminData(db: D1Database): Promise<AdminData> {
     identity,
     acks,
     orphanRows,
-    app,
-    pushSubs: push?.n || 0,
+    notify,
+    lineLinked: lineLinked?.n || 0,
     beam: { qr: setting('beam_fee_qr'), card: setting('beam_fee_card') },
     gp: await loadGp(db, ws.map((w) => w.instructor_id)),
     masters,
@@ -711,11 +721,11 @@ export function computeAdminAnalytics(full: AdminData, r: Range, now = Date.now(
     .sort((a, b) => utcMs(b.created_at) - utcMs(a.created_at))
     .slice(0, 10)
     .map((x) => ({ rating: x.rating, comment: x.comment, from: x.from, title: wsById.get(x.workshop_id)?.title || '—', host: wsById.get(x.workshop_id)?.host_name || '—', at: thaiDay(utcMs(x.created_at)) }));
-  const appIn = (metric: string) => d.app.filter((a) => a.metric === metric && dayIn(a.day)).reduce((s, a) => s + Number(a.n), 0);
-  const appDaily = Array.from({ length: 30 }, (_, i) => {
+  const notifyIn = (metric: string) => d.notify.filter((a) => a.metric === metric && dayIn(a.day)).reduce((s, a) => s + Number(a.n), 0);
+  const notifyDaily = Array.from({ length: 30 }, (_, i) => {
     const day = thaiDay(now - (29 - i) * DAY);
-    const at = (metric: string) => d.app.filter((a) => a.metric === metric && a.day === day).reduce((s, a) => s + Number(a.n), 0);
-    return { day, install: at('install'), open: at('open') };
+    const at = (metric: string) => d.notify.filter((a) => a.metric === metric && a.day === day).reduce((s, a) => s + Number(a.n), 0);
+    return { day, linked: at('linked'), sent: at('sent') };
   });
 
   /* ---- alerts: things a person should look at now (not tied to the window) ---- */
@@ -819,10 +829,10 @@ export function computeAdminAnalytics(full: AdminData, r: Range, now = Date.now(
         orphans: d.orphans,
         ledgerGaps,
         unsentVouchers,
-        installs: appIn('install'),
-        opens: appIn('open'),
-        pushSubs: d.pushSubs,
-        appDaily,
+        lineNew: notifyIn('linked'),
+        sent: notifyIn('sent'),
+        lineLinked: d.lineLinked,
+        notifyDaily,
       },
     },
   };

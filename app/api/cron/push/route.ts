@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDB, getEnv } from '@/lib/db';
-import { claimOnce, REACHABLE_USERS_SQL, releaseClaim, sendPushToUser, subscribedUsers, vapidKeys, type PushKind } from '@/lib/push';
+import { claimOnce, notificationsReady, REACHABLE_USERS_SQL, releaseClaim, sendPushToUser, subscribedUsers, type PushKind } from '@/lib/push';
 import { seatsHeldSubquery } from '@/lib/seats';
 import { pushAdminAlerts } from '@/lib/admin-alert-push';
 import { pushEvents } from '@/lib/push-events';
@@ -11,7 +11,7 @@ import { parseDashboardAccess, parseInstructorIds } from '@/lib/workshop-utils';
  * (worker.ts) with the shared secret:
  *   GET /api/cron/push   header: x-cron-secret: <CRON_SECRET>
  *
- * Sent only to members with a subscribed device, each at most once (push_sent):
+ * Sent only to members who linked LINE, each at most once (push_sent):
  *  - booked       a booking confirmed in the last hour  → "จองสำเร็จ"       (kind booking)
  *  - joined       a friend took a seat in the member's group booking        (kind booking)
  *  - remind-1d    the evening before (from 18:00 Thai time)                (kind reminder)
@@ -53,8 +53,8 @@ const SELECT = `SELECT b.id, b.user_id, w.title, w.date, w.time_start, l.name AS
                   FROM bookings b
                   JOIN workshops w ON w.id = b.workshop_id
                   LEFT JOIN locations l ON l.id = w.location_id`;
-// An app device, or LINE linked (migration 079).
-const HAS_DEVICE = `b.user_id IN (${REACHABLE_USERS_SQL})`;
+// LINE linked and not blocked (migration 079).
+const REACHABLE = `b.user_id IN (${REACHABLE_USERS_SQL})`;
 
 /** What members rely on to turn up: compared run to run to spot a move. */
 type Snapshot = {
@@ -119,7 +119,7 @@ export async function GET(request: Request) {
   if (!secret || request.headers.get('x-cron-secret') !== secret) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
-  if (!vapidKeys(env)) return NextResponse.json({ ok: true, skipped: 'push not configured' });
+  if (!notificationsReady(env)) return NextResponse.json({ ok: true, skipped: 'LINE not configured' });
 
   const db = await getDB();
   const counts = { booked: 0, remind1d: 0, remind2h: 0, joined: 0, host: 0, changed: 0, cancelled: 0, admin: 0 };
@@ -128,17 +128,16 @@ export async function GET(request: Request) {
     userId: string,
     payload: Parameters<typeof sendPushToUser>[3],
     kind: PushKind,
-    urgency: 'normal' | 'high' = 'normal',
   ) => {
     if (!(await claimOnce(db, key))) return false;
-    const ok = (await sendPushToUser(db, env, userId, payload, { urgency, topic: key.split(':')[0], kind })) > 0;
-    // Nothing delivered (LINE or every device refused): give the key back so
+    const ok = (await sendPushToUser(db, env, userId, payload, { kind })) > 0;
+    // Nothing delivered (not linked, or LINE refused): give the key back so
     // the next run tries again while the notice is still in its window.
     if (!ok) await releaseClaim(db, key);
     return ok;
   };
 
-  // Every admin who can be reached (app or LINE), looked up once per run.
+  // Every admin who can be reached on LINE, looked up once per run.
   let adminIds: string[] | null = null;
   const tellAdmins = async (key: string, payload: Parameters<typeof sendPushToUser>[3]) => {
     if (!adminIds) {
@@ -147,7 +146,7 @@ export async function GET(request: Request) {
       adminIds = all.map((a) => a.id).filter((id) => reach.has(id));
     }
     for (const id of adminIds) {
-      if (await send(`${key}:${id}`, id, payload, 'admin', 'high')) counts.admin++;
+      if (await send(`${key}:${id}`, id, payload, 'admin')) counts.admin++;
     }
   };
 
@@ -158,7 +157,7 @@ export async function GET(request: Request) {
         `${SELECT}
           WHERE b.status = 'confirmed' AND b.payment_status = 'paid' AND b.parent_booking_id IS NULL
             AND datetime(COALESCE(b.confirmed_at, b.created_at)) >= datetime('now', '-60 minutes')
-            AND ${HAS_DEVICE}
+            AND ${REACHABLE}
           LIMIT 100`,
       )
       .all<Row>();
@@ -186,7 +185,7 @@ export async function GET(request: Request) {
           `${SELECT}
             WHERE b.status = 'confirmed' AND w.status = 'active'
               AND w.date = date('now', '+7 hours', '+1 day')
-              AND ${HAS_DEVICE}
+              AND ${REACHABLE}
             LIMIT 300`,
         )
         .all<Row>();
@@ -215,7 +214,7 @@ export async function GET(request: Request) {
             AND w.time_start IS NOT NULL
             AND time(w.time_start) > time('now', '+7 hours')
             AND time(w.time_start) <= time('now', '+7 hours', '+2 hours')
-            AND ${HAS_DEVICE}
+            AND ${REACHABLE}
           LIMIT 300`,
       )
       .all<Row>();
@@ -230,7 +229,6 @@ export async function GET(request: Request) {
           tag: `booking-${r.id}`,
         },
         'reminder',
-        'high',
       );
       if (ok) counts.remind2h++;
     }
@@ -349,7 +347,7 @@ export async function GET(request: Request) {
             .prepare(
               `SELECT b.id, b.user_id FROM bookings b
                 WHERE b.workshop_id = ? AND b.status = 'cancelled' AND b.cancel_reason = 'workshop_changed'
-                  AND b.payment_status = 'paid' AND ${HAS_DEVICE}`,
+                  AND b.payment_status = 'paid' AND ${REACHABLE}`,
             )
             .bind(r.id)
             .all<{ id: string; user_id: string }>();
@@ -364,7 +362,6 @@ export async function GET(request: Request) {
                 tag: `booking-${b.id}`,
               },
               'change',
-              'high',
             );
             if (ok) counts.cancelled++;
           }
@@ -389,7 +386,7 @@ export async function GET(request: Request) {
           const what = describeChange(before, now);
           if (what) {
             const who = await db
-              .prepare(`SELECT b.id, b.user_id FROM bookings b WHERE b.workshop_id = ? AND b.status = 'confirmed' AND ${HAS_DEVICE}`)
+              .prepare(`SELECT b.id, b.user_id FROM bookings b WHERE b.workshop_id = ? AND b.status = 'confirmed' AND ${REACHABLE}`)
               .bind(r.id)
               .all<{ id: string; user_id: string }>();
             const version = hash(nowJson);
@@ -399,7 +396,6 @@ export async function GET(request: Request) {
                 b.user_id,
                 { title: `เปลี่ยนแปลง: ${r.title}`, body: what, url: '/me/bookings', tag: `booking-${b.id}` },
                 'change',
-                'high',
               );
               if (ok) counts.changed++;
             }

@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { PageLoader } from '@/components/design/PageLoader';
 import { AdminPager, Badge, type Tone } from '@/components/admin/AdminShell';
 import { sqliteToMs } from '@/lib/datetime';
-import type { AppStats } from '@/app/api/admin/app-stats/route';
+import type { NotifyStats } from '@/app/api/admin/notify-stats/route';
 
 interface Booking {
   id: string;
@@ -46,7 +46,7 @@ const BOOKING_TONE: Record<string, { label: string; tone: Tone }> = {
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
-  const [app, setApp] = useState<AppStats | null>(null);
+  const [line, setLine] = useState<NotifyStats | null>(null);
   const [orphans, setOrphans] = useState(0);
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(true);
@@ -91,9 +91,9 @@ export default function AdminDashboard() {
     }
     fetchStats();
     // The side pieces load on their own so a failure never blanks the dashboard.
-    fetch('/api/admin/app-stats')
-      .then((r) => (r.ok ? (r.json() as Promise<AppStats>) : null))
-      .then(setApp)
+    fetch('/api/admin/notify-stats')
+      .then((r) => (r.ok ? (r.json() as Promise<NotifyStats>) : null))
+      .then(setLine)
       .catch(() => {});
     fetch('/api/admin/orphan-payments')
       .then((r) => (r.ok ? (r.json() as Promise<{ unresolved?: number }>) : null))
@@ -157,18 +157,15 @@ export default function AdminDashboard() {
       d: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
     },
     {
-      label: 'ติดตั้งแอป',
-      value: (app?.installs || 0).toLocaleString(),
-      sub: app
-        ? `+${app.installs30d.toLocaleString()} ใน 30 วัน · แจ้งเตือน ${app.pushMembers.toLocaleString()} คน`
-        : 'เครื่องที่ติดตั้ง',
-      title: app
-        ? `เปิดแอป ${app.opens30d.toLocaleString()} ครั้ง · ${app.pushDevices.toLocaleString()} เครื่องเปิดแจ้งเตือน · ส่งแจ้งเตือน ${app.sent30d.toLocaleString()} ครั้ง (30 วัน)`
-        : undefined,
-      bg: '#fdf1d3',
-      color: '#7a5200',
-      d: 'M9 3.5h6a2 2 0 012 2v13a2 2 0 01-2 2H9a2 2 0 01-2-2v-13a2 2 0 012-2z',
-      d2: 'M11 17.5h2',
+      label: 'เชื่อม LINE',
+      value: (line?.linked || 0).toLocaleString(),
+      sub: line
+        ? `+${line.linked30d.toLocaleString()} ใน 30 วัน · ส่งแจ้งเตือน ${line.sent30d.toLocaleString()} ครั้ง`
+        : 'สมาชิกที่รับแจ้งเตือน',
+      title: line ? `บล็อก/เลิกเป็นเพื่อน ${line.blocked.toLocaleString()} คน` : undefined,
+      bg: '#dcf5e5',
+      color: '#067a3a',
+      d: 'M4 5.5h16a1.5 1.5 0 011.5 1.5v8a1.5 1.5 0 01-1.5 1.5H10l-4 3v-3H4A1.5 1.5 0 012.5 15V7A1.5 1.5 0 014 5.5z',
     },
   ];
 

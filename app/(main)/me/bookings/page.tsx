@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { PushToggle } from '@/components/pwa/PushToggle';
+import { LineNudge } from '@/components/pwa/NotifyPrefs';
 import { useLang, T, tr } from '@/lib/i18n';
 import { Reveal } from '@/components/design/Reveal';
 import { Btn } from '@/components/design/RippleButton';
@@ -467,8 +467,6 @@ export default function MyBookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  // Set when the installed app answered from its offline copy (no connection).
-  const [offlineCopy, setOfflineCopy] = useState(false);
   const [verifyFailed, setVerifyFailed] = useState(false);
   const [unauthorized, setUnauthorized] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
@@ -518,7 +516,6 @@ export default function MyBookingsPage() {
             return null;
           }
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          setOfflineCopy(r.headers.get('x-sw-offline') === '1');
           return r.json() as Promise<{ bookings: Booking[] }>;
         })
         .then((d) => {
@@ -834,13 +831,7 @@ export default function MyBookingsPage() {
             </div>
           )}
 
-          {bookings.length > 0 && !offlineCopy && <PushToggle variant="nudge" />}
-
-          {offlineCopy && (
-            <div className="mb-note is-info">
-              {tr(lang, 'ตอนนี้ไม่มีอินเทอร์เน็ต — แสดงการจองล่าสุดที่บันทึกไว้ในเครื่อง สถานะอาจยังไม่อัปเดต', 'You are offline — showing the bookings last saved on this phone; statuses may be out of date.')}
-            </div>
-          )}
+          {bookings.length > 0 && <LineNudge />}
 
           {loadError && (
             <div className="mb-note is-error">

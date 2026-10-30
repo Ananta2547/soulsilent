@@ -319,7 +319,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
               url: '/me/bookings',
               tag: `moved-${x.user_id}-${id}`,
             },
-            { urgency: 'high' },
           );
         } catch {}
       }

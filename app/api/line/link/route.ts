@@ -30,7 +30,7 @@ export async function POST() {
   if (row.line_blocked) return NextResponse.json({ error: 'ยังไม่ได้เพิ่มเพื่อน AllSoulLearn ใน LINE' }, { status: 400 });
   const ok = await linePush(env, row.line_user_id, {
     title: 'เชื่อม LINE สำเร็จ',
-    body: 'จากนี้การแจ้งเตือนของ AllSoulLearn จะส่งมาที่นี่แทนแจ้งเตือนในแอป',
+    body: 'จากนี้การแจ้งเตือนของ AllSoulLearn จะส่งมาที่นี่',
     url: '/me/settings?tab=notify',
   });
   return ok ? NextResponse.json({ ok: true }) : NextResponse.json({ error: 'ส่งไม่สำเร็จ ลองใหม่อีกครั้ง' }, { status: 502 });

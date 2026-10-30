@@ -10,7 +10,7 @@ import { ImageUploader } from '@/components/admin/image/ImageUploader';
 import { ASPECTS } from '@/lib/image-aspects';
 import { parseImageMeta } from '@/lib/image-meta';
 import type { ImageMeta } from '@/lib/types';
-import { PushPrefs, PushToggle } from '@/components/pwa/PushToggle';
+import { PushPrefs } from '@/components/pwa/NotifyPrefs';
 import { LineConnect } from '@/components/pwa/LineConnect';
 
 export interface MeData {
@@ -584,29 +584,21 @@ export function AccountPanel({
  *   (1) Identity — first/last name + nickname   (2) Health & dietary — medical.
  * All read from the autofill vault (localStorage). Incomplete → the status and
  * each unfinished step link to the Autofill form so the user can complete it. */
-/** Every notification switch in one place: this device on or off (the same
- *  control as /app), and which kinds to get. The kinds are saved for the
- *  member, not the device, so they show even where this device cannot take
- *  notifications. Hosts and admins also see their own kinds. */
+/** Every notification switch in one place: linking LINE (the only channel)
+ *  and which kinds to get. Hosts and admins also see their own kinds. */
 export function NotificationsPanel() {
   const { lang } = useLang();
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <SectionCard
         title="LINE"
-        desc={tr(lang, 'เชื่อมแล้ว การแจ้งเตือนทั้งหมดส่งทาง LINE แทนแอป', 'Once linked, every notification goes to LINE instead of the app')}
+        desc={tr(lang, 'การแจ้งเตือนทั้งหมดส่งเป็นแชทใน LINE', 'Every notification arrives as a LINE chat')}
       >
         <LineConnect />
       </SectionCard>
       <SectionCard
-        title={tr(lang, 'เครื่องนี้', 'This device')}
-        desc={tr(lang, 'เปิดหรือปิดการแจ้งเตือนบนอุปกรณ์ที่ใช้อยู่ตอนนี้', 'Turn notifications on or off for the device you are using')}
-      >
-        <PushToggle prefs={false} />
-      </SectionCard>
-      <SectionCard
         title={tr(lang, 'ประเภทที่ได้รับ', 'What you get')}
-        desc={tr(lang, 'ตั้งครั้งเดียว ใช้กับทุกเครื่องที่คุณเปิดการแจ้งเตือนไว้', 'Set once — applies to every device you turned notifications on')}
+        desc={tr(lang, 'ปิดเรื่องที่ไม่อยากได้รับ', 'Switch off what you do not want')}
       >
         <PushPrefs />
       </SectionCard>
