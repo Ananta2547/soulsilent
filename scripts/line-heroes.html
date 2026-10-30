@@ -1,0 +1,108 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@500&display=block" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: transparent; }
+  .s { width: 600px; height: 300px; position: relative; overflow: hidden; box-sizing: border-box; display: none; }
+  .mono { font-family: 'JetBrains Mono', monospace; letter-spacing: .2em; }
+  .blk { font-family: 'Archivo Black', sans-serif; }
+  @keyframes fxBlink { 0%,45% { opacity: 1 } 50%,95% { opacity: .15 } 100% { opacity: 1 } }
+  @keyframes fxFloat { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-16px) } }
+  @keyframes fxRing { from { stroke-dashoffset: 0 } to { stroke-dashoffset: -452 } }
+  @keyframes fxDraw { 0% { stroke-dashoffset: 480 } 35%,85% { stroke-dashoffset: 0; opacity: 1 } 100% { stroke-dashoffset: 0; opacity: 0 } }
+  @keyframes fxPulse { 0% { transform: scale(.6); opacity: .9 } 100% { transform: scale(1.9); opacity: 0 } }
+  @keyframes fxRise { 0%,100% { transform: translateY(12px) } 50% { transform: translateY(-8px) } }
+
+  /* tomorrow: background only — "TOMORROW" and the time are LINE text laid over it */
+  #tomorrow { background: #0d1e1d; }
+  #tomorrow .moon { position: absolute; right: 52px; top: 44px; width: 92px; height: 92px; border-radius: 50%; background: #f5c243; overflow: hidden; animation: fxFloat 4s ease-in-out infinite; }
+  #tomorrow .moon::after { content: ""; position: absolute; width: 92px; height: 92px; border-radius: 50%; background: #0d1e1d; left: 26px; top: -14px; }
+  #tomorrow .star { position: absolute; right: 172px; top: 56px; color: #a5d9d1; font-size: 26px; animation: fxBlink 2s ease-in-out infinite; }
+  #tomorrow .star2 { position: absolute; right: 260px; top: 120px; color: #a5d9d1; font-size: 16px; animation: fxBlink 2s ease-in-out -1s infinite; }
+
+  #soon { background: #0d8a7e; align-items: center; gap: 36px; padding: 0 44px; }
+  #soon .ring { position: relative; width: 176px; height: 176px; flex-shrink: 0; }
+  #soon .ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+  #soon .ring span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 52px; color: #fff; }
+  #soon .txt { font-size: 60px; line-height: .88; color: #fff; }
+
+  #selected { background: #eaf6f4; align-items: center; justify-content: center; }
+  #selected .w { position: relative; display: inline-flex; flex-direction: column; align-items: center; }
+  #selected .w svg { position: absolute; left: 50%; bottom: -20px; margin-left: -240px; }
+  #selected .w span { position: relative; font-size: 88px; line-height: .88; color: #075a51; letter-spacing: -.01em; }
+  #selected .tick { position: absolute; right: 44px; top: 40px; }
+
+  #gift { background: #fce4a0; align-items: center; padding: 0 48px; }
+  #gift .txt { font-size: 60px; line-height: .88; color: #0d1e1d; animation: fxRise 3s ease-in-out infinite; }
+  #gift .bow { position: absolute; right: 56px; top: 50%; margin-top: -70px; width: 140px; height: 140px; }
+
+  #linked { background: #0d1e1d; flex-direction: column; align-items: center; justify-content: center; gap: 28px; }
+  #linked .m { position: relative; width: 112px; height: 112px; display: flex; align-items: center; justify-content: center; }
+  #linked .p { position: absolute; inset: 0; border-radius: 50%; background: #16a99a; animation: fxPulse 2s ease-out infinite; }
+  #linked .c { position: absolute; inset: 0; border-radius: 50%; background: #f6f1e6; }
+  #linked .lbl { font-size: 20px; letter-spacing: .24em; color: #a5d9d1; }
+</style>
+</head>
+<body>
+  <div class="s" id="tomorrow">
+    <span class="moon"></span><span class="star">✺</span><span class="star2">✦</span>
+  </div>
+
+  <div class="s" id="soon">
+    <div class="ring">
+      <svg width="176" height="176" viewBox="0 0 176 176">
+        <circle cx="88" cy="88" r="72" fill="none" stroke="#075a51" stroke-width="16"></circle>
+        <circle cx="88" cy="88" r="72" fill="none" stroke="#f5c243" stroke-width="16" stroke-linecap="round" stroke-dasharray="112 340" style="animation: fxRing 3s linear infinite"></circle>
+      </svg>
+      <span class="blk">2H</span>
+    </div>
+    <span class="txt blk">STARTS<br>SOON</span>
+  </div>
+
+  <div class="s" id="selected">
+    <span class="w">
+      <svg width="480" height="44" viewBox="0 0 480 44">
+        <path d="M12 28 C 120 8, 280 8, 468 24" fill="none" stroke="#f5c243" stroke-width="20" stroke-linecap="round" stroke-dasharray="480" style="animation: fxDraw 3s cubic-bezier(.2,.7,.2,1) infinite"></path>
+      </svg>
+      <span class="blk">SELECTED</span>
+    </span>
+    <svg class="tick" width="68" height="68" viewBox="0 0 34 34">
+      <circle cx="17" cy="17" r="17" fill="#0d8a7e"></circle>
+      <path d="M10 17.5 L15 22 L24 12" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="240" style="animation: fxDraw 3s cubic-bezier(.2,.7,.2,1) -2.6s infinite"></path>
+    </svg>
+  </div>
+
+  <div class="s" id="gift">
+    <span class="txt blk">A GIFT<br>FOR YOU</span>
+    <svg class="bow" viewBox="0 0 70 70" style="animation: fxRise 3s ease-in-out -1.5s infinite">
+      <rect x="8" y="30" width="54" height="34" rx="6" fill="#0d8a7e"></rect>
+      <rect x="4" y="22" width="62" height="12" rx="4" fill="#075a51"></rect>
+      <rect x="31" y="22" width="8" height="42" fill="#f5c243"></rect>
+      <path d="M35 22 C 22 6, 10 14, 20 22 Z M35 22 C 48 6, 60 14, 50 22 Z" fill="#f5c243"></path>
+    </svg>
+  </div>
+
+  <div class="s" id="linked">
+    <div class="m">
+      <span class="p"></span><span class="c"></span>
+      <svg width="84" height="84" viewBox="0 0 100 100" style="position: relative">
+        <path d="M31,50 L43.7,50 L70.9,120 L3,120 Z M36.95,69.8 L47.1,91.4 L24.9,104.2 Z" fill="#0C8577" fill-rule="evenodd" transform="translate(20.44,-18) scale(0.8)"></path>
+      </svg>
+    </div>
+    <span class="lbl mono">CONNECTED</span>
+  </div>
+
+  <script>
+    // Show one scene; frame(t) pins every animation to t ms.
+    window.show = (id) => {
+      document.querySelectorAll('.s').forEach((s) => (s.style.display = 'none'));
+      document.getElementById(id).style.display = id === 'tomorrow' ? 'block' : 'flex';
+      document.getAnimations().forEach((a) => a.pause());
+    };
+    window.frame = (t) => document.getAnimations().forEach((a) => { a.currentTime = t; });
+  </script>
+</body>
+</html>

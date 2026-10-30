@@ -2,8 +2,8 @@
  * LINE notification cards ("LINE Flex Messages v2", Claude Design project
  * 226f25ce). Every card opens with a topic pill in one colour set shared by
  * the whole system; the bigger moments get a hero on top, small ones are
- * text only. Heroes are drawn with Flex boxes (no image hosting needed) —
- * the design's motion is not possible in Flex, so they are still.
+ * text only. The moving heroes are APNG pictures in public/line (rendered
+ * from the design); the poster and coupon heroes are drawn with Flex boxes.
  *
  * lib/line.ts sends `flexCard(payload.card ?? a plain card)`; the cron and
  * the event senders fill `card` with what the notice is about.
@@ -77,6 +77,13 @@ const dot = (color: string, size = '7px') => box('vertical', [], { width: size, 
 const section = (contents: unknown[]) => box('vertical', [{ type: 'separator', color: SEP }, ...contents], { spacing: 'sm', paddingTop: 'md' });
 const circle = (size: string, bg: string, inner: Obj, o: Obj = {}) => box('vertical', [inner], { width: size, height: size, cornerRadius: '50px', backgroundColor: bg, justifyContent: 'center', alignItems: 'center', flex: 0, ...o });
 
+/** An animated hero (APNG in public/line, made from the design's motion; 2:1).
+ *  Bump HERO_V when the files change so LINE fetches them again. */
+const HERO_V = 1;
+const motion = (siteUrl: string, name: string): Obj => ({
+  type: 'image', url: `${siteUrl}/line/hero-${name}.png?v=${HERO_V}`, size: 'full', aspectRatio: '2:1', aspectMode: 'cover', animated: true,
+});
+
 function heroOf(h: Hero, siteUrl: string): Obj {
   switch (h.kind) {
     case 'poster':
@@ -92,54 +99,27 @@ function heroOf(h: Hero, siteUrl: string): Obj {
         { paddingAll: '0px' },
       );
     case 'tomorrow':
+      // Moon and stars move in the picture; the time is LINE text laid over it.
       return box(
         'vertical',
         [
-          // A crescent moon: a yellow disc with a dark one laid over it.
-          box('vertical', [], { position: 'absolute', offsetTop: '22px', offsetEnd: '26px', width: '46px', height: '46px', cornerRadius: '50px', backgroundColor: '#f5c243' }),
-          box('vertical', [], { position: 'absolute', offsetTop: '16px', offsetEnd: '18px', width: '42px', height: '42px', cornerRadius: '50px', backgroundColor: INK }),
-          text('✺', { position: 'absolute', offsetTop: '30px', offsetEnd: '86px', size: 'sm', color: '#a5d9d1' }),
-          text('TOMORROW', { size: 'xxs', weight: 'bold', color: '#a5d9d1' }),
-          text(h.time, { size: '54px', weight: 'bold', color: '#ffffff', wrap: false }),
+          motion(siteUrl, 'tomorrow'),
+          box('vertical', [text('TOMORROW', { size: 'xxs', weight: 'bold', color: '#a5d9d1' }), text(h.time, { size: '48px', weight: 'bold', color: '#ffffff', wrap: false })], {
+            position: 'absolute', offsetStart: '20px', offsetBottom: '14px',
+          }),
         ],
-        { height: '150px', backgroundColor: INK, paddingAll: '20px', justifyContent: 'flex-end' },
+        { paddingAll: '0px' },
       );
     case 'soon':
-      return box(
-        'horizontal',
-        [
-          circle('88px', '#075a51', text('2H', { size: 'xxl', weight: 'bold', color: '#ffffff', align: 'center' }), { borderWidth: '8px', borderColor: '#f5c243' }),
-          box('vertical', [text('STARTS', { size: '30px', weight: 'bold', color: '#ffffff', wrap: false }), text('SOON', { size: '30px', weight: 'bold', color: '#ffffff', wrap: false })], { justifyContent: 'center' }),
-        ],
-        { height: '150px', backgroundColor: TEAL, paddingAll: '22px', spacing: 'lg', alignItems: 'center' },
-      );
     case 'selected':
-      return box(
-        'vertical',
-        [
-          circle('34px', TEAL, text('✓', { size: 'md', weight: 'bold', color: '#ffffff', align: 'center' }), { position: 'absolute', offsetTop: '20px', offsetEnd: '22px' }),
-          text('SELECTED', { size: '40px', weight: 'bold', color: '#075a51', align: 'center', wrap: false }),
-          box('vertical', [], { height: '10px', width: '200px', cornerRadius: '10px', backgroundColor: '#f5c243' }),
-        ],
-        { height: '150px', backgroundColor: '#eaf6f4', justifyContent: 'center', alignItems: 'center', spacing: 'xs' },
-      );
     case 'gift':
-      return box('vertical', [text('A GIFT', { size: '30px', weight: 'bold', color: INK, wrap: false }), text('FOR YOU', { size: '30px', weight: 'bold', color: INK, wrap: false })], {
-        height: '150px', backgroundColor: '#fce4a0', paddingAll: '24px', justifyContent: 'center',
-      });
+      return motion(siteUrl, h.kind);
     case 'coupon':
       return box('vertical', [text('COUPON', { size: 'xxs', weight: 'bold', color: '#7e5c14' }), text(h.discount, { size: '56px', weight: 'bold', color: INK, wrap: false })], {
         height: '150px', backgroundColor: '#fce4a0', paddingAll: '26px', justifyContent: 'center',
       });
     case 'linked':
-      return box(
-        'vertical',
-        [
-          circle('56px', '#f6f1e6', { type: 'image', url: `${siteUrl}/icons/icon-192.png`, size: '30px', aspectMode: 'fit' }, { borderWidth: '4px', borderColor: '#16a99a' }),
-          text('CONNECTED', { size: 'xxs', weight: 'bold', color: '#a5d9d1', align: 'center' }),
-        ],
-        { height: '150px', backgroundColor: INK, justifyContent: 'center', alignItems: 'center', spacing: 'md' },
-      );
+      return motion(siteUrl, 'linked');
   }
 }
 
