@@ -421,6 +421,17 @@ function WorkshopDetailInner() {
     });
   const partDates = safeParseArray<string>(workshop.dates_json, []);
   const workshopType = workshop.workshop_type || 'one_day';
+  // A round activity shows its rounds, not just this one: the soonest round
+  // still taking bookings and the last date with a round, so a visitor sees
+  // there are more to pick from. Same "open" test as the round picker.
+  const isRoundActivity = !!master && master.kind !== 'single';
+  const openRounds = isRoundActivity
+    ? siblings
+        .filter((s) => getWorkshopStatusBadge(s).open && s.private_taken === 0 && s.booked < s.max_participants)
+        .sort((a, b) => `${a.date}T${a.time_start || ''}`.localeCompare(`${b.date}T${b.time_start || ''}`))
+    : [];
+  const nextRound = openRounds[0];
+  const lastRoundDate = openRounds.reduce((d, s) => (s.date > d ? s.date : d), '');
 
   // Defined once and rendered by both headers. The desktop hero carries only
   // the title and leaves these below it; the phone design folds them into the
@@ -633,7 +644,30 @@ function WorkshopDetailInner() {
                 >
                   <Icon name="date" size={24} align="baseline" style={{ marginTop: 2, color: 'var(--teal)' }} />
                   <div style={{ minWidth: 0 }}>
-                    {workshopType === 'multi_day' && workshop.end_date ? (
+                    {nextRound ? (
+                      <>
+                        <div style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--teal-deep)', marginBottom: 4 }}>
+                          {tr(lang, 'รอบที่ใกล้ที่สุด', 'Next round')}
+                        </div>
+                        <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink)', lineHeight: 1.5 }}>{fmtFullDate(nextRound.date)}</div>
+                        <div style={{ fontSize: 13.5, color: 'var(--muted)', marginTop: 4 }}>
+                          {tr(lang, 'เวลา', 'Time')} {nextRound.time_start}–{nextRound.time_end} {tr(lang, 'น.', '')}
+                        </div>
+                        {openRounds.length > 1 && (
+                          <>
+                            <div style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--teal-deep)', margin: '14px 0 4px' }}>
+                              {tr(lang, 'มีรอบถึง', 'Rounds until')}
+                            </div>
+                            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink)', lineHeight: 1.5 }}>{fmtFullDate(lastRoundDate)}</div>
+                          </>
+                        )}
+                        <div style={{ fontSize: 13.5, color: 'var(--teal-deep)', marginTop: 8, fontWeight: 600 }}>
+                          {openRounds.length > 1
+                            ? tr(lang, `เปิดให้จองอยู่ ${openRounds.length} รอบ — กด “เลือกรอบกิจกรรม” เพื่อดูทุกรอบ`, `${openRounds.length} rounds open — tap “Choose a round” to see them all`)
+                            : tr(lang, 'เปิดให้จองอยู่ 1 รอบ', '1 round open')}
+                        </div>
+                      </>
+                    ) : workshopType === 'multi_day' && workshop.end_date ? (
                       <>
                         <div style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--teal-deep)', marginBottom: 4 }}>
                           {tr(lang, 'จัดต่อเนื่อง', 'Consecutive days')}
@@ -670,10 +704,13 @@ function WorkshopDetailInner() {
                         </div>
                       </>
                     )}
-                    <div style={{ fontSize: 13.5, color: 'var(--muted)', marginTop: 8 }}>
-                      {tr(lang, 'เวลา', 'Time')} {workshop.time_start}–{workshop.time_end} {tr(lang, 'น.', '')}
-                    </div>
-                    {workshop.close_at && (
+                    {/* Rounds each have their own time and booking close (in the picker). */}
+                    {!nextRound && (
+                      <div style={{ fontSize: 13.5, color: 'var(--muted)', marginTop: 8 }}>
+                        {tr(lang, 'เวลา', 'Time')} {workshop.time_start}–{workshop.time_end} {tr(lang, 'น.', '')}
+                      </div>
+                    )}
+                    {!nextRound && workshop.close_at && (
                       <div style={{ fontSize: 13.5, color: getWorkshopStatusBadge(workshop).open ? 'var(--teal-deep)' : 'var(--muted)', marginTop: 6, fontWeight: 600 }}>
                         <Icon name="reminder" size={16} /> {tr(lang, 'ปิดรับสมัคร', 'Registration closes')}: {fmtDateTime(`${workshop.close_at}:00+07:00`, lang, 'long')}
                       </div>
@@ -1092,6 +1129,7 @@ function WorkshopDetailInner() {
                   onViewApplication={() => setConsentOpen(true)}
                   manageHref={manageHref}
                   lang={lang}
+                  roundActivity={isRoundActivity}
                   otherRoundsOpen={
                     !!master &&
                     master.kind !== 'single' &&
@@ -1144,9 +1182,11 @@ function WorkshopDetailInner() {
             flexShrink: 0,
           }}
         >
-          {hasWorkshopEnded(workshop) || workshop.status === 'cancelled'
-            ? tr(lang, 'ดูรายละเอียด', 'View details')
-            : tr(lang, 'จองที่นั่ง', 'Book a seat')}
+          {nextRound
+            ? tr(lang, 'เลือกรอบกิจกรรม', 'Choose a round')
+            : hasWorkshopEnded(workshop) || workshop.status === 'cancelled'
+              ? tr(lang, 'ดูรายละเอียด', 'View details')
+              : tr(lang, 'จองที่นั่ง', 'Book a seat')}
           <span aria-hidden style={{ marginLeft: 8 }}>→</span>
         </button>
       </div>
@@ -1286,6 +1326,7 @@ function BookingCardContent({
   onViewApplication,
   manageHref,
   lang,
+  roundActivity = false,
   otherRoundsOpen = false,
 }: {
   workshop: Workshop;
@@ -1309,6 +1350,8 @@ function BookingCardContent({
   /** Set when the viewer teaches this workshop: its Teacher Dashboard page. */
   manageHref?: string | null;
   lang: 'th' | 'en';
+  /** The workshop is one round of a round activity: the button opens the picker. */
+  roundActivity?: boolean;
   /** A round activity with another round still taking bookings: the button
    *  opens the round picker even when this round has closed, filled or ended. */
   otherRoundsOpen?: boolean;
@@ -1696,7 +1739,9 @@ function BookingCardContent({
                 ? tr(lang, 'เต็มแล้ว', 'Sold out')
                 : isSelection
                   ? tr(lang, 'สมัครเข้าร่วม', 'Apply to join')
-                  : tr(lang, 'จองที่นั่งเลย', 'Book a seat')}{' '}
+                  : roundActivity
+                    ? tr(lang, 'เลือกรอบกิจกรรม', 'Choose a round')
+                    : tr(lang, 'จองที่นั่งเลย', 'Book a seat')}{' '}
             <span className="mono">→</span>
           </button>
           {/* Buying it for someone else. Not on a free workshop — the friend
