@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { cache } from 'react';
 import { getDB } from '@/lib/db';
+import Script from 'next/script';
 import { absoluteUrl, metaText, SITE_NAME } from '@/lib/seo';
+import { ADSENSE_CLIENT } from '@/lib/adsense';
 
 /* Search and share data for one article (the page is a client component). */
 
@@ -53,6 +55,8 @@ export default async function ArticleLayout({ children, params }: { children: Re
       {ld && (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld).replace(/</g, '\\u003c') }} />
       )}
+      {/* Google AdSense, on published articles only (a draft opened by share link has no row here). */}
+      {a && <Script async src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`} crossOrigin="anonymous" strategy="afterInteractive" />}
       {children}
     </>
   );

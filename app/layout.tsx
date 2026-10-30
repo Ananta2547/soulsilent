@@ -4,6 +4,7 @@ import { LangProvider } from '@/lib/i18n';
 import { DataLoadingProvider, DataLoadingScreen } from '@/components/design/DataLoading';
 import { PwaRegister } from '@/components/pwa/PwaRegister';
 import { DEFAULT_OG_IMAGE, SITE_DESCRIPTION, SITE_NAME, SITE_ORIGIN } from '@/lib/seo';
+import { ADSENSE_CLIENT } from '@/lib/adsense';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_ORIGIN),
@@ -22,6 +23,8 @@ export const metadata: Metadata = {
   twitter: { card: 'summary_large_image' },
   icons: { apple: '/icons/apple-touch-icon.png' },
   formatDetection: { telephone: false },
+  // Lets AdSense verify the site on any page; the ad script itself loads on articles only.
+  other: { 'google-adsense-account': ADSENSE_CLIENT },
 };
 
 export const viewport: Viewport = {
