@@ -47,6 +47,29 @@ export function AlertsTab({ a, onChanged, say }: { a: AdminAnalytics; onChanged:
     say('รับทราบแล้ว');
     onChanged();
   }
+  async function checkCards() {
+    setBusy('line-check');
+    try {
+      const r = await fetch('/api/admin/line-samples');
+      const d = (await r.json()) as { error?: string; total?: number; bad?: number; results?: { name: string; ok: boolean; detail: string | null }[] };
+      if (!r.ok) return say(d.error || 'ตรวจไม่สำเร็จ');
+      const bad = (d.results || []).filter((x) => !x.ok);
+      if (bad.length) console.warn('[line cards]', bad);
+      say(bad.length ? `การ์ดผิด ${bad.length} แบบ: ${bad.map((x) => x.name).join(', ')}` : `การ์ดทั้ง ${d.total} แบบผ่านการตรวจของ LINE`);
+    } finally {
+      setBusy(null);
+    }
+  }
+  async function sendCards() {
+    setBusy('line-send');
+    try {
+      const r = await fetch('/api/admin/line-samples', { method: 'POST' });
+      const d = (await r.json()) as { error?: string; sent?: number };
+      say(r.ok ? `ส่ง ${d.sent} แบบแล้ว — เปิด LINE ดูได้เลย` : d.error || 'ส่งไม่สำเร็จ');
+    } finally {
+      setBusy(null);
+    }
+  }
   async function unack(key: string) {
     setBusy(key);
     const r = await fetch(`/api/admin/alerts?key=${encodeURIComponent(key)}`, { method: 'DELETE' });
@@ -109,6 +132,15 @@ export function AlertsTab({ a, onChanged, say }: { a: AdminAnalytics; onChanged:
       <Card title="แจ้งเตือนเรื่องด่วนทาง LINE" sub="เรื่องด่วนใหม่ส่งเข้า LINE ที่เชื่อมไว้ (ตรวจทุก 3 นาที รวมเป็นข้อความเดียว) · ปิดได้ที่สวิตช์ “แจ้งเตือนผู้ดูแล” ในหน้าตั้งค่า" delay={280}>
         <LineNudge dismissible={false} />
         <a href="/me/settings?tab=notify" style={{ fontSize: 14, fontWeight: 600, color: 'var(--teal-deep)' }}>ตั้งค่าการแจ้งเตือน →</a>
+        {/* The card designs (lib/line-flex): LINE checks them, or they all come to this admin's own LINE. */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+          <button type="button" className="hx-btn white" disabled={busy === 'line-check'} onClick={checkCards}>
+            {busy === 'line-check' ? 'กำลังตรวจ…' : 'ตรวจการ์ด LINE ทุกแบบ'}
+          </button>
+          <button type="button" className="hx-btn" disabled={busy === 'line-send'} onClick={sendCards}>
+            {busy === 'line-send' ? 'กำลังส่ง…' : 'ส่งตัวอย่างทุกแบบมาที่ LINE ฉัน'}
+          </button>
+        </div>
       </Card>
 
       <Card

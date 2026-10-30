@@ -32,7 +32,14 @@ export async function POST() {
     title: 'เชื่อม LINE สำเร็จ',
     body: 'จากนี้การแจ้งเตือนของ AllSoulLearn จะส่งมาที่นี่',
     url: '/me/settings?tab=notify',
-  });
+    card: {
+      topic: 'system',
+      hero: { kind: 'linked' },
+      title: 'เชื่อม LINE สำเร็จ',
+      sub: 'จากนี้การแจ้งเตือนของ AllSoulLearn จะส่งมาที่นี่',
+      cta: { label: 'ตั้งค่าการแจ้งเตือน', url: '/me/settings?tab=notify' },
+    },
+  }, 'system');
   return ok ? NextResponse.json({ ok: true }) : NextResponse.json({ error: 'ส่งไม่สำเร็จ ลองใหม่อีกครั้ง' }, { status: 502 });
 }
 

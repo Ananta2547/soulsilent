@@ -1,6 +1,7 @@
 import { claimOnce, sendPushToUser, subscribedUsers, type PushKind, type PushPayload } from '@/lib/push';
 import { parseDashboardAccess, parseInstructorIds } from '@/lib/workshop-utils';
 import { visibleAppStatus } from '@/lib/selection-status';
+import { BLUE } from '@/lib/line-flex';
 
 /* Push notices about things that happen to a booking or a round, on top of
  * the booking / reminder / change notices in the cron (api/cron/push):
@@ -35,6 +36,8 @@ const clip = (s: string | null | undefined, n = 80) => {
   return t.length > n ? t.slice(0, n) + '…' : t;
 };
 const stars = (n: number) => '★'.repeat(n) + '☆'.repeat(5 - n);
+/** "9 พ.ย. 23:59 น." from a YYYY-MM-DDTHH:MM deadline. */
+const thDeadline = (v: string) => `${thDate(v.slice(0, 10))}${v.length >= 16 ? ` ${v.slice(11, 16)} น.` : ''}`;
 
 /** A member gave their seat back for a refund (api/bookings/[id]/refund-request):
  *  tell the round's hosts straight away. */
@@ -55,7 +58,19 @@ export async function notifyHostsRefundRequest(db: D1Database, env: Env, booking
         db,
         env,
         host,
-        { title: 'มีคนขอคืนเงิน', body: `${first(r.member, 'ผู้เข้าร่วม')} ขอคืนเงินแทนการย้ายรอบ · ${r.title} ${thDate(r.date)}`, url: `/host/journeys/${r.wid}`, tag: `host-${r.wid}` },
+        {
+          title: 'มีคนขอคืนเงิน',
+          body: `${first(r.member, 'ผู้เข้าร่วม')} ขอคืนเงินแทนการย้ายรอบ · ${r.title} ${thDate(r.date)}`,
+          url: `/host/journeys/${r.wid}`,
+          tag: `host-${r.wid}`,
+          card: {
+            topic: 'cancel',
+            topicLabel: 'ขอคืนเงิน',
+            title: 'มีคนขอคืนเงิน',
+            sub: `${first(r.member, 'ผู้เข้าร่วม')} ขอคืนเงินแทนการย้ายรอบ\n${r.title} · ${thDate(r.date)}`,
+            cta: { label: 'ดูรายละเอียด', url: `/host/journeys/${r.wid}`, dark: true },
+          },
+        },
         { kind: 'host' },
       );
     }
@@ -70,8 +85,9 @@ export async function pushEvents(db: D1Database, send: Send): Promise<Record<str
   const all = <T>(sql: string) => db.prepare(sql).all<T>().then((r) => r.results || []);
 
   // A new application to a selection round, for its hosts.
-  const applied = await all<RoundRow & { id: string; user_id: string | null; applicant: string | null }>(
-    `SELECT b.id, b.user_id, COALESCE(NULLIF(u.nickname, ''), u.name) AS applicant, ${ROUND_COLS}
+  const applied = await all<RoundRow & { id: string; user_id: string | null; applicant: string | null; waiting: number }>(
+    `SELECT b.id, b.user_id, COALESCE(NULLIF(u.nickname, ''), u.name) AS applicant, ${ROUND_COLS},
+            (SELECT COUNT(*) FROM bookings x WHERE x.workshop_id = w.id AND x.app_status = 'applied' AND x.parent_booking_id IS NULL AND x.status != 'cancelled') AS waiting
        FROM bookings b JOIN workshops w ON w.id = b.workshop_id LEFT JOIN workshop_masters m ON m.id = w.master_id
        LEFT JOIN users u ON u.id = b.user_id
       WHERE b.app_status = 'applied' AND b.parent_booking_id IS NULL AND b.status != 'cancelled'
@@ -84,7 +100,19 @@ export async function pushEvents(db: D1Database, send: Send): Promise<Record<str
       const ok = await send(
         `host-applied:${r.id}:${host}`,
         host,
-        { title: 'มีใบสมัครใหม่', body: `${first(r.applicant, 'ผู้สมัคร')} สมัคร ${r.title} ${thDate(r.date)}`, url: `/host/journeys/${r.wid}`, tag: `host-${r.wid}` },
+        {
+          title: 'มีใบสมัครใหม่',
+          body: `${first(r.applicant, 'ผู้สมัคร')} สมัคร ${r.title} ${thDate(r.date)}`,
+          url: `/host/journeys/${r.wid}`,
+          tag: `host-${r.wid}`,
+          card: {
+            topic: 'host',
+            title: 'มีใบสมัครใหม่',
+            sub: `${first(r.applicant, 'ผู้สมัคร')} สมัคร ${r.title} · ${thDate(r.date)}`,
+            avatars: { list: [first(r.applicant, 'ผ').slice(0, 1)], note: `รอคัดเลือก ${r.waiting} คน` },
+            cta: { label: 'อ่านใบสมัคร', url: `/host/journeys/${r.wid}`, dark: true },
+          },
+        },
         'host',
       );
       if (ok) counts.applied++;
@@ -113,6 +141,14 @@ export async function pushEvents(db: D1Database, send: Send): Promise<Record<str
           body: clip(r.comment) || 'ไม่มีความเห็นเพิ่ม',
           url: r.src === 'review' ? '/host/reviews' : `/host/journeys/${r.wid}/survey`,
           tag: `host-low-${r.wid}`,
+          card: {
+            topic: 'voice',
+            title: `${r.src === 'review' ? 'รีวิวใหม่' : 'แบบสอบถามใหม่'} · ${r.title}`,
+            sub: r.comment?.trim() ? undefined : 'ไม่มีความเห็นเพิ่ม',
+            stars: { n: r.rating },
+            quote: clip(r.comment, 300) || undefined,
+            cta: { label: r.src === 'review' ? 'ดูรีวิว' : 'ดูแบบสอบถาม', url: r.src === 'review' ? '/host/reviews' : `/host/journeys/${r.wid}/survey`, dark: true },
+          },
         },
         'host',
       );
@@ -123,8 +159,8 @@ export async function pushEvents(db: D1Database, send: Send): Promise<Record<str
   // Selection results, once the round's announcement time has passed (before
   // it, members still see "สมัครแล้ว"). A later change — promoted from the
   // waiting list — is a new notice.
-  const decided = await all<{ id: string; user_id: string; app_status: string; wid: string; title: string; date: string; admission_type: 'direct' | 'selection'; announce_at: string | null }>(
-    `SELECT b.id, b.user_id, b.app_status, w.id AS wid, w.title, w.date, w.admission_type, w.announce_at
+  const decided = await all<{ id: string; user_id: string; app_status: string; wid: string; title: string; date: string; admission_type: 'direct' | 'selection'; announce_at: string | null; confirm_main_by: string | null }>(
+    `SELECT b.id, b.user_id, b.app_status, w.id AS wid, w.title, w.date, w.admission_type, w.announce_at, w.confirm_main_by
        FROM bookings b JOIN workshops w ON w.id = b.workshop_id
       WHERE w.admission_type = 'selection' AND w.announce_at IS NOT NULL AND w.status != 'cancelled'
         AND b.app_status IN ('approved', 'waitlisted', 'rejected') AND b.parent_booking_id IS NULL AND b.user_id IS NOT NULL
@@ -137,10 +173,35 @@ export async function pushEvents(db: D1Database, send: Send): Promise<Record<str
     if (!memberDevices.has(r.user_id)) continue;
     const payload: PushPayload =
       r.app_status === 'approved'
-        ? { title: `ผ่านการคัดเลือก · ${r.title}`, body: `ยินดีด้วย! ยืนยันสิทธิ์ที่หน้าการจองของฉันภายในเวลาที่กำหนด · ${thDate(r.date)}`, url: '/me/bookings', tag: `booking-${r.id}` }
+        ? {
+            title: `ผ่านการคัดเลือก · ${r.title}`,
+            body: `ยินดีด้วย! ยืนยันสิทธิ์ที่หน้าการจองของฉันภายในเวลาที่กำหนด · ${thDate(r.date)}`,
+            url: '/me/bookings',
+            tag: `booking-${r.id}`,
+            card: {
+              topic: 'select',
+              hero: { kind: 'selected' },
+              title: 'ยินดีด้วย คุณผ่านการคัดเลือก',
+              sub: r.title,
+              rows: r.confirm_main_by ? [{ k: 'ยืนยันภายใน', v: thDeadline(r.confirm_main_by), color: BLUE }] : [{ k: 'วัน', v: thDate(r.date) }],
+              cta: { label: 'ยืนยันสิทธิ์', url: '/me/bookings' },
+            },
+          }
         : r.app_status === 'waitlisted'
-          ? { title: `อยู่ในรายชื่อสำรอง · ${r.title}`, body: 'ถ้ามีที่ว่าง เราจะแจ้งให้ทราบทันที', url: '/me/bookings', tag: `booking-${r.id}` }
-          : { title: `ผลการคัดเลือก · ${r.title}`, body: 'ครั้งนี้ยังไม่ได้รับเลือก ขอบคุณที่สนใจ — ลองดูกิจกรรมอื่นที่ใกล้เคียงได้เลย', url: '/journeys', tag: `booking-${r.id}` };
+          ? {
+              title: `อยู่ในรายชื่อสำรอง · ${r.title}`,
+              body: 'ถ้ามีที่ว่าง เราจะแจ้งให้ทราบทันที',
+              url: '/me/bookings',
+              tag: `booking-${r.id}`,
+              card: { topic: 'select', title: 'คุณอยู่ในรายชื่อสำรอง', sub: `${r.title}\nถ้ามีที่ว่าง เราจะแจ้งให้ทราบทันที`, cta: { label: 'ดูการจอง', url: '/me/bookings', dark: true } },
+            }
+          : {
+              title: `ผลการคัดเลือก · ${r.title}`,
+              body: 'ครั้งนี้ยังไม่ได้รับเลือก ขอบคุณที่สนใจ — ลองดูกิจกรรมอื่นที่ใกล้เคียงได้เลย',
+              url: '/journeys',
+              tag: `booking-${r.id}`,
+              card: { topic: 'select', title: 'ครั้งนี้ยังไม่ได้รับเลือก', sub: `ขอบคุณที่สนใจ ${r.title} — ลองดูกิจกรรมอื่นที่ใกล้เคียงได้เลย`, cta: { label: 'ดูกิจกรรมอื่น', url: '/journeys', dark: true } },
+            };
     if (await send(`select:${r.id}:${r.app_status}`, r.user_id, payload, 'booking')) counts.selection++;
   }
 
@@ -156,7 +217,16 @@ export async function pushEvents(db: D1Database, send: Send): Promise<Record<str
       const ok = await send(
         `transfer-to:${t.id}`,
         t.to_user_id,
-        { title: t.kind === 'gift' ? 'ได้รับของขวัญเป็นที่นั่ง 🎁' : 'ได้รับสิทธิ์เข้าร่วมแล้ว', body: `${t.title} ${thDate(t.date)} — ดูรายละเอียดที่การจองของฉัน`, url: '/me/bookings', tag: `transfer-${t.id}` },
+        {
+          title: t.kind === 'gift' ? 'ได้รับของขวัญเป็นที่นั่ง 🎁' : 'ได้รับสิทธิ์เข้าร่วมแล้ว',
+          body: `${t.title} ${thDate(t.date)} — ดูรายละเอียดที่การจองของฉัน`,
+          url: '/me/bookings',
+          tag: `transfer-${t.id}`,
+          card:
+            t.kind === 'gift'
+              ? { topic: 'gift', hero: { kind: 'gift' }, title: 'มีคนให้ที่นั่งเป็นของขวัญ', sub: `${t.title} · ${thDate(t.date)}`, cta: { label: 'เปิดของขวัญ', url: '/me/bookings' } }
+              : { topic: 'gift', title: 'ได้รับสิทธิ์เข้าร่วมแล้ว', sub: `${t.title} · ${thDate(t.date)}`, cta: { label: 'ดูตั๋วของฉัน', url: '/me/bookings' } },
+        },
         'booking',
       );
       if (ok) counts.transfer++;
@@ -165,7 +235,18 @@ export async function pushEvents(db: D1Database, send: Send): Promise<Record<str
       const ok = await send(
         `transfer-from:${t.id}`,
         t.from_user_id,
-        { title: t.kind === 'gift' ? 'ของขวัญถูกรับแล้ว' : 'มีคนรับสิทธิ์ต่อแล้ว', body: `${first(t.to_name, 'ผู้รับ')} รับที่นั่ง ${t.title} แล้ว`, url: '/me/bookings', tag: `transfer-${t.id}` },
+        {
+          title: t.kind === 'gift' ? 'ของขวัญถูกรับแล้ว' : 'มีคนรับสิทธิ์ต่อแล้ว',
+          body: `${first(t.to_name, 'ผู้รับ')} รับที่นั่ง ${t.title} แล้ว`,
+          url: '/me/bookings',
+          tag: `transfer-${t.id}`,
+          card: {
+            topic: 'gift',
+            title: `${first(t.to_name, 'ผู้รับ')} รับที่นั่งแล้ว`,
+            sub: t.kind === 'gift' ? `ของขวัญ ${t.title} ถึงมือแล้ว` : `ที่นั่ง ${t.title} มีคนรับต่อแล้ว`,
+            cta: { label: 'ดูการจอง', url: '/me/bookings', dark: true },
+          },
+        },
         'booking',
       );
       if (ok) counts.transfer++;
@@ -191,7 +272,19 @@ export async function pushEvents(db: D1Database, send: Send): Promise<Record<str
     const ok = await send(
       `survey:${r.survey_id}:${r.user_id}`,
       r.user_id,
-      { title: `ช่วยเล่าความรู้สึกหลัง ${r.title}`, body: 'แบบสอบถามสั้น ๆ ไม่ถึง 1 นาที — ผู้จัดจะได้ทำครั้งหน้าให้ดีขึ้น', url: `/survey/${r.wid}`, tag: `survey-${r.wid}` },
+      {
+        title: `ช่วยเล่าความรู้สึกหลัง ${r.title}`,
+        body: 'แบบสอบถามสั้น ๆ ไม่ถึง 1 นาที — ผู้จัดจะได้ทำครั้งหน้าให้ดีขึ้น',
+        url: `/survey/${r.wid}`,
+        tag: `survey-${r.wid}`,
+        card: {
+          topic: 'voice',
+          title: 'วันนี้เป็นอย่างไรบ้าง',
+          sub: `เล่าความรู้สึกหลัง ${r.title} ไม่ถึง 1 นาที — ผู้จัดจะได้ทำครั้งหน้าให้ดีขึ้น`,
+          stars: { n: 0, ask: true, hint: 'แตะเพื่อเริ่ม' },
+          cta: { label: 'ตอบแบบสอบถาม', url: `/survey/${r.wid}` },
+        },
+      },
       'booking',
     );
     if (ok) counts.survey++;

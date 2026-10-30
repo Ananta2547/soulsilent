@@ -3,7 +3,7 @@ import { v4 as uuid } from 'uuid';
 import { getDB, getEnv } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
 import { sendPushToUser } from '@/lib/push';
-import { couponHeadline, randomCode, type Coupon } from '@/lib/coupons';
+import { couponBig, couponHeadline, randomCode, type Coupon } from '@/lib/coupons';
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -65,7 +65,14 @@ export async function POST(request: Request, { params }: Ctx) {
             body: `${coupon.name} · ${couponHeadline(coupon)}`,
             url: '/me/coupons',
             tag: `coupon-${id}`,
-          });
+            card: {
+              topic: 'gift',
+              hero: { kind: 'coupon', discount: coupon.kind === 'percent' || coupon.kind === 'amount' ? `−${couponBig(coupon)}` : couponBig(coupon) },
+              title: 'คุณได้รับคูปอง',
+              sub: `${coupon.name} · ${couponHeadline(coupon)}`,
+              cta: { label: 'ดูคูปองของฉัน', url: '/me/coupons' },
+            },
+          }, { kind: 'booking' });
         } catch {}
       }
       return NextResponse.json({ created: found.length });

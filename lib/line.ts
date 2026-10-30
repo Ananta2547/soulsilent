@@ -10,6 +10,7 @@
  * Without them every function here does nothing, like push without VAPID.
  */
 import type { PushPayload } from '@/lib/push';
+import { flexCard, type Topic } from '@/lib/line-flex';
 
 export type LineEnv = {
   LINE_CHANNEL_ACCESS_TOKEN?: string;
@@ -36,44 +37,21 @@ export async function lineIdOf(db: D1Database, userId: string): Promise<string |
   }
 }
 
-const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
-
-/** One notification as a LINE card: brand line, title, body, and an "open" button. */
-function flexOf(p: PushPayload, siteUrl: string) {
-  const uri = p.url ? new URL(p.url, siteUrl).toString() : siteUrl;
-  return {
-    type: 'flex',
-    altText: clip(p.title, 390),
-    contents: {
-      type: 'bubble',
-      body: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'sm',
-        contents: [
-          { type: 'text', text: 'AllSoulLearn', size: 'xs', weight: 'bold', color: '#0d8a7e' },
-          { type: 'text', text: clip(p.title, 200), weight: 'bold', size: 'md', wrap: true, color: '#0d1e1d' },
-          { type: 'text', text: clip(p.body || ' ', 1000), size: 'sm', wrap: true, color: '#6a7a78' },
-        ],
-      },
-      footer: {
-        type: 'box',
-        layout: 'vertical',
-        contents: [{ type: 'button', style: 'primary', color: '#0d8a7e', height: 'sm', action: { type: 'uri', label: 'เปิดดู', uri } }],
-      },
-    },
-  };
+/** The notice as a LINE card: its own card, or the title and body under its topic. */
+function messageOf(p: PushPayload, topic: Topic, siteUrl: string) {
+  const card = p.card ?? { topic, title: p.title, sub: p.body, cta: { label: 'เปิดดู', url: p.url } };
+  return flexCard(card, siteUrl, p.title);
 }
 
 /** Push one notification to a LINE user. True when LINE accepted it. */
-export async function linePush(env: LineEnv, to: string, payload: PushPayload): Promise<boolean> {
+export async function linePush(env: LineEnv, to: string, payload: PushPayload, topic: Topic = 'booking'): Promise<boolean> {
   const token = t(env.LINE_CHANNEL_ACCESS_TOKEN);
   if (!token) return false;
   try {
     const r = await fetch('https://api.line.me/v2/bot/message/push', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ to, messages: [flexOf(payload, env.SITE_URL || 'https://allsoullearn.com')] }),
+      body: JSON.stringify({ to, messages: [messageOf(payload, topic, env.SITE_URL || 'https://allsoullearn.com')] }),
     });
     if (!r.ok) console.warn('[line] push rejected', r.status, (await r.text().catch(() => '')).slice(0, 200));
     else console.log('[line] push ok', payload.title);

@@ -307,6 +307,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             .all<{ user_id: string }>()
         ).results || [];
       const when = new Date(d.date + 'T00:00:00').toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+      const oldWhen = `${new Date(w.date + 'T00:00:00').toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}${w.time_start ? ` ${w.time_start} น.` : ''}`;
       for (const x of who) {
         try {
           await sendPushToUser(
@@ -318,6 +319,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
               body: `ผู้จัดย้ายที่นั่งของคุณไปรอบ ${when} ${d.time} น. — ไม่สะดวกขอคืนเงินได้ที่หน้าการจอง`,
               url: '/me/bookings',
               tag: `moved-${x.user_id}-${id}`,
+              card: {
+                topic: 'change',
+                title: `ย้ายรอบ: ${w.title}`,
+                sub: 'ผู้จัดย้ายที่นั่งของคุณไปรอบใหม่',
+                rows: [
+                  { k: 'รอบเดิม', v: oldWhen, color: '#9aaba8' },
+                  { k: 'รอบใหม่', v: `${when} ${d.time} น.` },
+                ],
+                cta: { label: 'ยืนยันรอบใหม่', url: '/me/bookings' },
+                cta2: { label: 'ไม่สะดวก ขอคืนเงิน', url: '/me/bookings' },
+              },
             },
           );
         } catch {}

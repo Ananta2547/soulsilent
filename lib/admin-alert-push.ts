@@ -1,4 +1,5 @@
 import { claimOnce, sendPushToUser, subscribedUsers } from '@/lib/push';
+import type { Card } from '@/lib/line-flex';
 import { thaiDay } from '@/lib/host-analytics';
 import { computeAdminAnalytics, loadAdminData, makeRange } from '@/lib/admin-analytics';
 
@@ -42,8 +43,15 @@ export async function pushAdminAlerts(db: D1Database, env: Env, now = Date.now()
           title: `แจ้งเตือนด่วน ${fresh.length} เรื่อง · ผู้ดูแล`,
           body: fresh.slice(0, 3).map((a) => `• ${a.title}`).join('\n') + (fresh.length > 3 ? `\nและอีก ${fresh.length - 3} เรื่อง` : ''),
         };
+  const card: Card = {
+    topic: 'admin',
+    band: { text: 'ADMIN · ด่วน', dot: '#d94b46' },
+    title: fresh.length === 1 ? 'แจ้งเตือนด่วน' : `แจ้งเตือนด่วน ${fresh.length} เรื่อง`,
+    bullets: { list: fresh.slice(0, 3).map((a) => ({ t: a.title, d: a.detail })), more: fresh.length > 3 ? `และอีก ${fresh.length - 3} เรื่อง` : undefined },
+    cta: { label: 'เปิดศูนย์แจ้งเตือน', url: '/admin/insights?tab=alerts', dark: true },
+  };
   for (const id of devices) {
-    await sendPushToUser(db, env, id, { ...payload, url: '/admin/insights?tab=alerts', tag: 'admin-alerts' }, { kind: 'admin' });
+    await sendPushToUser(db, env, id, { ...payload, url: '/admin/insights?tab=alerts', tag: 'admin-alerts', card }, { kind: 'admin' });
   }
   return fresh.length;
 }

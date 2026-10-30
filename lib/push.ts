@@ -9,6 +9,7 @@
  * booking or a page.
  */
 import { LINE_REACHABLE_SQL, lineIdOf, linePush, lineMessagingReady, type LineEnv } from '@/lib/line';
+import type { Card, Topic } from '@/lib/line-flex';
 
 export type PushPayload = {
   title: string;
@@ -17,7 +18,12 @@ export type PushPayload = {
   url?: string;
   /** Kept for callers; LINE has no replace-by-tag. */
   tag?: string;
+  /** The LINE card (lib/line-flex). Without it the title/body go out as a
+   *  plain card under the topic of the notice's kind. */
+  card?: Card;
 };
+
+const KIND_TOPIC: Record<PushKind, Topic> = { booking: 'booking', reminder: 'reminder', host: 'host', admin: 'admin', change: 'change', test: 'system' };
 
 type Env = { SITE_URL?: string } & LineEnv;
 
@@ -72,7 +78,7 @@ export async function sendPushToUser(
   if (opts.kind && (await mutedKinds(db, userId)).includes(opts.kind)) return 0;
   const lineId = await lineIdOf(db, userId);
   if (!lineId) return 0;
-  return (await linePush(env, lineId, payload)) ? 1 : 0;
+  return (await linePush(env, lineId, payload, opts.kind ? KIND_TOPIC[opts.kind] : 'booking')) ? 1 : 0;
 }
 
 /**

@@ -5,6 +5,7 @@ import { seatsHeldSubquery } from '@/lib/seats';
 import { pushAdminAlerts } from '@/lib/admin-alert-push';
 import { pushEvents } from '@/lib/push-events';
 import { parseDashboardAccess, parseInstructorIds } from '@/lib/workshop-utils';
+import { RED, type CardRow } from '@/lib/line-flex';
 
 /**
  * Push notifications on a schedule. Hit every minute by the Worker's cron
@@ -29,7 +30,7 @@ import { parseDashboardAccess, parseInstructorIds } from '@/lib/workshop-utils';
  * are set; the move/cancel and preference parts wait for 066.
  */
 
-type Row = { id: string; user_id: string; title: string; date: string; time_start: string | null; loc: string | null };
+type Row = { id: string; user_id: string; title: string; date: string; time_start: string | null; loc: string | null; is_online: number | null; image_url: string | null };
 
 const TH_DAYS = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
 const TH_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
@@ -49,7 +50,7 @@ function hash(s: string): string {
   return (h >>> 0).toString(36);
 }
 
-const SELECT = `SELECT b.id, b.user_id, w.title, w.date, w.time_start, l.name AS loc
+const SELECT = `SELECT b.id, b.user_id, w.title, w.date, w.time_start, COALESCE(l.name, w.location) AS loc, w.is_online, w.image_url
                   FROM bookings b
                   JOIN workshops w ON w.id = b.workshop_id
                   LEFT JOIN locations l ON l.id = w.location_id`;
@@ -99,6 +100,22 @@ const snapshotOf = (r: SchedRow): Snapshot => ({
   online: r.is_online ? 1 : 0,
   online_url: r.online_url || null,
 });
+
+const whenOf = (s: { date: string; time_start: string | null; end_date?: string | null }) =>
+  `${s.end_date && s.end_date !== s.date ? `${thDate(s.date)} – ${thDate(s.end_date)}` : thDate(s.date)}${s.time_start ? ` ${s.time_start} น.` : ''}`;
+const placeOf = (s: { online: number; loc: string | null }) => (s.online ? 'ออนไลน์' : s.loc || '—');
+
+/** The changed parts as card rows, old struck through above the new. */
+function changeRows(a: Snapshot, b: Snapshot): CardRow[] {
+  const rows: CardRow[] = [];
+  if (a.date !== b.date || a.end_date !== b.end_date || a.dates !== b.dates || a.time_start !== b.time_start || a.time_end !== b.time_end || a.day_times !== b.day_times) {
+    rows.push({ k: 'วันเวลา', old: whenOf(a), v: whenOf(b) });
+  }
+  if (a.online !== b.online || (b.online ? a.online_url !== b.online_url : a.location_id !== b.location_id || a.loc !== b.loc)) {
+    rows.push(a.online && b.online ? { k: 'ลิงก์', v: 'ลิงก์ออนไลน์ใหม่' } : { k: 'สถานที่', old: placeOf(a), v: placeOf(b) });
+  }
+  return rows;
+}
 
 /** "วันเวลาใหม่ … · สถานที่ใหม่ …" — only the parts that changed. */
 function describeChange(a: Snapshot, b: Snapshot): string | null {
@@ -170,6 +187,18 @@ export async function GET(request: Request) {
           body: `${r.title} · ${thDate(r.date)}${r.time_start ? ` ${hhmm(r.time_start)} น.` : ''}`,
           url: '/me/bookings',
           tag: `booking-${r.id}`,
+          card: {
+            topic: 'booking',
+            hero: r.image_url ? { kind: 'poster', image: r.image_url } : undefined,
+            title: 'จองสำเร็จแล้ว',
+            sub: r.title,
+            rows: [
+              { k: 'วัน', v: thDate(r.date) },
+              ...(r.time_start ? [{ k: 'เวลา', v: `${hhmm(r.time_start)} น.` }] : []),
+              { k: 'ที่', v: r.is_online ? 'ออนไลน์' : r.loc || '—' },
+            ],
+            cta: { label: 'ดูตั๋วของฉัน', url: '/me/bookings' },
+          },
         },
         'booking',
       );
@@ -198,6 +227,13 @@ export async function GET(request: Request) {
             body: [r.time_start ? `เริ่ม ${hhmm(r.time_start)} น.` : '', r.loc ? `ที่ ${r.loc}` : ''].filter(Boolean).join(' · ') || 'อย่าลืมกิจกรรมของคุณพรุ่งนี้',
             url: '/me/bookings',
             tag: `booking-${r.id}`,
+            card: {
+              topic: 'reminder',
+              hero: r.time_start ? { kind: 'tomorrow', time: hhmm(r.time_start) } : undefined,
+              title: `พรุ่งนี้ ${r.title}`,
+              sub: r.is_online ? 'ออนไลน์ · ลิงก์อยู่ในหน้าการจอง' : r.loc ? `ที่ ${r.loc} · มาก่อนเวลาสัก 10 นาที` : 'อย่าลืมกิจกรรมของคุณพรุ่งนี้',
+              cta: { label: r.is_online ? 'ดูการจองและลิงก์' : 'ดูตั๋วและแผนที่', url: '/me/bookings' },
+            },
           },
           'reminder',
         );
@@ -227,6 +263,13 @@ export async function GET(request: Request) {
           body: [`เริ่ม ${hhmm(r.time_start)} น.`, r.loc ? `ที่ ${r.loc}` : ''].filter(Boolean).join(' · '),
           url: '/me/bookings',
           tag: `booking-${r.id}`,
+          card: {
+            topic: 'reminder',
+            hero: { kind: 'soon' },
+            title: `อีกไม่นาน: ${r.title}`,
+            sub: [`เริ่ม ${hhmm(r.time_start)} น.`, r.is_online ? 'ออนไลน์' : r.loc ? `ที่ ${r.loc}` : ''].filter(Boolean).join(' · '),
+            cta: { label: r.is_online ? 'เปิดลิงก์เข้าร่วม' : 'เปิด QR เช็คอิน', url: '/me/bookings' },
+          },
         },
         'reminder',
       );
@@ -236,7 +279,8 @@ export async function GET(request: Request) {
     // A friend claimed a seat in a group booking: tell whoever booked it.
     const joined = await db
       .prepare(
-        `SELECT m.id, p.user_id, w.title, COALESCE(NULLIF(u.nickname, ''), u.name) AS friend
+        `SELECT m.id, p.user_id, w.title, COALESCE(NULLIF(u.nickname, ''), u.name) AS friend, p.group_size AS cap,
+                (SELECT COUNT(*) FROM bookings c WHERE c.parent_booking_id = p.id AND c.user_id IS NOT NULL AND c.status != 'cancelled') AS joined
            FROM bookings m
            JOIN bookings p ON p.id = m.parent_booking_id
            JOIN workshops w ON w.id = m.workshop_id
@@ -246,7 +290,7 @@ export async function GET(request: Request) {
             AND p.user_id IN (${REACHABLE_USERS_SQL})
           LIMIT 100`,
       )
-      .all<{ id: string; user_id: string; title: string; friend: string | null }>();
+      .all<{ id: string; user_id: string; title: string; friend: string | null; cap: number | null; joined: number }>();
     for (const r of joined.results || []) {
       const ok = await send(
         `joined:${r.id}`,
@@ -255,6 +299,16 @@ export async function GET(request: Request) {
           title: 'เพื่อนเข้ากลุ่มแล้ว',
           body: `${firstName(r.friend, 'เพื่อน')} รับคำเชิญ ${r.title}`,
           url: '/me/bookings',
+          card: {
+            topic: 'booking',
+            title: 'เพื่อนเข้ากลุ่มแล้ว',
+            sub: `${firstName(r.friend, 'เพื่อน')} รับคำเชิญ ${r.title}`,
+            avatars: {
+              list: ['คุณ', firstName(r.friend, 'เพื่อน').slice(0, 1), ...(r.joined > 1 ? [`+${r.joined - 1}`] : [])],
+              note: r.cap ? `ไปด้วยกัน ${Math.min(r.cap, r.joined + 1)} จาก ${r.cap} ที่` : 'ไปด้วยกัน',
+            },
+            cta: { label: 'ดูกลุ่มของฉัน', url: '/me/bookings' },
+          },
         },
         'booking',
       );
@@ -310,6 +364,13 @@ export async function GET(request: Request) {
             body: `${firstName(r.booker, 'ผู้เข้าร่วม')} จอง ${seats} · ${r.title} ${thDate(r.date)}${r.time_start ? ` ${hhmm(r.time_start)} น.` : ''}${full}`,
             url: `/host/journeys/${r.wid}`,
             tag: `host-${r.wid}`,
+            card: {
+              topic: 'host',
+              title: 'มีคนจองรอบของคุณ',
+              sub: `${firstName(r.booker, 'ผู้เข้าร่วม')} จอง ${seats} · ${r.title}\n${thDate(r.date)}${r.time_start ? ` ${hhmm(r.time_start)} น.` : ''}`,
+              meter: r.max_participants ? { taken: r.taken, cap: r.max_participants } : undefined,
+              cta: { label: 'ดูผู้เข้าร่วม', url: `/host/journeys/${r.wid}`, dark: true },
+            },
           },
           'host',
         );
@@ -360,6 +421,13 @@ export async function GET(request: Request) {
                 body: `รอบ ${thDate(before.date)}${before.time_start ? ` ${before.time_start} น.` : ''} ถูกยกเลิก แตะเพื่อดูการจองของคุณ`,
                 url: '/me/bookings',
                 tag: `booking-${b.id}`,
+                card: {
+                  topic: 'cancel',
+                  title: `ยกเลิก: ${r.title}`,
+                  sub: 'ขออภัย รอบนี้ถูกยกเลิก การคืนเงินเป็นไปตามนโยบาย',
+                  rows: [{ k: 'รอบ', v: whenOf(before), color: RED }],
+                  cta: { label: 'ดูการจองและการคืนเงิน', url: '/me/bookings', dark: true },
+                },
               },
               'change',
             );
@@ -380,6 +448,16 @@ export async function GET(request: Request) {
               body: `รอบ ${thDate(before.date)}${before.time_start ? ` ${before.time_start} น.` : ''} · มีผู้จอง ${had.n} คน — ตรวจการคืนเงิน/ย้ายรอบ`,
               url: '/admin/insights?tab=alerts',
               tag: `adm-round-${r.id}`,
+              card: {
+                topic: 'admin',
+                band: { text: 'ADMIN · ตรวจการคืนเงิน', dot: '#d94b46' },
+                title: `รอบถูกยกเลิก: ${r.title}`,
+                rows: [
+                  { k: 'รอบ', v: whenOf(before) },
+                  { k: 'ผู้จอง', v: `${had.n} คน` },
+                ],
+                cta: { label: 'เปิดการแจ้งเตือน', url: '/admin/insights?tab=alerts', dark: true },
+              },
             });
           }
         } else if (before && now.status !== 'cancelled') {
@@ -394,7 +472,19 @@ export async function GET(request: Request) {
               const ok = await send(
                 `changed:${b.id}:${version}`,
                 b.user_id,
-                { title: `เปลี่ยนแปลง: ${r.title}`, body: what, url: '/me/bookings', tag: `booking-${b.id}` },
+                {
+                  title: `เปลี่ยนแปลง: ${r.title}`,
+                  body: what,
+                  url: '/me/bookings',
+                  tag: `booking-${b.id}`,
+                  card: {
+                    topic: 'change',
+                    title: `เปลี่ยนแปลง: ${r.title}`,
+                    sub: 'ผู้จัดปรับรายละเอียดของรอบนี้',
+                    rows: changeRows(before, now),
+                    cta: { label: 'ดูการจอง', url: '/me/bookings' },
+                  },
+                },
                 'change',
               );
               if (ok) counts.changed++;
@@ -410,6 +500,13 @@ export async function GET(request: Request) {
                 body: `${what} · มีผู้จอง ${live.n} คน`,
                 url: '/admin/workshops',
                 tag: `adm-round-${r.id}`,
+                card: {
+                  topic: 'admin',
+                  band: { text: 'ADMIN · รอบเปลี่ยน', dot: '#ee7c2a' },
+                  title: `รอบถูกเลื่อน: ${r.title}`,
+                  rows: [...changeRows(before, now), { k: 'ผู้จอง', v: `${live.n} คน` }],
+                  cta: { label: 'เปิดรายการกิจกรรม', url: `/admin/workshops?focus=ws%3A${r.id}`, dark: true },
+                },
               });
             }
           }
