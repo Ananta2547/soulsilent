@@ -538,3 +538,10 @@ tr.adm-focus > td { background: #fff3c4 !important; animation: adm-focus-row 1.1
 @keyframes adm-focus-row { 50% { background: #ffe58f; } }
 @media (max-width: 1023px) { .adm-focusbar { top: 72px; } }
 @media (prefers-reduced-motion: reduce) { .adm-focus, tr.adm-focus > td { animation: none; } }
+
+/* บัญชีผู้จัด: a filled field being typed over (app/admin/hosts) */
+.adm .adm-field input[aria-invalid="true"] { box-shadow: inset 0 0 0 1.5px #e0a03a !important; background: #fff8ea !important; }
+.adm-overwrite { display: flex; align-items: flex-start; gap: 10px; margin-top: 6px; padding: 8px 10px; border-radius: 12px; background: #fff3dc; color: #7a4a00; font-size: 12.5px; line-height: 18px; }
+.adm-overwrite span { flex: 1; min-width: 0; word-break: break-word; }
+.adm-overwrite b { font-weight: 600; color: #4a2c00; }
+.adm-overwrite button { flex: none; border: 0; background: #fff; color: #7a4a00; font: inherit; font-weight: 600; padding: 2px 10px; border-radius: 999px; cursor: pointer; }

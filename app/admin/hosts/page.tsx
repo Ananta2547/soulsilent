@@ -8,7 +8,7 @@
  * but can still be saved (Thai / English spellings differ).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AdminChips, AdminHead, AdminSearch, AdminSheet, Badge, adminToast } from '@/components/admin/AdminShell';
+import { AdminChips, AdminHead, AdminSearch, AdminSheet, Badge, adminConfirm, adminToast } from '@/components/admin/AdminShell';
 import { accountNameMismatch, PAYOUT_FIELDS, type PayoutField } from '@/lib/host-payout';
 import type { HostAccountRow } from '@/app/api/admin/hosts/route';
 
@@ -248,6 +248,24 @@ const LABEL: Record<PayoutField, string> = {
 function EditSheet({ host, onClose, onSaved }: { host: HostAccountRow; onClose: () => void; onSaved: () => void }) {
   // Start from what is shown, profile values included, so saving keeps them.
   const [d, setD] = useState<Draft>(() => Object.fromEntries(PAYOUT_FIELDS.map((f) => [f, eff(host, f).v])) as Draft);
+  // What each field held when the sheet opened (admin's saved value or the
+  // host's own profile): changing one that was filled is flagged, field by
+  // field, and listed again before saving.
+  const [was] = useState(() => Object.fromEntries(PAYOUT_FIELDS.map((f) => [f, eff(host, f)])) as Record<PayoutField, { v: string; fromProfile: boolean }>);
+  const overwritten = PAYOUT_FIELDS.filter((f) => was[f].v.trim() !== '' && d[f].trim() !== was[f].v.trim());
+  const restore = (f: PayoutField) => setD((x) => ({ ...x, [f]: was[f].v }));
+  const warnOf = (f: PayoutField) =>
+    overwritten.includes(f) && (
+      <div className="adm-overwrite" role="status">
+        <span>
+          กำลังกรอกทับข้อมูลเดิม{was[f].fromProfile ? 'ที่ผู้จัดกรอกในโปรไฟล์' : 'ที่บันทึกไว้'}: <b>{was[f].v}</b>
+          {d[f].trim() === '' ? ' — จะถูกลบออก' : ''}
+        </span>
+        <button type="button" onClick={() => restore(f)}>
+          คืนค่าเดิม
+        </button>
+      </div>
+    );
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const bad = accountNameMismatch(d.full_name, d.account_name);
@@ -262,11 +280,18 @@ function EditSheet({ host, onClose, onSaved }: { host: HostAccountRow; onClose: 
         className={opts.mono ? 'adm-mono' : undefined}
         inputMode={opts.numeric ? 'numeric' : undefined}
         placeholder={opts.placeholder}
+        aria-invalid={overwritten.includes(f) || undefined}
       />
+      {warnOf(f)}
     </div>
   );
 
   async function save() {
+    if (overwritten.length) {
+      const lines = overwritten.map((f) => `• ${LABEL[f]}: ${was[f].v} → ${d[f].trim() || '(ว่าง)'}`).join('\n');
+      const ok = await adminConfirm({ title: `บันทึกทับข้อมูลเดิม ${overwritten.length} ช่อง?`, msg: lines, ok: 'บันทึกทับ', danger: true });
+      if (!ok) return;
+    }
     setSaving(true);
     setErr(null);
     try {
@@ -331,6 +356,7 @@ function EditSheet({ host, onClose, onSaved }: { host: HostAccountRow; onClose: 
       <div className="adm-field">
         <label htmlFor="hp-note">{LABEL.note}</label>
         <textarea id="hp-note" rows={3} value={d.note} onChange={(e) => setD((x) => ({ ...x, note: e.target.value }))} placeholder="หมายเหตุสำหรับ admin เช่น โอนทุกวันที่ 5 · ขอใบสำคัญทางอีเมล" />
+        {warnOf('note')}
       </div>
     </AdminSheet>
   );
