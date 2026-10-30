@@ -154,8 +154,10 @@ export function MasterForm({
   const [status, setStatus] = useState<MasterStatus>(initial?.activity_status || 'open');
   const [ageMin, setAgeMin] = useState(initial?.age_min != null ? String(initial.age_min) : '');
   const [ageMax, setAgeMax] = useState(initial?.age_max != null ? String(initial.age_max) : '');
-  const [closeDays, setCloseDays] = useState(initial?.close_days_before != null ? String(initial.close_days_before) : '');
-  const [closeTime, setCloseTime] = useState(initial?.close_time || '23:59');
+  // A new round activity closes bookings 1 day before at 18:00 unless changed;
+  // an existing one keeps what it has.
+  const [closeDays, setCloseDays] = useState(initial ? (initial.close_days_before != null ? String(initial.close_days_before) : '') : '1');
+  const [closeTime, setCloseTime] = useState(initial?.close_time || '18:00');
 
   // Unsaved-changes tracking: snapshot the loaded baseline once, then compare
   // the live fields against it so the modal can warn before discarding edits.
@@ -179,8 +181,8 @@ export function MasterForm({
         status: initial?.activity_status || 'open',
         ageMin: initial?.age_min != null ? String(initial.age_min) : '',
         ageMax: initial?.age_max != null ? String(initial.age_max) : '',
-        closeDays: initial?.close_days_before != null ? String(initial.close_days_before) : '',
-        closeTime: initial?.close_time || '23:59',
+        closeDays: initial ? (initial.close_days_before != null ? String(initial.close_days_before) : '') : '1',
+        closeTime: initial?.close_time || '18:00',
       }),
     [initial],
   );
