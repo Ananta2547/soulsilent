@@ -36,7 +36,7 @@ export const LINE_SAMPLES: { name: string; card: Card }[] = [
   { name: 'ของขวัญถูกรับ', card: { topic: 'gift', title: 'มายด์ รับที่นั่งแล้ว', sub: `ของขวัญ ${J} ถึงมือแล้ว`, cta: { label: 'ดูการจอง', url: '/me/bookings', dark: true } } },
   {
     name: 'ชวนตอบแบบสอบถาม',
-    card: { topic: 'voice', title: 'วันนี้เป็นอย่างไรบ้าง', sub: `เล่าความรู้สึกหลัง ${J} ไม่ถึง 1 นาที — ผู้จัดจะได้ทำครั้งหน้าให้ดีขึ้น`, stars: { n: 0, ask: true, hint: 'แตะเพื่อเริ่ม' }, cta: { label: 'ตอบแบบสอบถาม', url: '/journeys' } },
+    card: { topic: 'voice', title: 'วันนี้เป็นอย่างไรบ้าง', sub: `เล่าความรู้สึกหลัง ${J} ไม่ถึง 1 นาที — ผู้จัดจะได้ทำครั้งหน้าให้ดีขึ้น`, stars: { n: 0, ask: true, hint: 'แตะดาวเพื่อให้คะแนน', url: '/journeys' }, cta: { label: 'ตอบแบบสอบถาม', url: '/journeys' } },
   },
   { name: 'ได้รับคูปอง', card: { topic: 'gift', hero: { kind: 'coupon', discount: '−฿200' }, title: 'คุณได้รับคูปอง', sub: 'คูปองต้อนรับ · ใช้ได้กับทุกกิจกรรม', cta: { label: 'ดูคูปองของฉัน', url: '/me/coupons' } } },
   { name: 'มีคนจองรอบ', card: { topic: 'host', title: 'มีคนจองรอบของคุณ', sub: `มายด์ จอง 2 ที่ · ${J}\n${D} ${TM}`, meter: { taken: 8, cap: 12 }, cta: { label: 'ดูผู้เข้าร่วม', url: '/host', dark: true } } },

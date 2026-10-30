@@ -35,6 +35,17 @@ export default function SurveyPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
+  // ?rating=1–5: a star tapped on the LINE invitation card, filled in ahead.
+  const [preRating, setPreRating] = useState(0);
+  useEffect(() => {
+    const n = Number(new URLSearchParams(window.location.search).get('rating'));
+    if (Number.isInteger(n) && n >= 1 && n <= 5) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setRating(n);
+      setPreRating(n);
+    }
+  }, []);
+
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -124,7 +135,7 @@ export default function SurveyPage() {
   if (!info.signedIn) {
     return note(
       'กรุณาเข้าสู่ระบบก่อนทำแบบสอบถาม ด้วยบัญชีเดียวกับที่ใช้จองกิจกรรม',
-      <Link href={`/auth/login?redirect=${encodeURIComponent(`/survey/${workshopId}`)}`} className="btn btn-teal">
+      <Link href={`/auth/login?redirect=${encodeURIComponent(`/survey/${workshopId}${preRating ? `?rating=${preRating}` : ''}`)}`} className="btn btn-teal">
         {tr(lang, 'เข้าสู่ระบบ', 'Sign in')}
       </Link>,
     );

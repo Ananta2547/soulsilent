@@ -47,7 +47,8 @@ export type Card = {
   rows?: CardRow[];
   meter?: { taken: number; cap: number };
   avatars?: { list: string[]; note: string };
-  stars?: { n: number; ask?: boolean; hint?: string };
+  /** `ask` + `url`: each star opens url?rating=N (the survey, star filled in). */
+  stars?: { n: number; ask?: boolean; hint?: string; url?: string };
   quote?: string;
   bullets?: { list: { t: string; d: string }[]; more?: string };
   cta: { label: string; url?: string; dark?: boolean };
@@ -210,6 +211,7 @@ export function flexCard(c: Card, siteUrl: string, altText: string) {
             const on = !s.ask && i <= s.n;
             return box('vertical', [text('★', { size: 'lg', color: s.ask ? '#c9bf9f' : on ? '#d9a832' : '#d8cfb3', align: 'center' })], {
               height: '40px', cornerRadius: '10px', backgroundColor: on ? '#fdf1d3' : '#f6f1e6', justifyContent: 'center',
+              ...(s.ask && s.url ? { action: { type: 'uri', label: `${i} ดาว`, uri: abs(`${s.url}${s.url.includes('?') ? '&' : '?'}rating=${i}`) } } : {}),
             });
           }),
           { spacing: 'sm' },

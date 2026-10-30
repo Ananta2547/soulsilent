@@ -281,7 +281,7 @@ export async function pushEvents(db: D1Database, send: Send): Promise<Record<str
           topic: 'voice',
           title: 'วันนี้เป็นอย่างไรบ้าง',
           sub: `เล่าความรู้สึกหลัง ${r.title} ไม่ถึง 1 นาที — ผู้จัดจะได้ทำครั้งหน้าให้ดีขึ้น`,
-          stars: { n: 0, ask: true, hint: 'แตะเพื่อเริ่ม' },
+          stars: { n: 0, ask: true, hint: 'แตะดาวเพื่อให้คะแนน', url: `/survey/${r.wid}` },
           cta: { label: 'ตอบแบบสอบถาม', url: `/survey/${r.wid}` },
         },
       },
