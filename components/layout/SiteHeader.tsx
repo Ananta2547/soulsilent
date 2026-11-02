@@ -132,7 +132,7 @@ export function SiteHeader() {
                 <span className="hide-sm" style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {user.nickname || user.name}
                 </span>
-                <span style={{ fontSize: 10, opacity: 0.6 }}>▼</span>
+                <span className="hide-xs" style={{ fontSize: 10, opacity: 0.6 }}>▼</span>
               </button>
               {profileOpen && (
                 <ProfileDropdown
@@ -145,13 +145,22 @@ export function SiteHeader() {
           ) : (
             /* Below 560px this is dropped from the bar to keep the header on
                one line — the drawer carries the same action. */
-            <Btn kind="ink" size="sm" href="/auth/login" className="hide-xs">
-              <T th="เข้าสู่ระบบ" en="Sign in" />
-            </Btn>
+            <>
+              <Btn kind="ink" size="sm" href="/auth/login" className="hide-xs">
+                <T th="เข้าสู่ระบบ" en="Sign in" />
+              </Btn>
+              {/* Phones: a person icon on the right instead of the button. */}
+              <Link href="/auth/login" className="nav-icon-btn nav-login-ico" aria-label={tr(lang, 'เข้าสู่ระบบ', 'Sign in')}>
+                <svg width="19" height="19" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                  <circle cx="12" cy="8" r="4" strokeWidth={1.9} />
+                  <path strokeLinecap="round" strokeWidth={1.9} d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6" />
+                </svg>
+              </Link>
+            </>
           )}
 
           <button
-            className="show-sm nav-icon-btn"
+            className="show-sm nav-icon-btn nav-burger"
             onClick={() => setDrawerOpen(true)}
             aria-label="Menu"
           >

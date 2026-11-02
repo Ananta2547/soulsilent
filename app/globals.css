@@ -3311,6 +3311,27 @@ body {
   .nav-logo svg { height: 21px !important; }
 }
 
+/* Once the hamburger shows: menu (then calendar) on the left, the logo in the
+   middle of the bar, profile / sign-in on the right. The logo is taken out of
+   the row so it centres on the bar, not between its neighbours. */
+.nav-login-ico { display: none; }
+@media (max-width: 880px) {
+  .nav-bar { position: relative; }
+  .nav-burger { order: -2; }
+  .nav-cal { order: -1; }
+  .nav-logo { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+}
+@media (max-width: 560px) {
+  .nav-login-ico { display: inline-flex; }
+}
+/* Too narrow for menu + calendar + centred logo: the calendar is in the drawer. */
+@media (max-width: 380px) {
+  .nav-cal { display: none; }
+}
+@media (max-width: 350px) {
+  .nav-logo svg { height: 18px !important; }
+}
+
 /* ---- Drawer ---- */
 .drawer { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
 .drawer-links { display: flex; flex-direction: column; margin-top: 12px; }
