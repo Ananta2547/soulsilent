@@ -55,14 +55,15 @@
   .tdb-shell { flex-direction: column; }
   .tdb-rail { display: none; }
   .tdb-topbar {
-    position: sticky; top: 0; z-index: 40; height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 14px 0 18px;
+    /* menu | brand (centred) | profile — equal side columns keep the brand dead centre */
+    position: sticky; top: 0; z-index: 40; height: 56px; display: grid; grid-template-columns: 40px minmax(0, 1fr) 40px; align-items: center; gap: 10px; padding: 0 14px;
     background: rgba(246,241,230,.85); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid rgba(13,30,29,.06);
   }
-  .tdb-topbar-brand { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0; color: var(--ink); text-decoration: none; }
+  .tdb-topbar-brand { display: flex; align-items: center; justify-content: center; gap: 9px; min-width: 0; color: var(--ink); text-decoration: none; }
   .tdb-topbar-name { font-family: 'Mitr', sans-serif; font-weight: 500; font-size: 15px; }
   .tdb-topbar-name b { color: #f5c243; font-weight: 500; }
   .tdb-topbar-pill { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .2em; color: var(--teal); padding: 3px 7px; border-radius: 999px; background: rgba(13,138,126,.1); }
-  .tdb-topbar-av { width: 34px; height: 34px; border-radius: 50%; background: var(--ink); color: #fff; display: flex; align-items: center; justify-content: center; font-family: 'Mitr', sans-serif; font-weight: 500; font-size: 14px; flex-shrink: 0; }
+  .tdb-topbar-av { justify-self: end; width: 36px; height: 36px; border-radius: 50%; background: var(--ink); color: #fff; display: flex; align-items: center; justify-content: center; font-family: 'Mitr', sans-serif; font-weight: 500; font-size: 14px; flex-shrink: 0; text-decoration: none; }
   .tdb-topbar-btn {
     width: 40px; height: 40px; border-radius: 999px; background: #fff; border: 0; display: flex; align-items: center; justify-content: center;
     cursor: pointer; color: var(--ink); padding: 0; flex-shrink: 0; box-shadow: 0 0 0 1px rgba(13,30,29,.08);

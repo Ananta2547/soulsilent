@@ -117,8 +117,15 @@ export function TeacherSidebar() {
 
   return (
     <>
-      {/* Phone top bar — the rail stays off-screen until the menu is opened. */}
+      {/* Phone top bar: menu on the left (the rail slides in from there), the
+          brand centred, the profile on the right. The rail stays off-screen
+          until the menu is opened. */}
       <header className="tdb-topbar">
+        <button type="button" className="tdb-topbar-btn" onClick={() => setOpen(true)} aria-label="เปิดเมนูผู้จัด" aria-expanded={open}>
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeWidth={1.8} d="M4 7h16M4 12h16M4 17h16" />
+          </svg>
+        </button>
         <Link href="/host" className="tdb-topbar-brand">
           <span className="tdb-brand-mark" aria-hidden>a</span>
           <span className="tdb-topbar-name">
@@ -126,16 +133,14 @@ export function TeacherSidebar() {
           </span>
           <span className="tdb-topbar-pill">HOST</span>
         </Link>
-        {initial && (
-          <span className="tdb-topbar-av" aria-hidden>
-            {initial}
-          </span>
-        )}
-        <button type="button" className="tdb-topbar-btn" onClick={() => setOpen(true)} aria-label="เปิดเมนูผู้จัด" aria-expanded={open}>
-          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeWidth={1.8} d="M4 7h16M4 12h16M4 17h16" />
-          </svg>
-        </button>
+        <Link href="/me/settings" className="tdb-topbar-av" aria-label="โปรไฟล์ของฉัน">
+          {initial || (
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+              <circle cx="12" cy="8" r="4" strokeWidth={1.8} />
+              <path strokeLinecap="round" strokeWidth={1.8} d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6" />
+            </svg>
+          )}
+        </Link>
       </header>
 
       {open && <div className="tdb-scrim" aria-hidden onClick={() => setOpen(false)} />}
