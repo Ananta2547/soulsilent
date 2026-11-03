@@ -183,7 +183,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
  * money with it. Those are cancelled instead (PUT status), which frees the seat
  * and keeps the books intact.
  */
-export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireAuth();
     if (user.role !== 'admin') {
@@ -193,12 +193,17 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     const db = await getDB();
 
     const booking = await db
-      .prepare('SELECT id, amount, payment_status FROM bookings WHERE id = ?')
+      .prepare('SELECT id, amount, payment_status, status FROM bookings WHERE id = ?')
       .bind(id)
-      .first<{ id: string; amount: number | null; payment_status: string }>();
+      .first<{ id: string; amount: number | null; payment_status: string; status: string }>();
     if (!booking) return NextResponse.json({ error: 'ไม่พบการจองนี้' }, { status: 404 });
 
-    if (booking.payment_status === 'paid' && (booking.amount || 0) > 0) {
+    // The admin overview deletes cancelled bookings only.
+    if (new URL(request.url).searchParams.get('only') === 'cancelled' && booking.status !== 'cancelled') {
+      return NextResponse.json({ error: 'ลบได้เฉพาะการจองที่ยกเลิกแล้ว' }, { status: 400 });
+    }
+
+    if ((booking.payment_status === 'paid' || booking.payment_status === 'refunded') && (booking.amount || 0) > 0) {
       return NextResponse.json(
         {
           error: 'ที่นั่งนี้มีการชำระเงินแล้ว ลบถาวรไม่ได้ — ให้ยกเลิกที่นั่งแทน เพื่อเก็บประวัติการเงินไว้',
@@ -208,10 +213,28 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
       );
     }
 
+    // Money recorded against it (ledger, or a Beam payment that came in after
+    // all) keeps the row: deleting would leave those records pointing nowhere.
+    const linked = await db
+      .prepare(
+        `SELECT (SELECT COUNT(*) FROM money_tx WHERE booking_id = ?) + (SELECT COUNT(*) FROM orphan_payments WHERE booking_id = ?) AS n`,
+      )
+      .bind(id, id)
+      .first<{ n: number }>()
+      .catch(() => null);
+    if (linked?.n) {
+      return NextResponse.json({ error: 'การจองนี้มีรายการเงินผูกอยู่ในบัญชีการเงิน ลบถาวรไม่ได้', paid: true }, { status: 400 });
+    }
+
     // A handover link points at this booking; leaving it behind would hand the
-    // receiver a claim on a seat that no longer exists.
-    await db.prepare('DELETE FROM ticket_transfers WHERE booking_id = ?').bind(id).run();
-    await db.prepare('DELETE FROM bookings WHERE id = ?').bind(id).run();
+    // receiver a claim on a seat that no longer exists. Seats friends took in
+    // a group booking go with it, and survey answers keep their text.
+    await db.batch([
+      db.prepare('DELETE FROM ticket_transfers WHERE booking_id = ? OR booking_id IN (SELECT id FROM bookings WHERE parent_booking_id = ?)').bind(id, id),
+      db.prepare('UPDATE survey_responses SET booking_id = NULL WHERE booking_id = ? OR booking_id IN (SELECT id FROM bookings WHERE parent_booking_id = ?)').bind(id, id),
+      db.prepare('DELETE FROM bookings WHERE parent_booking_id = ?').bind(id),
+      db.prepare('DELETE FROM bookings WHERE id = ?').bind(id),
+    ]);
 
     return NextResponse.json({ deleted: true });
   } catch (error) {

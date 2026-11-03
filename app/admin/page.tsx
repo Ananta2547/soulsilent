@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { PageLoader } from '@/components/design/PageLoader';
-import { AdminPager, Badge, type Tone } from '@/components/admin/AdminShell';
+import { AdminPager, Badge, adminAlert, adminConfirm, adminToast, type Tone } from '@/components/admin/AdminShell';
 import { sqliteToMs } from '@/lib/datetime';
 import type { NotifyStats } from '@/app/api/admin/notify-stats/route';
 
@@ -104,6 +104,30 @@ export default function AdminDashboard() {
       .then((d) => setName(d?.user?.nickname || d?.user?.name || ''))
       .catch(() => {});
   }, []);
+
+  /** Delete a cancelled booking for good (the server refuses one with money on it). */
+  async function removeBooking(b: Booking) {
+    const ok = await adminConfirm({
+      title: 'ลบการจองนี้ถาวร?',
+      msg: `${b.user_name || '—'} · ${b.workshop_title || '—'}\nการจองที่ยกเลิกแล้วจะถูกลบออกจากระบบ ย้อนกลับไม่ได้`,
+      ok: 'ลบถาวร',
+      danger: true,
+    });
+    if (!ok) return;
+    const r = await fetch(`/api/bookings/${b.id}?only=cancelled`, { method: 'DELETE' });
+    const d = (await r.json().catch(() => ({}))) as { error?: string };
+    if (!r.ok) return adminAlert('ลบไม่ได้', d.error || 'เกิดข้อผิดพลาด');
+    setStats((s) => (s ? { ...s, bookings: s.bookings.filter((x) => x.id !== b.id) } : s));
+    adminToast('ลบการจองแล้ว');
+  }
+  const delBtn = (b: Booking) =>
+    b.status === 'cancelled' && (
+      <button type="button" className="adm-del" onClick={() => removeBooking(b)} aria-label="ลบการจองนี้" title="ลบการจองนี้ถาวร">
+        <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 002 2h8a2 2 0 002-2l1-12M9 7V4h6v3" />
+        </svg>
+      </button>
+    );
 
   if (loading) {
     return (
@@ -246,7 +270,10 @@ export default function AdminDashboard() {
                     </div>
                     <div className="adm-line-side">
                       <b>฿{(b.amount || 0).toLocaleString()}</b>
-                      <Badge tone={t.tone}>{t.label}</Badge>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <Badge tone={t.tone}>{t.label}</Badge>
+                        {delBtn(b)}
+                      </span>
                     </div>
                   </div>
                 );
@@ -301,6 +328,7 @@ export default function AdminDashboard() {
                           {b.workshop_title || 'ไม่ทราบกิจกรรม'}
                         </span>
                         {b.status === 'cancelled' && <span className="adm-act-cancel">ยกเลิก</span>}
+                        {delBtn(b)}
                       </div>
                     ))}
                   </div>
