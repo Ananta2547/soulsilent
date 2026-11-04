@@ -48,6 +48,8 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [line, setLine] = useState<NotifyStats | null>(null);
   const [orphans, setOrphans] = useState(0);
+  /** Host-made activities waiting for approval (/admin/submissions). */
+  const [toReview, setToReview] = useState(0);
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(true);
   // Paging is per box and client-side: the dashboard already holds every
@@ -99,6 +101,10 @@ export default function AdminDashboard() {
       .then((r) => (r.ok ? (r.json() as Promise<{ unresolved?: number }>) : null))
       .then((d) => setOrphans(d?.unresolved || 0))
       .catch(() => {});
+    fetch('/api/admin/submissions')
+      .then((r) => (r.ok ? (r.json() as Promise<{ pending?: number }>) : null))
+      .then((d) => setToReview(d?.pending || 0))
+      .catch(() => {});
     fetch('/api/auth/me')
       .then((r) => (r.ok ? (r.json() as Promise<{ user?: { name?: string; nickname?: string | null } | null }>) : null))
       .then((d) => setName(d?.user?.nickname || d?.user?.name || ''))
@@ -147,6 +153,7 @@ export default function AdminDashboard() {
   const todayKey = dayKey(today);
   const newToday = allBookings.filter((b) => dayKey(toDate(b.created_at)) === todayKey).length;
   const attention = [
+    { n: toReview, label: 'กิจกรรมที่ผู้จัดส่งมารออนุมัติ', href: '/admin/submissions', bg: '#e3eefc', color: '#1f5fae' },
     { n: orphans, label: 'เงินเข้าที่ต้องตรวจ', href: '/admin/ledger', bg: '#fde4e1', color: '#a3261a' },
     { n: pendingPay, label: 'การจองที่รอชำระเงิน', href: '/admin/workshops', bg: '#fdf1d3', color: '#7a5200' },
     { n: stats?.pendingDeletion || 0, label: 'บัญชีที่ขอลบ (ภายใน 30 วัน)', href: '/admin/users', bg: '#eceeed', color: '#4c5755' },

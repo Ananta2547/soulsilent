@@ -2,9 +2,8 @@ import { NextResponse } from 'next/server';
 import { v4 as uuid } from 'uuid';
 import { getDB } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
-import { cleanAges, cleanCloseRule, statusOf } from '@/lib/round-rules';
-import type { ImageMeta, WorkshopMaster } from '@/lib/types';
-import { normalizeTiers, seatPrice } from '@/lib/pricing';
+import type { WorkshopMaster } from '@/lib/types';
+import { insertMaster, type MasterBody } from '@/lib/master-write';
 
 /** GET /api/workshop-masters — list all masters (public read; used by the
  *  admin list + the session form's master dropdown). */
@@ -25,81 +24,15 @@ export async function GET() {
   }
 }
 
-type Body = {
-  title: string;
-  description?: string;
-  organizer?: string;
-  cover_image_url?: string | null;
-  cover_image_meta?: ImageMeta | null;
-  target?: string[];
-  takeaways?: string[];
-  price_group?: number | null;
-  price_private?: number | null;
-  default_max_participants?: number | null;
-  kind?: 'round' | 'single';
-  location_ids?: string[];
-  price_group_booking?: number | null;
-  price_tiers?: unknown;
-  activity_status?: unknown;
-  age_min?: unknown;
-  age_max?: unknown;
-  close_days_before?: unknown;
-  close_time?: unknown;
-};
-const locIds = (v: unknown): string => JSON.stringify(Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x) : []);
-const kindOf = (v: unknown): 'round' | 'single' => (v === 'single' ? 'single' : 'round');
-
-const money = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null);
-
-/** POST /api/workshop-masters — admin creates a master. */
+ /** POST /api/workshop-masters — admin creates a master. */
 export async function POST(request: Request) {
   try {
     await requireAdmin();
-    const body = (await request.json()) as Body;
-    if (!body.title || !body.title.trim()) {
-      return NextResponse.json({ error: 'กรุณากรอกชื่อกิจกรรม' }, { status: 400 });
-    }
+    const body = (await request.json()) as MasterBody;
     const db = await getDB();
     const id = uuid();
-    // Prices are tiers; price_group is the per-seat one. A single master (no
-    // tiers) still takes the price it was sent.
-    const tiers = normalizeTiers(body.price_tiers);
-    const priceGroup = tiers.length ? seatPrice(tiers) : money(body.price_group);
-    const ages = cleanAges(body.age_min, body.age_max);
-    if ('error' in ages) return NextResponse.json({ error: ages.error }, { status: 400 });
-    const rule = cleanCloseRule(body.close_days_before, body.close_time);
-    if ('error' in rule) return NextResponse.json({ error: rule.error }, { status: 400 });
-    await db
-      .prepare(
-        `INSERT INTO workshop_masters
-          (id, title, description, organizer, cover_image_url, cover_image_meta, target_json, takeaways_json,
-           price_group, price_private, default_max_participants, kind, location_ids_json,
-           price_group_booking, price_tiers_json, activity_status, age_min, age_max, close_days_before, close_time)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .bind(
-        id,
-        body.title.trim(),
-        body.description || null,
-        body.organizer || null,
-        body.cover_image_url || null,
-        body.cover_image_meta ? JSON.stringify(body.cover_image_meta) : null,
-        JSON.stringify((body.target || []).filter((s) => s.trim())),
-        JSON.stringify((body.takeaways || []).filter((s) => s.trim())),
-        priceGroup,
-        money(body.price_private),
-        Math.max(1, Math.round(Number(body.default_max_participants) || 20)),
-        kindOf(body.kind),
-        locIds(body.location_ids),
-        money(body.price_group_booking),
-        JSON.stringify(tiers),
-        statusOf(body.activity_status),
-        ages.min,
-        ages.max,
-        rule.days,
-        rule.time
-      )
-      .run();
+    const r = await insertMaster(db, id, body);
+    if (r.error) return NextResponse.json({ error: r.error }, { status: 400 });
     return NextResponse.json({ id }, { status: 201 });
   } catch (error) {
     const err = error as Error;

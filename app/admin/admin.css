@@ -549,3 +549,19 @@ tr.adm-focus > td { background: #fff3c4 !important; animation: adm-focus-row 1.1
 /* Delete a cancelled booking (admin overview) */
 .adm-del { flex: none; width: 28px; height: 28px; border: 0; border-radius: 999px; background: transparent; color: #a3261a; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; opacity: .55; transition: opacity .15s, background .15s; }
 .adm-del:hover, .adm-del:focus-visible { opacity: 1; background: #fde4e1; }
+
+/* Admin's activity forms used inside the Host Dashboard (/host/submissions):
+   only the variables and scoped field styles of .adm, not its page layout. */
+.adm.adm-host-forms { display: contents; }
+
+/* ---- รออนุมัติ (/admin/submissions) ---- */
+.adm-subm { display: flex; gap: 16px; padding: 16px; }
+.adm-subm-img { width: 104px; height: 147px; flex: none; border-radius: 12px; object-fit: cover; background: var(--cream); }
+.adm-subm-img.is-empty { display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--muted); text-align: center; padding: 8px; }
+.adm-subm-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.adm-subm-title { margin: 2px 0 0; font-family: Mitr, sans-serif; font-weight: 500; font-size: 18px; line-height: 1.3; word-break: break-word; }
+.adm-subm-acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+@media (max-width: 560px) {
+  .adm-subm { flex-direction: column; }
+  .adm-subm-img { width: 100%; height: 170px; }
+}

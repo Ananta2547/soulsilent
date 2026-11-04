@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin, getCurrentUser } from '@/lib/auth';
+import { requireAdmin, getCurrentUser, getCurrentUserWithRoles } from '@/lib/auth';
+import { hasAnyRole } from '@/lib/roles';
 import { uploadToR2 } from '@/lib/r2';
 
 // Folders any signed-in user may write to (their own profile/portfolio assets).
-// Everything else (workshop/course/article/location) stays admin-only.
 const USER_WRITABLE_PREFIXES = ['images/avatar/', 'images/portfolio/'];
+// Activity posters: hosts upload them for the activities they submit
+// (api/teacher/submissions). Everything else (course/article/location) stays admin-only.
+const HOST_WRITABLE_PREFIXES = ['images/workshop/'];
 
 export async function POST(request: Request) {
   try {
@@ -24,6 +27,10 @@ export async function POST(request: Request) {
       if (!user) {
         return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 });
       }
+    } else if (HOST_WRITABLE_PREFIXES.some((p) => key.startsWith(p))) {
+      const user = await getCurrentUserWithRoles();
+      if (!user) return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 });
+      if (!hasAnyRole(user.roles, ['teacher', 'session_host'])) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     } else {
       await requireAdmin();
     }

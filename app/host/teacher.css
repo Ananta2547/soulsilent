@@ -932,3 +932,28 @@ a.tdb-round:hover { color: var(--ink); background: #eaf6f4; }
   .hd-ov > .a-todo { order: 1; } .hd-ov > .a-up { order: 2; } .hd-ov > .a-pay { order: 3; }
   .hd-ov > .a-cards { order: 4; } .hd-ov > .a-chart { order: 5; } .hd-ov > .a-fee { order: 6; } .hd-ov > .a-ins { order: 7; }
 }
+
+/* ---- กิจกรรมของฉัน (/host/submissions) ---- */
+.tdb-sub-new { display: flex; gap: 8px; flex-wrap: wrap; }
+.tdb-sub-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 0 16px; border-radius: 999px; border: 0; background: #fff; color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer; box-shadow: 0 0 0 1px rgba(13,30,29,.08); }
+.tdb-sub-btn:hover { box-shadow: 0 0 0 1px rgba(13,30,29,.2); }
+.tdb-sub-btn.ink { background: var(--ink); color: #fff; box-shadow: none; }
+.tdb-sub-btn.danger { color: #a3261a; }
+.tdb-sub-btn:disabled { opacity: .55; cursor: default; }
+.tdb-sub-flash { margin: 0 0 14px; padding: 12px 16px; border-radius: 16px; background: #eaf6f4; color: var(--teal-deep, #075a51); font-size: 14px; font-weight: 600; }
+.tdb-sub-list { display: flex; flex-direction: column; gap: 12px; }
+.tdb-sub { display: flex; gap: 16px; padding: 14px; border-radius: 20px; background: #fff; box-shadow: 0 0 0 1px rgba(13,30,29,.05); }
+.tdb-sub-img { width: 96px; height: 136px; flex: none; border-radius: 12px; object-fit: cover; background: var(--cream, #f6f1e6); }
+.tdb-sub-img.is-empty { display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--muted); }
+.tdb-sub-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.tdb-sub-tags { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.tdb-sub-pill { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; }
+.tdb-sub-kind { font-size: 12px; color: var(--muted); padding: 3px 8px; border-radius: 999px; background: var(--cream, #f6f1e6); }
+.tdb-sub-title { margin: 2px 0 0; font-family: 'Mitr', sans-serif; font-weight: 500; font-size: 18px; line-height: 1.3; word-break: break-word; }
+.tdb-sub-meta { margin: 0; font-size: 13px; color: var(--muted); }
+.tdb-sub-note { margin: 2px 0 0; padding: 10px 12px; border-radius: 12px; background: #fff3dc; color: #6b4300; font-size: 13.5px; line-height: 1.5; }
+.tdb-sub-acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+@media (max-width: 560px) {
+  .tdb-sub { flex-direction: column; }
+  .tdb-sub-img { width: 100%; height: 160px; }
+}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { parseTiers, isGroupTier, type PriceTier } from '@/lib/pricing';
 import { ImageUploader } from '@/components/admin/image/ImageUploader';
 import { ASPECTS } from '@/lib/image-aspects';
@@ -109,10 +109,11 @@ export function MasterForm({
   onCancel,
   onDirtyChange,
   pendingClose,
-  onStay, kind = 'round',}: {
+  onStay, kind = 'round', host = false,}: {
   initial?: WorkshopMaster | null;
   editingId?: string;
-  onSuccess: () => void;
+  /** Gets the activity's id (a new one included). */
+  onSuccess: (id?: string) => void;
   onCancel: () => void;
   /** Report unsaved-changes state up to the modal so it can guard close. */
   onDirtyChange?: (dirty: boolean) => void;
@@ -121,7 +122,10 @@ export function MasterForm({
   /** User chose to keep editing. */
   onStay?: () => void;
   /** 'round' (teacher opens rounds) or 'single' (admin links workshops). */
-  kind?: 'round' | 'single';}) {
+  kind?: 'round' | 'single';
+  /** A host filling in their own round activity: they are its organiser,
+   *  saves go to /api/teacher/submissions, and the status stays admin's. */
+  host?: boolean;}) {
   const [title, setTitle] = useState(initial?.title || '');
   const [organizer, setOrganizer] = useState(initial?.organizer || '');
   const [description, setDescription] = useState(initial?.description || '');
@@ -194,15 +198,19 @@ export function MasterForm({
   useUnsavedGuard(dirty, 'คุณมีข้อมูลที่ยังไม่ได้บันทึก แน่ใจว่าต้องการออกจากหน้านี้?');
 
   useEffect(() => {
-    fetch('/api/users?role=teacher,admin')
-      .then((r) => r.json() as Promise<{ users: { id: string; name: string }[] }>)
-      .then((d) => setTeachers(d.users || []))
-      .catch(() => {});
+    if (!host)
+      fetch('/api/users?role=teacher,admin')
+        .then((r) => r.json() as Promise<{ users: { id: string; name: string }[] }>)
+        .then((d) => setTeachers(d.users || []))
+        .catch(() => {});
     fetch('/api/locations')
       .then((r) => r.json() as Promise<{ locations: { id: string; name: string; province: string }[] }>)
       .then((d) => setLocations(d.locations || []))
       .catch(() => {});
-  }, []);
+  }, [host]);
+
+  /** Saved activity id, for the caller (a new one comes back from the API). */
+  const savedId = useRef<string | undefined>(editingId);
 
   async function doSave(): Promise<boolean> {
     setErr(null);
@@ -212,11 +220,14 @@ export function MasterForm({
     }
     setSaving(true);
     try {
-      const url = editingId ? `/api/workshop-masters/${editingId}` : '/api/workshop-masters';
-      const res = await fetch(url, {
-        method: editingId ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const url = host
+        ? editingId
+          ? `/api/teacher/submissions/round/${editingId}`
+          : '/api/teacher/submissions'
+        : editingId
+          ? `/api/workshop-masters/${editingId}`
+          : '/api/workshop-masters';
+      const payload = {
           title,
           organizer,
           description,
@@ -234,7 +245,11 @@ export function MasterForm({
           ...((initial?.kind || kind) === 'round'
             ? { activity_status: status, age_min: ageMin.trim(), age_max: ageMax.trim(), close_days_before: closeDays.trim(), close_time: closeTime }
             : {}),
-        }),
+      };
+      const res = await fetch(url, {
+        method: editingId ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(host && !editingId ? { kind: 'round', data: payload } : payload),
       });
       const data = (await res.json()) as { error?: string; id?: string };
       if (!res.ok) {
@@ -244,6 +259,7 @@ export function MasterForm({
       // The form + PDPA go through the same route the host uses, so they
       // reach the activity's upcoming rounds the same way.
       const masterId = editingId || data.id;
+      savedId.current = masterId;
       if ((initial?.kind || kind) === 'round' && masterId) {
         const r = await fetch(`/api/teacher/masters/${masterId}/application`, {
           method: 'PUT',
@@ -267,12 +283,12 @@ export function MasterForm({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (await doSave()) onSuccess();
+    if (await doSave()) onSuccess(savedId.current);
   }
 
   // "Save & close" from the unsaved-changes prompt.
   async function saveAndClose() {
-    if (await doSave()) onSuccess();
+    if (await doSave()) onSuccess(savedId.current);
     // On failure the prompt stays open and the error banner explains why.
   }
 
@@ -308,6 +324,7 @@ export function MasterForm({
           <label htmlFor="mf-title">ชื่อกิจกรรม</label>
           <input id="mf-title" value={title} onChange={(e) => setTitle(e.target.value)} required />
         </div>
+        {!host && (
         <div className="adm-field">
           <label>ผู้จัดกิจกรรม (Host)</label>
           <AdmSelect value={organizer} onChange={(e) => setOrganizer(e.target.value)} aria-label="ผู้จัดกิจกรรม">
@@ -319,6 +336,7 @@ export function MasterForm({
             ))}
           </AdmSelect>
         </div>
+        )}
         <div className="adm-field">
           <label htmlFor="mf-desc">รายละเอียดกิจกรรม</label>
           <textarea id="mf-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={5} />
@@ -493,6 +511,7 @@ export function MasterForm({
 
       {isRound && (
         <SheetSection n={6} title="สถานะ · อายุ · ปิดรับจอง">
+          {!host && (
           <div className="adm-field">
             <label>สถานะกิจกรรม</label>
             <AdmSelect value={status} onChange={(e) => setStatus(e.target.value as MasterStatus)} aria-label="สถานะกิจกรรม">
@@ -504,6 +523,7 @@ export function MasterForm({
             </AdmSelect>
             <p className="adm-hint">{MASTER_STATUSES.find((s) => s.key === status)?.hint}</p>
           </div>
+          )}
           <div className="adm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}>
             <div className="adm-field">
               <label htmlFor="mf-age-min">อายุต่ำสุด (ปี)</label>
@@ -536,7 +556,7 @@ export function MasterForm({
           ยกเลิก
         </button>
         <button type="submit" disabled={saving} className="adm-btn teal">
-          {saving ? 'กำลังบันทึก…' : editingId ? 'บันทึกการแก้ไข' : 'เพิ่มข้อมูล'}
+          {saving ? 'กำลังบันทึก…' : host ? 'บันทึก' : editingId ? 'บันทึกการแก้ไข' : 'เพิ่มข้อมูล'}
         </button>
       </div>
 

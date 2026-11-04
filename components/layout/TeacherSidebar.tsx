@@ -36,6 +36,16 @@ const NAV: NavItem[] = [
     ),
   },
   {
+    href: '/host/submissions',
+    label: 'สร้าง & ส่งกิจกรรม',
+    icon: (
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 5v14M5 12h14" />
+        <rect x="3.5" y="3.5" width="17" height="17" rx="4" strokeWidth={1.5} />
+      </svg>
+    ),
+  },
+  {
     href: '/host/journeys',
     label: 'กิจกรรมเดี่ยว',
     icon: (

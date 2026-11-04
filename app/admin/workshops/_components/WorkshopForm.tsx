@@ -85,6 +85,60 @@ export type WorkshopFormValues = {
   master_id: string;
 };
 
+/** A saved workshops row as form values (the host's "my activities" page edits with it). */
+export function formValuesFromWorkshop(w: Workshop & { image_meta?: string | null; online_url?: string | null; photos_drive_url?: string | null; dashboard_access_json?: string | null }): WorkshopFormValues {
+  const ids = safeParseArray<string>(w.instructor_ids_json, []);
+  const schedule = safeParseArray<ScheduleDay>(w.schedule_json, []);
+  return {
+    ...emptyWorkshopForm,
+    title: w.title,
+    description: w.description || '',
+    short_description: w.short_description || '',
+    workshop_type: (w.workshop_type || 'one_day') as WorkshopType,
+    date: w.date,
+    end_date: w.end_date || '',
+    dates: safeParseArray<string>(w.dates_json, []),
+    time_start: w.time_start,
+    time_end: w.time_end,
+    dayTimes: safeParseArray<DayTime>(w.day_times_json, []),
+    location: w.location || '',
+    location_id: w.location_id || '',
+    is_online: !!w.is_online,
+    online_platform: w.online_platform || 'zoom',
+    online_platform_other: w.online_platform_other || '',
+    online_url: w.online_url || '',
+    instructor_id: w.instructor_id || '',
+    instructor_ids: ids.length ? ids : w.instructor_id ? [w.instructor_id] : [],
+    dashboard_access: safeParseArray<string>(w.dashboard_access_json, []),
+    scheduleDays: schedule.length > 0 ? schedule : [{ label: '', items: [] }],
+    learn_items: safeParseArray<string>(w.learn_json, []),
+    target_items: safeParseArray<string>(w.target_json, []),
+    category: w.category || '',
+    tags: safeParseArray<string>(w.tags_json, []),
+    promo_price: w.promo_price != null ? String(w.promo_price) : '',
+    promo_start: w.promo_start || '',
+    promo_end: w.promo_end || '',
+    theme_color: w.theme_color || '',
+    max_participants: w.max_participants,
+    min_age: w.min_age != null ? String(w.min_age) : '',
+    max_age: w.max_age != null ? String(w.max_age) : '',
+    price: w.price,
+    image_url: w.image_url || '',
+    image_meta: parseImageMeta(w.image_meta ?? null),
+    status: w.status as WorkshopFormValues['status'],
+    admission_type: (w.admission_type || 'direct') as WorkshopFormValues['admission_type'],
+    payment_type: (w.payment_type || 'paid') as WorkshopFormValues['payment_type'],
+    deposit_amount: w.deposit_amount || 0,
+    announce_at: w.announce_at || '',
+    close_at: w.close_at || '',
+    confirm_main_by: w.confirm_main_by || '',
+    confirm_waitlist_by: w.confirm_waitlist_by || '',
+    require_consent: !!w.require_consent,
+    photos_drive_url: w.photos_drive_url || '',
+    master_id: w.master_id || '',
+  };
+}
+
 export const emptyWorkshopForm: WorkshopFormValues = {
   title: '',
   description: '',
@@ -159,9 +213,13 @@ type Props = {
   onAttemptClose?: () => void;
   /** Dismiss the save-draft prompt and stay on the form. */
   onStay?: () => void;
+  /** A host filling in their own activity (Host Dashboard): saves go to
+   *  /api/teacher/submissions, and admin-only fields (round link, status,
+   *  photo folder, who runs it) are left out. */
+  host?: boolean;
 };
 
-export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyChange, pendingClose, onAttemptClose, onStay }: Props) {
+export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyChange, pendingClose, onAttemptClose, onStay, host = false }: Props) {
   const router = useRouter();
   const baseline = initial ?? emptyWorkshopForm;
   const [form, setForm] = useState<WorkshopFormValues>(baseline);
@@ -189,10 +247,12 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
   useUnsavedGuard(dirty, 'คุณมีข้อมูลที่ยังไม่ได้บันทึก แน่ใจว่าต้องการออกจากหน้านี้?');
 
   useEffect(() => {
+    const none = <T,>(v: T) => Promise.resolve(v);
     Promise.all([
       fetch('/api/locations').then((r) => r.json() as Promise<{ locations: Location[] }>),
-      fetch('/api/users?role=teacher,admin').then((r) => r.json() as Promise<{ users: User[] }>),
-      fetch('/api/workshop-masters').then((r) => r.json() as Promise<{ masters: WorkshopMaster[] }>),
+      // A host picks no one and links no round activity — those lists are admin's.
+      host ? none({ users: [] as User[] }) : fetch('/api/users?role=teacher,admin').then((r) => r.json() as Promise<{ users: User[] }>),
+      host ? none({ masters: [] as WorkshopMaster[] }) : fetch('/api/workshop-masters').then((r) => r.json() as Promise<{ masters: WorkshopMaster[] }>),
     ])
       .then(([loc, t, m]) => {
         setLocations(loc.locations || []);
@@ -202,7 +262,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
         setMasters((m.masters || []).filter((x) => x.kind !== 'round'));
       })
       .catch(() => {});
-  }, []);
+  }, [host]);
 
   // —— per-day operating hours (multi_day / multi_part) ————————————————
   const DEFAULT_START = '09:00';
@@ -301,11 +361,17 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
   async function send(payload: ReturnType<typeof makePayload>): Promise<boolean> {
     setSaving(true);
     try {
-      const url = editingId ? `/api/workshops/${editingId}` : '/api/workshops';
+      const url = host
+        ? editingId
+          ? `/api/teacher/submissions/single/${editingId}`
+          : '/api/teacher/submissions'
+        : editingId
+          ? `/api/workshops/${editingId}`
+          : '/api/workshops';
       const res = await fetch(url, {
         method: editingId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(host && !editingId ? { kind: 'single', data: payload } : payload),
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
@@ -456,7 +522,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
     if (!(await adminConfirm({ title: 'ลบกิจกรรมนี้?', msg: 'การจองและข้อมูลของรอบนี้จะถูกลบไปด้วย', ok: 'ลบกิจกรรม', danger: true }))) return;
     setDeleting(true);
     try {
-      await fetch(`/api/workshops/${editingId}`, { method: 'DELETE' });
+      await fetch(host ? `/api/teacher/submissions/single/${editingId}` : `/api/workshops/${editingId}`, { method: 'DELETE' });
       if (onSuccess) {
         onSuccess();
       } else {
@@ -640,6 +706,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
 
       <div className={`adm-step${step === 0 ? ' is-on' : ''}`}>
         <SheetSection n={1} title="ข้อมูลหลัก">
+          {!host && (
           <div>
             <label className="block text-sm font-medium text-dark mb-1">
               ข้อมูลกิจกรรม (Master) <span className="text-gray font-normal">— ผูกรอบนี้กับภาพรวมกิจกรรม</span>
@@ -658,6 +725,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
               <p className="text-xs text-gray mt-1">เลือกแล้วระบบจะดึงข้อมูลภาพรวมมาเติมให้อัตโนมัติ — แก้ไขเฉพาะรอบนี้ต่อได้เลย</p>
             )}
           </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-dark mb-1">ชื่อกิจกรรม</label>
@@ -688,6 +756,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
             />
           </div>
 
+          {!host && (
           <div>
             <label className="block text-sm font-medium text-dark mb-1">สถานะ</label>
             <AdmSelect
@@ -708,6 +777,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
               </p>
             )}
           </div>
+          )}
 
           {/* Category + tags */}
           <fieldset className="border border-gray-lighter rounded-xl p-4 bg-surface/40 space-y-4">
@@ -1209,7 +1279,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
             </label>
 
             {/* Google Drive photo link — only relevant when PDPA consent is on */}
-            {form.require_consent && (
+            {form.require_consent && !host && (
               <div className="pl-6">
                 <label className="block text-xs font-medium text-dark mb-1">
                   Link Google Drive (รูปกิจกรรม)
@@ -1307,7 +1377,13 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
         <SheetSection n={1} title="ผู้จัด">
           {/* Facilitators — multi-select. Order matters: the first one is the
               owning teacher (teacher dashboard, payout and student nicknames all
-              resolve to that single person) and heads the public list. */}
+              resolve to that single person) and heads the public list. A host
+              submitting their own activity is that person. */}
+          {host ? (
+            <p className="text-sm text-dark" style={{ margin: 0 }}>
+              คุณเป็นผู้จัดหลักของกิจกรรมนี้ — ถ้ามีผู้จัดร่วม แจ้งทีมงานเพิ่มให้ได้หลังอนุมัติ
+            </p>
+          ) : (
           <div>
             <label className="block text-sm font-medium text-dark mb-1">
               ผู้จัด <span className="text-gray font-normal">(เลือกได้หลายคน)</span>
@@ -1421,6 +1497,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
               คนแรกที่เลือก = ผู้รับผิดชอบหลัก (เห็นกิจกรรมนี้ใน Host Dashboard และเป็นผู้รับเงินโอน)
             </p>
           </div>
+          )}
         </SheetSection>
       </div>
 
@@ -1669,7 +1746,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
           </button>
         )}
         <button type="submit" disabled={saving} className="adm-btn teal">
-          {saving ? 'กำลังบันทึก…' : editingId ? 'บันทึกการแก้ไข' : 'สร้างกิจกรรม'}
+          {saving ? 'กำลังบันทึก…' : host ? 'บันทึก' : editingId ? 'บันทึกการแก้ไข' : 'สร้างกิจกรรม'}
         </button>
       </div>
 
