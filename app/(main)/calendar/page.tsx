@@ -211,6 +211,31 @@ export default function CalendarPage() {
     if (!b) return null;
     return hasWorkshopEnded(w) && b.attended === 0 ? 'rain' : 'star';
   };
+  // Several rounds of one activity on the same day read as one row ("4 รอบ")
+  // on the grid and in the day panel, instead of a stack of identical bars.
+  const groupKey = (w: Workshop) => (w.master_id && !isMultiDay(w) && getWorkshopDays(w).length <= 1 ? `${w.master_id}|${w.date}` : null);
+  const groupsOf = (list: Workshop[]) => {
+    const m = new Map<string, Workshop[]>();
+    list.forEach((w) => {
+      const k = groupKey(w);
+      if (!k) return;
+      m.set(k, [...(m.get(k) || []), w]);
+    });
+    m.forEach((a) => a.sort((x, z) => x.time_start.localeCompare(z.time_start)));
+    return m;
+  };
+  const groupSt = (a: Workshop[]): St => {
+    const s = a.map(statusOf);
+    return s.includes('applied') ? 'applied' : s.includes('available') ? 'available' : s.includes('full') ? 'full' : 'past';
+  };
+  /** The round a grouped row opens: the one booked, else the first with seats. */
+  const groupRep = (a: Workshop[]) => a.find((w) => statusOf(w) === 'applied') || a.find((w) => statusOf(w) === 'available') || a[0];
+  /** This workshop's day group when it has more than one round, and whether it leads it. */
+  const inGroup = (groups: Map<string, Workshop[]>, w: Workshop) => {
+    const k = groupKey(w);
+    const a = k ? groups.get(k) : undefined;
+    return a && a.length > 1 ? { all: a, lead: a[0].id === w.id } : null;
+  };
   const openWs = (w: Workshop, day?: string) => {
     if (day) setSel(day);
     setWsId(w.id);
@@ -295,6 +320,7 @@ export default function CalendarPage() {
   type Bar = { key: string; title: string; tip: string; gc: string; gr: number; margin: string; radius: string; bg: string; fg: string; accent: string; cl: boolean; cr: boolean; star: boolean; rain: boolean; time: string; tag: string; full: boolean; onClick: () => void };
   type Raw = { title: string; tip: string; bg: string; fg: string; accent: string; star: boolean; rain: boolean; time: string; full: boolean; span: number; onClick: () => void; sc: number; ec: number; cl: boolean; cr: boolean };
   const weeks: { days: string[]; bars: Bar[]; hidden: number[] }[] = [];
+  const visGroups = groupsOf(visible.ws);
   const colInfo: Record<string, { dots: string[]; mini: { t: string; bg: string; fg: string }[] }> = {};
   for (let wi = 0; wi < 6; wi++) {
     const days = Array.from({ length: 7 }, (_, i) => iso(new Date(y, mo, 1 - first + wi * 7 + i)));
@@ -308,6 +334,27 @@ export default function CalendarPage() {
       raw.push({ ...bar, sc: diffDays(s0, st), ec: diffDays(s0, en), cl: s < s0, cr: e > s6 });
     };
     visible.ws.forEach((w) => {
+      const g = inGroup(visGroups, w);
+      if (g && !g.lead) return;
+      if (g) {
+        const st = groupSt(g.all);
+        const rep = groupRep(g.all);
+        const mk = markOf(rep);
+        push(w.date, w.date, {
+          title: w.title,
+          tip: `${w.title} · ${g.all.length} รอบ ${g.all.map((x) => x.time_start).join(', ')} · ${STATUS[st][2]}`,
+          bg: TINT[st].bg,
+          fg: TINT[st].fg,
+          accent: mk === 'star' ? '#f2b705' : STATUS[st][0],
+          star: mk === 'star',
+          rain: mk === 'rain',
+          time: `${g.all.length} รอบ`,
+          full: st === 'full',
+          span: 0,
+          onClick: () => openWs(rep, w.date),
+        });
+        return;
+      }
       const st = statusOf(w);
       const mk = markOf(w);
       const md = isMultiDay(w);
@@ -394,9 +441,29 @@ export default function CalendarPage() {
   const ent = diary[sel];
   type Item = { key: string; sort: string; t1: string; t2: string; title: string; sub: string; dot: string; tag: string; tagBg: string; tagFg: string; onClick: () => void };
   const items: Item[] = [];
+  const allGroups = groupsOf(workshops);
   workshops.forEach((w) => {
     if (!onDay(w, sel)) return;
-    const st = statusOf(w);
+    const g = inGroup(allGroups, w);
+    if (g && !g.lead) return;
+    const st = g ? groupSt(g.all) : statusOf(w);
+    if (g) {
+      const rep = groupRep(g.all);
+      items.push({
+        key: 'g' + w.id,
+        sort: w.time_start,
+        t1: g.all[0].time_start,
+        t2: g.all[g.all.length - 1].time_end,
+        title: `${w.title} · ${g.all.length} รอบ`,
+        sub: `รอบ ${g.all.map((x) => x.time_start).join(' · ')}`,
+        dot: STATUS[st][0],
+        tag: STATUS[st][2],
+        tagBg: st === 'applied' ? '#fce4a0' : st === 'past' ? '#ede5cf' : st === 'full' ? '#fde7d3' : '#eaf6f4',
+        tagFg: st === 'applied' ? '#3f3100' : st === 'past' ? '#5f5f59' : st === 'full' ? '#a04a14' : '#075a51',
+        onClick: () => openWs(rep),
+      });
+      return;
+    }
     items.push({
       key: 'w' + w.id,
       sort: w.time_start,
@@ -417,9 +484,11 @@ export default function CalendarPage() {
     items.push({ key: 'e' + m.id, sort: m.allDay ? '00:00' : m.ts, t1: m.allDay ? 'ทั้งวัน' : m.ts, t2: m.allDay ? '' : m.te, title: m.title, sub: m.note || k.label, dot: k.c, tag: 'ของฉัน', tagBg: k.bg, tagFg: k.fg, onClick: () => openEvent(m) });
   });
   items.sort((a, b) => a.sort.localeCompare(b.sort));
+  // One line per activity and day: a day of rounds is not three copies.
   const upcoming = workshops
     .filter((w) => w.date > T && statusOf(w) === 'available')
-    .sort((a, b) => a.date.localeCompare(b.date))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.time_start.localeCompare(b.time_start))
+    .filter((w, i, arr) => !groupKey(w) || arr.findIndex((x) => groupKey(x) === groupKey(w)) === i)
     .slice(0, 3);
   const nextUp = [
     ...workshops.filter((w) => bookings[w.id] && w.date > sel).map((w) => ({ day: w.date, title: w.title, dot: STATUS.applied[0], go: () => openWs(w, w.date) })),

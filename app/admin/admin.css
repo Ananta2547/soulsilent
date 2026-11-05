@@ -565,3 +565,10 @@ tr.adm-focus > td { background: #fff3c4 !important; animation: adm-focus-row 1.1
   .adm-subm { flex-direction: column; }
   .adm-subm-img { width: 100%; height: 170px; }
 }
+
+/* รออนุมัติ › ยืนยันผู้จัด (migration 081) */
+.adm .adm-ver-dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px 16px; margin: 6px 0 0; }
+.adm .adm-ver-dl > div { min-width: 0; }
+.adm .adm-ver-dl > div.is-wide { grid-column: 1 / -1; }
+.adm .adm-ver-dl dt { font-size: 12px; color: var(--muted, #6b7674); }
+.adm .adm-ver-dl dd { margin: 0; font-size: 14px; overflow-wrap: anywhere; white-space: pre-wrap; }

@@ -1109,7 +1109,10 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
                   </div>
                 </div>
               )}
-              {locations.length === 0 && (
+              {host && (
+                <p className="text-xs text-gray mt-1">เลือกได้เฉพาะสถานที่ในรายการ — ถ้าไม่มีสถานที่ที่ต้องการ ติดต่อทีมงานให้เพิ่มก่อน</p>
+              )}
+              {!host && locations.length === 0 && (
                 <p className="text-xs text-gray mt-1">
                   ยังไม่มีสถานที่ —{' '}
                   <a href="/admin/locations" className="text-primary hover:underline">

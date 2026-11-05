@@ -449,6 +449,18 @@ export default function TeacherMasterSessionsPage() {
   const nx = upcoming[0];
   const bookedUp = upcoming.reduce((a, r) => a + r.booked, 0);
   const capUp = upcoming.reduce((a, r) => a + r.max_participants, 0);
+  // "รอบถัดไป": one row per day, so a day with many rounds is not five rows.
+  const upDays: { date: string; first: string; last: string; n: number; booked: number; cap: number }[] = [];
+  upcoming.forEach((r) => {
+    const d = upDays.find((x) => x.date === r.date);
+    if (d) {
+      d.n += 1;
+      d.booked += r.booked;
+      d.cap += r.max_participants;
+      if (r.time_start < d.first) d.first = r.time_start;
+      if (r.time_end > d.last) d.last = r.time_end;
+    } else upDays.push({ date: r.date, first: r.time_start, last: r.time_end, n: 1, booked: r.booked, cap: r.max_participants });
+  });
 
   return (
     <div>
@@ -636,9 +648,9 @@ export default function TeacherMasterSessionsPage() {
             <div className="tdb-upcoming tdb-hide-phone">
               <span className="tdb-mono-label">รอบถัดไป</span>
               <div style={{ display: 'flex', flexDirection: 'column', marginTop: 8 }}>
-                {upcoming.slice(0, 5).map((r) => (
+                {upDays.slice(0, 5).map((r) => (
                   <button
-                    key={r.id}
+                    key={r.date}
                     type="button"
                     className={r.date === day ? 'on' : ''}
                     onClick={() => pickDay(r.date)}
@@ -648,10 +660,11 @@ export default function TeacherMasterSessionsPage() {
                       <span>{monShort(r.date)}</span>
                     </span>
                     <span style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-mono)', fontSize: 13 }}>
-                      {r.time_start}–{r.time_end}
+                      {r.n > 1 ? `${r.n} รอบ · ` : ''}
+                      {r.first}–{r.last}
                     </span>
                     <span className="tdb-bar-n">
-                      {r.booked}/{r.max_participants}
+                      {r.booked}/{r.cap}
                     </span>
                   </button>
                 ))}

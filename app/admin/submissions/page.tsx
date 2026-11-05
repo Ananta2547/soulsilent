@@ -4,7 +4,9 @@
  * รออนุมัติ — activities hosts made themselves (migration 080), and the price
  * or date edits waiting on ones already live. Admin checks, may fix them in
  * the usual forms, then approves, sends back with a note, or turns them
- * down; the host hears on LINE (api/admin/submissions).
+ * down; the host hears on LINE (api/admin/submissions). The second tab holds
+ * hosts asking to publish on their own (migration 081): admin phones them,
+ * then approves, which grants the self_publisher role.
  */
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -13,12 +15,19 @@ import { AdminFormModal } from '@/components/admin/AdminFormModal';
 import { WorkshopForm, formValuesFromWorkshop, type WorkshopFormValues } from '@/app/admin/workshops/_components/WorkshopForm';
 import { MasterForm } from '@/app/admin/workshop-info/_components/MasterForm';
 import { GATED_LABEL, REVIEW_LABEL, type ReviewStatus } from '@/lib/submission-labels';
-import type { AdminSubmission } from '@/app/api/admin/submissions/route';
+import type { AdminSubmission, AdminVerification } from '@/app/api/admin/submissions/route';
+import { VERIFY_FIELDS, VERIFY_LABEL, VERIFY_STATUS_LABEL } from '@/lib/verification-labels';
+import { accountNameMismatch } from '@/lib/host-payout';
+import { useFocusTokens } from '@/components/admin/AlertFocus';
 import type { Workshop, WorkshopMaster } from '@/lib/types';
 
 type Filter = 'pending' | 'changes_requested' | 'rejected';
 type Modal = { kind: 'single'; id: string; initial: WorkshopFormValues } | { kind: 'round'; id: string; initial: WorkshopMaster } | null;
-type Decide = { s: AdminSubmission; action: 'changes' | 'reject' } | null;
+type Decide =
+  | { s: AdminSubmission; ver?: undefined; action: 'changes' | 'reject' }
+  | { ver: AdminVerification; s?: undefined; action: 'changes' | 'reject' }
+  | null;
+type Tab = 'activities' | 'hosts';
 
 const TONE: Record<ReviewStatus, Tone> = { draft: 'mute', pending: 'warn', changes_requested: 'info', approved: 'ok', rejected: 'bad' };
 
@@ -39,6 +48,9 @@ function fmtValue(k: string, v: unknown): string {
 
 export default function AdminSubmissionsPage() {
   const [rows, setRows] = useState<AdminSubmission[] | null>(null);
+  const [vers, setVers] = useState<AdminVerification[]>([]);
+  const focus = useFocusTokens();
+  const [tab, setTab] = useState<Tab>(focus.some((t) => t.startsWith('ver:')) ? 'hosts' : 'activities');
   const [filter, setFilter] = useState<Filter>('pending');
   const [busy, setBusy] = useState<string | null>(null);
   const [modal, setModal] = useState<Modal>(null);
@@ -47,8 +59,11 @@ export default function AdminSubmissionsPage() {
 
   const load = useCallback(() => {
     fetch('/api/admin/submissions')
-      .then((r) => (r.ok ? (r.json() as Promise<{ submissions: AdminSubmission[] }>) : null))
-      .then((d) => setRows(d?.submissions || []))
+      .then((r) => (r.ok ? (r.json() as Promise<{ submissions: AdminSubmission[]; verifications?: AdminVerification[] }>) : null))
+      .then((d) => {
+        setRows(d?.submissions || []);
+        setVers(d?.verifications || []);
+      })
       .catch(() => setRows([]));
   }, []);
   useEffect(() => {
@@ -72,6 +87,26 @@ export default function AdminSubmissionsPage() {
     } finally {
       setBusy(null);
     }
+  }
+
+  async function sendVer(v: AdminVerification, action: 'approve' | 'changes' | 'reject', text = '') {
+    setBusy(v.user_id);
+    try {
+      const r = await fetch(`/api/admin/verifications/${v.user_id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, note: text }) });
+      const d = (await r.json()) as { error?: string };
+      if (!r.ok) return adminAlert('ทำรายการไม่สำเร็จ', d.error || 'เกิดข้อผิดพลาด');
+      adminToast(action === 'approve' ? 'อนุมัติแล้ว — ผู้จัดลงกิจกรรมเองได้ แจ้งทาง LINE แล้ว' : action === 'changes' ? 'ส่งกลับให้ผู้จัดแก้แล้ว' : 'ไม่อนุมัติแล้ว');
+      setDecide(null);
+      setNote('');
+      load();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function approveVer(v: AdminVerification) {
+    if (!window.confirm(`อนุมัติ ${v.full_name}? ผู้จัดจะสร้างกิจกรรมเองได้ และข้อมูลบัญชีจะถูกบันทึกในหน้าบัญชีผู้จัด`)) return;
+    void sendVer(v, 'approve');
   }
 
   async function openEdit(s: AdminSubmission) {
@@ -102,13 +137,24 @@ export default function AdminSubmissionsPage() {
 
   const all = rows || [];
   const shown = all.filter((r) => r.review_status === filter);
-  const count = (f: Filter) => all.filter((r) => r.review_status === f).length;
+  const count = (f: Filter) => (tab === 'hosts' ? vers.filter((v) => v.status === f).length : all.filter((r) => r.review_status === f).length);
+  const shownVer = vers.filter((v) => v.status === filter);
+  const waitingSubs = all.filter((r) => r.review_status === 'pending').length;
+  const waitingVers = vers.filter((v) => v.status === 'pending').length;
 
   return (
     <>
       <AdminHead eyebrow="admin · submissions" title="รออนุมัติ" sub="กิจกรรมที่ผู้จัดสร้างเอง และการแก้ราคา/วันเวลาของกิจกรรมที่เปิดแล้ว — อนุมัติแล้วจึงขึ้นบนเว็บ" />
 
-      <div className="adm-toolbar">
+      <div className="adm-toolbar" style={{ flexWrap: 'wrap', gap: 8 }}>
+        <AdminChips
+          value={tab}
+          onChange={setTab}
+          items={[
+            { key: 'activities', label: 'กิจกรรม', n: waitingSubs },
+            { key: 'hosts', label: 'ยืนยันผู้จัด', n: waitingVers },
+          ]}
+        />
         <AdminChips
           value={filter}
           onChange={setFilter}
@@ -120,7 +166,80 @@ export default function AdminSubmissionsPage() {
         />
       </div>
 
-      {rows === null ? (
+      {tab === 'hosts' &&
+        (rows === null ? (
+          <p className="adm-meta">กำลังโหลด…</p>
+        ) : shownVer.length === 0 ? (
+          <div className="adm-card adm-empty">{filter === 'pending' ? 'ไม่มีผู้จัดรอยืนยันข้อมูล ✺' : 'ไม่มีรายการ'}</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {shownVer.map((v) => {
+              const st = v.status;
+              const tel = (v.phone || '').replace(/[^0-9+]/g, '');
+              const mismatch = accountNameMismatch(v.full_name, v.account_name);
+              return (
+                <article key={v.user_id} className="adm-card adm-subm" data-focus={`ver:${v.user_id}`}>
+                  <div className="adm-subm-body">
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <Badge tone={st === 'pending' ? 'warn' : st === 'changes_requested' ? 'info' : 'bad'}>{VERIFY_STATUS_LABEL[st]}</Badge>
+                      <Badge tone="mute">ขอลงกิจกรรมเอง</Badge>
+                    </div>
+                    <h3 className="adm-subm-title">
+                      {v.full_name} {v.nickname ? `(${v.nickname})` : ''}
+                    </h3>
+                    <p className="adm-meta" style={{ margin: 0 }}>
+                      บัญชี {v.account_name_user || '—'} · {v.account_email || '—'} · ส่ง {fmtStamp(v.submitted_at)}
+                    </p>
+                    <dl className="adm-ver-dl">
+                      {VERIFY_FIELDS.filter((k) => k !== 'full_name' && k !== 'nickname' && v[k]).map((k) => (
+                        <div key={k} className={k === 'about' ? 'is-wide' : undefined}>
+                          <dt>{VERIFY_LABEL[k]}</dt>
+                          <dd>
+                            {k === 'phone' && tel ? (
+                              <a href={`tel:${tel}`}>{v[k]}</a>
+                            ) : /^https?:\/\//i.test(v[k] || '') ? (
+                              <a href={v[k]} target="_blank" rel="noopener noreferrer">
+                                {v[k]} ↗
+                              </a>
+                            ) : (
+                              v[k]
+                            )}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                    {mismatch && <p className="adm-hint" style={{ margin: 0, color: '#a04a14' }}>ชื่อบัญชีไม่ตรงกับชื่อจริง — ถามตอนโทรคุย</p>}
+                    {v.review_note && <p className="adm-meta" style={{ margin: 0 }}>หมายเหตุล่าสุด: {v.review_note}</p>}
+                    <div className="adm-subm-acts">
+                      {tel && (
+                        <a href={`tel:${tel}`} className="adm-btn sm white">
+                          โทร {v.phone}
+                        </a>
+                      )}
+                      {st !== 'rejected' && (
+                        <>
+                          <button type="button" className="adm-btn sm" disabled={busy === v.user_id} onClick={() => setDecide({ ver: v, action: 'changes' })}>
+                            ขอให้แก้
+                          </button>
+                          <button type="button" className="adm-btn sm danger" disabled={busy === v.user_id} onClick={() => setDecide({ ver: v, action: 'reject' })}>
+                            ไม่อนุมัติ
+                          </button>
+                        </>
+                      )}
+                      {st === 'pending' && (
+                        <button type="button" className="adm-btn sm teal" disabled={busy === v.user_id} onClick={() => approveVer(v)}>
+                          โทรคุยแล้ว · อนุมัติ
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ))}
+
+      {tab === 'hosts' ? null : rows === null ? (
         <p className="adm-meta">กำลังโหลด…</p>
       ) : shown.length === 0 ? (
         <div className="adm-card adm-empty">{filter === 'pending' ? 'ไม่มีกิจกรรมรออนุมัติ ✺' : 'ไม่มีรายการ'}</div>
@@ -204,12 +323,14 @@ export default function AdminSubmissionsPage() {
         <div className="adm-dlg-scrim" onClick={() => setDecide(null)}>
           <div className="adm-dlg" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <h3>
-              {decide.action === 'changes' ? 'ขอให้ผู้จัดแก้' : 'ไม่อนุมัติ'}: {decide.s.title}
+              {decide.action === 'changes' ? 'ขอให้ผู้จัดแก้' : 'ไม่อนุมัติ'}: {decide.s ? decide.s.title : decide.ver.full_name}
             </h3>
             <p>
               {decide.action === 'changes'
                 ? 'บอกผู้จัดว่าต้องแก้อะไร ข้อความนี้ส่งไปทาง LINE และแสดงในหน้ากิจกรรมของผู้จัด'
-                : decide.s.live_status !== 'draft'
+                : decide.ver
+                  ? 'ผู้จัดคนนี้จะลงกิจกรรมเองไม่ได้ และส่งใบยืนยันใหม่ไม่ได้'
+                  : decide.s.live_status !== 'draft'
                   ? 'การแก้ไขจะถูกยกเลิก กิจกรรมยังเปิดอยู่ด้วยค่าเดิม'
                   : 'กิจกรรมนี้จะไม่ขึ้นบนเว็บ ผู้จัดยังเห็นและแก้ส่งใหม่ได้'}
             </p>
@@ -228,8 +349,8 @@ export default function AdminSubmissionsPage() {
               <button
                 type="button"
                 className={`adm-btn ${decide.action === 'reject' ? 'danger' : 'teal'}`}
-                disabled={busy === decide.s.id || (decide.action === 'changes' && !note.trim())}
-                onClick={() => send(decide.s, decide.action, note)}
+                disabled={busy === (decide.s ? decide.s.id : decide.ver.user_id) || (decide.action === 'changes' && !note.trim())}
+                onClick={() => (decide.s ? send(decide.s, decide.action, note) : sendVer(decide.ver, decide.action, note))}
               >
                 {decide.action === 'changes' ? 'ส่งกลับให้แก้' : 'ไม่อนุมัติ'}
               </button>

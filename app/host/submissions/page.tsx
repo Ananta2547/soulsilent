@@ -15,6 +15,10 @@ import { MasterForm } from '@/app/admin/workshop-info/_components/MasterForm';
 import { REVIEW_LABEL, GATED_LABEL, type ReviewStatus } from '@/lib/submission-labels';
 import type { SubmissionRow } from '@/app/api/teacher/submissions/route';
 import type { Workshop, WorkshopMaster } from '@/lib/types';
+import type { VerificationRow, VerifyData } from '@/lib/verification-labels';
+import { VerifyPanel } from './VerifyPanel';
+
+type Ver = { canPublish: boolean; verification: VerificationRow | null; prefill: Partial<VerifyData> };
 
 type Modal =
   | { kind: 'single'; id?: string; initial: WorkshopFormValues }
@@ -43,12 +47,20 @@ export default function HostSubmissionsPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
+  const [ver, setVer] = useState<Ver | null>(null);
+
   const load = useCallback(() => {
-    fetch('/api/teacher/submissions')
+    fetch('/api/teacher/verification')
       .then(async (r) => {
-        const d = (await r.json()) as { submissions?: SubmissionRow[]; error?: string };
+        const d = (await r.json()) as Ver & { error?: string };
         if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
-        setRows(d.submissions || []);
+        setVer(d);
+        // Only a host admin let publish on their own has a list to load.
+        if (!d.canPublish) return;
+        const s = await fetch('/api/teacher/submissions');
+        const j = (await s.json()) as { submissions?: SubmissionRow[]; error?: string };
+        if (!s.ok) throw new Error(j.error || `HTTP ${s.status}`);
+        setRows(j.submissions || []);
       })
       .catch((e: Error) => setErr(e.message));
   }, []);
@@ -93,6 +105,20 @@ export default function HostSubmissionsPage() {
     setNote(isNewRound ? 'บันทึกแล้ว — ต่อไปกด “จัดรอบ” เพื่อเพิ่มรอบ แล้วกลับมากด “ส่งให้ทีมตรวจ”' : 'บันทึกแล้ว');
   }
 
+  if (ver && !ver.canPublish) {
+    return (
+      <div>
+        <div className="tdb-head">
+          <div>
+            <span className="tdb-eyebrow">กิจกรรมของฉัน</span>
+            <h1 className="tdb-h1">สร้าง &amp; ส่งกิจกรรม.</h1>
+          </div>
+        </div>
+        <VerifyPanel verification={ver.verification} prefill={ver.prefill} onSent={load} />
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="tdb-head">
@@ -134,6 +160,7 @@ export default function HostSubmissionsPage() {
             const waiting = s.pending_json ? Object.keys(JSON.parse(s.pending_json) as object).map((k) => GATED_LABEL[k] || k) : [];
             const canSend = live ? waiting.length > 0 && st === 'changes_requested' : st !== 'pending' && st !== 'approved';
             const tone = TONE[st] || TONE.draft;
+            const locked = s.booked > 0;
             return (
               <article key={`${s.kind}-${s.id}`} className="tdb-sub">
                 {s.image_url ? (
@@ -157,14 +184,15 @@ export default function HostSubmissionsPage() {
                     {s.reviewed_at ? ` · ตรวจแล้ว ${fmtDay(s.reviewed_at)}` : ''}
                   </p>
                   {waiting.length > 0 && <p className="tdb-sub-meta">รออนุมัติ: {waiting.join(', ')} — หน้าเว็บยังใช้ค่าเดิมจนกว่าทีมงานจะอนุมัติ</p>}
+                  {locked && <p className="tdb-sub-meta">มีผู้จองแล้ว {s.booked} คน — แก้ไขเองไม่ได้ หากต้องแก้ติดต่อทีมงาน</p>}
                   {s.review_note && st !== 'pending' && (
                     <p className="tdb-sub-note">
                       <b>หมายเหตุจากทีมงาน:</b> {s.review_note}
                     </p>
                   )}
                   <div className="tdb-sub-acts">
-                    <button type="button" className="tdb-sub-btn" disabled={busy === s.id} onClick={() => openEdit(s)}>
-                      แก้ไข
+                    <button type="button" className="tdb-sub-btn" disabled={busy === s.id || locked} onClick={() => openEdit(s)}>
+                      {locked ? 'มีผู้จองแล้ว · แก้ไม่ได้' : 'แก้ไข'}
                     </button>
                     {s.kind === 'round' && (
                       <Link href={`/host/sessions/${s.id}`} className="tdb-sub-btn">

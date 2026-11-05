@@ -9,7 +9,7 @@ import { GATED_LABEL, isLive, routeError, tellAdminsSubmitted } from '@/lib/subm
  */
 export async function POST(_req: Request, { params }: { params: Promise<{ kind: string; id: string }> }) {
   try {
-    const me = await requireRoles('teacher', 'session_host');
+    const me = await requireRoles('self_publisher');
     const { kind, id } = await params;
     if (kind !== 'single' && kind !== 'round') return NextResponse.json({ error: 'ไม่รู้จักประเภทกิจกรรม' }, { status: 400 });
     const table = kind === 'single' ? 'workshops' : 'workshop_masters';

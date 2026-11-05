@@ -9,13 +9,15 @@
  */
 import { NextResponse } from 'next/server';
 import { safeParseArray } from '@/lib/workshop-utils';
+import { ONLINE_VENUE } from '@/lib/online-platform';
 import { sendPushToUser, subscribedUsers } from '@/lib/push';
 import type { WorkshopBody } from '@/lib/workshop-write';
 import type { MasterBody } from '@/lib/master-write';
 import type { DayTime, Workshop, WorkshopMaster } from '@/lib/types';
 
 import type { SubKind } from '@/lib/submission-labels';
-export { GATED_LABEL, REVIEW_LABEL, type ReviewStatus, type SubKind } from '@/lib/submission-labels';
+import { FIELD_LABEL } from '@/lib/submission-labels';
+export { FIELD_LABEL, GATED_LABEL, REVIEW_LABEL, type ReviewStatus, type SubKind } from '@/lib/submission-labels';
 
 /**
  * What a host may set on their single activity. Who runs it, the co-host
@@ -38,6 +40,28 @@ export function hostWorkshopBody(data: WorkshopBody, me: string, existing: Works
  *  status stays as it is (a new one waits as a draft). */
 export function hostMasterBody(data: MasterBody, me: string, existing: MasterBody | null): MasterBody {
   return { ...data, organizer: me, kind: 'round', activity_status: existing?.activity_status || 'draft' };
+}
+
+/**
+ * A host picks venues from admin's list only (or online): a single activity's
+ * location text is rebuilt from its location row, a round activity keeps only
+ * ids that exist. A venue that is not on the list is dropped.
+ */
+export async function lockVenue<B extends WorkshopBody | MasterBody>(db: D1Database, kind: SubKind, body: B): Promise<B> {
+  if (kind === 'single') {
+    const b = body as WorkshopBody;
+    if (b.is_online) return { ...body, location_id: '', location: '' };
+    const loc = b.location_id
+      ? await db.prepare('SELECT name, subdistrict, district, province FROM locations WHERE id = ?').bind(b.location_id).first<{ name: string; subdistrict: string; district: string; province: string }>()
+      : null;
+    return { ...body, location_id: loc ? b.location_id : '', location: loc ? `${loc.name}, ${loc.subdistrict}, ${loc.district}, ${loc.province}` : '' };
+  }
+  const ids = ((body as MasterBody).location_ids || []).filter((x): x is string => typeof x === 'string');
+  if (!ids.length) return body;
+  const known = new Set(
+    ((await db.prepare(`SELECT id FROM locations WHERE id IN (${ids.map(() => '?').join(',')})`).bind(...ids).all<{ id: string }>()).results || []).map((r) => r.id),
+  );
+  return { ...body, location_ids: ids.filter((x) => x === ONLINE_VENUE || known.has(x)) };
 }
 
 /** Live on the site already (approved once), so edits split into now / waiting. */
@@ -156,6 +180,22 @@ export function splitGated<B extends object>(kind: SubKind, live: B, next: B, al
     else pending[k] = want;
   }
   return { save: save as B, pending: Object.keys(pending).length ? (pending as Partial<B>) : null };
+}
+
+/** Fields that only follow another one (the picture's crop, the venue's text)
+ *  or that the host cannot set, left out when telling admin what changed. */
+const NOT_NEWS = new Set(['image_meta', 'cover_image_meta', 'location', 'online_platform_other', 'status', 'activity_status', 'organizer', 'kind', 'instructor_ids', 'instructor_id', 'dashboard_access', 'master_id', 'photos_drive_url', 'price_group']);
+
+/** Labels of the text / picture fields that differ between live and next
+ *  (gated price and date fields are left to splitGated). */
+export function textChanges(kind: SubKind, live: object, next: object): string[] {
+  const gated = new Set<string>(kind === 'single' ? SINGLE_GATED : MASTER_GATED);
+  const out = new Set<string>();
+  for (const k of Object.keys(next)) {
+    if (gated.has(k) || NOT_NEWS.has(k)) continue;
+    if (!same(k, (next as Record<string, unknown>)[k], (live as Record<string, unknown>)[k])) out.add(FIELD_LABEL[k] || 'ข้อมูลอื่น');
+  }
+  return [...out];
 }
 
 /** Make sure a host who submits a round activity can open its rounds. */

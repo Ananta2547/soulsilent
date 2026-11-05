@@ -55,7 +55,10 @@ export function SessionPickerModal({
   // Range group tiers: how many people the booker is bringing (themselves included).
   const [groupN, setGroupN] = useState<number | null>(null);
 
-  const onDay = useMemo(() => (day ? open.filter((s) => s.date === day) : []), [open, day]);
+  const onDay = useMemo(() => (day ? open.filter((s) => s.date === day).sort((a, b) => a.time_start.localeCompare(b.time_start)) : []), [open, day]);
+  // Many rounds in one day, all at the same place: a tight grid of times
+  // with the place said once, rather than a long column of cards.
+  const compact = onDay.length > 3 && onDay.every((s) => !!s.is_online === !!onDay[0].is_online && (s.location || '') === (onDay[0].location || ''));
   const setDay = (d: string) => {
     setDayState(d);
     setSessionId(null); // a new day, a new choice of round
@@ -154,11 +157,20 @@ export function SessionPickerModal({
               {!day ? (
                 <p style={{ fontSize: 13, color: 'var(--muted)', margin: 0, lineHeight: 1.6 }}>{tr(lang, 'จิ้มวันในปฏิทินเพื่อดูรอบ', 'Tap a day on the calendar to see its rounds.')}</p>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div className={`sp2-rounds${compact ? ' is-grid' : ''}`}>
+                  {compact && <p className="sp2-rounds-where">{tr(lang, `${onDay.length} รอบ`, `${onDay.length} rounds`)} · {onDay[0].is_online ? 'ONLINE' : onDay[0].location || '—'}</p>}
                   {onDay.map((s) => {
                     const left = Math.max(0, s.max_participants - s.booked);
                     const full = s.private_taken > 0 || left <= 0;
                     const on = sessionId === s.id;
+                    if (compact)
+                      return (
+                        <label key={s.id} className={`sp2-round is-chip${on ? ' on' : ''}${full ? ' full' : ''}`}>
+                          <input type="radio" name="session" checked={on} disabled={full} onChange={() => setSessionId(s.id)} />
+                          <span className="display-th" style={{ fontSize: 15 }}>{s.time_start}–{s.time_end}</span>
+                          <span style={{ fontSize: 11.5, color: full ? '#a04a14' : 'var(--muted)' }}>{full ? tr(lang, 'เต็ม', 'Full') : tr(lang, `ว่าง ${left}`, `${left} left`)}</span>
+                        </label>
+                      );
                     return (
                       <label key={s.id} className={`sp2-round${on ? ' on' : ''}${full ? ' full' : ''}`}>
                         <input type="radio" name="session" checked={on} disabled={full} onChange={() => setSessionId(s.id)} />

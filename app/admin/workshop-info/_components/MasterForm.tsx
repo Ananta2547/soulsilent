@@ -473,7 +473,7 @@ export function MasterForm({
             </label>
           </div>
           {locations.length === 0 ? (
-            <p className="adm-soft-empty">ยังไม่มีสถานที่ในระบบ — เพิ่มได้ที่เมนู สถานที่</p>
+            <p className="adm-soft-empty">{host ? 'ยังไม่มีสถานที่ในระบบ — ติดต่อทีมงานให้เพิ่ม' : 'ยังไม่มีสถานที่ในระบบ — เพิ่มได้ที่เมนู สถานที่'}</p>
           ) : (
             <div className="adm-checklist">
               {locations.map((l) => (
@@ -492,6 +492,7 @@ export function MasterForm({
           <p className="adm-hint" style={{ margin: 0 }}>
             {venueHint(locationIds)}
           </p>
+          {host && <p className="adm-hint" style={{ margin: 0 }}>เลือกได้เฉพาะสถานที่ในรายการ — ถ้าไม่มีสถานที่ที่ต้องการ ติดต่อทีมงานให้เพิ่มก่อน</p>}
         </SheetSection>
       )}
 

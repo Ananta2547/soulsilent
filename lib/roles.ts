@@ -2,12 +2,13 @@
  *  and may carry extra ones in `roles_json` (migration 052). Admin implies
  *  everything. This file has no server imports so both sides can use it. */
 
-export type Role = 'user' | 'teacher' | 'admin' | 'session_host';
+export type Role = 'user' | 'teacher' | 'admin' | 'session_host' | 'self_publisher';
 
 /** Roles the admin can add on top of the primary one, with their Thai label. */
 export const EXTRA_ROLES: { value: Role; label: string; hint: string }[] = [
   { value: 'teacher', label: 'ผู้จัด', hint: 'เห็น Host Dashboard และมีหน้าโปรไฟล์สาธารณะ' },
   { value: 'session_host', label: 'ผู้จัดรอบ', hint: 'เปิดรอบของกิจกรรมที่ถูกผูกชื่อไว้ได้เอง' },
+  { value: 'self_publisher', label: 'ผู้จัดลงกิจกรรมเอง', hint: 'ยืนยันข้อมูลแล้ว สร้างกิจกรรมเองแล้วส่งให้ admin อนุมัติได้' },
 ];
 
 export function parseRoles(json: string | null | undefined): Role[] {

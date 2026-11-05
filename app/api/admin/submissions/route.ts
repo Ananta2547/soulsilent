@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
 import { routeError, type SubKind } from '@/lib/submissions';
+import type { VerificationRow } from '@/lib/verification-labels';
+
+export type AdminVerification = VerificationRow & { account_email: string | null; account_name_user: string | null };
 
 export type AdminSubmission = {
   kind: SubKind;
@@ -22,7 +25,8 @@ export type AdminSubmission = {
 
 /**
  * GET /api/admin/submissions — host-made activities that are not simply
- * approved: waiting for admin first, then those sent back or turned down.
+ * approved: waiting for admin first, then those sent back or turned down —
+ * plus hosts asking to be allowed to publish on their own.
  */
 export async function GET() {
   try {
@@ -48,7 +52,23 @@ export async function GET() {
       )
       .all<AdminSubmission>();
     const list = rows.results || [];
-    return NextResponse.json({ submissions: list, pending: list.filter((r) => r.review_status === 'pending').length });
+    // Host forms asking to publish on their own (migration 081), waiting first.
+    const ver =
+      (
+        await db
+          .prepare(
+          `SELECT v.*, u.email AS account_email, u.name AS account_name_user
+               FROM host_verifications v LEFT JOIN users u ON u.id = v.user_id
+              WHERE v.status IN ('pending', 'changes_requested', 'rejected')
+              ORDER BY CASE v.status WHEN 'pending' THEN 0 WHEN 'changes_requested' THEN 1 ELSE 2 END, v.submitted_at DESC`,
+          )
+          .all<AdminVerification>()
+      ).results || [];
+    return NextResponse.json({
+      submissions: list,
+      verifications: ver,
+      pending: list.filter((r) => r.review_status === 'pending').length + ver.filter((v) => v.status === 'pending').length,
+    });
   } catch (e) {
     return routeError(e, 'Admin list submissions');
   }

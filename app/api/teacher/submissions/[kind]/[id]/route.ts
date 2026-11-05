@@ -10,11 +10,14 @@ import {
   hostMasterBody,
   hostWorkshopBody,
   isLive,
+  lockVenue,
   routeError,
   splitGated,
   tellAdminsSubmitted,
+  textChanges,
   type SubKind,
 } from '@/lib/submissions';
+import { tellAdmins } from '@/lib/host-verification';
 import type { Workshop, WorkshopMaster } from '@/lib/types';
 
 type Ctx = { params: Promise<{ kind: string; id: string }> };
@@ -31,14 +34,51 @@ async function own(db: D1Database, kind: string, id: string, me: string) {
   return { kind: kind as SubKind, row };
 }
 
-/** GET — the whole row, to fill the form. */
+/** Live seats taken on this activity (a round activity: on any of its rounds). */
+async function bookedCount(db: D1Database, kind: SubKind, id: string): Promise<number> {
+  const r = await db
+    .prepare(
+      kind === 'single'
+        ? "SELECT COUNT(*) AS n FROM bookings WHERE workshop_id = ? AND status != 'cancelled'"
+        : "SELECT COUNT(*) AS n FROM bookings WHERE status != 'cancelled' AND workshop_id IN (SELECT id FROM workshops WHERE master_id = ?)",
+    )
+    .bind(id)
+    .first<{ n: number }>();
+  return r?.n || 0;
+}
+
+const LOCKED = 'มีผู้จองกิจกรรมนี้แล้ว แก้ไขเองไม่ได้ — ติดต่อทีมงานให้แก้ให้';
+
+/** Tell admin on LINE which text / pictures a host changed on a live activity. */
+async function tellEdited(db: D1Database, kind: SubKind, id: string, title: string, me: string, changed: string[]) {
+  if (!changed.length) return;
+  const host = await db.prepare("SELECT COALESCE(NULLIF(TRIM(nickname), ''), name) AS n FROM users WHERE id = ?").bind(me).first<{ n: string | null }>();
+  const who = host?.n || 'ผู้จัด';
+  const env = (await getEnv()) as unknown as Parameters<typeof tellAdmins>[1];
+  const url = kind === 'single' ? `/journeys/${id}` : `/admin/workshop-info?focus=${encodeURIComponent(`master:${id}`)}`;
+  await tellAdmins(db, env, {
+    title: `ผู้จัดแก้กิจกรรม: ${title}`,
+    body: `${who} แก้ ${changed.join(', ')} (มีผลทันที)`,
+    band: 'ADMIN · ผู้จัดแก้ข้อมูล',
+    url,
+    rows: [
+      { k: 'ผู้จัด', v: who },
+      { k: 'แก้', v: changed.join(', ') },
+    ],
+    cta: 'ดูกิจกรรม',
+  });
+}
+
+/** GET — the whole row, to fill the form; locked once someone booked. */
 export async function GET(_req: Request, { params }: Ctx) {
   try {
-    const me = await requireRoles('teacher', 'session_host');
+    const me = await requireRoles('self_publisher');
     const { kind, id } = await params;
-    const o = await own(await getDB(), kind, id, me.sub);
+    const db = await getDB();
+    const o = await own(db, kind, id, me.sub);
     if ('error' in o) return o.error;
-    return NextResponse.json({ row: o.row });
+    const booked = await bookedCount(db, o.kind, id);
+    return NextResponse.json({ row: o.row, booked, locked: booked > 0 });
   } catch (e) {
     return routeError(e, 'Get submission');
   }
@@ -47,20 +87,22 @@ export async function GET(_req: Request, { params }: Ctx) {
 /**
  * PUT — save the form. Before approval everything is saved as is. Once the
  * activity is live, text and pictures go live now, while a price or date
- * change waits for admin (pending_json) and admin is told on LINE.
+ * change waits for admin (pending_json) and admin is told on LINE — of the
+ * text and picture changes too. Once anyone has booked, the host cannot edit.
  */
 export async function PUT(request: Request, { params }: Ctx) {
   try {
-    const me = await requireRoles('teacher', 'session_host');
+    const me = await requireRoles('self_publisher');
     const { kind, id } = await params;
     const db = await getDB();
     const o = await own(db, kind, id, me.sub);
     if ('error' in o) return o.error;
     const data = (await request.json()) as unknown;
+    if ((await bookedCount(db, o.kind, id)) > 0) return NextResponse.json({ error: LOCKED }, { status: 409 });
 
     if (o.kind === 'single') {
       const live = bodyFromWorkshop(o.row as Workshop);
-      const next = hostWorkshopBody(data as WorkshopBody, me.sub, live);
+      const next = await lockVenue(db, 'single', hostWorkshopBody(data as WorkshopBody, me.sub, live));
       if (!next.title?.trim()) return NextResponse.json({ error: 'กรุณากรอกชื่อกิจกรรม' }, { status: 400 });
       if (!isLive('single', o.row)) {
         await updateWorkshop(db, id, next);
@@ -69,11 +111,12 @@ export async function PUT(request: Request, { params }: Ctx) {
       const was = o.row.pending_json ? (JSON.parse(o.row.pending_json) as Partial<WorkshopBody>) : null;
       const split = splitGated('single', live, next, was);
       await updateWorkshop(db, id, split.save);
+      await tellEdited(db, o.kind, id, next.title, me.sub, textChanges('single', live, next));
       return NextResponse.json(await settlePending(db, 'workshops', o.kind, id, next.title, split.pending, me.sub));
     }
 
     const live = bodyFromMaster(o.row as WorkshopMaster);
-    const next = hostMasterBody(data as MasterBody, me.sub, live);
+    const next = await lockVenue(db, 'round', hostMasterBody(data as MasterBody, me.sub, live));
     if (!isLive('round', o.row)) {
       const r = await updateMaster(db, id, next);
       if (r.error) return NextResponse.json({ error: r.error }, { status: 400 });
@@ -83,6 +126,7 @@ export async function PUT(request: Request, { params }: Ctx) {
     const split = splitGated('round', live, next, was);
     const r = await updateMaster(db, id, split.save);
     if (r.error) return NextResponse.json({ error: r.error }, { status: 400 });
+    await tellEdited(db, o.kind, id, next.title, me.sub, textChanges('round', live, next));
     return NextResponse.json(await settlePending(db, 'workshop_masters', o.kind, id, next.title, split.pending, me.sub));
   } catch (e) {
     return routeError(e, 'Save submission');
@@ -109,7 +153,7 @@ async function settlePending(db: D1Database, table: 'workshops' | 'workshop_mast
 /** DELETE — a host may throw away an activity that never went live and has no bookings. */
 export async function DELETE(_req: Request, { params }: Ctx) {
   try {
-    const me = await requireRoles('teacher', 'session_host');
+    const me = await requireRoles('self_publisher');
     const { kind, id } = await params;
     const db = await getDB();
     const o = await own(db, kind, id, me.sub);
