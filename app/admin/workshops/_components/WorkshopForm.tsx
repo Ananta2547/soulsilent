@@ -522,7 +522,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
     if (!(await adminConfirm({ title: 'ลบกิจกรรมนี้?', msg: 'การจองและข้อมูลของรอบนี้จะถูกลบไปด้วย', ok: 'ลบกิจกรรม', danger: true }))) return;
     setDeleting(true);
     try {
-      await fetch(host ? `/api/teacher/submissions/single/${editingId}` : `/api/workshops/${editingId}`, { method: 'DELETE' });
+      await fetch(`/api/workshops/${editingId}`, { method: 'DELETE' });
       if (onSuccess) {
         onSuccess();
       } else {
@@ -1728,7 +1728,8 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
       </div>
 
       <div className="adm-sticky-foot">
-        {editingId && (
+        {/* Hosts never delete — they cancel from their list; admin deletes. */}
+        {editingId && !host && (
           <button type="button" onClick={handleDelete} disabled={deleting} className="adm-btn danger">
             {deleting ? 'กำลังลบ…' : 'ลบกิจกรรมนี้'}
           </button>

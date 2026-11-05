@@ -9,6 +9,7 @@
  * then approves, which grants the self_publisher role.
  */
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminChips, AdminHead, Badge, adminAlert, adminToast, type Tone } from '@/components/admin/AdminShell';
 import { AdminFormModal } from '@/components/admin/AdminFormModal';
@@ -21,7 +22,7 @@ import { accountNameMismatch } from '@/lib/host-payout';
 import { useFocusTokens } from '@/components/admin/AlertFocus';
 import type { Workshop, WorkshopMaster } from '@/lib/types';
 
-type Filter = 'pending' | 'changes_requested' | 'rejected';
+type Filter = 'pending' | 'changes_requested' | 'rejected' | 'cancelled';
 type Modal = { kind: 'single'; id: string; initial: WorkshopFormValues } | { kind: 'round'; id: string; initial: WorkshopMaster } | null;
 type Decide =
   | { s: AdminSubmission; ver?: undefined; action: 'changes' | 'reject' }
@@ -51,7 +52,8 @@ export default function AdminSubmissionsPage() {
   const [vers, setVers] = useState<AdminVerification[]>([]);
   const focus = useFocusTokens();
   const [tab, setTab] = useState<Tab>(focus.some((t) => t.startsWith('ver:')) ? 'hosts' : 'activities');
-  const [filter, setFilter] = useState<Filter>('pending');
+  const sp = useSearchParams();
+  const [filter, setFilter] = useState<Filter>(sp.get('tab') === 'cancelled' ? 'cancelled' : 'pending');
   const [busy, setBusy] = useState<string | null>(null);
   const [modal, setModal] = useState<Modal>(null);
   const [decide, setDecide] = useState<Decide>(null);
@@ -59,9 +61,9 @@ export default function AdminSubmissionsPage() {
 
   const load = useCallback(() => {
     fetch('/api/admin/submissions')
-      .then((r) => (r.ok ? (r.json() as Promise<{ submissions: AdminSubmission[]; verifications?: AdminVerification[] }>) : null))
+      .then((r) => (r.ok ? (r.json() as Promise<{ submissions: AdminSubmission[]; cancelled?: AdminSubmission[]; verifications?: AdminVerification[] }>) : null))
       .then((d) => {
-        setRows(d?.submissions || []);
+        setRows([...(d?.submissions || []), ...(d?.cancelled || [])]);
         setVers(d?.verifications || []);
       })
       .catch(() => setRows([]));
@@ -109,6 +111,20 @@ export default function AdminSubmissionsPage() {
     void sendVer(v, 'approve');
   }
 
+  async function remove(s: AdminSubmission) {
+    if (!window.confirm(`ลบ "${s.title}" ถาวร? กู้คืนไม่ได้`)) return;
+    setBusy(s.id);
+    try {
+      const r = await fetch(`/api/admin/submissions/${s.kind}/${s.id}`, { method: 'DELETE' });
+      const d = (await r.json()) as { error?: string };
+      if (!r.ok) return adminAlert('ลบไม่สำเร็จ', d.error || 'เกิดข้อผิดพลาด');
+      adminToast('ลบแล้ว');
+      load();
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function openEdit(s: AdminSubmission) {
     setBusy(s.id);
     try {
@@ -136,10 +152,10 @@ export default function AdminSubmissionsPage() {
   };
 
   const all = rows || [];
-  const shown = all.filter((r) => r.review_status === filter);
-  const count = (f: Filter) => (tab === 'hosts' ? vers.filter((v) => v.status === f).length : all.filter((r) => r.review_status === f).length);
+  const shown = filter === 'cancelled' ? all.filter((r) => r.cancelled) : all.filter((r) => !r.cancelled && r.review_status === filter);
+  const count = (f: Filter) => (tab === 'hosts' ? vers.filter((v) => v.status === f).length : f === 'cancelled' ? all.filter((r) => r.cancelled).length : all.filter((r) => !r.cancelled && r.review_status === f).length);
   const shownVer = vers.filter((v) => v.status === filter);
-  const waitingSubs = all.filter((r) => r.review_status === 'pending').length;
+  const waitingSubs = all.filter((r) => !r.cancelled && r.review_status === 'pending').length;
   const waitingVers = vers.filter((v) => v.status === 'pending').length;
 
   return (
@@ -162,6 +178,7 @@ export default function AdminSubmissionsPage() {
             { key: 'pending', label: 'รออนุมัติ', n: count('pending') },
             { key: 'changes_requested', label: 'ส่งกลับให้แก้', n: count('changes_requested') },
             { key: 'rejected', label: 'ไม่อนุมัติ', n: count('rejected') },
+            ...(tab === 'activities' ? [{ key: 'cancelled' as Filter, label: 'ผู้จัดยกเลิก', n: count('cancelled') }] : []),
           ]}
         />
       </div>
@@ -249,7 +266,7 @@ export default function AdminSubmissionsPage() {
             const live = s.live_status !== 'draft';
             const pending = s.pending_json ? (JSON.parse(s.pending_json) as Record<string, unknown>) : null;
             const st = s.review_status as ReviewStatus;
-            const noRounds = s.kind === 'round' && !live && s.rounds === 0;
+            const noRounds = !s.cancelled && s.kind === 'round' && !live && s.rounds === 0;
             return (
               <article key={`${s.kind}-${s.id}`} className="adm-card adm-subm" data-focus={`sub:${s.kind}:${s.id}`}>
                 {s.image_url ? (
@@ -260,7 +277,7 @@ export default function AdminSubmissionsPage() {
                 )}
                 <div className="adm-subm-body">
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <Badge tone={TONE[st] || 'mute'}>{live && st === 'pending' ? 'ขอแก้ราคา/วันเวลา' : REVIEW_LABEL[st] || st}</Badge>
+                    {s.cancelled ? <Badge tone="bad">ผู้จัดยกเลิกแล้ว</Badge> : <Badge tone={TONE[st] || 'mute'}>{live && st === 'pending' ? 'ขอแก้ราคา/วันเวลา' : REVIEW_LABEL[st] || st}</Badge>}
                     <Badge tone="mute">{s.kind === 'round' ? `จองรอบ · ${s.rounds} รอบ` : 'กิจกรรมเดี่ยว'}</Badge>
                     {live && <Badge tone="ok">เปิดบนเว็บแล้ว</Badge>}
                   </div>
@@ -282,6 +299,14 @@ export default function AdminSubmissionsPage() {
                     </div>
                   )}
                   {s.review_note && <p className="adm-meta" style={{ margin: 0 }}>หมายเหตุล่าสุด: {s.review_note}</p>}
+                  {s.cancelled ? (
+                    <div className="adm-subm-acts">
+                      <button type="button" className="adm-btn sm danger" disabled={busy === s.id || !!s.bookings} onClick={() => remove(s)}>
+                        ลบถาวร
+                      </button>
+                      {!!s.bookings && <span className="adm-hint">มีประวัติการจอง {s.bookings} รายการ — ลบไม่ได้ ปิดไว้แบบนี้</span>}
+                    </div>
+                  ) : (
                   <div className="adm-subm-acts">
                     {s.kind === 'single' ? (
                       <Link href={`/journeys/${s.id}`} target="_blank" className="adm-btn sm white">
@@ -311,7 +336,8 @@ export default function AdminSubmissionsPage() {
                       </button>
                     )}
                   </div>
-                  {noRounds && <p className="adm-hint" style={{ margin: 0 }}>ยังไม่มีรอบ — รอผู้จัดเพิ่มรอบก่อนอนุมัติ</p>}
+                  )}
+                  {!s.cancelled && noRounds && <p className="adm-hint" style={{ margin: 0 }}>ยังไม่มีรอบ — รอผู้จัดเพิ่มรอบก่อนอนุมัติ</p>}
                 </div>
               </article>
             );

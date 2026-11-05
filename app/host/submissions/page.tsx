@@ -17,6 +17,7 @@ import type { SubmissionRow } from '@/app/api/teacher/submissions/route';
 import type { Workshop, WorkshopMaster } from '@/lib/types';
 import type { VerificationRow, VerifyData } from '@/lib/verification-labels';
 import { VerifyPanel } from './VerifyPanel';
+import { PostponeModal } from './PostponeModal';
 
 type Ver = { canPublish: boolean; verification: VerificationRow | null; prefill: Partial<VerifyData> };
 
@@ -48,6 +49,7 @@ export default function HostSubmissionsPage() {
   const [note, setNote] = useState<string | null>(null);
 
   const [ver, setVer] = useState<Ver | null>(null);
+  const [moving, setMoving] = useState<string | null>(null);
 
   const load = useCallback(() => {
     fetch('/api/teacher/verification')
@@ -84,15 +86,19 @@ export default function HostSubmissionsPage() {
     }
   }
 
-  async function act(s: SubmissionRow, what: 'submit' | 'delete') {
-    if (what === 'delete' && !window.confirm(`ลบ "${s.title}"? ลบแล้วกู้คืนไม่ได้`)) return;
+  async function act(s: SubmissionRow, what: 'submit' | 'cancel') {
+    if (what === 'cancel' && !window.confirm(`ยกเลิก "${s.title}"? กิจกรรมจะถูกปิดไว้ (ไม่ได้ลบ) — เปิดใหม่ไม่ได้ ต้องสร้างใหม่`)) return;
     setBusy(s.id);
     setNote(null);
     try {
-      const r = await fetch(`/api/teacher/submissions/${s.kind}/${s.id}${what === 'submit' ? '/submit' : ''}`, { method: what === 'submit' ? 'POST' : 'DELETE' });
+      const r = await fetch(`/api/teacher/submissions/${s.kind}/${s.id}/${what}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(what === 'cancel' ? { action: 'cancel' } : {}),
+      });
       const d = (await r.json()) as { error?: string };
       if (!r.ok) return setNote(d.error || 'ทำรายการไม่สำเร็จ');
-      setNote(what === 'submit' ? `ส่ง "${s.title}" ให้ทีมตรวจแล้ว — จะแจ้งผลทาง LINE` : 'ลบแล้ว');
+      setNote(what === 'submit' ? `ส่ง "${s.title}" ให้ทีมตรวจแล้ว — จะแจ้งผลทาง LINE` : 'ยกเลิกแล้ว — กิจกรรมถูกปิดไว้');
       load();
     } finally {
       setBusy(null);
@@ -161,6 +167,7 @@ export default function HostSubmissionsPage() {
             const canSend = live ? waiting.length > 0 && st === 'changes_requested' : st !== 'pending' && st !== 'approved';
             const tone = TONE[st] || TONE.draft;
             const locked = s.booked > 0;
+            const gone = s.live_status === 'cancelled' || s.live_status === 'archived';
             return (
               <article key={`${s.kind}-${s.id}`} className="tdb-sub">
                 {s.image_url ? (
@@ -171,11 +178,17 @@ export default function HostSubmissionsPage() {
                 )}
                 <div className="tdb-sub-body">
                   <div className="tdb-sub-tags">
-                    <span className="tdb-sub-pill" style={{ background: tone.bg, color: tone.fg }}>
-                      {live && st === 'pending' ? 'รออนุมัติการแก้ไข' : REVIEW_LABEL[st] || st}
-                    </span>
+                    {gone ? (
+                      <span className="tdb-sub-pill" style={{ background: '#eceeed', color: '#4c5755' }}>
+                        ยกเลิกแล้ว
+                      </span>
+                    ) : (
+                      <span className="tdb-sub-pill" style={{ background: tone.bg, color: tone.fg }}>
+                        {live && st === 'pending' ? 'รออนุมัติการแก้ไข' : REVIEW_LABEL[st] || st}
+                      </span>
+                    )}
                     <span className="tdb-sub-kind">{s.kind === 'round' ? 'กิจกรรมจองรอบ' : 'กิจกรรมเดี่ยว'}</span>
-                    {live && <span className="tdb-sub-kind">เปิดบนเว็บแล้ว</span>}
+                    {live && !gone && <span className="tdb-sub-kind">เปิดบนเว็บแล้ว</span>}
                   </div>
                   <h3 className="tdb-sub-title">{s.title}</h3>
                   <p className="tdb-sub-meta">
@@ -184,12 +197,17 @@ export default function HostSubmissionsPage() {
                     {s.reviewed_at ? ` · ตรวจแล้ว ${fmtDay(s.reviewed_at)}` : ''}
                   </p>
                   {waiting.length > 0 && <p className="tdb-sub-meta">รออนุมัติ: {waiting.join(', ')} — หน้าเว็บยังใช้ค่าเดิมจนกว่าทีมงานจะอนุมัติ</p>}
-                  {locked && <p className="tdb-sub-meta">มีผู้จองแล้ว {s.booked} คน — แก้ไขเองไม่ได้ หากต้องแก้ติดต่อทีมงาน</p>}
+                  {locked && !gone && (
+                    <p className="tdb-sub-meta">
+                      มีผู้จองแล้ว {s.booked} คน — แก้ไขเองไม่ได้ หากต้องแก้ติดต่อทีมงาน{s.kind === 'single' ? ' · เลื่อนวันหรือยกเลิกได้ที่ปุ่ม “เลื่อน / ยกเลิก”' : ' · ยกเลิกหรือย้ายรอบได้ที่หน้าจัดรอบ'}
+                    </p>
+                  )}
                   {s.review_note && st !== 'pending' && (
                     <p className="tdb-sub-note">
                       <b>หมายเหตุจากทีมงาน:</b> {s.review_note}
                     </p>
                   )}
+                  {!gone && (
                   <div className="tdb-sub-acts">
                     <button type="button" className="tdb-sub-btn" disabled={busy === s.id || locked} onClick={() => openEdit(s)}>
                       {locked ? 'มีผู้จองแล้ว · แก้ไม่ได้' : 'แก้ไข'}
@@ -209,17 +227,40 @@ export default function HostSubmissionsPage() {
                         ส่งให้ทีมตรวจ
                       </button>
                     )}
-                    {!live && st !== 'pending' && (
-                      <button type="button" className="tdb-sub-btn danger" disabled={busy === s.id} onClick={() => act(s, 'delete')}>
-                        ลบ
+                    {s.kind === 'single' && locked ? (
+                      <button type="button" className="tdb-sub-btn danger" disabled={busy === s.id} onClick={() => setMoving(s.id)}>
+                        เลื่อน / ยกเลิก
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="tdb-sub-btn danger"
+                        disabled={busy === s.id || locked}
+                        title={locked ? 'ยังมีรอบที่มีคนจอง — ยกเลิกหรือย้ายรอบนั้นที่หน้าจัดรอบก่อน' : undefined}
+                        onClick={() => act(s, 'cancel')}
+                      >
+                        ยกเลิก
                       </button>
                     )}
                   </div>
+                  )}
                 </div>
               </article>
             );
           })}
         </div>
+      )}
+
+      {moving && (
+        <PostponeModal
+          id={moving}
+          onClose={() => setMoving(null)}
+          onDone={(msg) => {
+            setMoving(null);
+            setNote(msg);
+            load();
+          }}
+        />
       )}
 
       {/* The admin form styles (admin.css) are scoped to .adm. */}

@@ -150,32 +150,8 @@ async function settlePending(db: D1Database, table: 'workshops' | 'workshop_mast
   return { ok: true, waiting: changed };
 }
 
-/** DELETE — a host may throw away an activity that never went live and has no bookings. */
-export async function DELETE(_req: Request, { params }: Ctx) {
-  try {
-    const me = await requireRoles('self_publisher');
-    const { kind, id } = await params;
-    const db = await getDB();
-    const o = await own(db, kind, id, me.sub);
-    if ('error' in o) return o.error;
-    if (isLive(o.kind, o.row)) return NextResponse.json({ error: 'กิจกรรมที่เปิดแล้วลบเองไม่ได้ — ติดต่อทีมงาน' }, { status: 400 });
-    const booked = await db
-      .prepare(
-        o.kind === 'single'
-          ? 'SELECT COUNT(*) AS n FROM bookings WHERE workshop_id = ?'
-          : 'SELECT COUNT(*) AS n FROM bookings WHERE workshop_id IN (SELECT id FROM workshops WHERE master_id = ?)',
-      )
-      .bind(id)
-      .first<{ n: number }>();
-    if (booked?.n) return NextResponse.json({ error: 'มีการจองแล้ว ลบไม่ได้' }, { status: 400 });
-    if (o.kind === 'single') await db.prepare('DELETE FROM workshops WHERE id = ?').bind(id).run();
-    else
-      await db.batch([
-        db.prepare('DELETE FROM workshops WHERE master_id = ?').bind(id),
-        db.prepare('DELETE FROM workshop_masters WHERE id = ?').bind(id),
-      ]);
-    return NextResponse.json({ ok: true });
-  } catch (e) {
-    return routeError(e, 'Delete submission');
-  }
+/** DELETE — hosts do not delete: they cancel (POST ./cancel), which only hides
+ *  the activity. Deleting is admin's (DELETE /api/admin/submissions/[kind]/[id]). */
+export async function DELETE() {
+  return NextResponse.json({ error: 'ผู้จัดลบกิจกรรมไม่ได้ — ใช้ปุ่มยกเลิก แล้วทีมงานจะลบให้ถ้าจำเป็น' }, { status: 405 });
 }

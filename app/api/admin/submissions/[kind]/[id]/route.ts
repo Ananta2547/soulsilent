@@ -82,3 +82,40 @@ export async function POST(request: Request, { params }: { params: Promise<{ kin
     return routeError(e, 'Admin decide');
   }
 }
+
+/**
+ * DELETE /api/admin/submissions/[kind]/[id] — admin removes for good a host
+ * activity the host cancelled. Only one nobody ever booked: a booking row
+ * (even cancelled or refunded) is money history, so that activity stays hidden.
+ */
+export async function DELETE(_req: Request, { params }: { params: Promise<{ kind: string; id: string }> }) {
+  try {
+    await requireAdmin();
+    const { kind, id } = await params;
+    if (kind !== 'single' && kind !== 'round') return NextResponse.json({ error: 'ไม่รู้จักประเภทกิจกรรม' }, { status: 400 });
+    const db = await getDB();
+    const row =
+      kind === 'single'
+        ? await db.prepare("SELECT id FROM workshops WHERE id = ? AND master_id IS NULL AND review_status IS NOT NULL AND status = 'cancelled'").bind(id).first()
+        : await db.prepare("SELECT id FROM workshop_masters WHERE id = ? AND review_status IS NOT NULL AND activity_status = 'archived'").bind(id).first();
+    if (!row) return NextResponse.json({ error: 'ลบได้เฉพาะกิจกรรมของผู้จัดที่ยกเลิกแล้ว' }, { status: 400 });
+    const used = await db
+      .prepare(
+        kind === 'single'
+          ? 'SELECT COUNT(*) AS n FROM bookings WHERE workshop_id = ?'
+          : 'SELECT COUNT(*) AS n FROM bookings WHERE workshop_id IN (SELECT id FROM workshops WHERE master_id = ?)',
+      )
+      .bind(id)
+      .first<{ n: number }>();
+    if (used?.n) return NextResponse.json({ error: `มีประวัติการจอง ${used.n} รายการ — ลบไม่ได้ ปิดไว้แบบนี้แทน` }, { status: 409 });
+    if (kind === 'single') await db.prepare('DELETE FROM workshops WHERE id = ?').bind(id).run();
+    else
+      await db.batch([
+        db.prepare('DELETE FROM workshops WHERE master_id = ?').bind(id),
+        db.prepare('DELETE FROM workshop_masters WHERE id = ?').bind(id),
+      ]);
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    return routeError(e, 'Admin delete submission');
+  }
+}

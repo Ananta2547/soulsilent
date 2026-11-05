@@ -983,3 +983,21 @@ a.tdb-round:hover { color: var(--ink); background: #eaf6f4; }
 .tdb-ver-err { margin: 0; color: #a3261a; font-size: 14px; font-weight: 600; }
 @media (max-width: 640px) { .tdb-ver-grid { grid-template-columns: 1fr; } }
 .tdb-ver > .tdb-sub-btn { align-self: flex-start; }
+
+/* เลื่อน / ยกเลิกกิจกรรมเดี่ยว (PostponeModal) */
+.tdb-pp { display: flex; flex-direction: column; gap: 14px; width: min(560px, 100%); max-height: min(88vh, 860px); overflow-y: auto; padding: 22px; box-sizing: border-box; }
+.tdb-pp-title { margin: 6px 0 2px; font-family: 'Mitr', sans-serif; font-weight: 500; font-size: 22px; line-height: 1.25; }
+.tdb-pp-seg { display: inline-flex; align-self: flex-start; padding: 3px; border-radius: 999px; background: var(--cream, #f6f1e6); }
+.tdb-pp-seg button { border: 0; background: transparent; padding: 8px 16px; border-radius: 999px; font: inherit; font-size: 14px; font-weight: 600; color: var(--muted); cursor: pointer; }
+.tdb-pp-seg button.on { background: var(--ink); color: #fff; }
+.tdb-pp-when { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 10px; }
+.tdb-pp-when label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; min-width: 0; }
+.tdb-pp-when input { min-height: 42px; padding: 8px 10px; border: 1px solid rgba(13,30,29,.14); border-radius: 12px; font: inherit; font-size: 15px; background: #fff; color: var(--ink); min-width: 0; }
+.tdb-pp-list { display: flex; flex-direction: column; gap: 8px; }
+.tdb-pp-party { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; background: #eaf6f4; }
+.tdb-pp-party b { display: block; font-size: 14.5px; }
+.tdb-pp-party .tdb-sub-meta { display: block; }
+.tdb-pp-party.is-refund { background: #fde4e1; }
+.tdb-pp-toggle { flex: none; border: 0; border-radius: 999px; padding: 7px 12px; background: #fff; font: inherit; font-size: 13px; font-weight: 700; color: #075a51; cursor: pointer; box-shadow: 0 0 0 1px rgba(13,30,29,.1); }
+.tdb-pp-party.is-refund .tdb-pp-toggle { color: #a3261a; }
+@media (max-width: 640px) { .tdb-pp-when { grid-template-columns: 1fr 1fr; } .tdb-pp-when label:first-child { grid-column: 1 / -1; } }
