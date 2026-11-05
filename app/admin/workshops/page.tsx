@@ -169,6 +169,14 @@ export default function AdminWorkshopsPage() {
         confirm_main_by: w.confirm_main_by || '',
         confirm_waitlist_by: w.confirm_waitlist_by || '',
         require_consent: !!w.require_consent,
+        application_form: (() => {
+          try {
+            const q = JSON.parse(w.application_form || '[]') as ApplicationQuestion[];
+            return Array.isArray(q) ? q : [];
+          } catch {
+            return [];
+          }
+        })(),
         photos_drive_url: w.photos_drive_url || '',
         master_id: w.master_id || '',
       };

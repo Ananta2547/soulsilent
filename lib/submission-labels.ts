@@ -65,5 +65,6 @@ export const FIELD_LABEL: Record<string, string> = {
   close_at: 'ปิดรับสมัคร',
   close_days_before: 'ปิดรับจอง',
   close_time: 'ปิดรับจอง',
-  require_consent: 'ข้อตกลง',
+  require_consent: 'ขอความยินยอม PDPA',
+  application_form: 'ใบสมัคร',
 };

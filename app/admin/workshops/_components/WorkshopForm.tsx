@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import type { DayTime, ImageMeta, Location, ScheduleDay, ScheduleItem, User, Workshop, WorkshopMaster } from '@/lib/types';
+import type { ApplicationQuestion, DayTime, ImageMeta, Location, ScheduleDay, ScheduleItem, User, Workshop, WorkshopMaster } from '@/lib/types';
+import { ApplicationEditor } from '@/components/workshops/ApplicationEditor';
+import { cleanQuestions } from '@/lib/application-form';
 import { ImageUploader } from '@/components/admin/image/ImageUploader';
 // The admin popup pickers (design "Date picker"), same values as before.
 import { PickTime as TimeField24, PickDate as DateField24, PickDateTime as DateTimePicker } from '@/components/admin/pickers';
@@ -80,6 +82,8 @@ export type WorkshopFormValues = {
   confirm_main_by: string;
   confirm_waitlist_by: string;
   require_consent: boolean;
+  /** Questions asked before booking — the same editor as a round activity. */
+  application_form: ApplicationQuestion[];
   /** Google Drive link to event photos — only when require_consent is on. */
   photos_drive_url: string;
   master_id: string;
@@ -134,6 +138,7 @@ export function formValuesFromWorkshop(w: Workshop & { image_meta?: string | nul
     confirm_main_by: w.confirm_main_by || '',
     confirm_waitlist_by: w.confirm_waitlist_by || '',
     require_consent: !!w.require_consent,
+    application_form: safeParseArray<ApplicationQuestion>(w.application_form, []),
     photos_drive_url: w.photos_drive_url || '',
     master_id: w.master_id || '',
   };
@@ -185,6 +190,7 @@ export const emptyWorkshopForm: WorkshopFormValues = {
   confirm_main_by: '',
   confirm_waitlist_by: '',
   require_consent: false,
+  application_form: [],
   photos_drive_url: '',
   master_id: '',
 };
@@ -492,6 +498,11 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
 
     if (closeErr) {
       setError(`วันปิดรับสมัคร${closeErr}`);
+      return;
+    }
+    const app = cleanQuestions(form.application_form);
+    if ('error' in app) {
+      setError(`ใบสมัคร: ${app.error}`);
       return;
     }
     // Selection rounds must run in order: announce → confirm main → confirm waitlist.
@@ -1266,39 +1277,6 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
               </div>
             )}
 
-            <label className="flex items-start gap-2 pt-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.require_consent}
-                onChange={(e) => setForm({ ...form, require_consent: e.target.checked })}
-                className="mt-0.5"
-              />
-              <span className="text-sm text-dark">
-                ขอความยินยอมบันทึกเสียง ภาพและวิดีโอ (PDPA)
-                <span className="block text-xs text-gray mt-0.5">
-                  เปิดไว้เพื่อให้แบบฟอร์มใบสมัครมีส่วนขอความยินยอมการบันทึกภาพ/วิดีโอ (บังคับเลือก)
-                </span>
-              </span>
-            </label>
-
-            {/* Google Drive photo link — only relevant when PDPA consent is on */}
-            {form.require_consent && !host && (
-              <div className="pl-6">
-                <label className="block text-xs font-medium text-dark mb-1">
-                  Link Google Drive (รูปกิจกรรม)
-                </label>
-                <input
-                  type="url"
-                  value={form.photos_drive_url}
-                  onChange={(e) => setForm({ ...form, photos_drive_url: e.target.value })}
-                  className="input-field"
-                  placeholder="https://drive.google.com/..."
-                />
-                <p className="text-xs text-gray mt-1">
-                  ลิงก์นี้จะแสดงใน My Journey ให้เฉพาะผู้ที่เข้าร่วมและถูกเช็คชื่อแล้วเท่านั้น
-                </p>
-              </div>
-            )}
           </fieldset>
         </SheetSection>
         <SheetSection n={2} title="ราคา & การชำระเงิน">
@@ -1372,6 +1350,33 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
                 </div>
               )}
             </fieldset>
+          )}
+        </SheetSection>
+        <SheetSection n={3} title="ใบสมัคร & PDPA">
+          <ApplicationEditor
+            questions={form.application_form}
+            onQuestions={(q) => setForm((f) => ({ ...f, application_form: q }))}
+            consent={form.require_consent}
+            onConsent={(on) => setForm((f) => ({ ...f, require_consent: on }))}
+            disabled={saving}
+          />
+          {/* Google Drive photo link — only relevant when PDPA consent is on */}
+          {form.require_consent && !host && (
+            <div className="pl-6">
+              <label className="block text-xs font-medium text-dark mb-1">
+                Link Google Drive (รูปกิจกรรม)
+              </label>
+              <input
+                type="url"
+                value={form.photos_drive_url}
+                onChange={(e) => setForm({ ...form, photos_drive_url: e.target.value })}
+                className="input-field"
+                placeholder="https://drive.google.com/..."
+              />
+              <p className="text-xs text-gray mt-1">
+                ลิงก์นี้จะแสดงใน My Journey ให้เฉพาะผู้ที่เข้าร่วมและถูกเช็คชื่อแล้วเท่านั้น
+              </p>
+            </div>
           )}
         </SheetSection>
       </div>

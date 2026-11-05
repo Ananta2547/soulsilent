@@ -6,7 +6,8 @@
  */
 import { normalizeInstructorIds } from '@/lib/workshop-utils';
 import { normalizeOnlineFields } from '@/lib/online-platform';
-import type { DayTime, ImageMeta } from '@/lib/types';
+import { cleanQuestions } from '@/lib/application-form';
+import type { ApplicationQuestion, DayTime, ImageMeta } from '@/lib/types';
 
 export type WorkshopBody = {
   title: string;
@@ -55,9 +56,24 @@ export type WorkshopBody = {
   confirm_main_by?: string | null;
   confirm_waitlist_by?: string | null;
   require_consent?: boolean | number;
+  /** Questions asked before booking (migration 021). Left out = unchanged. */
+  application_form?: ApplicationQuestion[];
   photos_drive_url?: string | null;
   master_id?: string | null;
 };
+
+/** The form's questions as stored: each well-formed one kept, a half-written
+ *  one dropped (the form itself refuses to save those). null = not sent. */
+function questionsJson(body: WorkshopBody): string | null {
+  if (!Array.isArray(body.application_form)) return null;
+  const all = cleanQuestions(body.application_form);
+  if (!('error' in all)) return JSON.stringify(all.questions);
+  const kept = body.application_form.flatMap((q) => {
+    const one = cleanQuestions([q]);
+    return 'error' in one ? [] : one.questions;
+  });
+  return JSON.stringify(kept);
+}
 
 /** The owner is the first facilitator; co-hosts with dashboard access exclude them. */
 function people(body: WorkshopBody) {
@@ -81,8 +97,8 @@ export async function insertWorkshop(db: D1Database, id: string, body: WorkshopB
         admission_type, payment_type, deposit_amount, announce_at, close_at, confirm_main_by, confirm_waitlist_by,
         require_consent, master_id, day_times_json, photos_drive_url,
         is_online, online_platform, online_platform_other, online_url,
-        dashboard_access_json
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        dashboard_access_json, application_form
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -132,6 +148,7 @@ export async function insertWorkshop(db: D1Database, id: string, body: WorkshopB
       online.platform_other,
       online.url,
       JSON.stringify(dashboardAccess),
+      questionsJson(body) ?? '[]',
     )
     .run();
 }
@@ -153,7 +170,7 @@ export async function updateWorkshop(db: D1Database, id: string, body: WorkshopB
          announce_at = ?, close_at = ?, confirm_main_by = ?, confirm_waitlist_by = ?,
          require_consent = ?, photos_drive_url = ?, master_id = ?,
          is_online = ?, online_platform = ?, online_platform_other = ?, online_url = ?,
-         dashboard_access_json = ?,
+         dashboard_access_json = ?, application_form = COALESCE(?, application_form),
          updated_at = datetime('now')
        WHERE id = ?`,
     )
@@ -204,6 +221,7 @@ export async function updateWorkshop(db: D1Database, id: string, body: WorkshopB
       online.platform_other,
       online.url,
       JSON.stringify(dashboardAccess),
+      questionsJson(body),
       id,
     )
     .run();

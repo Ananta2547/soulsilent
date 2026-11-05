@@ -13,7 +13,7 @@ import { ONLINE_VENUE } from '@/lib/online-platform';
 import { sendPushToUser, subscribedUsers } from '@/lib/push';
 import type { WorkshopBody } from '@/lib/workshop-write';
 import type { MasterBody } from '@/lib/master-write';
-import type { DayTime, Workshop, WorkshopMaster } from '@/lib/types';
+import type { ApplicationQuestion, DayTime, Workshop, WorkshopMaster } from '@/lib/types';
 
 import type { SubKind } from '@/lib/submission-labels';
 import { FIELD_LABEL } from '@/lib/submission-labels';
@@ -129,6 +129,7 @@ export function bodyFromWorkshop(w: Workshop): WorkshopBody {
     confirm_main_by: w.confirm_main_by || null,
     confirm_waitlist_by: w.confirm_waitlist_by || null,
     require_consent: w.require_consent ? 1 : 0,
+    application_form: safeParseArray<ApplicationQuestion>(w.application_form, []),
     photos_drive_url: x.photos_drive_url || null,
     master_id: w.master_id || null,
   };
