@@ -14,9 +14,7 @@ import { Children, Fragment, isValidElement, useEffect, useRef, useState, type P
 import { createPortal } from 'react-dom';
 
 const pad = (n: number) => String(n).padStart(2, '0');
-const TH_MONTH = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 const TH_MON = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
-const TH_WD = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 
 /* ------------------------------------------------------------------ */
 /* Anchored popover / phone sheet                                      */
@@ -40,12 +38,15 @@ function anchorOf(el: HTMLElement, width: number, height: number): Anchor {
 function Popover({
   anchor,
   onClose,
+  onScrim,
   role,
   label,
   children,
 }: {
   anchor: Anchor;
   onClose: () => void;
+  /** A tap outside the box; defaults to onClose. */
+  onScrim?: () => void;
   role: 'dialog' | 'listbox';
   label?: string;
   children: ReactNode;
@@ -69,7 +70,7 @@ function Popover({
   // transformed ancestor, which would make position:fixed relative to it.
   return createPortal(
     <>
-      <div className={`adm-pop-scrim${anchor.sheet ? ' is-sheet' : ''}`} onClick={onClose} aria-hidden="true" />
+      <div className={`adm-pop-scrim${anchor.sheet ? ' is-sheet' : ''}`} onClick={onScrim ?? onClose} aria-hidden="true" />
       <div
         role={role}
         aria-label={label}
@@ -216,6 +217,12 @@ export function AdmSelect({
 
 /* ------------------------------------------------------------------ */
 /* Date / time picker                                                  */
+/*                                                                     */
+/* Every column is a scroll wheel (day / month / year, hour / minute): */
+/* scroll, mouse-wheel, drag with the left button, or tap a number.    */
+/* There is no OK button — tapping outside the box keeps the choice,   */
+/* Esc leaves the field as it was. Tapping the chosen date again       */
+/* clears it.                                                          */
 /* ------------------------------------------------------------------ */
 
 const isoOf = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}`;
@@ -232,167 +239,42 @@ export function fmtThaiDate(iso: string): string {
   return `${d} ${TH_MON[m - 1]} ${y + 543}`;
 }
 
-function addDays(iso: string, n: number): string {
-  const [y, m, d] = iso.split('-').map(Number);
-  const t = new Date(y, m - 1, d + n);
-  return isoOf(t.getFullYear(), t.getMonth(), t.getDate());
-}
-
-function PickerPanel({
-  mode,
-  date,
-  time,
-  onPick,
-  onCancel,
-}: {
-  mode: 'date' | 'time' | 'datetime';
-  date: string;
-  time: string;
-  onPick: (date: string, time: string) => void;
-  onCancel: () => void;
-}) {
-  const [today] = useState(todayIso);
-  const [view, setView] = useState(() => {
-    const [y, m] = (date || today).split('-').map(Number);
-    return { y, m: m - 1 };
-  });
-  const [d, setD] = useState(date);
-  const [t, setT] = useState(time || '09:00');
-  const [h, mi] = t.split(':');
-
-  const first = new Date(view.y, view.m, 1).getDay();
-  const days = new Date(view.y, view.m + 1, 0).getDate();
-  const cells: (number | null)[] = [...Array<null>(first).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)];
-  const shift = (n: number) =>
-    setView((v) => {
-      const t2 = new Date(v.y, v.m + n, 1);
-      return { y: t2.getFullYear(), m: t2.getMonth() };
-    });
-  const choose = (iso: string) => {
-    if (mode === 'date') {
-      onPick(iso, t);
-      return;
-    }
-    setD(iso);
-    const [y, m] = iso.split('-').map(Number);
-    setView({ y, m: m - 1 });
-  };
-  const hasDate = mode !== 'time';
-  const hasTime = mode !== 'date';
-
-  return (
-    <div className="adm-dp">
-      {hasDate && (
-        <>
-          <div className="adm-dp-head">
-            <button type="button" onClick={() => shift(-1)} aria-label="เดือนก่อน">
-              ‹
-            </button>
-            <b>
-              {TH_MONTH[view.m]} {view.y + 543}
-            </b>
-            <button type="button" onClick={() => shift(1)} aria-label="เดือนถัดไป">
-              ›
-            </button>
-          </div>
-          <div className="adm-dp-wd" aria-hidden="true">
-            {TH_WD.map((w) => (
-              <span key={w}>{w}</span>
-            ))}
-          </div>
-          <div className="adm-dp-grid">
-            {cells.map((c, i) => {
-              if (c == null) return <span key={`e${i}`} />;
-              const iso = isoOf(view.y, view.m, c);
-              const on = iso === d;
-              return (
-                <button
-                  key={iso}
-                  type="button"
-                  className={`adm-dp-day${on ? ' is-on' : ''}${iso === today ? ' is-today' : ''}`}
-                  aria-pressed={on}
-                  aria-label={fmtThaiDate(iso)}
-                  onClick={() => choose(iso)}
-                >
-                  {c}
-                </button>
-              );
-            })}
-          </div>
-          <div className="adm-dp-quick">
-            {(
-              [
-                ['วันนี้', today],
-                ['พรุ่งนี้', addDays(today, 1)],
-                ['อีก 7 วัน', addDays(today, 7)],
-              ] as const
-            ).map(([label, iso]) => (
-              <button key={label} type="button" onClick={() => choose(iso)}>
-                {label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-      {hasTime && (
-        <>
-          <div className={`adm-dp-time${hasDate ? ' has-line' : ''}`}>
-            <div className="adm-label">ชั่วโมง</div>
-            <div className="adm-dp-hours">
-              {Array.from({ length: 24 }, (_, i) => pad(i)).map((x) => (
-                <button key={x} type="button" className={x === h ? 'is-on' : ''} aria-pressed={x === h} onClick={() => setT(`${x}:${mi}`)}>
-                  {x}
-                </button>
-              ))}
-            </div>
-            <div className="adm-label" style={{ marginTop: 4 }}>
-              นาที
-            </div>
-            <div className="adm-dp-mins">
-              {Array.from({ length: 12 }, (_, i) => pad(i * 5)).map((x) => (
-                <button key={x} type="button" className={x === mi ? 'is-on' : ''} aria-pressed={x === mi} onClick={() => setT(`${h}:${x}`)}>
-                  {x}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="adm-dp-foot">
-            <span>
-              {hasDate ? (d ? `${fmtThaiDate(d)} · ` : 'ยังไม่เลือกวัน · ') : ''}
-              {t} น.
-            </span>
-            <button type="button" className="adm-btn sm" onClick={onCancel}>
-              ยกเลิก
-            </button>
-            <button type="button" className="adm-btn sm teal" disabled={hasDate && !d} onClick={() => onPick(d, t)}>
-              ตกลง
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* "Host Create Journey v4" panel: calendar with วันนี้ ‹ ›, past days  */
-/* greyed, scroll-wheel hours/minutes, common times, summary footer.   */
-/* ------------------------------------------------------------------ */
-
 const ROW = 52;
 const QUICK_TIMES = ['08:00', '09:00', '10:00', '13:00', '14:00', '17:00', '18:00', '19:00'];
-const HOURS = Array.from({ length: 24 }, (_, i) => pad(i));
-const MINS = Array.from({ length: 12 }, (_, i) => pad(i * 5));
+const HOURS = Array.from({ length: 24 }, (_, i) => ({ v: pad(i), label: pad(i) }));
+const MINS = Array.from({ length: 12 }, (_, i) => ({ v: pad(i * 5), label: pad(i * 5) }));
+const MONTHS = TH_MON.map((label, i) => ({ v: String(i), label }));
+const daysIn = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
 
-function WheelCol({ label, items, value, onChange }: { label: string; items: string[]; value: string; onChange: (v: string) => void }) {
+type WheelItem = { v: string; label: string; off?: boolean; tint?: boolean };
+
+function WheelCol({
+  label,
+  items,
+  value,
+  onChange,
+  onTapCurrent,
+  dim,
+  width = 84,
+}: {
+  label: string;
+  items: WheelItem[];
+  value: string;
+  onChange: (v: string) => void;
+  onTapCurrent?: () => void;
+  dim?: boolean;
+  width?: number;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const fromWheel = useRef(false);
   const first = useRef(true);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const idx = Math.max(0, items.indexOf(value));
+  const drag = useRef<{ y: number; top: number; moved: boolean } | null>(null);
+  const idx = Math.max(0, items.findIndex((it) => it.v === value));
 
-  // Follow the chosen value when it changes from outside (a common-time
-  // chip, or the first open), but not when the user's own scroll set it.
+  // Follow the value when it changes from outside (a quick-time chip, a
+  // month change that clamps the day, the first open) — not after the
+  // user's own scroll set it.
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -402,7 +284,7 @@ function WheelCol({ label, items, value, onChange }: { label: string; items: str
     }
     el.scrollTo({ top: idx * ROW, behavior: first.current ? 'auto' : 'smooth' });
     first.current = false;
-  }, [idx]);
+  }, [idx, items.length]);
   useEffect(
     () => () => {
       if (timer.current) clearTimeout(timer.current);
@@ -410,28 +292,28 @@ function WheelCol({ label, items, value, onChange }: { label: string; items: str
     [],
   );
 
+  const settle = (i: number) => {
+    const it = items[Math.min(items.length - 1, Math.max(0, i))];
+    if (it && it.v !== value) {
+      fromWheel.current = true;
+      onChange(it.v);
+    }
+  };
   const onScroll = () => {
+    if (drag.current?.moved) return;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       const el = ref.current;
-      if (!el) return;
-      const i = Math.min(items.length - 1, Math.max(0, Math.round(el.scrollTop / ROW)));
-      if (items[i] !== value) {
-        fromWheel.current = true;
-        onChange(items[i]);
-      }
+      if (el) settle(Math.round(el.scrollTop / ROW));
     }, 90);
   };
 
   // Mouse drag: hold the left button and move up/down to spin the column.
   // Touch already scrolls natively, so only mouse pointers are handled.
-  const drag = useRef<{ y: number; top: number; moved: boolean } | null>(null);
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     const el = ref.current;
     if (!el || e.pointerType !== 'mouse' || e.button !== 0) return;
     drag.current = { y: e.clientY, top: el.scrollTop, moved: false };
-    el.style.scrollSnapType = 'none';
-    el.style.cursor = 'grabbing';
   };
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current;
@@ -441,26 +323,25 @@ function WheelCol({ label, items, value, onChange }: { label: string; items: str
     if (!d.moved && Math.abs(dy) > 3) {
       // capture only once it is a real drag, so a plain click still hits the item
       d.moved = true;
+      el.style.scrollSnapType = 'none';
+      el.style.cursor = 'grabbing';
       el.setPointerCapture(e.pointerId);
     }
-    if (!d.moved) return;
-    el.scrollTop = d.top - dy;
+    if (d.moved) el.scrollTop = d.top - dy;
   };
   const endDrag = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     const el = ref.current;
     if (!d || !el) return;
-    if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
-    el.style.cursor = '';
     if (!d.moved) {
-      // plain click: let the item's own onClick spin the column
-      el.style.scrollSnapType = 'y mandatory';
       drag.current = null;
       return;
     }
+    if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+    el.style.cursor = '';
     const i = Math.min(items.length - 1, Math.max(0, Math.round(el.scrollTop / ROW)));
     el.scrollTo({ top: i * ROW, behavior: 'smooth' });
-    // put snapping back once the glide has landed
+    settle(i); // keep it at once, so a tap outside right after still saves it
     setTimeout(() => {
       if (ref.current) ref.current.style.scrollSnapType = 'y mandatory';
     }, 350);
@@ -470,7 +351,7 @@ function WheelCol({ label, items, value, onChange }: { label: string; items: str
 
   const mask = 'linear-gradient(180deg, transparent 0, #000 34%, #000 66%, transparent 100%)';
   return (
-    <div style={{ position: 'relative', width: 84, height: ROW * 3 }}>
+    <div style={{ position: 'relative', width, height: ROW * 3, flexShrink: 0 }}>
       <div aria-hidden="true" style={{ position: 'absolute', left: 0, right: 0, top: ROW, height: ROW, borderRadius: 14, background: 'var(--cream)', pointerEvents: 'none' }} />
       <div
         ref={ref}
@@ -490,18 +371,36 @@ function WheelCol({ label, items, value, onChange }: { label: string; items: str
         style={{ position: 'relative', height: ROW * 3, overflowY: 'auto', cursor: 'grab', userSelect: 'none', touchAction: 'pan-y', scrollSnapType: 'y mandatory', scrollbarWidth: 'none', overscrollBehavior: 'contain', WebkitMaskImage: mask, maskImage: mask }}
       >
         <div style={{ height: ROW }} />
-        {items.map((v, i) => {
-          const on = v === value;
+        {items.map((it, i) => {
+          const on = i === idx;
+          const strong = on && !dim;
           return (
             <button
-              key={v}
+              key={it.v}
               type="button"
               role="option"
-              aria-selected={on}
-              onClick={() => ref.current?.scrollTo({ top: i * ROW, behavior: 'smooth' })}
-              style={{ display: 'block', width: '100%', height: ROW, scrollSnapAlign: 'center', fontFamily: "'Archivo Black', Mitr, sans-serif", fontSize: on ? 30 : 22, lineHeight: `${ROW}px`, color: on ? 'var(--ink)' : 'rgba(13,30,29,.35)', transition: 'font-size .15s, color .15s', textAlign: 'center' }}
+              aria-selected={strong}
+              onClick={() => {
+                if (on) onTapCurrent?.();
+                else ref.current?.scrollTo({ top: i * ROW, behavior: 'smooth' });
+              }}
+              style={{
+                display: 'block',
+                width: '100%',
+                height: ROW,
+                scrollSnapAlign: 'center',
+                fontFamily: "'Archivo Black', Mitr, sans-serif",
+                fontSize: strong ? 28 : 21,
+                lineHeight: `${ROW}px`,
+                color: strong ? 'var(--ink)' : it.tint ? 'var(--teal)' : 'rgba(13,30,29,.35)',
+                opacity: it.off ? 0.35 : 1,
+                textDecoration: it.off ? 'line-through' : undefined,
+                transition: 'font-size .15s, color .15s',
+                textAlign: 'center',
+                whiteSpace: 'nowrap',
+              }}
             >
-              {v}
+              {it.label}
             </button>
           );
         })}
@@ -515,110 +414,94 @@ function WheelPanel({
   mode,
   date,
   time,
-  onPick,
-  onCancel,
   disablePast,
   taken,
+  onPick,
+  commitRef,
 }: {
   mode: 'date' | 'time' | 'datetime';
   date: string;
   time: string;
-  onPick: (date: string, time: string) => void;
-  onCancel: () => void;
   disablePast?: boolean;
   taken?: string[];
+  onPick: (date: string, time: string) => void;
+  /** Filled with "keep what is on the wheels" — run on a tap outside. */
+  commitRef: { current: (() => void) | null };
 }) {
   const [today] = useState(todayIso);
-  const [view, setView] = useState(() => {
-    const [y, m] = (date || today).split('-').map(Number);
-    return { y, m: m - 1 };
+  const [ty, tm, td] = today.split('-').map(Number);
+  const [ymd, setYmd] = useState(() => {
+    const [y, m, d] = (date || today).split('-').map(Number);
+    return { y, m: m - 1, d };
   });
-  const [d, setD] = useState(date);
+  const [isSet, setIsSet] = useState(!!date);
   const [t, setT] = useState(() => {
     const [h0 = '09', m0 = '00'] = (time || '09:00').split(':');
-    return `${h0}:${pad(Math.min(55, Math.round(Number(m0) / 5) * 5))}`;
+    return `${pad(Math.min(23, Number(h0) || 0))}:${pad(Math.min(55, Math.round(Number(m0) / 5) * 5))}`;
   });
   const [h, mi] = t.split(':');
-
-  const first = new Date(view.y, view.m, 1).getDay();
-  const days = new Date(view.y, view.m + 1, 0).getDate();
-  const cells: (number | null)[] = [...Array<null>(first).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)];
-  const shift = (n: number) =>
-    setView((v) => {
-      const t2 = new Date(v.y, v.m + n, 1);
-      return { y: t2.getFullYear(), m: t2.getMonth() };
-    });
   const hasDate = mode !== 'time';
   const hasTime = mode !== 'date';
-  const needDate = hasDate && !d;
+  const iso = isoOf(ymd.y, ymd.m, ymd.d);
+
+  useEffect(() => {
+    commitRef.current = () => onPick(hasDate && isSet ? iso : '', t);
+  });
+
+  const pickDate = (y: number, m: number, d: number) => {
+    let next = { y, m, d: Math.min(d, daysIn(y, m)) };
+    if (disablePast && isoOf(next.y, next.m, next.d) < today) next = { y: ty, m: tm - 1, d: td };
+    setYmd(next);
+    setIsSet(true);
+  };
+  const toggleSet = () => setIsSet((v) => !v);
+
+  // Years: a few back and ahead, always including the value's own year.
+  const yFrom = Math.min(disablePast ? ty : ty - 5, ymd.y);
+  const yTo = Math.max(ty + 5, ymd.y);
+  const years = Array.from({ length: yTo - yFrom + 1 }, (_, i) => ({ v: String(yFrom + i), label: String(yFrom + i + 543), off: !!disablePast && yFrom + i < ty }));
+  const months = MONTHS.map((mo) => ({ ...mo, off: !!disablePast && (ymd.y < ty || (ymd.y === ty && Number(mo.v) < tm - 1)) }));
+  const days = Array.from({ length: daysIn(ymd.y, ymd.m) }, (_, i) => {
+    const di = isoOf(ymd.y, ymd.m, i + 1);
+    return { v: String(i + 1), label: String(i + 1), off: !!disablePast && di < today, tint: !!taken?.includes(di) };
+  });
+
   const summary =
-    mode === 'time' ? `${t} น.` : mode === 'date' ? (d ? fmtThaiDate(d) : 'แตะเลือกวันในปฏิทิน') : d ? `${fmtThaiDate(d)} · ${t} น.` : 'แตะเลือกวันด้านบนก่อน';
-  const circle = { width: 34, height: 34, borderRadius: '50%', background: 'var(--cream)', fontSize: 17 } as const;
+    mode === 'time' ? `${t} น.` : !isSet ? 'ยังไม่ได้เลือกวัน' : mode === 'date' ? fmtThaiDate(iso) : `${fmtThaiDate(iso)} · ${t} น.`;
 
   return (
     <div className="adm-dp" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1, paddingBottom: 0 }}>
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, scrollbarWidth: 'thin' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, scrollbarWidth: 'none' }}>
         {hasDate && (
-          <>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <b style={{ flex: 1, fontFamily: 'Mitr, sans-serif', fontWeight: 500, fontSize: 17 }}>
-                {TH_MONTH[view.m]} {view.y + 543}
-              </b>
+              <span className="adm-label" style={{ flex: 1 }}>
+                วัน · เดือน · ปี
+              </span>
               <button
                 type="button"
-                onClick={() => {
-                  const [y, m] = today.split('-').map(Number);
-                  setView({ y, m: m - 1 });
-                }}
-                style={{ height: 34, padding: '0 14px', borderRadius: 999, background: 'var(--cream)', fontSize: 12.5, fontWeight: 600 }}
+                onClick={() => pickDate(ty, tm - 1, td)}
+                style={{ height: 32, padding: '0 14px', borderRadius: 999, background: 'var(--cream)', fontSize: 12.5, fontWeight: 600 }}
               >
                 วันนี้
               </button>
-              <button type="button" onClick={() => shift(-1)} aria-label="เดือนก่อน" style={circle}>
-                ‹
-              </button>
-              <button type="button" onClick={() => shift(1)} aria-label="เดือนถัดไป" style={circle}>
-                ›
-              </button>
             </div>
-            <div className="adm-dp-wd" aria-hidden="true">
-              {TH_WD.map((w) => (
-                <span key={w}>{w}</span>
-              ))}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <WheelCol label="วัน" width={64} dim={!isSet} items={days} value={String(ymd.d)} onChange={(v) => pickDate(ymd.y, ymd.m, Number(v))} onTapCurrent={toggleSet} />
+              <WheelCol label="เดือน" width={84} dim={!isSet} items={months} value={String(ymd.m)} onChange={(v) => pickDate(ymd.y, Number(v), ymd.d)} onTapCurrent={toggleSet} />
+              <WheelCol label="ปี" width={88} dim={!isSet} items={years} value={String(ymd.y)} onChange={(v) => pickDate(Number(v), ymd.m, ymd.d)} onTapCurrent={toggleSet} />
             </div>
-            <div className="adm-dp-grid">
-              {cells.map((c, i) => {
-                if (c == null) return <span key={`e${i}`} />;
-                const iso = isoOf(view.y, view.m, c);
-                const on = iso === d;
-                const off = !!disablePast && iso < today;
-                return (
-                  <button
-                    key={iso}
-                    type="button"
-                    disabled={off}
-                    className={`adm-dp-day${on ? ' is-on' : ''}${iso === today ? ' is-today' : ''}`}
-                    aria-pressed={on}
-                    aria-label={fmtThaiDate(iso)}
-                    onClick={() => setD(iso)}
-                    style={off ? { opacity: 0.35, cursor: 'default' } : !on && taken?.includes(iso) ? { background: 'var(--teal-50)', color: 'var(--teal-deep)' } : undefined}
-                  >
-                    {c}
-                  </button>
-                );
-              })}
-            </div>
-          </>
+            {isSet && taken?.includes(iso) && <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--teal)', margin: 0 }}>วันนี้เลือกไว้แล้ว</p>}
+          </div>
         )}
         {hasTime && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, ...(hasDate ? { borderTop: '1px solid #eef0ef', paddingTop: 12 } : {}) }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, ...(hasDate ? { borderTop: '1px solid #eef0ef', paddingTop: 12 } : {}) }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
               <WheelCol label="ชั่วโมง" items={HOURS} value={h} onChange={(v) => setT(`${v}:${mi}`)} />
               <span style={{ fontFamily: "'Archivo Black', Mitr, sans-serif", fontSize: 28, color: 'var(--muted)' }}>:</span>
               <WheelCol label="นาที" items={MINS} value={mi} onChange={(v) => setT(`${h}:${v}`)} />
               <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--muted)' }}>น.</span>
             </div>
-            <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--muted)', marginTop: -6 }}>เลื่อนขึ้น–ลง หรือหมุนลูกกลิ้งเมาส์</p>
             {mode === 'time' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <span className="adm-label">เวลาที่ใช้บ่อย</span>
@@ -642,15 +525,13 @@ function WheelPanel({
             )}
           </div>
         )}
+        <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--muted)', margin: 0 }}>
+          เลื่อนขึ้น–ลง ลากด้วยเมาส์ หรือแตะตัวเลข{hasDate ? ' · แตะวันที่เลือกซ้ำเพื่อล้าง' : ''}
+        </p>
       </div>
       <div className="adm-dp-foot" style={{ flexShrink: 0, padding: '10px 0', borderTop: '1px solid #eef0ef', background: '#fff' }}>
-        <span style={needDate ? { color: '#a04a14' } : undefined}>{summary}</span>
-        <button type="button" className="adm-btn sm" onClick={onCancel}>
-          ยกเลิก
-        </button>
-        <button type="button" className="adm-btn sm teal" disabled={needDate} onClick={() => onPick(d, t)}>
-          ตกลง
-        </button>
+        <span style={hasDate && !isSet ? { color: '#a04a14' } : undefined}>{summary}</span>
+        <span style={{ fontSize: 11.5, color: 'var(--muted)', whiteSpace: 'nowrap', flex: 'none' }}>แตะนอกกล่องเพื่อเลือก</span>
       </div>
     </div>
   );
@@ -664,14 +545,12 @@ function PickField({
   clearable = true,
   placeholder,
   ariaLabel,
-  wheel,
   disablePast,
   taken,
 }: {
   mode: 'date' | 'time' | 'datetime';
   value: string;
   onChange: (v: string) => void;
-  wheel?: boolean;
   disablePast?: boolean;
   taken?: string[];
   invalid?: boolean;
@@ -680,6 +559,7 @@ function PickField({
   ariaLabel: string;
 }) {
   const [anchor, setAnchor] = useState<Anchor | null>(null);
+  const commitRef = useRef<(() => void) | null>(null);
   const [date = '', time = ''] = mode === 'time' ? ['', value] : (value || '').split('T');
   const label =
     mode === 'time'
@@ -700,7 +580,7 @@ function PickField({
         aria-haspopup="dialog"
         aria-expanded={!!anchor}
         className={`adm-select adm-pick-btn${anchor ? ' is-open' : ''}${invalid ? ' is-invalid' : ''}`}
-        onClick={(e) => setAnchor(anchorOf(e.currentTarget, 320, wheel ? (mode === 'datetime' ? 640 : 420) : mode === 'time' ? 300 : mode === 'date' ? 380 : 620))}
+        onClick={(e) => setAnchor(anchorOf(e.currentTarget, 320, mode === 'datetime' ? 520 : mode === 'time' ? 400 : 300))}
       >
         {mode === 'time' ? <ClockIcon /> : <CalIcon />}
         <span className={`adm-select-label${label ? '' : ' is-ph'}`}>{label || placeholder}</span>
@@ -711,32 +591,20 @@ function PickField({
         </button>
       )}
       {anchor && (
-        <Popover anchor={anchor} onClose={() => setAnchor(null)} role="dialog" label={ariaLabel}>
-          {wheel ? (
-            <WheelPanel
-              mode={mode}
-              date={date}
-              time={time}
-              disablePast={disablePast}
-              taken={taken}
-              onCancel={() => setAnchor(null)}
-              onPick={(d, t) => {
-                setAnchor(null);
-                onChange(mode === 'date' ? d : mode === 'time' ? t : `${d}T${t}`);
-              }}
-            />
-          ) : (
-          <PickerPanel
+        <Popover anchor={anchor} onClose={() => setAnchor(null)} onScrim={() => commitRef.current?.()} role="dialog" label={ariaLabel}>
+          <WheelPanel
             mode={mode}
             date={date}
             time={time}
-            onCancel={() => setAnchor(null)}
+            disablePast={disablePast}
+            taken={taken}
+            commitRef={commitRef}
             onPick={(d, t) => {
               setAnchor(null);
-              onChange(mode === 'date' ? d : mode === 'time' ? t : `${d}T${t}`);
+              const next = mode === 'date' ? d : mode === 'time' ? t : d ? `${d}T${t}` : '';
+              if (next !== (value || '')) onChange(next);
             }}
           />
-          )}
         </Popover>
       )}
     </div>
@@ -744,16 +612,16 @@ function PickField({
 }
 
 /** Date only — value "YYYY-MM-DD" (drop-in for DateField24 / <input type="date">). */
-export function PickDate({ value, onChange, placeholder = 'เลือกวันที่', wheel, disablePast, taken }: { value: string; onChange: (v: string) => void; placeholder?: string; className?: string; yearsAhead?: number; yearsBehind?: number; wheel?: boolean; disablePast?: boolean; taken?: string[] }) {
-  return <PickField mode="date" value={value} onChange={onChange} placeholder={placeholder} ariaLabel="วันที่" wheel={wheel} disablePast={disablePast} taken={taken} />;
+export function PickDate({ value, onChange, placeholder = 'เลือกวันที่', disablePast, taken }: { value: string; onChange: (v: string) => void; placeholder?: string; className?: string; yearsAhead?: number; yearsBehind?: number; wheel?: boolean; disablePast?: boolean; taken?: string[] }) {
+  return <PickField mode="date" value={value} onChange={onChange} placeholder={placeholder} ariaLabel="วันที่" disablePast={disablePast} taken={taken} />;
 }
 
 /** 24-hour time — value "HH:MM" (drop-in for TimeField24). */
-export function PickTime({ value, onChange, wheel }: { value: string; onChange: (v: string) => void; className?: string; wheel?: boolean }) {
-  return <PickField mode="time" value={value} onChange={onChange} placeholder="เลือกเวลา" ariaLabel="เวลา" clearable={false} wheel={wheel} />;
+export function PickTime({ value, onChange }: { value: string; onChange: (v: string) => void; className?: string; wheel?: boolean }) {
+  return <PickField mode="time" value={value} onChange={onChange} placeholder="เลือกเวลา" ariaLabel="เวลา" clearable={false} />;
 }
 
 /** Date + time — value "YYYY-MM-DDTHH:MM" (drop-in for DateTimePicker / DateTimeField24). */
-export function PickDateTime({ value, onChange, invalid, wheel, disablePast }: { value: string; onChange: (v: string) => void; invalid?: boolean; className?: string; wheel?: boolean; disablePast?: boolean }) {
-  return <PickField mode="datetime" value={value} onChange={onChange} invalid={invalid} placeholder="เลือกวันและเวลา" ariaLabel="วันและเวลา" wheel={wheel} disablePast={disablePast} />;
+export function PickDateTime({ value, onChange, invalid, disablePast }: { value: string; onChange: (v: string) => void; invalid?: boolean; className?: string; wheel?: boolean; disablePast?: boolean }) {
+  return <PickField mode="datetime" value={value} onChange={onChange} invalid={invalid} placeholder="เลือกวันและเวลา" ariaLabel="วันและเวลา" disablePast={disablePast} />;
 }

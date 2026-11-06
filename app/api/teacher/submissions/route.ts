@@ -22,6 +22,8 @@ export type SubmissionRow = {
   updated_at: string | null;
   /** Seats taken (not cancelled); any booking locks the activity for the host. */
   booked: number;
+  /** 1 when the host saved something (or, for rounds, touched a round) after admin last reviewed it. */
+  edited: number;
 };
 
 /** GET /api/teacher/submissions — the activities this host made, newest first. */
@@ -33,12 +35,15 @@ export async function GET() {
       .prepare(
         `SELECT 'single' AS kind, id, title, review_status, review_note, submitted_at, reviewed_at, pending_json,
                 status AS live_status, date, image_url, updated_at,
-                (SELECT COUNT(*) FROM bookings b WHERE b.workshop_id = workshops.id AND b.status != 'cancelled') AS booked
+                (SELECT COUNT(*) FROM bookings b WHERE b.workshop_id = workshops.id AND b.status != 'cancelled') AS booked,
+                CASE WHEN reviewed_at IS NOT NULL AND updated_at > reviewed_at THEN 1 ELSE 0 END AS edited
            FROM workshops WHERE created_by = ? AND master_id IS NULL AND review_status IS NOT NULL
          UNION ALL
          SELECT 'round' AS kind, id, title, review_status, review_note, submitted_at, reviewed_at, pending_json,
                 activity_status AS live_status, NULL AS date, cover_image_url AS image_url, updated_at,
-                (SELECT COUNT(*) FROM bookings b JOIN workshops r ON r.id = b.workshop_id WHERE r.master_id = workshop_masters.id AND b.status != 'cancelled') AS booked
+                (SELECT COUNT(*) FROM bookings b JOIN workshops r ON r.id = b.workshop_id WHERE r.master_id = workshop_masters.id AND b.status != 'cancelled') AS booked,
+                CASE WHEN reviewed_at IS NOT NULL AND (updated_at > reviewed_at
+                  OR EXISTS (SELECT 1 FROM workshops r WHERE r.master_id = workshop_masters.id AND r.updated_at > workshop_masters.reviewed_at)) THEN 1 ELSE 0 END AS edited
            FROM workshop_masters WHERE created_by = ? AND review_status IS NOT NULL
          ORDER BY updated_at DESC`,
       )
@@ -60,7 +65,8 @@ export async function POST(request: Request) {
     if (kind === 'single') {
       const body = await lockVenue(db, 'single', hostWorkshopBody(data as WorkshopBody, me.sub, null));
       if (!body.title?.trim()) return NextResponse.json({ error: 'กรุณากรอกชื่อกิจกรรม' }, { status: 400 });
-      if (!body.date) return NextResponse.json({ error: 'กรุณาเลือกวันที่จัดกิจกรรม' }, { status: 400 });
+      // A draft needs only its name; the date is checked when it is sent to admin.
+      body.date = body.date || '';
       await insertWorkshop(db, id, body);
       await db.prepare("UPDATE workshops SET created_by = ?, review_status = 'draft' WHERE id = ?").bind(me.sub, id).run();
     } else if (kind === 'round') {

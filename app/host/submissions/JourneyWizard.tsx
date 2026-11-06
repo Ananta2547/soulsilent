@@ -21,6 +21,7 @@ import { parseImageMeta } from '@/lib/image-meta';
 import { safeParseArray } from '@/lib/workshop-utils';
 import { parseTiers, type PriceTier } from '@/lib/pricing';
 import { ONLINE_VENUE } from '@/lib/online-platform';
+import { HostConfirm } from './HostConfirm';
 import type { ApplicationQuestion, ImageMeta, ScheduleDay, Workshop, WorkshopMaster } from '@/lib/types';
 
 export type WizardKind = 'single' | 'round';
@@ -272,6 +273,7 @@ export function JourneyWizard({
   initial,
   onClose,
   onSaved,
+  review,
 }: {
   /** null = start at the chooser. */
   kind: WizardKind | null;
@@ -281,6 +283,8 @@ export function JourneyWizard({
   onClose: (changed: boolean) => void;
   /** After any successful save (the list reloads). */
   onSaved: () => void;
+  /** Admin asked for changes and nothing was saved since — the note, to warn before sending again. */
+  review?: { note: string | null; unchanged: boolean };
 }) {
   const [kind, setKind] = useState<WizardKind | null>(kind0);
   const [s, setS] = useState<S>(() => (initial ? (kind0 === 'round' ? fromMaster(initial as WorkshopMaster) : fromWorkshop(initial as Workshop & Record<string, unknown>)) : blank()));
@@ -337,16 +341,17 @@ export function JourneyWizard({
   const dirty = !saved && JSON.stringify(s) !== baseline;
   const close = () => {
     if (busy) return;
-    if (dirty && !window.confirm('ยังไม่ได้บันทึก — ปิดแล้วข้อมูลที่กรอกจะหาย ปิดเลยไหม?')) return;
+    if (dirty) return setAsk(true);
     onClose(didSave);
   };
+  const [ask, setAsk] = useState(false);
   const closeRef = useRef(close);
   useEffect(() => {
     closeRef.current = close;
   });
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeRef.current();
+      if (e.key === 'Escape' && !document.querySelector('.adm-pop, [role="alertdialog"]')) closeRef.current();
     };
     window.addEventListener('keydown', on);
     return () => window.removeEventListener('keydown', on);
@@ -533,15 +538,11 @@ export function JourneyWizard({
   }
 
   /** Save as it is; `final` = the "บันทึกกิจกรรม" button (checks more, then shows SAVED). */
-  async function save(final: boolean) {
+  async function save(final: boolean): Promise<boolean | void> {
     if (!kind) return;
     if (!s.title.trim()) {
       flash('กรุณากรอกชื่อกิจกรรม', true);
       return go(0);
-    }
-    if (single && !id && !dateOk) {
-      flash('เลือกวันที่จัดก่อนบันทึก', true);
-      return go(1);
     }
     if (final && single && (timeErr || dateErr)) {
       flash(timeErr ? 'เวลาเริ่มต้องอยู่ก่อนเวลาจบ' : dateErr, true);
@@ -555,6 +556,13 @@ export function JourneyWizard({
     if ('error' in app) {
       flash(`ใบสมัคร: ${app.error}`, true);
       return go(3);
+    }
+    if (id && !dirty) {
+      if (final) {
+        setSaved(true);
+        bodyRef.current?.scrollTo({ top: 0 });
+      } else flash('ไม่มีอะไรเปลี่ยน — บันทึกไว้แล้ว');
+      return true;
     }
     setBusy(true);
     try {
@@ -588,6 +596,7 @@ export function JourneyWizard({
         setSaved(true);
         bodyRef.current?.scrollTo({ top: 0 });
       } else flash(d.waiting?.length ? `บันทึกแล้ว — รออนุมัติ: ${d.waiting.join(', ')}` : 'บันทึกแล้ว');
+      return true;
     } catch {
       flash('บันทึกไม่สำเร็จ', true);
     } finally {
@@ -595,8 +604,11 @@ export function JourneyWizard({
     }
   }
 
-  async function sendForReview() {
+  const [askResend, setAskResend] = useState(false);
+  async function sendForReview(force = false) {
     if (!id) return;
+    if (!force && review?.unchanged && !didSave) return setAskResend(true);
+    setAskResend(false);
     setBusy(true);
     try {
       const r = await fetch(`/api/teacher/submissions/single/${id}/submit`, { method: 'POST' });
@@ -814,10 +826,7 @@ export function JourneyWizard({
               <form
                 className="jw-form"
                 noValidate
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  save(true);
-                }}
+                onSubmit={(e) => e.preventDefault()}
               >
                 <nav className="jw-tabs" aria-label="ขั้นตอน" style={{ gridTemplateColumns: `repeat(${STEPS.length}, minmax(0, auto))` }}>
                   {STEPS.map(([key, label], i) => {
@@ -900,18 +909,18 @@ export function JourneyWizard({
                             {s.wtype === 'multi_part' ? (
                               <div className="adm-field">
                                 <span className="adm-field-label">เพิ่มวัน</span>
-                                <PickDate wheel disablePast taken={s.dates} value="" onChange={(v) => v && set({ dates: [...new Set([...s.dates, v])].sort() })} placeholder="กดเพื่อเลือกวัน" />
+                                <PickDate disablePast taken={s.dates} value="" onChange={(v) => v && set({ dates: [...new Set([...s.dates, v])].sort() })} placeholder="กดเพื่อเลือกวัน" />
                               </div>
                             ) : (
                               <>
                                 <div className="adm-field">
                                   <span className="adm-field-label">{s.wtype === 'one_day' ? 'วันที่จัด' : 'วันเริ่มต้น'}</span>
-                                  <PickDate wheel disablePast value={s.date} onChange={(v) => set({ date: v })} />
+                                  <PickDate disablePast value={s.date} onChange={(v) => set({ date: v })} />
                                 </div>
                                 {s.wtype === 'multi_day' && (
                                   <div className="adm-field">
                                     <span className="adm-field-label">วันสิ้นสุด</span>
-                                    <PickDate wheel disablePast value={s.endDate} onChange={(v) => set({ endDate: v })} />
+                                    <PickDate disablePast value={s.endDate} onChange={(v) => set({ endDate: v })} />
                                   </div>
                                 )}
                               </>
@@ -938,9 +947,9 @@ export function JourneyWizard({
                           <div className="adm-field">
                             <span className="adm-field-label">{s.wtype === 'one_day' ? 'เวลา (24 ชม.)' : 'เวลาของแต่ละวัน (24 ชม.)'}</span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                              <PickTime wheel value={s.tStart} onChange={(v) => set({ tStart: v })} />
+                              <PickTime value={s.tStart} onChange={(v) => set({ tStart: v })} />
                               <span style={{ color: 'var(--muted)' }}>–</span>
-                              <PickTime wheel value={s.tEnd} onChange={(v) => set({ tEnd: v })} />
+                              <PickTime value={s.tEnd} onChange={(v) => set({ tEnd: v })} />
                             </div>
                             {timeErr && (
                               <p className="jw-err" style={{ marginTop: 6 }}>
@@ -1068,18 +1077,18 @@ export function JourneyWizard({
                                       เอาออก
                                     </button>
                                   </div>
-                                  <div className="jw-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, alignItems: 'start' }}>
-                                    <div className="adm-field">
-                                      <label htmlFor="jw-promo">ราคาโปร</label>
-                                      <input id="jw-promo" type="number" min={0} className="is-white" value={s.promoPrice} onChange={(e) => set({ promoPrice: e.target.value })} placeholder="ปล่อยว่าง = ไม่มีโปร" />
-                                    </div>
+                                  <div className="adm-field" style={{ maxWidth: 260 }}>
+                                    <label htmlFor="jw-promo">ราคาโปร</label>
+                                    <input id="jw-promo" type="number" min={0} className="is-white" value={s.promoPrice} onChange={(e) => set({ promoPrice: e.target.value })} placeholder="ปล่อยว่าง = ไม่มีโปร" />
+                                  </div>
+                                  <div className="jw-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12, alignItems: 'start' }}>
                                     <div className="adm-field">
                                       <span className="adm-field-label">เริ่ม</span>
-                                      <PickDateTime wheel disablePast value={s.promoStart} onChange={(v) => set({ promoStart: v })} />
+                                      <PickDateTime disablePast value={s.promoStart} onChange={(v) => set({ promoStart: v })} />
                                     </div>
                                     <div className="adm-field">
                                       <span className="adm-field-label">สิ้นสุด</span>
-                                      <PickDateTime wheel disablePast value={s.promoEnd} onChange={(v) => set({ promoEnd: v })} />
+                                      <PickDateTime disablePast value={s.promoEnd} onChange={(v) => set({ promoEnd: v })} />
                                     </div>
                                   </div>
                                   {promoLive && (
@@ -1119,18 +1128,18 @@ export function JourneyWizard({
                               <p style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>
                                 กำหนดการคัดเลือก <span style={{ fontWeight: 400, color: 'var(--muted)' }}>· ประกาศผล → ยืนยันตัวจริง → ยืนยันตัวสำรอง</span>
                               </p>
-                              <div className="jw-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+                              <div className="jw-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
                                 <div className="adm-field">
                                   <span className="adm-field-label">ประกาศผลคัดเลือก</span>
-                                  <PickDateTime wheel disablePast value={s.announce} onChange={(v) => set({ announce: v })} />
+                                  <PickDateTime disablePast value={s.announce} onChange={(v) => set({ announce: v })} />
                                 </div>
                                 <div className="adm-field">
                                   <span className="adm-field-label">ยืนยันตัวจริง ภายใน</span>
-                                  <PickDateTime wheel disablePast value={s.confirmMain} onChange={(v) => set({ confirmMain: v })} />
+                                  <PickDateTime disablePast value={s.confirmMain} onChange={(v) => set({ confirmMain: v })} />
                                 </div>
                                 <div className="adm-field">
                                   <span className="adm-field-label">ยืนยันตัวสำรอง ภายใน</span>
-                                  <PickDateTime wheel disablePast value={s.confirmWait} onChange={(v) => set({ confirmWait: v })} />
+                                  <PickDateTime disablePast value={s.confirmWait} onChange={(v) => set({ confirmWait: v })} />
                                 </div>
                               </div>
                               {selErr && <p className="jw-err">{selErr}</p>}
@@ -1138,7 +1147,7 @@ export function JourneyWizard({
                           )}
                           <div className="adm-field" style={{ maxWidth: 320 }}>
                             <span className="adm-field-label">ปิดรับสมัคร</span>
-                            <PickDateTime wheel disablePast value={s.closeAt} onChange={(v) => set({ closeAt: v })} />
+                            <PickDateTime disablePast value={s.closeAt} onChange={(v) => set({ closeAt: v })} />
                             <p className="adm-hint">ไม่ใส่ = ปิดรับเมื่อกิจกรรมเริ่ม</p>
                           </div>
                         </>
@@ -1298,7 +1307,7 @@ export function JourneyWizard({
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 14 }}>
                               <input type="number" min={0} max={365} value={s.closeDays} onChange={(e) => set({ closeDays: e.target.value })} style={{ width: 90 }} placeholder="—" aria-label="จำนวนวัน" />
                               <span>วันก่อนวันกิจกรรม เวลา</span>
-                              <PickTime wheel value={s.closeTime} onChange={(v) => set({ closeTime: v })} />
+                              <PickTime value={s.closeTime} onChange={(v) => set({ closeTime: v })} />
                             </div>
                             <p className="adm-hint">
                               {cd === '' ? 'เปิดรับจองจนรอบเริ่ม' : `${Number(cd) === 0 ? 'ปิดรับจองวันกิจกรรม' : `ปิดรับจอง ${Number(cd)} วันก่อนวันกิจกรรม`} เวลา ${s.closeTime || '23:59'} น.`} · เว้นว่าง =
@@ -1326,7 +1335,7 @@ export function JourneyWizard({
                                 {s.schedule.map((it, i) => (
                                   <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                                     <div style={{ width: 150, flexShrink: 0 }}>
-                                      <PickTime wheel value={it.time} onChange={(v) => set({ schedule: s.schedule.map((x, j) => (j === i ? { ...x, time: v } : x)) })} />
+                                      <PickTime value={it.time} onChange={(v) => set({ schedule: s.schedule.map((x, j) => (j === i ? { ...x, time: v } : x)) })} />
                                     </div>
                                     <input
                                       type="text"
@@ -1405,11 +1414,11 @@ export function JourneyWizard({
                   <div style={{ flex: 1 }} />
                   {!phone && step === last && <span className="jw-hint">{missing.length ? `ยังขาด ${missing.length} อย่าง — บันทึกเป็นร่างได้` : 'ครบแล้ว'}</span>}
                   {step < last ? (
-                    <button type="button" className="jw-next" onClick={() => go(step + 1)}>
+                    <button key="next" type="button" className="jw-next" onClick={() => go(step + 1)}>
                       {phone ? 'ถัดไป →' : `ถัดไป · ${STEPS[step + 1][1]} →`}
                     </button>
                   ) : (
-                    <button type="submit" className="jw-save" disabled={busy}>
+                    <button key="save" type="button" className="jw-save" disabled={busy} onClick={() => save(true)}>
                       {busy ? 'กำลังบันทึก…' : 'บันทึกกิจกรรม ✓'}
                     </button>
                   )}
@@ -1464,7 +1473,7 @@ export function JourneyWizard({
                   <button
                     type="button"
                     className="adm-btn ink"
-                    onClick={sendForReview}
+                    onClick={() => sendForReview()}
                     disabled={busy || missing.length > 0}
                     title={missing.length ? `ยังขาด ${missing.map((m) => m.k).join(', ')}` : undefined}
                   >
@@ -1476,6 +1485,50 @@ export function JourneyWizard({
           )}
         </div>
       </section>
+      {ask && (
+        <HostConfirm
+          title="ยังไม่ได้บันทึก"
+          onClose={() => setAsk(false)}
+          actions={[
+            { label: 'กลับไปแก้ต่อ', tone: 'soft', onClick: () => setAsk(false) },
+            { label: 'ออกโดยไม่บันทึก', tone: 'danger', onClick: () => onClose(didSave) },
+            {
+              label: busy ? 'กำลังบันทึก…' : 'บันทึกร่างแล้วปิด',
+              tone: 'teal',
+              disabled: busy || !s.title.trim(),
+              onClick: async () => {
+                if (await save(false)) onClose(true);
+                else setAsk(false);
+              },
+            },
+          ]}
+        >
+          {s.title.trim() ? 'มีข้อมูลที่ยังไม่ได้บันทึก — จะบันทึกเป็นร่างไว้ก่อน หรือออกโดยทิ้งสิ่งที่แก้?' : 'มีข้อมูลที่ยังไม่ได้บันทึก — ใส่ชื่อกิจกรรมก่อนถึงจะบันทึกร่างได้ หรือออกโดยทิ้งสิ่งที่กรอก'}
+        </HostConfirm>
+      )}
+      {askResend && <ResendWarn note={review?.note ?? null} onClose={() => setAskResend(false)} onEdit={() => { setAskResend(false); setSaved(false); }} onSend={() => sendForReview(true)} busy={busy} />}
     </div>
+  );
+}
+
+/** Sending again after admin asked for changes, with nothing changed since. */
+export function ResendWarn({ note, onClose, onEdit, onSend, busy }: { note: string | null; onClose: () => void; onEdit: () => void; onSend: () => void; busy?: boolean }) {
+  return (
+    <HostConfirm
+      title="ยังไม่ได้แก้ตามที่ทีมงานขอ"
+      onClose={onClose}
+      actions={[
+        { label: 'ส่งต่อโดยไม่แก้', tone: 'soft', disabled: busy, onClick: onSend },
+        { label: 'ไปแก้ไข', tone: 'ink', onClick: onEdit },
+      ]}
+    >
+      <p style={{ margin: 0 }}>ตั้งแต่ทีมงานขอให้แก้ ยังไม่มีการบันทึกการแก้ไขในกิจกรรมนี้</p>
+      {note && (
+        <p style={{ margin: '10px 0 0', padding: '10px 14px', borderRadius: 14, background: '#fdf1d3', color: '#7a5200' }}>
+          <b>หมายเหตุจากทีมงาน:</b> {note}
+        </p>
+      )}
+      <p style={{ margin: '10px 0 0' }}>ถ้าแก้นอกระบบหรือคุยกับทีมงานแล้ว กด “ส่งต่อโดยไม่แก้” ได้</p>
+    </HostConfirm>
   );
 }

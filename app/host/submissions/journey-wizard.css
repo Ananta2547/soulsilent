@@ -178,3 +178,7 @@
 .jw-saved p { position: relative; font-size: 15px; line-height: 1.6; color: var(--muted); max-width: 440px; margin: 0; }
 .jw-saved-fun { position: relative; font-family: Caveat, Mitr, cursive; font-weight: 700; font-size: 24px; color: var(--teal); transform: rotate(-2deg); }
 .jw-saved-acts { position: relative; display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
+
+/* fields inside grids may shrink; a date-and-time field fills its cell */
+.jw-grid > .adm-field { min-width: 0; }
+.jw-grid .adm-pick.is-datetime { min-width: 0; width: 100%; }

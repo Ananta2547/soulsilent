@@ -15,11 +15,27 @@ export async function POST(_req: Request, { params }: { params: Promise<{ kind: 
     const table = kind === 'single' ? 'workshops' : 'workshop_masters';
     const db = await getDB();
     const row = await db
-      .prepare(`SELECT id, title, created_by, review_status, pending_json, ${kind === 'single' ? 'status' : 'activity_status'} AS s FROM ${table} WHERE id = ?`)
+      .prepare(`SELECT id, title, created_by, review_status, pending_json, ${kind === 'single' ? "status AS s, date, location_id, is_online, payment_type, price" : 'activity_status AS s, price_tiers_json AS price_tiers'} FROM ${table} WHERE id = ?`)
       .bind(id)
-      .first<{ id: string; title: string; created_by: string | null; review_status: string | null; pending_json: string | null; s: string }>();
+      .first<{ id: string; title: string; created_by: string | null; review_status: string | null; pending_json: string | null; s: string; date?: string | null; location_id?: string | null; is_online?: number | null; payment_type?: string | null; price?: number | null; price_tiers?: string | null }>();
     if (!row || row.created_by !== me.sub) return NextResponse.json({ error: 'ไม่พบกิจกรรม' }, { status: 404 });
     if (row.review_status === 'pending') return NextResponse.json({ error: 'ส่งให้ทีมตรวจแล้ว รอผลอยู่' }, { status: 400 });
+
+    // A draft can be saved half-done; sending it needs the essentials.
+    const lack: string[] = [];
+    if (!row.title?.trim()) lack.push('ชื่อกิจกรรม');
+    if (kind === 'single') {
+      if (!row.date) lack.push('วันที่จัด');
+      if (!row.is_online && !row.location_id) lack.push('สถานที่');
+      if (row.payment_type !== 'free' && !(Number(row.price) > 0)) lack.push('ราคา');
+    } else {
+      let tiers: unknown[] = [];
+      try {
+        tiers = JSON.parse(row.price_tiers || '[]') as unknown[];
+      } catch {}
+      if (!Array.isArray(tiers) || !tiers.length) lack.push('ราคาอย่างน้อย 1 แบบ');
+    }
+    if (lack.length) return NextResponse.json({ error: `ยังกรอกไม่ครบ: ${lack.join(', ')} — กดแก้ไขแล้วกรอกให้ครบก่อนส่ง` }, { status: 400 });
 
     const live = isLive(kind, kind === 'single' ? { status: row.s } : { activity_status: row.s });
     // A live activity is only sent again for the price / date edit that waits.

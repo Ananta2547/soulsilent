@@ -15,12 +15,12 @@ import type { Workshop, WorkshopMaster } from '@/lib/types';
 import type { VerificationRow, VerifyData } from '@/lib/verification-labels';
 import { VerifyPanel } from './VerifyPanel';
 import { PostponeModal } from './PostponeModal';
-import { JourneyWizard, type WizardKind } from './JourneyWizard';
+import { JourneyWizard, ResendWarn, type WizardKind } from './JourneyWizard';
 
 type Ver = { canPublish: boolean; verification: VerificationRow | null; prefill: Partial<VerifyData> };
 
 /** The create / edit wizard (design "Host Create Journey v4"); kind null = the chooser. */
-type Modal = { kind: WizardKind | null; id?: string; initial?: (Workshop & Record<string, unknown>) | WorkshopMaster | null } | null;
+type Modal = { kind: WizardKind | null; id?: string; initial?: (Workshop & Record<string, unknown>) | WorkshopMaster | null; review?: { note: string | null; unchanged: boolean } } | null;
 
 const TONE: Record<ReviewStatus, { bg: string; fg: string }> = {
   draft: { bg: '#eceeed', fg: '#4c5755' },
@@ -46,6 +46,7 @@ export default function HostSubmissionsPage() {
 
   const [ver, setVer] = useState<Ver | null>(null);
   const [moving, setMoving] = useState<string | null>(null);
+  const [resend, setResend] = useState<SubmissionRow | null>(null);
 
   const load = useCallback(() => {
     fetch('/api/teacher/verification')
@@ -72,13 +73,20 @@ export default function HostSubmissionsPage() {
       const r = await fetch(`/api/teacher/submissions/${s.kind}/${s.id}`);
       const d = (await r.json()) as { row?: Workshop | WorkshopMaster; error?: string };
       if (!r.ok || !d.row) return setNote(d.error || 'โหลดกิจกรรมไม่สำเร็จ');
-      setModal({ kind: s.kind, id: s.id, initial: d.row as (Workshop & Record<string, unknown>) | WorkshopMaster });
+      setModal({
+        kind: s.kind,
+        id: s.id,
+        initial: d.row as (Workshop & Record<string, unknown>) | WorkshopMaster,
+        review: s.review_status === 'changes_requested' ? { note: s.review_note, unchanged: !s.edited } : undefined,
+      });
     } finally {
       setBusy(null);
     }
   }
 
-  async function act(s: SubmissionRow, what: 'submit' | 'cancel') {
+  async function act(s: SubmissionRow, what: 'submit' | 'cancel', force = false) {
+    if (what === 'submit' && !force && s.review_status === 'changes_requested' && !s.edited) return setResend(s);
+    setResend(null);
     if (what === 'cancel' && !window.confirm(`ยกเลิก "${s.title}"? กิจกรรมจะถูกปิดไว้ (ไม่ได้ลบ) — เปิดใหม่ไม่ได้ ต้องสร้างใหม่`)) return;
     setBusy(s.id);
     setNote(null);
@@ -256,10 +264,24 @@ export default function HostSubmissionsPage() {
           kind={modal.kind}
           editingId={modal.id}
           initial={modal.initial}
+          review={modal.review}
           onSaved={load}
           onClose={(changed) => {
             setModal(null);
             if (changed) load();
+          }}
+        />
+      )}
+      {resend && (
+        <ResendWarn
+          note={resend.review_note}
+          busy={busy === resend.id}
+          onClose={() => setResend(null)}
+          onSend={() => act(resend, 'submit', true)}
+          onEdit={() => {
+            const r = resend;
+            setResend(null);
+            openEdit(r);
           }}
         />
       )}
