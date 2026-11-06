@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { Workshop } from '@/lib/types';
 import { getWorkshopDays, hasWorkshopEnded } from '@/lib/workshop-utils';
-import { IcoCal, IcoPin, PAY_PILL, Pill, SeatBar, TdbCalendar, TdbPager, dateOf, fmtLong, fmtMed, monthOf, todayYmd, type Month } from '@/components/teacher/tdb';
+import { IcoCal, IcoPin, PAY_PILL, Pill, REVIEW_PILL, SeatBar, TdbCalendar, TdbPager, dateOf, fmtLong, fmtMed, monthOf, todayYmd, type Month } from '@/components/teacher/tdb';
 
 type Row = Workshop & { booked: number; review_status?: string | null };
 type Kind = 'open' | 'ended' | 'cancelled';
@@ -21,13 +21,7 @@ const PILLS: Record<Kind, [string, string, string, string]> = {
   ended: ['จบแล้ว', '#6a7a78', '#f6f1e6', '#6a7a78'],
   cancelled: ['ยกเลิก', '#9a4a3f', '#f4dad4', '#9a4a3f'],
 };
-/** A host-made activity still with admin (api/teacher/submissions): its review state. */
-const REVIEW_PILL: Record<string, [string, string, string, string]> = {
-  pending: ['รออนุมัติ', '#7a5200', '#fdf1d3', '#c99a1c'],
-  draft: ['ร่าง', '#4c5755', '#eceeed', '#8a9593'],
-  changes_requested: ['ขอให้แก้', '#a04a14', '#fde7d3', '#a04a14'],
-  rejected: ['ไม่อนุมัติ', '#a3261a', '#fde4e1', '#a3261a'],
-};
+
 
 export default function TeacherWorkshopsPage() {
   const [rows, setRows] = useState<Row[] | null>(null);

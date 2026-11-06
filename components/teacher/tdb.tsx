@@ -174,6 +174,14 @@ export function SeatBar({ booked, max, soft, full }: { booked: number; max: numb
 }
 
 /** Status pill with its dot: [label, text colour, background, dot colour]. */
+/** A host-made activity still with admin (api/teacher/submissions): its review state. */
+export const REVIEW_PILL: Record<string, [string, string, string, string]> = {
+  pending: ['รออนุมัติ', '#7a5200', '#fdf1d3', '#c99a1c'],
+  draft: ['ร่าง', '#4c5755', '#eceeed', '#8a9593'],
+  changes_requested: ['ขอให้แก้', '#a04a14', '#fde7d3', '#a04a14'],
+  rejected: ['ไม่อนุมัติ', '#a3261a', '#fde4e1', '#a3261a'],
+};
+
 export function Pill({ s }: { s: [string, string, string, string] }) {
   return (
     <span className="tdb-pill" style={{ background: s[2], color: s[1] }}>

@@ -8,7 +8,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { Workshop, WorkshopMaster } from '@/lib/types';
-import { PAY_PILL, Pill, SeatBar, fmtShort, todayYmd } from '@/components/teacher/tdb';
+import { PAY_PILL, Pill, REVIEW_PILL, SeatBar, fmtShort, todayYmd } from '@/components/teacher/tdb';
 import { platformLabel } from '@/lib/online-platform';
 
 type Round = {
@@ -124,6 +124,9 @@ export default function TeacherSessionsPage() {
         <div className="tdb-grid">
           {shown.map(({ m, group, rep, ended, kind, days }) => {
             const image = m.cover_image_url;
+            const rv = (m as WorkshopMaster & { review_status?: string | null }).review_status;
+            const review = rv ? REVIEW_PILL[rv] : undefined;
+            const notLive = m.activity_status === 'draft';
             return (
               <Link key={m.id} href={`/host/sessions/${m.id}`} className="tdb-card">
                 <div className="tdb-poster" style={{ width: 124 }}>
@@ -132,8 +135,10 @@ export default function TeacherSessionsPage() {
                 </div>
                 <div className="tdb-card-body">
                   <div className="tdb-card-tags">
-                    <Pill s={PILLS[kind]} />
-                    {rep && PAY_PILL(data.payout[rep.id] === 'paid')}
+                    {/* not yet approved: the review state replaces เปิดรับ; a live one waiting on an edit shows both */}
+                    {!(review && notLive) && <Pill s={PILLS[kind]} />}
+                    {review && <Pill s={review} />}
+                    {rep && !notLive && PAY_PILL(data.payout[rep.id] === 'paid')}
                   </div>
                   <h3 className="tdb-card-title">{m.title}</h3>
                   {rep ? (
