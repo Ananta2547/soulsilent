@@ -11,7 +11,7 @@ import type { Workshop } from '@/lib/types';
 import { getWorkshopDays, hasWorkshopEnded } from '@/lib/workshop-utils';
 import { IcoCal, IcoPin, PAY_PILL, Pill, SeatBar, TdbCalendar, TdbPager, dateOf, fmtLong, fmtMed, monthOf, todayYmd, type Month } from '@/components/teacher/tdb';
 
-type Row = Workshop & { booked: number };
+type Row = Workshop & { booked: number; review_status?: string | null };
 type Kind = 'open' | 'ended' | 'cancelled';
 
 const PER_PAGE = 6;
@@ -20,6 +20,13 @@ const PILLS: Record<Kind, [string, string, string, string]> = {
   open: ['เปิดรับ', '#075a51', '#eaf6f4', '#0d8a7e'],
   ended: ['จบแล้ว', '#6a7a78', '#f6f1e6', '#6a7a78'],
   cancelled: ['ยกเลิก', '#9a4a3f', '#f4dad4', '#9a4a3f'],
+};
+/** A host-made activity still with admin (api/teacher/submissions): its review state. */
+const REVIEW_PILL: Record<string, [string, string, string, string]> = {
+  pending: ['รออนุมัติ', '#7a5200', '#fdf1d3', '#c99a1c'],
+  draft: ['ร่าง', '#4c5755', '#eceeed', '#8a9593'],
+  changes_requested: ['ขอให้แก้', '#a04a14', '#fde7d3', '#a04a14'],
+  rejected: ['ไม่อนุมัติ', '#a3261a', '#fde4e1', '#a3261a'],
 };
 
 export default function TeacherWorkshopsPage() {
@@ -160,6 +167,7 @@ export default function TeacherWorkshopsPage() {
                 const days = getWorkshopDays(w);
                 const isToday = k === 'open' && days.includes(today);
                 const paid = w.payout_status === 'paid';
+                const review = w.review_status ? REVIEW_PILL[w.review_status] : undefined;
                 const until = Math.round((dateOf(days[0]).getTime() - dateOf(today).getTime()) / 86400000);
                 const meta = k === 'open' ? (isToday ? 'กำลังจะเริ่ม' : until > 0 ? `อีก ${until} วัน` : 'กำลังดำเนินอยู่') : k === 'ended' ? (paid ? 'ปิดงานแล้ว' : 'รอทีมงานโอน') : 'ยกเลิกโดย Admin';
                 const cta = k === 'open' ? 'ผู้สมัคร / เช็คชื่อ' : k === 'ended' ? 'ดูสรุป' : 'รายละเอียด';
@@ -171,8 +179,10 @@ export default function TeacherWorkshopsPage() {
                     </div>
                     <div className="tdb-card-body">
                       <div className="tdb-card-tags">
-                        <Pill s={isToday ? ['วันนี้', '#0d1e1d', '#f5c243', '#0d1e1d'] : PILLS[k]} />
-                        {k !== 'cancelled' && PAY_PILL(paid)}
+                        {/* not yet approved: the review state replaces เปิดรับ; a live one waiting on an edit shows both */}
+                        {!(review && w.status === 'draft') && <Pill s={isToday ? ['วันนี้', '#0d1e1d', '#f5c243', '#0d1e1d'] : PILLS[k]} />}
+                        {review && k !== 'cancelled' && <Pill s={review} />}
+                        {k !== 'cancelled' && w.status !== 'draft' && PAY_PILL(paid)}
                       </div>
                       <h3 className="tdb-card-title">{w.title}</h3>
                       <div className="tdb-card-box">
