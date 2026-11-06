@@ -900,18 +900,18 @@ export function JourneyWizard({
                             {s.wtype === 'multi_part' ? (
                               <div className="adm-field">
                                 <span className="adm-field-label">เพิ่มวัน</span>
-                                <PickDate value="" onChange={(v) => v && set({ dates: [...new Set([...s.dates, v])].sort() })} placeholder="กดเพื่อเลือกวัน" />
+                                <PickDate wheel disablePast taken={s.dates} value="" onChange={(v) => v && set({ dates: [...new Set([...s.dates, v])].sort() })} placeholder="กดเพื่อเลือกวัน" />
                               </div>
                             ) : (
                               <>
                                 <div className="adm-field">
                                   <span className="adm-field-label">{s.wtype === 'one_day' ? 'วันที่จัด' : 'วันเริ่มต้น'}</span>
-                                  <PickDate value={s.date} onChange={(v) => set({ date: v })} />
+                                  <PickDate wheel disablePast value={s.date} onChange={(v) => set({ date: v })} />
                                 </div>
                                 {s.wtype === 'multi_day' && (
                                   <div className="adm-field">
                                     <span className="adm-field-label">วันสิ้นสุด</span>
-                                    <PickDate value={s.endDate} onChange={(v) => set({ endDate: v })} />
+                                    <PickDate wheel disablePast value={s.endDate} onChange={(v) => set({ endDate: v })} />
                                   </div>
                                 )}
                               </>
@@ -938,9 +938,9 @@ export function JourneyWizard({
                           <div className="adm-field">
                             <span className="adm-field-label">{s.wtype === 'one_day' ? 'เวลา (24 ชม.)' : 'เวลาของแต่ละวัน (24 ชม.)'}</span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                              <PickTime value={s.tStart} onChange={(v) => set({ tStart: v })} />
+                              <PickTime wheel value={s.tStart} onChange={(v) => set({ tStart: v })} />
                               <span style={{ color: 'var(--muted)' }}>–</span>
-                              <PickTime value={s.tEnd} onChange={(v) => set({ tEnd: v })} />
+                              <PickTime wheel value={s.tEnd} onChange={(v) => set({ tEnd: v })} />
                             </div>
                             {timeErr && (
                               <p className="jw-err" style={{ marginTop: 6 }}>
@@ -1075,11 +1075,11 @@ export function JourneyWizard({
                                     </div>
                                     <div className="adm-field">
                                       <span className="adm-field-label">เริ่ม</span>
-                                      <PickDateTime value={s.promoStart} onChange={(v) => set({ promoStart: v })} />
+                                      <PickDateTime wheel disablePast value={s.promoStart} onChange={(v) => set({ promoStart: v })} />
                                     </div>
                                     <div className="adm-field">
                                       <span className="adm-field-label">สิ้นสุด</span>
-                                      <PickDateTime value={s.promoEnd} onChange={(v) => set({ promoEnd: v })} />
+                                      <PickDateTime wheel disablePast value={s.promoEnd} onChange={(v) => set({ promoEnd: v })} />
                                     </div>
                                   </div>
                                   {promoLive && (
@@ -1122,15 +1122,15 @@ export function JourneyWizard({
                               <div className="jw-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
                                 <div className="adm-field">
                                   <span className="adm-field-label">ประกาศผลคัดเลือก</span>
-                                  <PickDateTime value={s.announce} onChange={(v) => set({ announce: v })} />
+                                  <PickDateTime wheel disablePast value={s.announce} onChange={(v) => set({ announce: v })} />
                                 </div>
                                 <div className="adm-field">
                                   <span className="adm-field-label">ยืนยันตัวจริง ภายใน</span>
-                                  <PickDateTime value={s.confirmMain} onChange={(v) => set({ confirmMain: v })} />
+                                  <PickDateTime wheel disablePast value={s.confirmMain} onChange={(v) => set({ confirmMain: v })} />
                                 </div>
                                 <div className="adm-field">
                                   <span className="adm-field-label">ยืนยันตัวสำรอง ภายใน</span>
-                                  <PickDateTime value={s.confirmWait} onChange={(v) => set({ confirmWait: v })} />
+                                  <PickDateTime wheel disablePast value={s.confirmWait} onChange={(v) => set({ confirmWait: v })} />
                                 </div>
                               </div>
                               {selErr && <p className="jw-err">{selErr}</p>}
@@ -1138,7 +1138,7 @@ export function JourneyWizard({
                           )}
                           <div className="adm-field" style={{ maxWidth: 320 }}>
                             <span className="adm-field-label">ปิดรับสมัคร</span>
-                            <PickDateTime value={s.closeAt} onChange={(v) => set({ closeAt: v })} />
+                            <PickDateTime wheel disablePast value={s.closeAt} onChange={(v) => set({ closeAt: v })} />
                             <p className="adm-hint">ไม่ใส่ = ปิดรับเมื่อกิจกรรมเริ่ม</p>
                           </div>
                         </>
@@ -1298,7 +1298,7 @@ export function JourneyWizard({
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 14 }}>
                               <input type="number" min={0} max={365} value={s.closeDays} onChange={(e) => set({ closeDays: e.target.value })} style={{ width: 90 }} placeholder="—" aria-label="จำนวนวัน" />
                               <span>วันก่อนวันกิจกรรม เวลา</span>
-                              <PickTime value={s.closeTime} onChange={(v) => set({ closeTime: v })} />
+                              <PickTime wheel value={s.closeTime} onChange={(v) => set({ closeTime: v })} />
                             </div>
                             <p className="adm-hint">
                               {cd === '' ? 'เปิดรับจองจนรอบเริ่ม' : `${Number(cd) === 0 ? 'ปิดรับจองวันกิจกรรม' : `ปิดรับจอง ${Number(cd)} วันก่อนวันกิจกรรม`} เวลา ${s.closeTime || '23:59'} น.`} · เว้นว่าง =
@@ -1326,7 +1326,7 @@ export function JourneyWizard({
                                 {s.schedule.map((it, i) => (
                                   <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                                     <div style={{ width: 150, flexShrink: 0 }}>
-                                      <PickTime value={it.time} onChange={(v) => set({ schedule: s.schedule.map((x, j) => (j === i ? { ...x, time: v } : x)) })} />
+                                      <PickTime wheel value={it.time} onChange={(v) => set({ schedule: s.schedule.map((x, j) => (j === i ? { ...x, time: v } : x)) })} />
                                     </div>
                                     <input
                                       type="text"
