@@ -389,7 +389,8 @@ function WheelCol({
                 width: '100%',
                 height: ROW,
                 scrollSnapAlign: 'center',
-                fontFamily: "'Archivo Black', Mitr, sans-serif",
+                fontFamily: "Mitr, 'IBM Plex Sans Thai', sans-serif",
+                fontWeight: 400,
                 fontSize: strong ? 28 : 21,
                 lineHeight: `${ROW}px`,
                 color: strong ? 'var(--ink)' : it.tint ? 'var(--teal)' : 'rgba(13,30,29,.35)',
@@ -498,7 +499,7 @@ function WheelPanel({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, ...(hasDate ? { borderTop: '1px solid #eef0ef', paddingTop: 12 } : {}) }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
               <WheelCol label="ชั่วโมง" items={HOURS} value={h} onChange={(v) => setT(`${v}:${mi}`)} />
-              <span style={{ fontFamily: "'Archivo Black', Mitr, sans-serif", fontSize: 28, color: 'var(--muted)' }}>:</span>
+              <span style={{ fontFamily: "Mitr, sans-serif", fontWeight: 300, fontSize: 28, color: 'var(--muted)' }}>:</span>
               <WheelCol label="นาที" items={MINS} value={mi} onChange={(v) => setT(`${h}:${v}`)} />
               <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--muted)' }}>น.</span>
             </div>
