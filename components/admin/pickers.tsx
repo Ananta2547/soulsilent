@@ -10,7 +10,7 @@
  * calls onChange with `{ target: { value } }`, so `onChange={(e) => …
  * e.target.value}` keeps working unchanged.
  */
-import { Children, Fragment, isValidElement, useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import { Children, Fragment, isValidElement, useEffect, useRef, useState, type PointerEvent, type ReactElement, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -423,6 +423,51 @@ function WheelCol({ label, items, value, onChange }: { label: string; items: str
     }, 90);
   };
 
+  // Mouse drag: hold the left button and move up/down to spin the column.
+  // Touch already scrolls natively, so only mouse pointers are handled.
+  const drag = useRef<{ y: number; top: number; moved: boolean } | null>(null);
+  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    const el = ref.current;
+    if (!el || e.pointerType !== 'mouse' || e.button !== 0) return;
+    drag.current = { y: e.clientY, top: el.scrollTop, moved: false };
+    el.style.scrollSnapType = 'none';
+    el.style.cursor = 'grabbing';
+  };
+  const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    const el = ref.current;
+    if (!d || !el) return;
+    const dy = e.clientY - d.y;
+    if (!d.moved && Math.abs(dy) > 3) {
+      // capture only once it is a real drag, so a plain click still hits the item
+      d.moved = true;
+      el.setPointerCapture(e.pointerId);
+    }
+    if (!d.moved) return;
+    el.scrollTop = d.top - dy;
+  };
+  const endDrag = (e: PointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    const el = ref.current;
+    if (!d || !el) return;
+    if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+    el.style.cursor = '';
+    if (!d.moved) {
+      // plain click: let the item's own onClick spin the column
+      el.style.scrollSnapType = 'y mandatory';
+      drag.current = null;
+      return;
+    }
+    const i = Math.min(items.length - 1, Math.max(0, Math.round(el.scrollTop / ROW)));
+    el.scrollTo({ top: i * ROW, behavior: 'smooth' });
+    // put snapping back once the glide has landed
+    setTimeout(() => {
+      if (ref.current) ref.current.style.scrollSnapType = 'y mandatory';
+    }, 350);
+    // a drag must not count as a click on the item under the pointer
+    setTimeout(() => (drag.current = null), 0);
+  };
+
   const mask = 'linear-gradient(180deg, transparent 0, #000 34%, #000 66%, transparent 100%)';
   return (
     <div style={{ position: 'relative', width: 84, height: ROW * 3 }}>
@@ -430,9 +475,19 @@ function WheelCol({ label, items, value, onChange }: { label: string; items: str
       <div
         ref={ref}
         onScroll={onScroll}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onClickCapture={(e) => {
+          if (drag.current?.moved) {
+            e.stopPropagation();
+            e.preventDefault();
+          }
+        }}
         role="listbox"
         aria-label={label}
-        style={{ position: 'relative', height: ROW * 3, overflowY: 'auto', scrollSnapType: 'y mandatory', scrollbarWidth: 'none', overscrollBehavior: 'contain', WebkitMaskImage: mask, maskImage: mask }}
+        style={{ position: 'relative', height: ROW * 3, overflowY: 'auto', cursor: 'grab', userSelect: 'none', touchAction: 'pan-y', scrollSnapType: 'y mandatory', scrollbarWidth: 'none', overscrollBehavior: 'contain', WebkitMaskImage: mask, maskImage: mask }}
       >
         <div style={{ height: ROW }} />
         {items.map((v, i) => {
