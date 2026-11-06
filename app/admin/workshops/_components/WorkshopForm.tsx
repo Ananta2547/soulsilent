@@ -748,6 +748,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
             />
           </div>
 
+          {!host && (
           <div>
             <label className="block text-sm font-medium text-dark mb-1">คำอธิบายสั้น</label>
             <input
@@ -756,6 +757,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
               className="input-field"
             />
           </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-dark mb-1">รายละเอียด</label>
@@ -790,6 +792,8 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
           </div>
           )}
 
+          {!host && (
+          <>
           {/* Category + tags */}
           <fieldset className="border border-gray-lighter rounded-xl p-4 bg-surface/40 space-y-4">
             <legend className="text-sm font-medium text-dark px-2">หมวด + แท็ก</legend>
@@ -852,6 +856,8 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
               )}
             </div>
           </fieldset>
+          </>
+          )}
         </SheetSection>
         <SheetSection n={2} title="รูปปก">
           <ImageUploader
@@ -1220,7 +1226,10 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
                   { v: 'free', label: 'ฟรี' },
                   { v: 'deposit', label: 'มัดจำ' },
                   { v: 'paid', label: 'เต็มจำนวน' },
-                ] as const).map((o) => (
+                ] as const)
+                  // A deposit is admin's call; hosts choose free or full price.
+                  .filter((o) => !host || o.v !== 'deposit')
+                  .map((o) => (
                   <button
                     key={o.v}
                     type="button"
@@ -1674,6 +1683,8 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
             </div>
           </fieldset>
         </SheetSection>
+        {/* Theme colour, short line, category and tags are admin's to set. */}
+        {!host && (
         <SheetSection n={3} title="สีธีม Calendar">
           {/* Theme color */}
           <div>
@@ -1730,6 +1741,7 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
             </div>
           </div>
         </SheetSection>
+        )}
       </div>
 
       <div className="adm-sticky-foot">

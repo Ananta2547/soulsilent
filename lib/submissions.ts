@@ -33,6 +33,14 @@ export function hostWorkshopBody(data: WorkshopBody, me: string, existing: Works
     master_id: null,
     photos_drive_url: existing?.photos_drive_url || null,
     status: existing?.status || 'draft',
+    // Admin's to set: the short line, category, tags and calendar colour.
+    short_description: existing?.short_description || '',
+    category: existing?.category || '',
+    tags: existing?.tags || [],
+    theme_color: existing?.theme_color || '',
+    // No deposit for hosts: a deposit activity stays one only if admin made it so.
+    payment_type: data.payment_type === 'deposit' && existing?.payment_type !== 'deposit' ? 'paid' : data.payment_type,
+    deposit_amount: data.payment_type === 'deposit' && existing?.payment_type === 'deposit' ? existing.deposit_amount : 0,
   };
 }
 
