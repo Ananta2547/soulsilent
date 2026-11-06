@@ -9,22 +9,18 @@
 import '@/app/admin/admin.css';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { AdminFormModal } from '@/components/admin/AdminFormModal';
-import { WorkshopForm, formValuesFromWorkshop, emptyWorkshopForm, type WorkshopFormValues } from '@/app/admin/workshops/_components/WorkshopForm';
-import { MasterForm } from '@/app/admin/workshop-info/_components/MasterForm';
 import { REVIEW_LABEL, GATED_LABEL, type ReviewStatus } from '@/lib/submission-labels';
 import type { SubmissionRow } from '@/app/api/teacher/submissions/route';
 import type { Workshop, WorkshopMaster } from '@/lib/types';
 import type { VerificationRow, VerifyData } from '@/lib/verification-labels';
 import { VerifyPanel } from './VerifyPanel';
 import { PostponeModal } from './PostponeModal';
+import { JourneyWizard, type WizardKind } from './JourneyWizard';
 
 type Ver = { canPublish: boolean; verification: VerificationRow | null; prefill: Partial<VerifyData> };
 
-type Modal =
-  | { kind: 'single'; id?: string; initial: WorkshopFormValues }
-  | { kind: 'round'; id?: string; initial: WorkshopMaster | null }
-  | null;
+/** The create / edit wizard (design "Host Create Journey v4"); kind null = the chooser. */
+type Modal = { kind: WizardKind | null; id?: string; initial?: (Workshop & Record<string, unknown>) | WorkshopMaster | null } | null;
 
 const TONE: Record<ReviewStatus, { bg: string; fg: string }> = {
   draft: { bg: '#eceeed', fg: '#4c5755' },
@@ -76,11 +72,7 @@ export default function HostSubmissionsPage() {
       const r = await fetch(`/api/teacher/submissions/${s.kind}/${s.id}`);
       const d = (await r.json()) as { row?: Workshop | WorkshopMaster; error?: string };
       if (!r.ok || !d.row) return setNote(d.error || 'โหลดกิจกรรมไม่สำเร็จ');
-      setModal(
-        s.kind === 'single'
-          ? { kind: 'single', id: s.id, initial: formValuesFromWorkshop(d.row as Workshop) }
-          : { kind: 'round', id: s.id, initial: d.row as WorkshopMaster },
-      );
+      setModal({ kind: s.kind, id: s.id, initial: d.row as (Workshop & Record<string, unknown>) | WorkshopMaster });
     } finally {
       setBusy(null);
     }
@@ -105,11 +97,6 @@ export default function HostSubmissionsPage() {
     }
   }
 
-  function saved(isNewRound: boolean) {
-    setModal(null);
-    load();
-    setNote(isNewRound ? 'บันทึกแล้ว — ต่อไปกด “จัดรอบ” เพื่อเพิ่มรอบ แล้วกลับมากด “ส่งให้ทีมตรวจ”' : 'บันทึกแล้ว');
-  }
 
   if (ver && !ver.canPublish) {
     return (
@@ -134,10 +121,10 @@ export default function HostSubmissionsPage() {
           <p className="tdb-lead">สร้างกิจกรรมเอง บันทึกเป็นร่าง แล้วส่งให้ทีมตรวจ — อนุมัติแล้วกิจกรรมจึงขึ้นบนเว็บ</p>
         </div>
         <div className="tdb-sub-new">
-          <button type="button" className="tdb-sub-btn ink" onClick={() => setModal({ kind: 'single', initial: emptyWorkshopForm })}>
+          <button type="button" className="tdb-sub-btn ink" onClick={() => setModal({ kind: 'single' })}>
             + กิจกรรมเดี่ยว
           </button>
-          <button type="button" className="tdb-sub-btn" onClick={() => setModal({ kind: 'round', initial: null })}>
+          <button type="button" className="tdb-sub-btn" onClick={() => setModal({ kind: 'round' })}>
             + กิจกรรมจองรอบ
           </button>
         </div>
@@ -263,23 +250,19 @@ export default function HostSubmissionsPage() {
         />
       )}
 
-      {/* The admin form styles (admin.css) are scoped to .adm. */}
-      <div className="adm adm-host-forms">
-        <AdminFormModal
-          eyebrow="host"
-          open={modal !== null}
-          title={modal?.id ? 'แก้ไขกิจกรรม' : modal?.kind === 'round' ? 'สร้างกิจกรรมจองรอบ' : 'สร้างกิจกรรมเดี่ยว'}
-          subtitle={modal?.kind === 'round' ? 'ข้อมูล ราคา และสถานที่ — เพิ่มรอบที่หน้า “จัดรอบ” หลังบันทึก' : 'บันทึกเป็นร่างก่อน แล้วกดส่งให้ทีมตรวจจากรายการ'}
-          onClose={() => setModal(null)}
-        >
-          {modal?.kind === 'single' && (
-            <WorkshopForm key={modal.id || 'new'} host initial={modal.initial} editingId={modal.id} onSuccess={() => saved(false)} onCancel={() => setModal(null)} />
-          )}
-          {modal?.kind === 'round' && (
-            <MasterForm key={modal.id || 'new'} host kind="round" initial={modal.initial} editingId={modal.id} onSuccess={() => saved(!modal.id)} onCancel={() => setModal(null)} />
-          )}
-        </AdminFormModal>
-      </div>
+      {modal && (
+        <JourneyWizard
+          key={modal.id || modal.kind || 'new'}
+          kind={modal.kind}
+          editingId={modal.id}
+          initial={modal.initial}
+          onSaved={load}
+          onClose={(changed) => {
+            setModal(null);
+            if (changed) load();
+          }}
+        />
+      )}
     </div>
   );
 }
