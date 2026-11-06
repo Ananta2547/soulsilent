@@ -1209,6 +1209,42 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
               </div>
             </div>
 
+            {/* The three selection dates sit together, right under the choice that needs them. */}
+            {form.admission_type === 'selection' && (
+              <div className="rounded-xl border border-primary/30 bg-primary/5 p-3">
+                <p className="text-xs font-semibold text-dark mb-2">กำหนดการคัดเลือก</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
+                  <div>
+                    <label className="block text-xs font-medium text-dark mb-1">ประกาศผลคัดเลือก</label>
+                    <DateTimePicker
+                      value={form.announce_at}
+                      onChange={(v) => setForm({ ...form, announce_at: v })}
+                      invalid={!!announceErr}
+                    />
+                    {announceErr && <p className="text-xs text-red-500 mt-1">⚠ {announceErr}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-dark mb-1">ยืนยันตัวจริง ภายใน</label>
+                    <DateTimePicker
+                      value={form.confirm_main_by}
+                      onChange={(v) => setForm({ ...form, confirm_main_by: v })}
+                      invalid={!!confirmMainErr}
+                    />
+                    {confirmMainErr && <p className="text-xs text-red-500 mt-1">⚠ {confirmMainErr}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-dark mb-1">ยืนยันตัวสำรอง ภายใน</label>
+                    <DateTimePicker
+                      value={form.confirm_waitlist_by}
+                      onChange={(v) => setForm({ ...form, confirm_waitlist_by: v })}
+                      invalid={!!confirmWaitErr}
+                    />
+                    {confirmWaitErr && <p className="text-xs text-red-500 mt-1">⚠ {confirmWaitErr}</p>}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="max-w-[320px]">
               <label className="block text-sm font-medium text-dark mb-1">ปิดรับสมัคร</label>
               <DateTimePicker value={form.close_at} onChange={(v) => setForm({ ...form, close_at: v })} invalid={!!closeErr} />
@@ -1253,38 +1289,6 @@ export function WorkshopForm({ initial, editingId, onSuccess, onCancel, onDirtyC
                 </div>
               )}
             </div>
-
-            {form.admission_type === 'selection' && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 items-start">
-                <div>
-                  <label className="block text-xs font-medium text-dark mb-1">ประกาศผลคัดเลือก</label>
-                  <DateTimePicker
-                    value={form.announce_at}
-                    onChange={(v) => setForm({ ...form, announce_at: v })}
-                    invalid={!!announceErr}
-                  />
-                  {announceErr && <p className="text-xs text-red-500 mt-1">⚠ {announceErr}</p>}
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-dark mb-1">ยืนยันตัวจริง ภายใน</label>
-                  <DateTimePicker
-                    value={form.confirm_main_by}
-                    onChange={(v) => setForm({ ...form, confirm_main_by: v })}
-                    invalid={!!confirmMainErr}
-                  />
-                  {confirmMainErr && <p className="text-xs text-red-500 mt-1">⚠ {confirmMainErr}</p>}
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-dark mb-1">ยืนยันตัวสำรอง ภายใน</label>
-                  <DateTimePicker
-                    value={form.confirm_waitlist_by}
-                    onChange={(v) => setForm({ ...form, confirm_waitlist_by: v })}
-                    invalid={!!confirmWaitErr}
-                  />
-                  {confirmWaitErr && <p className="text-xs text-red-500 mt-1">⚠ {confirmWaitErr}</p>}
-                </div>
-              </div>
-            )}
 
           </fieldset>
         </SheetSection>
