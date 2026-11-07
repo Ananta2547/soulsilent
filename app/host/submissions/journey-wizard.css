@@ -182,3 +182,6 @@
 /* fields inside grids may shrink; a date-and-time field fills its cell */
 .jw-grid > .adm-field { min-width: 0; }
 .jw-grid .adm-pick.is-datetime { min-width: 0; width: 100%; }
+
+/* a checkbox row inside .adm-field: the field label rule (display: block) must not stack it */
+.adm-field label.adm-inline-check { display: flex; }
